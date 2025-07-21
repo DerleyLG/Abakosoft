@@ -29,7 +29,7 @@ Este proyecto es una plataforma web desarrollada para facilitar la gestión de i
 ### 🔧 Requisitos previos
 
 - Node.js y npm instalados
-- MongoDB local o en la nube (cuando se conecte)
+- Mysql local o en la nube (cuando se conecte)
 - Git
 
 ### 🖥️ Clonar el repositorio
