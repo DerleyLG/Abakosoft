@@ -3,19 +3,27 @@ const detalleOrdenFabricacionModel = require('../models/detalleOrdenFabricacionM
 const inventarioModel = require('../models/inventarioModel');
 
 module.exports = {
-getAll: async (req, res) => {
-  try {
-    const estados = req.query.estados
-      ? req.query.estados.split(',').map(e => e.trim().replace('_', ' '))
-      : ['pendiente', 'en proceso', 'completada'];
+ getAll: async (req, res) => {
+    try {
+      const { estados } = req.query; 
 
-    const ordenes = await ordenesFabricacionModel.getAll(estados);
-    res.json(ordenes);
-  } catch (error) {
-    console.error('Error en getAll:', error);
-    res.status(500).json({ error: 'Error al obtener las órdenes de fabricación.' });
-  }
-},
+      let estadosToFilter = [];
+      if (estados) {
+        estadosToFilter = estados.split(','); 
+      } else {
+        
+        estadosToFilter = ['pendiente', 'en proceso', 'completada'];
+      }
+
+    
+      const ordenes = await ordenesFabricacionModel.getAll(estadosToFilter);
+
+      res.status(200).json(ordenes);
+    } catch (error) {
+      console.error("Error al obtener órdenes de fabricación:", error);
+      res.status(500).json({ error: "Error interno del servidor al obtener órdenes de fabricación." });
+    }
+  },
 
   getById: async (req, res) => {
     try {

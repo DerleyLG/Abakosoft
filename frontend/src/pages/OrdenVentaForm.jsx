@@ -305,13 +305,13 @@ const OrdenVentaForm = () => {
   <button
     type="button"
     onClick={() => navigate("/ordenes_venta")}
-    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition"
+    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-300 transition cursor-pointer" 
   >
     Cancelar
   </button>
   <button
     type="submit"
-    className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition"
+    className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition cursor-pointer"
   >
     Guardar
   </button>

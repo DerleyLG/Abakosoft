@@ -75,8 +75,8 @@ const ListaAvances = () => {
             onClick={() => setMostrarPagados(!mostrarPagados)}
             className={`px-4 py-2 rounded-md font-semibold transition ${
               mostrarPagados
-                ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                : 'bg-gray-300 hover:bg-gray-400 text-gray-800'
+                ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'
+                : 'bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer'
             }`}
           >
             {mostrarPagados ? 'Ver no pagados' : 'Ver pagados'}
@@ -84,7 +84,7 @@ const ListaAvances = () => {
 
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
           >
             <FiArrowLeft />
             Volver

@@ -2,6 +2,7 @@ const AvanceModel = require('../models/avanceEtapasModel');
 const db = require('../database/db');
  const inventarioModel = require('../models/inventarioModel');
  const detalleOrdenFabricacionModel = require('../models/detalleOrdenFabricacionModel');
+const LoteModel = require ('../models/lotesFabricadosModel');
 
 async function exists(table, key, id) {
   if (typeof id === 'undefined') {
@@ -88,10 +89,10 @@ const cantidadNumerica = parseInt(cantidad);
 
 const totalAcumulado = cantidadRegistradaAntes + cantidadNumerica;
 
-console.log(`🔢 Cantidad total esperada en orden: ${cantidadTotal}`);
-console.log(`🔄 Cantidad ya registrada en esta etapa (antes de este avance): ${cantidadRegistradaAntes}`);
-console.log(`➕ Cantidad que se está registrando: ${cantidad}`);
-console.log(`🧮 Total acumulado (registrado + actual): ${totalAcumulado}`);
+console.log(`Cantidad total esperada en orden: ${cantidadTotal}`);
+console.log(`Cantidad ya registrada en esta etapa (antes de este avance): ${cantidadRegistradaAntes}`);
+console.log(`Cantidad que se está registrando: ${cantidad}`);
+console.log(`Total acumulado (registrado + actual): ${totalAcumulado}`);
 
 const estado = totalAcumulado >= cantidadTotal ? 'completado' : 'en proceso';
 
@@ -119,19 +120,25 @@ const estado = totalAcumulado >= cantidadTotal ? 'completado' : 'en proceso';
     }
 
     // Si es la etapa final del cliente, registrar en lotes
-    if (id_etapa_produccion === etapaFinalCliente) {
-      await db.query(`
-        INSERT INTO lotes_fabricados 
-        (id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        id_orden_fabricacion,
-        id_articulo,
-        id_trabajador,
-        cantidad,
-        observaciones || null
-      ]);
-    }
+     if (id_etapa_produccion === etapaFinalCliente) {
+          await LoteModel.createLote({
+          id_orden_fabricacion,
+          id_articulo,
+          id_trabajador,
+          cantidad,
+          observaciones: observaciones || null
+        });
+        
+        try {
+          await inventarioModel.agregarActualizarInventario(id_articulo, cantidad);
+          console.log(`Stock actualizado para artículo ${id_articulo} (lote fabricado): +${cantidad}`);
+        } catch (err) {
+          console.error(`Error actualizando stock para artículo ${id_articulo} al crear lote:`, err.message);
+          // Opcional: Podrías decidir si esto debería detener la operación o solo loguear el error.
+          // Por ahora, solo loguea y permite que la operación continúe.
+        }
+     
+      }
 
     // Cambiar estado de la orden si es necesario
     const estadoActual = await AvanceModel.getEstadoOrden(id_orden_fabricacion);
@@ -141,23 +148,7 @@ const estado = totalAcumulado >= cantidadTotal ? 'completado' : 'en proceso';
 
     await AvanceModel.checkearSiOrdenCompleta(id_orden_fabricacion);
 
-    const estadoFinal = await AvanceModel.getEstadoOrden(id_orden_fabricacion);
-
-    if (estadoFinal === 'completada') {
-      const detalles = await detalleOrdenFabricacionModel.getById(id_orden_fabricacion);
-
-      for (const detalle of detalles) {
-        const { id_articulo, cantidad } = detalle;
-        try {
-          await inventarioModel.agregarActualizarInventario(id_articulo, cantidad);
-          console.log(` Stock actualizado para artículo ${id_articulo}: +${cantidad}`);
-        } catch (err) {
-          console.error(` Error actualizando stock para artículo ${id_articulo}:`, err.message);
-        }
-      }
-
-      console.log(` Inventario actualizado tras completar la orden #${id_orden_fabricacion}`);
-    }
+    
 
     res.status(201).json({ message: 'Avance registrado correctamente', id: insertId });
 

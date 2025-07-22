@@ -10,7 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { FiDollarSign } from 'react-icons/fi';
+import { FiDollarSign, FiCreditCard } from 'react-icons/fi';
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 
@@ -84,6 +84,13 @@ const Sidebar = ({ isOpen }) => {
         </NavLink>
 
         <NavLink
+          to="/trabajadores/pagos"
+          className="flex items-center gap-2 p-2 rounded hover:bg-slate-800"
+        >
+          <FiCreditCard size={20} /> Pagos
+        </NavLink>
+
+        <NavLink
           to="/inventario"
           className="flex items-center gap-2 p-2 rounded hover:bg-slate-800"
         >
@@ -91,7 +98,7 @@ const Sidebar = ({ isOpen }) => {
         </NavLink>
 
         {/* Órdenes con submenú */}
-        <div>
+        <div >
           <button
             onClick={() => setOrdenesOpen(!ordenesOpen)}
             className="w-full flex items-center justify-between gap-2 p-2 rounded hover:bg-slate-700 text-gray-300"
@@ -100,7 +107,7 @@ const Sidebar = ({ isOpen }) => {
               <ClipboardList size={20} />
               Órdenes
             </div>
-            {ordenesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            {ordenesOpen ? <ChevronDown size={16} className='cursor-pointer' /> : <ChevronRight size={16} className='cursor-pointer'/>}
           </button>
 
           {ordenesOpen && (

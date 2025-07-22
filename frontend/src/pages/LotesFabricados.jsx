@@ -4,14 +4,13 @@ import api from "../services/api";
 import {  FiTrash2,FiPlus, FiArrowLeft } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-
+import { confirmAlert } from 'react-confirm-alert';
 
 const ListaLotesFabricacion = () => {
   const [lotes, setLotes] = useState([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchLotes = async () => {
+ const fetchLotes = async () => {
       try {
         const res = await api.get("/lotes-fabricados");
         setLotes(res.data);
@@ -21,8 +20,33 @@ const ListaLotesFabricacion = () => {
       }
     };
 
+  useEffect(() => {
+ 
     fetchLotes();
   }, []);
+
+ const handleDelete = (id) => {
+    confirmAlert({
+      title: 'Confirmar eliminación',
+      message: '¿Seguro que quieres eliminar este lote?',
+      buttons: [
+        {
+          label: 'Sí',
+          onClick: async () => {
+            try {
+              await api.delete(`/lotes-fabricados/${id}`);
+              toast.success('Lote eliminado');
+              fetchLotes();
+            } catch (error) {
+              console.error('Error eliminando Lote', error);
+              toast.error('Error al eliminar el Lote');
+            }
+          },
+        },
+        { label: 'No', onClick: () => {} },
+      ],
+    });
+  };
 
   return (
     <div className="p-6">
@@ -59,8 +83,8 @@ const ListaLotesFabricacion = () => {
             </tr>
           </thead>
           <tbody>
-            {lotes.map((lote, idx) => (
-              <tr key={idx} className="hover:bg-slate-300 select-none">
+            {lotes.map((lote) => (
+              <tr key={lote.id_lote} className="hover:bg-slate-300 select-none">
                <td className="px-4 py-2 ">
   #{lote.id_orden_fabricacion} - {lote.nombre_cliente || "Sin cliente"}
 </td>
@@ -75,7 +99,7 @@ const ListaLotesFabricacion = () => {
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          eliminarOrden(orden.id_orden_fabricacion);
+                                          handleDelete(lote.id_lote);
                                         }}
                                         className="text-red-600 hover:text-red-400 transition"
                                         title="Eliminar orden"

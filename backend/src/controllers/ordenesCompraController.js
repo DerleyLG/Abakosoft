@@ -43,12 +43,13 @@ const getOrdenCompraById = async (req, res) => {
 // Crear una nueva orden de compra
 async function createOrdenCompra(req, res) {
   try {
-    const { id_proveedor, categoria_costo, id_orden_fabricacion, items } = req.body;
+    const { id_proveedor, categoria_costo, id_orden_fabricacion, estado, items } = req.body;
 
     if (!id_proveedor || !id_orden_fabricacion || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Faltan datos obligatorios' });
     }
-
+const estadosValidos = ['pendiente', 'completada', 'cancelada'];
+    const estadoFinal = estadosValidos.includes(estado) ? estado : 'pendiente';
     // Agrupar artículos por descripcion_articulo sumando las cantidades
     const itemsMap = new Map();
 
@@ -70,7 +71,7 @@ async function createOrdenCompra(req, res) {
     }
 
     // Crear la orden de compra (cabecera) UNA SOLA VEZ
-    const ordenId = await ordenCompras.create(id_proveedor, categoria_costo, id_orden_fabricacion);
+    const ordenId = await ordenCompras.create(id_proveedor, categoria_costo, id_orden_fabricacion, estadoFinal);
 
     if (!ordenId) {
       return res.status(500).json({ message: 'Error al crear la orden de compra' });

@@ -9,6 +9,8 @@ const CrearOrdenCompra = () => {
     const [ordenesFabricacion, setOrdenesFabricacion] = useState([]);
   const [categoriaCosto, setCategoriaCosto] = useState('');
   const [idOrdenFabricacion, setIdOrdenFabricacion] = useState('');
+  const [estado, setEstado] = useState('pendiente');
+
   const [items, setItems] = useState([
     { descripcion_articulo: '', cantidad: '', precio: '' }
   ]);
@@ -31,7 +33,7 @@ const CrearOrdenCompra = () => {
    useEffect(() => {
     const fetchOrdenesFabricacion = async () => {
       try {
-        const res = await api.get('/ordenes_fabricacion');
+        const res = await api.get('/ordenes-fabricacion');
         setOrdenesFabricacion(res.data);
       } catch (error) {
         console.error('Error cargando órdenes de fabricación', error);
@@ -90,6 +92,8 @@ const CrearOrdenCompra = () => {
       id_proveedor: parseInt(idProveedor),
       categoria_costo: categoriaCosto.trim(),
       id_orden_fabricacion: parseInt(idOrdenFabricacion),
+      estado,
+
       items: items.map(({ descripcion_articulo, cantidad, precio }) => ({
         descripcion_articulo: descripcion_articulo.trim(),
         cantidad: Number(cantidad),
@@ -98,7 +102,7 @@ const CrearOrdenCompra = () => {
     };
 
     try {
-      await api.post('/ordenes_compra', dataEnviar);
+      await api.post('/ordenes-compra', dataEnviar);
       toast.success('Orden de compra creada correctamente', {
         duration: 4000,
         style: {
@@ -171,6 +175,23 @@ const CrearOrdenCompra = () => {
               className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
             />
           </div>
+{/* Estado de la orden */}
+<div>
+  <label htmlFor="estado" className="block text-sm font-semibold text-gray-700 mb-1">
+    Estado de la Orden <span className="text-red-500">*</span>
+  </label>
+  <select
+    id="estado"
+    value={estado}
+    onChange={(e) => setEstado(e.target.value)}
+    required
+    className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+  >
+    <option value="pendiente">Pendiente</option>
+    <option value="completada">Completada</option>
+    <option value="cancelada">Cancelada</option>
+  </select>
+</div>
 
           {/* Id orden fabricación */}
           <div>
@@ -187,7 +208,7 @@ const CrearOrdenCompra = () => {
               <option value="">-- Seleccione una orden de fabricación --</option>
               {ordenesFabricacion.map((orden) => (
                 <option key={orden.id_orden_fabricacion} value={orden.id_orden_fabricacion}>
-                  {`#${orden.id_orden_fabricacion} - ${orden.descripcion || orden.estado || ''}`}
+                  {`#${orden.id_orden_fabricacion} - ${orden.descripcion || orden.nombre_cliente || ''}`}
                 </option>
               ))}
             </select>

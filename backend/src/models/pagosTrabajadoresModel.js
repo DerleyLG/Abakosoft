@@ -9,13 +9,8 @@ getAll: async () => {
       p.id_pago,
       p.id_trabajador,
       t.nombre AS trabajador,
-      p.es_anticipo,
-      
-      CASE 
-        WHEN p.es_anticipo = 1 THEN p.monto_total
-        ELSE IFNULL(SUM(d.subtotal), 0)
-      END AS total,
       p.fecha_pago,
+      p.monto_total as total,
       p.observaciones
     FROM pagos_trabajadores p
     JOIN trabajadores t ON p.id_trabajador = t.id_trabajador
@@ -36,7 +31,6 @@ getAll: async () => {
          p.id_pago,
          p.id_trabajador,
          t.nombre AS trabajador,
-         p.es_anticipo,
          p.monto_total,
          p.fecha_pago,
          p.observaciones
@@ -49,12 +43,12 @@ getAll: async () => {
   },
 
   // Crear un nuevo pago
-  create: async ({ id_trabajador, es_anticipo, monto_total, observaciones }) => {
+  create: async ({ id_trabajador, monto_total, observaciones }) => {
     const [result] = await db.query(
       `INSERT INTO pagos_trabajadores
-         (id_trabajador, es_anticipo, monto_total, observaciones)
-       VALUES (?, ?, ?, ?)`,
-      [id_trabajador, es_anticipo, monto_total,  observaciones]
+         (id_trabajador, monto_total, observaciones)
+       VALUES (?, ?, ?)`,
+      [id_trabajador, monto_total,  observaciones]
     );
     return result.insertId;
   },
@@ -77,12 +71,12 @@ calcularMonto: async (id_pago) => {
 
 
   // Actualizar un pago existente
-  update: async (id, { id_trabajador, es_anticipo, monto_total,  observaciones }) => {
+  update: async (id, { id_trabajador, monto_total,  observaciones }) => {
     await db.query(
       `UPDATE pagos_trabajadores
-       SET id_trabajador = ?, es_anticipo = ?, monto_total = ?,  observaciones = ?
+       SET id_trabajador = ? , monto_total = ?,  observaciones = ?
        WHERE id_pago = ?`,
-      [id_trabajador, es_anticipo, monto_total,  observaciones, id]
+      [id_trabajador, monto_total,  observaciones, id]
     );
   },
  updateMontoTotal: async (id_pago, monto_total) => {
