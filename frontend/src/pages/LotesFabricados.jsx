@@ -101,7 +101,7 @@ const ListaLotesFabricacion = () => {
                                           e.stopPropagation();
                                           handleDelete(lote.id_lote);
                                         }}
-                                        className="text-red-600 hover:text-red-400 transition"
+                                        className="text-red-600 hover:text-red-400 transition cursor-pointer"
                                         title="Eliminar orden"
                                       >
                                         <FiTrash2 size={18} />

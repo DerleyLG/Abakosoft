@@ -17,6 +17,9 @@ const TIPOS_ORIGEN_MOVIMIENTO = {
 };
 
 module.exports = {
+    TIPOS_MOVIMIENTO,
+    TIPOS_ORIGEN_MOVIMIENTO,
+
     obtenerInventarioPorArticulo: async (id_articulo) => {
         const [rows] = await db.query('SELECT * FROM inventario WHERE id_articulo = ?', [id_articulo]);
         console.log(`Resultado de obtenerInventarioPorArticulo para id_articulo ${id_articulo}:`, rows[0]);
