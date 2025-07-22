@@ -25,21 +25,19 @@ getAll: async (estadoQueryParam) => {
     `, estadosToFilter); // Aquí pasamos el array de estados para la consulta SQL
     return rows;
   },
-
-  getById: async (id) => {
-    const [rows] = await db.query('SELECT * FROM pedidos WHERE id_pedido = ?', [id]);
-    return rows[0];
-  },
-
-  create: async ({ id_cliente, estado, observaciones}) => {
-    const [result] = await db.query(
-      `INSERT INTO pedidos (id_cliente, estado, observaciones)
-       VALUES (?, ?,?)`,
-      [id_cliente,  estado, observaciones]
+ create: async ({ id_cliente, estado, observaciones }, connection = db) => {
+    const [result] = await (connection || db).query(
+      `INSERT INTO pedidos (id_cliente, estado, observaciones) VALUES (?, ?, ?)`,
+      [id_cliente, estado, observaciones || null]
     );
     return result.insertId;
   },
 
+  getById: async (id, connection = db) => { // Acepta 'connection' opcional
+    const [rows] = await (connection || db).query('SELECT * FROM pedidos WHERE id_pedido = ?', [id]);
+    return rows[0] || null;
+  },
+  
 update: async (id, { id_cliente, estado, observaciones }) => {
   
   const [result] = await db.query(

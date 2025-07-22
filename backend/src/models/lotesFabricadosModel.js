@@ -26,12 +26,12 @@ module.exports = {
  getById: async (id) => {
   const [rows] = await db.query(`
 SELECT * FROM lotes_fabricados WHERE id_orden = ?
-  `, [id_pago]);
+  `, [id]);
   return rows;
 },
 
-createLote: async ({ id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones }) => {
-    const [result] = await db.query(
+createLote: async ({ id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones }, connection = db) => {
+    const [result] = await (connection || db).query( // Usa la conexión pasada o db por defecto
       `INSERT INTO lotes_fabricados 
        (id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones)
        VALUES (?, ?, ?, ?, ?)`,

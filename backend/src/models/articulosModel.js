@@ -16,13 +16,11 @@ const Articulo = {
   return rows;
   },
 
-  async getById(id) {
-    const [rows] = await db.query(
-      "SELECT * FROM articulos WHERE id_articulo = ?",
-      [id]
-    );
-    return rows[0];
+ getById: async (id, connection = db) => { // Acepta 'connection' opcional
+    const [rows] = await (connection || db).query('SELECT * FROM articulos WHERE id_articulo = ?', [id]);
+    return rows[0] || null;
   },
+  
   async create({referencia,descripcion,precio_venta, precio_costo, id_categoria}) {
     const [result] = await db.query(
       "INSERT INTO articulos (referencia, descripcion, precio_venta, id_categoria, precio_costo) VALUES (?, ?, ?, ?, ?)",

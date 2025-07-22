@@ -7,11 +7,10 @@ const db = require("../database/db");
 const ESTADOS_VALIDOS = ["pendiente", "completado", "cancelado"];
 
 module.exports = {
- getAll: async (req, res) => {
+  getAll: async (req, res) => {
     try {
       const { estado } = req.query; 
 
-    
       const pedidos = await pedidoModel.getAll(estado);
       
       res.status(200).json(pedidos);
@@ -37,85 +36,79 @@ module.exports = {
   },
 
   create: async (req, res) => {
+    let connection; // Para la transacción
     try {
       const { id_cliente, estado, observaciones, detalles } = req.body;
 
-      // Validaciones
-      const cliente = await clienteModel.getById(id_cliente);
+      // --- INICIO DE TRANSACCIÓN ---
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Validaciones iniciales
+      const cliente = await clienteModel.getById(id_cliente, connection); // Pasamos la conexión
       if (!cliente) {
-        return res.status(400).json({ error: "Cliente no encontrado." });
+        throw new Error("Cliente no encontrado."); // Lanzamos error para que la transacción se revierta
       }
 
       if (!ESTADOS_VALIDOS.includes(estado)) {
-        return res.status(400).json({ error: `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}` });
+        throw new Error(`Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`);
       }
 
       if (!Array.isArray(detalles) || detalles.length === 0) {
-        return res.status(400).json({ error: "Debe incluir al menos un detalle." });
+        throw new Error("Debe incluir al menos un detalle.");
       }
 
-      // Validar detalles
+      // Validar detalles y obtener precios antes de crear el pedido
       for (const detalle of detalles) {
         const { id_articulo, cantidad } = detalle;
-  const articuloExistente = await articuloModel.getById(id_articulo);
-      if (!articuloExistente) {
-        return res.status(400).json({
-          error: `El artículo con ID ${id_articulo} no existe.`,
-        });
-      }
-
-      const [inventarioRow] = await db.query(
-        "SELECT stock FROM inventario WHERE id_articulo = ?",
-        [id_articulo]
-      );
-
-      if (inventarioRow.length === 0) {
-        return res.status(400).json({
-          error: `No hay inventario registrado para el artículo ${articuloExistente.descripcion}.`,
-        });
-      }
-
-
-      const precio_unitario = articuloExistente.precio_venta;
-      if (precio_unitario == null) {
-        return res.status(400).json({
-          error: `El artículo con ID ${id_articulo} no tiene precio de venta definido.`,
-        });
-      }
-    
-        const articulo = await articuloModel.getById(id_articulo);
-        if (!articulo) {
-          return res.status(400).json({ error: `Artículo con ID ${id_articulo} no encontrado.` });
+        const articuloExistente = await articuloModel.getById(id_articulo, connection); // Pasamos la conexión
+        if (!articuloExistente) {
+          throw new Error(`El artículo con ID ${id_articulo} no existe.`);
         }
+
+        // --- ELIMINADA LA VALIDACIÓN DE INVENTARIO AQUÍ ---
+        // La validación de si el artículo está en inventario y la opción de agregarlo
+        // con stock 0 se maneja completamente en el frontend (OrdenPedidoForm.jsx).
+        // El backend asume que si el pedido llega aquí, el artículo ya está en 'inventario'
+        // o el usuario decidió no agregarlo y asume el riesgo.
+        // --- FIN DE LA ELIMINACIÓN ---
 
         if (cantidad <= 0) {
-          return res.status(400).json({ error: `Cantidad inválida para el artículo ${articulo.descripcion}.` });
+          throw new Error(`Cantidad inválida para el artículo ${articuloExistente.descripcion}.`);
         }
 
-        if (articulo.precio_venta == null) {
-          return res.status(400).json({ error: `El artículo ${articulo.descripcion} no tiene precio de venta definido.` });
+        if (articuloExistente.precio_venta == null) {
+          throw new Error(`El artículo ${articuloExistente.descripcion} no tiene precio de venta definido.`);
         }
+        // Asignar el precio_unitario del artículo existente al detalle
+        detalle.precio_unitario = articuloExistente.precio_venta;
       }
 
-      // Crear pedido
-      const id_pedido = await pedidoModel.create({ id_cliente, estado, observaciones });
+      // Crear pedido (pasando la conexión)
+      const id_pedido = await pedidoModel.create({ id_cliente, estado, observaciones }, connection);
 
+      // Crear cada detalle de pedido (pasando la conexión)
       for (const detalle of detalles) {
-        const { id_articulo, cantidad, observaciones } = detalle;
-        const articulo = await articuloModel.getById(id_articulo);
         await detallePedidoModel.create({
           id_pedido,
-          id_articulo,
-          cantidad,
-          observaciones: observaciones || "",
-          precio_unitario: articulo.precio_venta
-        });
+          id_articulo: detalle.id_articulo,
+          cantidad: detalle.cantidad,
+          observaciones: detalle.observaciones || "",
+          precio_unitario: detalle.precio_unitario // Usamos el precio ya asignado
+        }, connection);
       }
+
+      await connection.commit(); // Confirmar la transacción
+      connection.release(); // Liberar la conexión
 
       res.status(201).json({ message: "Pedido creado correctamente.", id_pedido });
     } catch (err) {
+      if (connection) {
+        await connection.rollback(); // Revertir la transacción en caso de error
+        connection.release(); // Liberar la conexión
+      }
       console.error("Error al crear el pedido:", err);
-      res.status(500).json({ error: "Error al crear el pedido." });
+      res.status(500).json({ error: err.message || "Error al crear el pedido." });
     }
   },
 
@@ -167,12 +160,11 @@ module.exports = {
       if (!pedido) {
         return res.status(404).json({ error: "Pedido no encontrado." });
       }
-console.log("Estado pedido:", pedido.estado);
+      console.log("Estado pedido:", pedido.estado);
 
       if (pedido.estado.toLowerCase().trim() !== "pendiente") {
-  return res.status(400).json({ error: "Solo se pueden anular pedidos pendientes." });
-}
-
+        return res.status(400).json({ error: "Solo se pueden anular pedidos pendientes." });
+      }
 
       await pedidoModel.update(id, { estado: "cancelado" });
 

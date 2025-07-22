@@ -6,9 +6,9 @@ const Cliente = {
     return rows;
   },
 
-  async getById(id) {
-    const [rows] = await db.query('SELECT * FROM clientes WHERE id_cliente = ?', [id]);
-    return rows[0];
+ getById: async (id, connection = db) => { // Acepta 'connection' opcional
+    const [rows] = await (connection || db).query('SELECT * FROM clientes WHERE id_cliente = ?', [id]);
+    return rows[0] || null;
   },
 
   async create({ nombre, identificacion, telefono, direccion, ciudad, departamento }) {

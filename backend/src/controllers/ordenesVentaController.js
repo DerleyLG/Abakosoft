@@ -2,18 +2,21 @@ const ordenModel = require("../models/ordenesVentaModel");
 const detalleOrdenModel = require("../models/detalleOrdenVentaModel");
 const clienteModel = require("../models/clientesModel");
 const articuloModel = require("../models/articulosModel");
+const inventarioModel = require("../models/inventarioModel"); // Importamos el modelo de inventario
 const db = require("../database/db");
 
-async function clienteExists(id_cliente) {
-  const [rows] = await db.query(
+// Función auxiliar para verificar existencia de cliente
+async function clienteExists(id_cliente, connection = db) {
+  const [rows] = await (connection || db).query(
     "SELECT 1 FROM clientes WHERE id_cliente = ? LIMIT 1",
     [id_cliente]
   );
   return rows.length > 0;
 }
 
-async function ordenExists(id_orden_venta) {
-  const [rows] = await db.query(
+// Función auxiliar para verificar existencia de orden de venta
+async function ordenExists(id_orden_venta, connection = db) {
+  const [rows] = await (connection || db).query(
     "SELECT 1 FROM ordenes_venta WHERE id_orden_venta = ? LIMIT 1",
     [id_orden_venta]
   );
@@ -36,6 +39,7 @@ module.exports = {
       const data = await ordenModel.getAll(estados);
       res.json(data);
     } catch (err) {
+      console.error("Error al obtener órdenes de venta:", err);
       res.status(500).json({ error: "Error al obtener órdenes de venta." });
     }
   },
@@ -46,192 +50,281 @@ module.exports = {
       const orden = await ordenModel.getById(id);
       if (!orden)
         return res.status(404).json({ error: "Orden de venta no encontrada." });
-      res.json(orden);
+      
+      // Obtener los detalles de la orden de venta
+      const detalles = await detalleOrdenModel.getByVenta(id); // Asumiendo que getByVenta existe en detalleOrdenModel
+      res.json({ ...orden, detalles }); // Devolver la orden con sus detalles
     } catch (err) {
+      console.error("Error al obtener la orden:", err);
       res.status(500).json({ error: "Error al obtener la orden." });
     }
   },
 
   create: async (req, res) => {
-  try {
-    const { id_cliente, estado, fecha, detalles } = req.body;
+    let connection; // Para la transacción
+    try {
+      const { id_cliente, estado, fecha, detalles } = req.body;
 
-    // Validar cliente
-    const clienteExistente = await clienteModel.getById(id_cliente);
-    if (!clienteExistente) {
-      return res
-        .status(400)
-        .json({ error: "El cliente especificado no existe." });
-    }
+      console.log("[OrdenVentaController] Inicio de la creación de la orden de venta.");
+      console.log("[OrdenVentaController] Datos recibidos en el body:", req.body);
 
-    // Validar estado
-    const ESTADOS_VALIDOS = ["pendiente", "anulada", "completada"];
-    if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
-      return res.status(400).json({
-        error: `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`,
-      });
-    }
+      // --- INICIO DE TRANSACCIÓN GLOBAL ---
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+      console.log("[OrdenVentaController] Transacción iniciada.");
 
-    // Validar fecha
-    if (!fecha || isNaN(Date.parse(fecha))) {
-      return res
-        .status(400)
-        .json({ error: "Fecha inválida o no proporcionada." });
-    }
+      // Validar cliente
+      const clienteExistente = await clienteModel.getById(id_cliente, connection); // Pasamos la conexión
+      if (!clienteExistente) {
+        throw new Error("El cliente especificado no existe.");
+      }
+      console.log("[OrdenVentaController] Cliente validado.");
 
-    // Validar detalles
-    if (!Array.isArray(detalles) || detalles.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Debe incluir al menos un detalle." });
-    }
+      // Validar estado
+      if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
+        throw new Error(`Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`);
+      }
+      console.log("[OrdenVentaController] Estado validado.");
 
-    // 🔍 Validar cada detalle antes de crear la orden
-    for (const detalle of detalles) {
-      const { id_articulo, cantidad } = detalle;
+      // Validar fecha
+      if (!fecha || isNaN(Date.parse(fecha))) {
+        throw new Error("Fecha inválida o no proporcionada.");
+      }
+      console.log("[OrdenVentaController] Fecha validada.");
 
-      const articuloExistente = await articuloModel.getById(id_articulo);
-      if (!articuloExistente) {
-        return res.status(400).json({
-          error: `El artículo con ID ${id_articulo} no existe.`,
+      // Validar detalles
+      if (!Array.isArray(detalles) || detalles.length === 0) {
+        throw new Error("Debe incluir al menos un detalle.");
+      }
+      console.log("[OrdenVentaController] Detalles validados.");
+
+      // 🔍 Validar cada detalle y stock antes de crear la orden
+      for (const detalle of detalles) {
+        const { id_articulo, cantidad } = detalle;
+        console.log(`[OrdenVentaController] Validando detalle para artículo ${id_articulo}, cantidad ${cantidad}`);
+
+        const articuloExistente = await articuloModel.getById(id_articulo, connection); // Pasamos la conexión
+        if (!articuloExistente) {
+          throw new Error(`El artículo con ID ${id_articulo} no existe.`);
+        }
+        console.log(`[OrdenVentaController] Artículo ${id_articulo} existe.`);
+
+        // Obtener stock disponible del inventario
+        const inventarioArticulo = await inventarioModel.obtenerInventarioPorArticulo(id_articulo, connection); // Pasamos la conexión
+        
+        if (!inventarioArticulo || inventarioArticulo.stock < cantidad) {
+          throw new Error(`Stock insuficiente para el artículo ${articuloExistente.descripcion}. Stock disponible: ${inventarioArticulo?.stock || 0}, solicitado: ${cantidad}`);
+        }
+        console.log(`[OrdenVentaController] Stock suficiente para artículo ${id_articulo}.`);
+
+        const precio_unitario = articuloExistente.precio_venta;
+        if (precio_unitario == null) {
+          throw new Error(`El artículo con ID ${id_articulo} no tiene precio de venta definido.`);
+        }
+        // Asignar el precio_unitario del artículo existente al detalle
+        detalle.precio_unitario = precio_unitario;
+        console.log(`[OrdenVentaController] Precio unitario asignado para artículo ${id_articulo}.`);
+      }
+      console.log("[OrdenVentaController] Todas las validaciones de detalles y stock pasaron.");
+
+      // Todas las validaciones pasaron, crea la orden de venta
+      console.log("[OrdenVentaController] Intentando crear la orden de venta en el modelo...");
+      const id_orden_venta = await ordenModel.create({
+        id_cliente,
+        estado,
+        fecha,
+      }, connection); // Pasamos la conexión
+      console.log(`[OrdenVentaController] Orden de venta creada con ID: ${id_orden_venta}`);
+
+      // Crear detalles y descontar stock
+      for (const detalle of detalles) {
+        const { id_articulo, cantidad } = detalle; // No se espera 'observaciones' en el detalle del frontend
+        console.log(`[OrdenVentaController] Procesando detalle para artículo ${id_articulo} (cantidad: ${cantidad})`);
+
+        // 1. Descontar stock del inventario
+        try {
+            console.log(`[OrdenVentaController] Descontando stock para artículo ${id_articulo}...`);
+            await inventarioModel.processInventoryMovement({
+                id_articulo: Number(id_articulo),
+                cantidad_movida: Number(cantidad),
+                tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.SALIDA,
+                tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.VENTA,
+                observaciones: `Salida por orden de venta #${id_orden_venta}`,
+                referencia_documento_id: id_orden_venta,
+                referencia_documento_tipo: 'orden_venta',
+            }, connection); // Pasamos la conexión para que processInventoryMovement use la misma transacción
+            console.log(`[OrdenVentaController] Stock descontado para artículo ${id_articulo}.`);
+        } catch (inventoryError) {
+            console.error(`[OrdenVentaController] Error al descontar stock para artículo ${id_articulo}:`, inventoryError.message);
+            throw new Error(`Stock insuficiente para el artículo ${detalle.descripcion} (ID: ${id_articulo}). Error: ${inventoryError.message}`);
+        }
+
+        // 2. Crear el detalle de la orden de venta
+        console.log(`[OrdenVentaController] Preparando datos para detalle de orden de venta para artículo ${id_articulo}:`, {
+            id_orden_venta,
+            id_articulo: detalle.id_articulo,
+            cantidad: detalle.cantidad,
+            observaciones: '',
+            precio_unitario: detalle.precio_unitario,
         });
+        try {
+            await detalleOrdenModel.create({
+              id_orden_venta,
+              id_articulo: detalle.id_articulo,
+              cantidad: detalle.cantidad,
+              observaciones: '', // Se pasa string vacío para evitar NOT NULL si el frontend no lo envía
+              precio_unitario: detalle.precio_unitario,
+            }, connection); // Pasamos la conexión
+            console.log(`[OrdenVentaController] Detalle de orden de venta creado para artículo ${id_articulo}.`);
+        } catch (detailError) {
+            console.error(`[OrdenVentaController] ERROR CRÍTICO al crear detalle de orden de venta para artículo ${id_articulo}:`, detailError); // Log completo del error
+            throw new Error(`Error al crear detalle para artículo ${detalle.descripcion} (ID: ${id_articulo}). Detalle: ${detailError.message}`);
+        }
       }
 
-      const [inventarioRow] = await db.query(
-        "SELECT stock FROM inventario WHERE id_articulo = ?",
-        [id_articulo]
-      );
+      console.log("[OrdenVentaController] Intentando COMMIT de la transacción...");
+      await connection.commit(); // Confirmar la transacción
+      connection.release(); // Liberar la conexión
+      console.log("[OrdenVentaController] Transacción COMITADA y conexión liberada.");
 
-      if (inventarioRow.length === 0) {
-        return res.status(400).json({
-          error: `No hay inventario registrado para el artículo ${articuloExistente.descripcion}.`,
-        });
-      }
-
-      const stockDisponible = inventarioRow[0].stock;
-
-      if (cantidad > stockDisponible) {
-        return res.status(400).json({
-          error: `Stock insuficiente para el artículo ${articuloExistente.descripcion}. Stock disponible: ${stockDisponible}, solicitado: ${cantidad}`,
-        });
-      }
-
-      const precio_unitario = articuloExistente.precio_venta;
-      if (precio_unitario == null) {
-        return res.status(400).json({
-          error: `El artículo con ID ${id_articulo} no tiene precio de venta definido.`,
-        });
-      }
-    }
-
-    // Todas las validaciones pasaron, crea la orden
-    const id_orden_venta = await ordenModel.create({
-      id_cliente,
-      estado,
-      fecha,
-    });
-
-    for (const detalle of detalles) {
-      const { id_articulo, cantidad } = detalle;
-
-      const articulo = await articuloModel.getById(id_articulo);
-      const precio_unitario = articulo.precio_venta;
-
-      await detalleOrdenModel.create({
+      return res.status(201).json({
+        message: "Orden de venta creada con sus detalles y stock descontado.",
         id_orden_venta,
-        id_articulo,
-        cantidad,
-        precio_unitario,
       });
-
-      // Descontar stock
-      await db.query(
-        "UPDATE inventario SET stock = stock - ? WHERE id_articulo = ?",
-        [cantidad, id_articulo]
-      );
+    } catch (error) {
+      if (connection) {
+        console.log("[OrdenVentaController] Error detectado. Intentando ROLLBACK de la transacción...");
+        await connection.rollback(); // Revertir la transacción en caso de error
+        connection.release(); // Liberar la conexión
+        console.log("[OrdenVentaController] Transacción ROLLEADA y conexión liberada.");
+      }
+      console.error("Detalles del error al crear orden de venta:", {
+        message: error.message,
+        stack: error.stack,
+        body: req.body,
+      });
+      return res
+        .status(500)
+        .json({ error: error.message || "Error al crear la orden de venta." });
     }
-
-    return res.status(201).json({
-      message: "Orden de venta creada con sus detalles.",
-      id_orden_venta,
-    });
-  } catch (error) {
-    console.error("Detalles del error:", {
-      message: error.message,
-      stack: error.stack,
-      body: req.body,
-    });
-    return res
-      .status(500)
-      .json({ error: "Error al crear la orden de venta." });
-  }
-},
-
+  },
 
   update: async (req, res) => {
+    let connection;
     try {
       const id = +req.params.id;
       const { id_cliente, estado } = req.body;
 
-      if (!(await ordenExists(id))) {
-        return res.status(404).json({ error: "Orden de venta no encontrada." });
+      // Iniciar transacción para actualizar la orden y posiblemente ajustar stock si el estado cambia
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      const ordenActual = await ordenModel.getById(id, connection);
+      if (!ordenActual) {
+        throw new Error("Orden de venta no encontrada.");
       }
 
+      // Validaciones
       if (!id_cliente || !estado) {
-        return res.status(400).json({ error: "Faltan campos obligatorios." });
+        throw new Error("Faltan campos obligatorios.");
       }
-
-      if (!(await clienteExists(id_cliente))) {
-        return res.status(400).json({ error: "Cliente no existe." });
+      if (!(await clienteExists(id_cliente, connection))) {
+        throw new Error("Cliente no existe.");
       }
-
       if (!ESTADOS_VALIDOS.includes(estado)) {
-        return res.status(400).json({
-          error: `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(
-            ", "
-          )}.`,
-        });
+        throw new Error(`Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}.`);
       }
 
-      const updatedRows = await ordenModel.update(id, { id_cliente, estado });
-
-      if (updatedRows === 0) {
-        // No se actualizó porque la orden no estaba pendiente
-        return res
-          .status(400)
-          .json({
-            error: "Solo se pueden actualizar órdenes en estado pendiente.",
-          });
+      // Lógica de ajuste de stock si el estado cambia a 'anulada'
+      if (ordenActual.estado !== 'anulada' && estado === 'anulada') {
+        // Si la orden pasa de cualquier estado a 'anulada', reintegrar el stock
+        const detalles = await detalleOrdenModel.getByVenta(id, connection); // Obtener detalles con la misma conexión
+        for (const detalle of detalles) {
+          await inventarioModel.processInventoryMovement({
+            id_articulo: detalle.id_articulo,
+            cantidad_movida: detalle.cantidad,
+            tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA, // Reintegrar stock
+            tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.DEVOLUCION_CLIENTE, // O un tipo específico para anulación
+            observaciones: `Reintegro por anulación de orden de venta #${id}`,
+            referencia_documento_id: id,
+            referencia_documento_tipo: 'anulacion_orden_venta',
+          }, connection); // Pasamos la conexión
+          console.log(`Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`);
+        }
       }
 
+      const updatedRows = await ordenModel.update(id, { id_cliente, estado }, connection); // Pasamos la conexión
+
+      if (updatedRows === 0 && ordenActual.estado === 'pendiente' && estado === 'pendiente') {
+        // Esto puede ocurrir si no hay cambios en los campos actualizables (id_cliente, estado)
+        // y el estado sigue siendo pendiente. No es un error, simplemente no hubo UPDATE.
+        res.json({ message: "Orden de venta actualizada (sin cambios en stock)." });
+      } else if (updatedRows === 0) {
+         // Si updatedRows es 0 y el estado no era pendiente, o ya estaba anulada
+        throw new Error("No se pudo actualizar la orden de venta. Posiblemente ya no está en estado 'pendiente'.");
+      }
+
+      await connection.commit();
+      connection.release();
       res.json({ message: "Orden de venta actualizada." });
     } catch (err) {
-      console.error("Error updating order:", err);
-      res.status(500).json({ error: "Error al actualizar la orden de venta." });
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
+      console.error("Error al actualizar la orden de venta:", err);
+      res.status(500).json({ error: err.message || "Error al actualizar la orden de venta." });
     }
   },
 
   delete: async (req, res) => {
+    let connection;
     try {
       const id = +req.params.id;
 
-      if (!(await ordenExists(id))) {
-        return res.status(404).json({ error: "Orden de venta no encontrada." });
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      const orden = await ordenModel.getById(id, connection); // Usamos la conexión
+      if (!orden) {
+        throw new Error("Orden de venta no encontrada.");
       }
 
-      const orden = await ordenModel.getById(id);
-      if (!["pendiente"].includes(orden.estado)) {
-        return res
-          .status(400)
-          .json({ error: "Solo se pueden anular órdenes pendientes " });
+      console.log("Estado pedido:", orden.estado);
+
+      // Si la orden no está pendiente, no se puede anular (y no se devuelve stock)
+      if (orden.estado.toLowerCase().trim() !== "pendiente") {
+        throw new Error("Solo se pueden anular órdenes pendientes.");
       }
 
-      await ordenModel.update(id, { estado: "anulada" });
+      // Anular la orden (cambiar estado a 'anulada')
+      await ordenModel.update(id, { estado: "anulada" }, connection); // Usamos la conexión
 
-      res.json({ message: "Orden de venta anulada." });
+      // Reintegrar el stock para cada detalle de la orden anulada
+      const detalles = await detalleOrdenModel.getByVenta(id, connection); // Obtener detalles con la misma conexión
+      for (const detalle of detalles) {
+        await inventarioModel.processInventoryMovement({
+          id_articulo: detalle.id_articulo,
+          cantidad_movida: detalle.cantidad,
+          tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA, // Reintegrar stock
+          tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.DEVOLUCION_CLIENTE, // O un tipo específico para anulación
+          observaciones: `Reintegro por anulación de orden de venta #${id}`,
+          referencia_documento_id: id,
+          referencia_documento_tipo: 'anulacion_orden_venta',
+        }, connection); // Pasamos la conexión
+        console.log(`Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`);
+      }
+
+      await connection.commit();
+      connection.release();
+      res.json({ message: "Orden de venta anulada y stock reintegrado correctamente." });
     } catch (err) {
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
       console.error("Error anulando la orden de venta:", err);
-      res.status(500).json({ error: "Error al anular la orden de venta." });
+      res.status(500).json({ error: err.message || "Error al anular la orden de venta." });
     }
   },
 };
