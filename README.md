@@ -9,7 +9,7 @@ Este proyecto es una plataforma web desarrollada para facilitar la gestión de i
 - 🔹 React.js (frontend)
 - 🔹 Tailwind CSS (estilos)
 - 🔹 Node.js + Express (backend)
-- 🔹 MongoDB (base de datos - en desarrollo)
+- 🔹 MySql (base de datos - en desarrollo)
 - 🔹 Git y GitHub (control de versiones)
 
 ---
