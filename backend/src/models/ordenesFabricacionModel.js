@@ -1,4 +1,5 @@
 const db = require('../database/db');
+const LoteModel = require ('../models/lotesFabricadosModel');
 
 module.exports = {
 getAll: async (estados = ['pendiente', 'en proceso', 'completada']) => {
@@ -59,6 +60,14 @@ getById: async (id) => {
     SET estado = 'cancelada' 
     WHERE id_orden_fabricacion = ?
   `;
+
   await db.query(query, [id]);
+
+  try {
+      await LoteModel.deleteByOrdenId(id);
+      console.log(`Lotes fabricados asociados a la orden ${id} eliminados físicamente.`);
+    } catch (error) {
+      console.error(`Error al eliminar lotes fabricados para la orden ${id}:`, error)
+    }
 }
 };

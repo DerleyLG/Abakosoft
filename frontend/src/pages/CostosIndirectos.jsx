@@ -12,8 +12,7 @@ const CostosIndirectos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchCostos = async () => {
+ const fetchCostos = async () => {
       try {
         const res = await api.get('/costos-indirectos');
         setCostos(res.data);
@@ -22,6 +21,7 @@ const CostosIndirectos = () => {
       }
     };
 
+  useEffect(() => {
     fetchCostos();
   }, []);
 
@@ -34,8 +34,9 @@ const CostosIndirectos = () => {
           label: 'Sí',
           onClick: async () => {
             try {
-              await api.delete(`/costos_indirectos/${id}`);
+              await api.delete(`/costos-indirectos/${id}`);
               toast.success('Costo indirecto eliminado');
+              fetchCostos();
               setCostos((prev) => prev.filter((c) => c.id !== id));
             } catch (error) {
               console.error('Error eliminando costo indirecto', error);
@@ -49,8 +50,10 @@ const CostosIndirectos = () => {
   };
 
   const filteredCostos = costos.filter((costo) =>
+    
     (costo.tipo_costo || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
@@ -97,7 +100,7 @@ const CostosIndirectos = () => {
             {filteredCostos.length > 0 ? (
               filteredCostos.map((costo) => (
                 <tr
-                  key={costo.id}
+                  key={costo.id_costo_indirecto}
                   className="hover:bg-slate-300 cursor-pointer transition select-none"
                 >
           
@@ -107,7 +110,7 @@ const CostosIndirectos = () => {
                   <td className="px-4 py-3">{costo.observaciones || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <button
-                      onClick={() => handleDelete(costo.id)}
+                      onClick={() => handleDelete(costo.id_costo_indirecto)}
                       className="text-red-600 hover:text-red-400 transition cursor-pointer"
                       title="Eliminar"
                     >

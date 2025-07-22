@@ -30,9 +30,25 @@ SELECT * FROM lotes_fabricados WHERE id_orden = ?
   return rows;
 },
 
- eliminar: async (id_orden) => {  
-  const [result] = await db.query('DELETE FROM inventario WHERE id_orden_fabricacion = ?', [id_orden]);
-    return result.affectedRows > 0;
-}
+createLote: async ({ id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones }) => {
+    const [result] = await db.query(
+      `INSERT INTO lotes_fabricados 
+       (id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id_orden_fabricacion, id_articulo, id_trabajador, cantidad, observaciones || null]
+    );
+    return result.insertId;
+  },
 
+ eliminar: async (id_lote) => {  
+  const [result] = await db.query('DELETE FROM lotes_fabricados WHERE id_lote = ?', [id_lote]);
+    return result.affectedRows > 0;
+},
+
+ deleteByOrdenId: async (idOrden) => {
+    await db.query(
+      `DELETE FROM lotes_fabricados WHERE id_orden_fabricacion = ?`,
+      [idOrden]
+    );
+  },
 };

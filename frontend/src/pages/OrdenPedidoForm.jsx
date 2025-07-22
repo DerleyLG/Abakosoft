@@ -306,13 +306,13 @@ const OrdenPedidoForm = () => {
                   }),
                 }}
               />
-              <button
-                type="button"
-                className="flex items-center gap-1 text-sm text-white bg-slate-600 hover:bg-slate-700 px-6 rounded-lg transition cursor-pointer"
-                onClick={() => setMostrarFormularioArticulo(true)}
-              >
-                Crear nuevo
-              </button>
+             <button
+    type="button"
+    className="h-[38px] px-4 text-sm text-white bg-slate-600 hover:bg-slate-700 rounded-md flex items-center justify-center whitespace-nowrap"
+    onClick={() => setMostrarFormularioArticulo(true)}
+  >
+    Crear artículo
+  </button>
             </div>
 
             {mostrarFormularioArticulo && (

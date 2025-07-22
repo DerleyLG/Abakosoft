@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 const NuevoInventario = () => {
   const [articulos, setArticulos] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
-  const [cantidad, setCantidad] = useState(0); // Antes stock
+  const [cantidad, setCantidad] = useState(0); // Esto será el stock inicial para stock_disponible y stock_fabricado
   const [stockMinimo, setStockMinimo] = useState(0);
   const navigate = useNavigate();
 
@@ -36,21 +36,31 @@ const NuevoInventario = () => {
       toast.error('Por favor selecciona un artículo');
       return;
     }
+    if (cantidad < 0) {
+      toast.error('La cantidad inicial no puede ser negativa');
+      return;
+    }
+    if (stockMinimo < 0) {
+      toast.error('El stock mínimo no puede ser negativo');
+      return;
+    }
 
     try {
+      // Los datos que enviamos al backend deben coincidir con lo que espera InventarioController.registrarMovimiento
       await api.post('/inventario/movimientos', {
         id_articulo: Number(articuloSeleccionado.value),
-        cantidad: Number(cantidad),
-        tipo_movimiento: 'entrada',
-        descripcion: 'Ingreso inicial',
-        origen: 'Stock inicial',
-        stock_minimo: Number(stockMinimo),
+        cantidad: Number(cantidad), // Esto se mapea a 'cantidad_movida' en el backend
+        tipo_movimiento: 'entrada', // Tipo de movimiento para el ingreso inicial
+        descripcion: 'Ingreso inicial de artículo al inventario', // Observaciones del movimiento
+        origen: 'inicial', // Tipo de origen del movimiento (definido en el ENUM del modelo)
+        stock_minimo: Number(stockMinimo), // Se pasa para que se establezca en el registro de inventario
       });
       toast.success('Artículo agregado al inventario');
       navigate('/inventario');
     } catch (error) {
       console.error('Error al agregar inventario', error.response?.data || error.message);
-      toast.error('No se pudo agregar el artículo al inventario');
+      const mensajeError = error.response?.data?.error || error.response?.data?.message || 'No se pudo agregar el artículo al inventario';
+      toast.error(mensajeError);
     }
   };
 
@@ -70,12 +80,12 @@ const NuevoInventario = () => {
             styles={{
               control: (base) => ({
                 ...base,
-                borderColor: '#d1d5db', 
+                borderColor: '#d1d5db',
                 boxShadow: 'none',
                 '&:hover': {
-                  borderColor: '#64748b', 
+                  borderColor: '#64748b',
                 },
-                borderRadius: '0.375rem', 
+                borderRadius: '0.375rem',
               }),
             }}
           />

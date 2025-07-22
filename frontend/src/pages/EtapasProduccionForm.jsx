@@ -12,14 +12,11 @@ const CrearEtapa = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-
     try {
       await api.post('/etapas-produccion', {
         nombre,
         descripcion,
-
       });
-      console.log("Datos a enviar:", { nombre, descripcion});
       toast.success('Etapa registrada exitosamente');
       navigate('/ordenes_fabricacion');
     } catch (error) {
@@ -31,42 +28,44 @@ const CrearEtapa = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-xl">
-      <button onClick={() => navigate(-1)} className="mb-4 flex items-center text-slate-600 hover:text-black">
-        <FiArrowLeft className="mr-1" />
-        Volver
-      </button>
+    <div className="max-w-6xl mx-auto bg-white p-8 rounded-2xl shadow-md mt-10">
+      <div className="flex items-center justify-between mb-6 border-b border-slate-300 p-5">
+        <h2 className="text-3xl font-bold text-slate-700">Registrar Nueva Etapa</h2>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition cursor-pointer"
+        >
+          <FiArrowLeft />
+          Volver
+        </button>
+      </div>
 
-      <h2 className="text-2xl font-semibold text-slate-800 mb-4">Registrar Nueva Etapa</h2>
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Nombre</label>
+          <label className="text-sm text-slate-600 mb-1 block">Nombre</label>
           <input
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+            className="w-full border border-slate-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"
             required
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Descripción (opcional)</label>
+          <label className="text-sm text-slate-600 mb-1 block">Descripción (opcional)</label>
           <textarea
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
-            rows={3}
+            className="w-full border border-slate-300 rounded-2xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"
+            rows={4}
           />
         </div>
 
-       
-
-        <div className="col-span-2 mt-4">
+        <div className="col-span-2 flex justify-end mt-4">
           <button
             type="submit"
-            className="bg-slate-700 text-white px-4 py-2 rounded hover:bg-slate-800 transition"
+            className="bg-slate-700 text-white px-6 py-2 rounded-md hover:bg-slate-800 transition font-semibold cursor-pointer"
           >
             Registrar Etapa
           </button>

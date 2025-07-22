@@ -1,20 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const inventarioController = require('../controllers/movimientosInventarioController');
+const movimientosInventarioController = require('../controllers/movimientosInventarioController'); 
 
-// Crear movimiento
-router.post('/', inventarioController.createMovimiento);  
+
 
 // Obtener todos los movimientos
-router.get('/', inventarioController.getMovimientos);  
+router.get('/', movimientosInventarioController.getMovimientos);
 
 // Obtener movimiento por ID
-router.get('/:id', inventarioController.getMovimientoById); 
+router.get('/:id', movimientosInventarioController.getMovimientoById);
 
-// Actualizar movimiento
-router.put('/:id', inventarioController.updateMovimiento);  
+// Actualizar movimiento (sigue sin permitirse)
+router.put('/:id', movimientosInventarioController.updateMovimiento);
 
-// Eliminar movimiento
-router.delete('/:id', inventarioController.deleteMovimiento); 
+// Eliminar movimiento (sigue sin permitirse)
+router.delete('/:id', movimientosInventarioController.deleteMovimiento);
 
 module.exports = router;

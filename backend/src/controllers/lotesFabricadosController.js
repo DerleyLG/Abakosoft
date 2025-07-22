@@ -30,10 +30,10 @@ const getById = async (req, res) => {
 const eliminar = async (req, res) => {
 
   try {
-    const { id_orden } = req.params;
-    console.log('ID recibido para eliminar:', id_orden);  
+    const { id_lote } = req.params;
+    console.log('ID recibido para eliminar:', id_lote);  
 
-    const eliminado = await lotesmodel.eliminar(id_orden);
+    const eliminado = await lotesmodel.eliminar(id_lote);
 
     if (eliminado) {
       res.status(200).json({ mensaje: 'Lote eliminado ' });

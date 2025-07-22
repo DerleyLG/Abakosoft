@@ -282,73 +282,78 @@ console.log("Consulta de costo anterior:", rows);
 },
 
 checkearSiOrdenCompleta: async (id_orden_fabricacion) => {
-  // Obtener la última etapa de producción (la de mayor orden)
-  const [[ultimaEtapa]] = await db.query(`
-    SELECT id_etapa FROM etapas_produccion ORDER BY orden DESC LIMIT 1
-  `);
 
-  const idUltimaEtapa = ultimaEtapa?.id_etapa;
-  if (!idUltimaEtapa) return false;
-
-  // Obtener todos los artículos y cantidades requeridas en esta orden
-  const [articulos] = await db.query(`
-    SELECT id_articulo, cantidad 
-    FROM detalle_orden_fabricacion 
-    WHERE id_orden_fabricacion = ?
-  `, [id_orden_fabricacion]);
-
-    const [pendientes] = await db.query(`
-    SELECT dof.id_articulo, dof.cantidad AS cantidad_total, 
-      IFNULL(SUM(a.cantidad), 0) AS cantidad_avanzada,
-      dof.id_etapa_final
-    FROM detalle_orden_fabricacion dof
-    LEFT JOIN avance_etapas_produccion a 
-      ON dof.id_articulo = a.id_articulo 
-      AND dof.id_orden_fabricacion = a.id_orden_fabricacion
-      AND a.id_etapa_produccion = dof.id_etapa_final
-    WHERE dof.id_orden_fabricacion = ?
-    GROUP BY dof.id_articulo, dof.cantidad, dof.id_etapa_final
-  `, [id_orden_fabricacion]);
-
- const incompletos = pendientes.some(
-    (p) => p.cantidad_avanzada < p.cantidad_total
+  const [ordenData] = await db.query(
+    `SELECT id_pedido, estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
+    [id_orden_fabricacion]
   );
 
-  if (!incompletos) {
-    // Todos los artículos llegaron a su etapa final
+  if (!ordenData.length) {
+    console.log(`Orden ${id_orden_fabricacion} no encontrada.`);
+    return false; 
+  }
+
+  const id_pedido = ordenData[0].id_pedido;
+  const estadoActualOrden = ordenData[0].estado;
+
+  if (estadoActualOrden === 'completada') {
+    console.log(`Orden ${id_orden_fabricacion} ya está completada. No se requiere acción.`);
+    return true; 
+  }
+
+ 
+  const [articulosProgreso] = await db.query(`
+    SELECT
+      dof.id_articulo,
+      dof.cantidad AS cantidad_total_requerida,
+      dof.id_etapa_final,
+      IFNULL(SUM(CASE WHEN a.estado = 'completado' THEN a.cantidad ELSE 0 END), 0) AS cantidad_avanzada_final
+    FROM
+      detalle_orden_fabricacion dof
+    LEFT JOIN
+      avance_etapas_produccion a ON dof.id_articulo = a.id_articulo
+      AND dof.id_orden_fabricacion = a.id_orden_fabricacion
+      AND a.id_etapa_produccion = dof.id_etapa_final
+    WHERE
+      dof.id_orden_fabricacion = ?
+    GROUP BY
+      dof.id_articulo, dof.cantidad, dof.id_etapa_final
+  `, [id_orden_fabricacion]);
+
+
+  const hayArticulosIncompletos = articulosProgreso.some(
+    (articulo) => articulo.cantidad_avanzada_final < articulo.cantidad_total_requerida
+  );
+
+  
+  if (!hayArticulosIncompletos) {
+    console.log(`Orden ${id_orden_fabricacion} ha sido completamente completada. Actualizando estados...`);
+
+
     await db.query(
       `UPDATE ordenes_fabricacion SET estado = 'completada' WHERE id_orden_fabricacion = ?`,
       [id_orden_fabricacion]
-    )
-  
-  }
+    );
 
-  for (const articulo of articulos) {
-    const [[producidas]] = await db.query(`
-      SELECT SUM(cantidad) AS total 
-      FROM avance_etapas_produccion 
-      WHERE id_orden_fabricacion = ? 
-        AND id_articulo = ? 
-        AND id_etapa_produccion = ? 
-        AND estado = 'completado'
-    `, [id_orden_fabricacion, articulo.id_articulo, idUltimaEtapa]);
 
-    const totalProducidas = producidas.total || 0;
-
-    if (totalProducidas < articulo.cantidad) {
-      return false; // Aún falta producción para algún artículo
+    if (id_pedido) {
+      await db.query(
+        `UPDATE pedidos SET estado = 'completado' WHERE id_pedido = ?`,
+        [id_pedido]
+      );
+      console.log(`Pedido ${id_pedido} asociado a la orden ${id_orden_fabricacion} marcado como 'completado'.`);
+    } else {
+      console.warn(`No se encontró id_pedido para la orden ${id_orden_fabricacion}. No se actualizó el pedido.`);
     }
+
+    return true; 
   }
 
-  // Si pasa todos los artículos, marcar la orden como completada
-  await db.query(`
-    UPDATE ordenes_fabricacion 
-    SET estado = 'completada' 
-    WHERE id_orden_fabricacion = ?
-  `, [id_orden_fabricacion]);
-
-  return true;
+ 
+  console.log(`Orden ${id_orden_fabricacion} aún tiene artículos pendientes.`);
+  return false;
 },
+
 
 getEtapaFinalCliente: async (id_orden_fabricacion, id_articulo) => {
   const [rows] = await db.query(`

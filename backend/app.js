@@ -32,6 +32,10 @@ const detalleOrdenVentaRoutes = require('./src/routes/detalleOrdenVentaRoutes.js
 const ordenPedidosRoutes = require('./src/routes/ordenPedidosRoutes.js');
 const detalleOrdenPedidoRoutes = require('./src/routes/detalleOrdenPedidoRoutes.js');
 const lotesFabricadosRoutes = require('./src/routes/lotesFabricadosRoutes.js');
+const anticiposRoutes = require('./src/routes/anticiposRoutes.js');
+
+
+const detalleOrdenCompraRoutes = require('./src/routes/detalleOrdenCompraRoutes');
 
 
 
@@ -124,6 +128,10 @@ app.use('/api/pedidos', ordenPedidosRoutes);
 app.use('/api/detalle-orden-pedido', detalleOrdenPedidoRoutes);
 
 app.use('/api/lotes-fabricados', lotesFabricadosRoutes);
+
+app.use('/api/anticipos', anticiposRoutes);
+
+app.use('/api/detalles-orden-compra', detalleOrdenCompraRoutes);
 
 const PORT = process.env.PORT || 3300;
 app.listen(PORT, () => {

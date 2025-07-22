@@ -102,9 +102,7 @@ const Pedidos = () => {
     return cliente.includes(term) || fechaStr.includes(term);
   });
 
-const BotonIrOrdenFabricacion = () => {
-  const navigate = useNavigate();
-}
+
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -139,7 +137,7 @@ const BotonIrOrdenFabricacion = () => {
           </button>
 
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate(-1)}
             className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
           >
             <FiArrowLeft />
@@ -181,29 +179,31 @@ const BotonIrOrdenFabricacion = () => {
                     </td>
                     <td className="px-4 py-3">{pedido.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
-           <button
-      onClick={(e) => {
-        e.stopPropagation();
-        confirmAlert({
-          title: 'Ir a orden de fabricación',
-          message: '¿Está seguro que desea crear una orden de fabricación?',
-          buttons: [
-            {
-              label: 'Sí',
-              onClick: () => navigate('/ordenes_fabricacion/nuevo', { state: { idPedidoSeleccionado: pedido.id_pedido }}),
-             
-            },
-            {
-              label: 'No',
-            },
-          ],
-        });
-      }}
-      className="text-green-600 hover:text-green-400 cursor-pointer"
-      title="Crear orden de fabricación"
-    >
-      <FiPackage size={18} />
-    </button>
+           {!mostrarCancelados && ( // <-- ¡Condición re-añadida aquí!
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmAlert({
+                              title: 'Orden de fabricación',
+                              message: '¿Está seguro que desea crear una orden de fabricación?',
+                              buttons: [
+                                {
+                                  label: 'Sí',
+                                  onClick: () => navigate('/ordenes_fabricacion/nuevo', { state: { idPedidoSeleccionado: pedido.id_pedido }}),
+
+                                },
+                                {
+                                  label: 'No',
+                                },
+                              ],
+                            });
+                          }}
+                          className="text-green-600 hover:text-green-400 cursor-pointer"
+                          title="Crear orden de fabricación"
+                        >
+                          <FiPackage size={18} />
+                        </button>
+                      )}
 
 
                       {!mostrarCancelados && (

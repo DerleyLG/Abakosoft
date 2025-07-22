@@ -1,4 +1,4 @@
-const db = require("../database/db");
+/** const db = require("../database/db");
 const inventario = require("../models/movimientosInventarioModel");
 
 
@@ -93,4 +93,75 @@ module.exports = {
   getMovimientoById,
   updateMovimiento,
   deleteMovimiento,
+};
+**/
+const MovimientoInventarioModel = require("../models/movimientosInventarioModel"); // Asegúrate de que la ruta sea correcta
+
+// La creación de movimientos que afectan el stock ahora se maneja centralmente
+// por InventarioModel.processInventoryMovement, usualmente llamada desde InventarioController
+// o desde controladores específicos (ej. LoteController, VentaController).
+// Por lo tanto, esta función 'createMovimiento' aquí se vuelve redundante para
+// la mayoría de los casos que afectan el stock y debería ser eliminada o repensada.
+// Si necesitas un endpoint para crear movimientos *sin* afectar el stock (muy raro),
+// su lógica sería diferente.
+/*
+const createMovimiento = async (req, res) => {
+    // Esta función ya no debería existir o debería ser para casos muy específicos
+    // que NO actualizan el stock en la tabla 'inventario'.
+    // Si el objetivo es registrar un movimiento Y actualizar stock, se usa
+    // InventarioModel.processInventoryMovement.
+    // ... (lógica anterior, pero sin actualizar stock en 'articulos' ni 'inventario')
+};
+*/
+
+module.exports = {
+  /**
+   * Obtiene todos los movimientos de inventario.
+   * Ruta: GET /movimientos-inventario
+   */
+  getMovimientos: async (_req, res) => {
+    try {
+      const movimientos = await MovimientoInventarioModel.getAll();
+      if (!movimientos.length) {
+        return res.status(404).json({ error: "No hay movimientos registrados" });
+      }
+      res.status(200).json(movimientos);
+    } catch (error) {
+      console.error("Error al obtener los movimientos:", error);
+      res.status(500).json({ error: "Error al obtener los movimientos." });
+    }
+  },
+
+  /**
+   * Obtiene un movimiento de inventario por su ID.
+   * Ruta: GET /movimientos-inventario/:id
+   */
+  getMovimientoById: async (req, res) => {
+    try {
+      const movimiento = await MovimientoInventarioModel.getById(req.params.id);
+      if (!movimiento) {
+        return res.status(404).json({ error: "Movimiento no encontrado" });
+      }
+      res.status(200).json(movimiento);
+    } catch (error) {
+      console.error("Error al obtener el movimiento:", error);
+      res.status(500).json({ error: "Error al obtener el movimiento." });
+    }
+  },
+
+  /**
+   * No se permite modificar movimientos de inventario.
+   * Ruta: PUT /movimientos-inventario/:id
+   */
+  updateMovimiento: (_req, res) => {
+    return res.status(403).json({ error: "No se permite modificar movimientos de inventario. Use un movimiento correctivo." });
+  },
+
+  /**
+   * No se permite eliminar movimientos de inventario.
+   * Ruta: DELETE /movimientos-inventario/:id
+   */
+  deleteMovimiento: (_req, res) => {
+    return res.status(403).json({ error: "No se permite eliminar movimientos de inventario. Use un movimiento correctivo." });
+  },
 };

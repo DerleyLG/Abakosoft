@@ -2,20 +2,29 @@ const db = require('../database/db');
 const detalleOrdenModel = require('../models/detalleOrdenPedidosModel');
 
 module.exports = {
- getAll: async (estados = ['pendiente', 'completada']) => {
-  const placeholders = estados.map(() => '?').join(',');
-  const [rows] = await db.query(`
-    SELECT p.id_pedido, p.fecha_pedido, p.id_cliente, c.nombre AS cliente_nombre, p.estado,
-      SUM(dp.cantidad * dp.precio_unitario) AS monto_total
-    FROM pedidos p
-    JOIN clientes c ON p.id_cliente = c.id_cliente
-    LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
-    WHERE p.estado IN (${placeholders})
-    GROUP BY p.id_pedido
-    ORDER BY p.fecha_pedido DESC;
-  `, estados);
-  return rows;
-},
+getAll: async (estadoQueryParam) => {
+    let estadosToFilter = [];
+
+    if (estadoQueryParam === 'cancelado') {
+      estadosToFilter = ['cancelado'];
+    } else {
+     
+      estadosToFilter = ['pendiente', 'en fabricacion', 'listo para entrega', 'completado'];
+    }
+
+    const placeholders = estadosToFilter.map(() => '?').join(',');
+    const [rows] = await db.query(`
+      SELECT p.id_pedido, p.fecha_pedido, p.id_cliente, c.nombre AS cliente_nombre, p.estado,
+        SUM(dp.cantidad * dp.precio_unitario) AS monto_total
+      FROM pedidos p
+      JOIN clientes c ON p.id_cliente = c.id_cliente
+      LEFT JOIN detalle_pedido dp ON p.id_pedido = dp.id_pedido
+      WHERE p.estado IN (${placeholders})
+      GROUP BY p.id_pedido
+      ORDER BY p.fecha_pedido DESC;
+    `, estadosToFilter); // Aquí pasamos el array de estados para la consulta SQL
+    return rows;
+  },
 
   getById: async (id) => {
     const [rows] = await db.query('SELECT * FROM pedidos WHERE id_pedido = ?', [id]);

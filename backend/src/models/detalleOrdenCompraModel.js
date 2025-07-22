@@ -4,7 +4,7 @@ const detalleOrdenCompra = {
   // Obtener todos los detalles de una orden de compra
   async getByOrdenCompra(id_orden_compra) {
     const [rows] = await db.query(
-      "SELECT * FROM detalle_orden_compra WHERE id_orden_compra = ?",
+      "SELECT *, (cantidad * precio_unitario) AS total FROM detalle_orden_compra WHERE id_orden_compra = ?",
       [id_orden_compra]
     );
     return rows;

@@ -38,6 +38,7 @@ import CostosIndirectos from "./pages/CostosIndirectos";
 import CostosIndirectosNuevo from "./pages/CostosIndirectosForm";
 import VistaReportes from "./pages/Reportes";
 import ReporteInventario from "./pages/ReporteInventario";
+import ListaAnticipos from "./pages/Anticipos";
 
 
 export default function App() {
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="costos_indirectos/nuevo" element={<CostosIndirectosNuevo/>} />
           <Route path="reportes" element={<VistaReportes/>} />
           <Route path="reportes/inventario" element={<ReporteInventario/>} />
+          <Route path="pagos_anticipados" element={<ListaAnticipos/>} />
 
 
 

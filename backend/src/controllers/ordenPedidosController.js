@@ -7,22 +7,19 @@ const db = require("../database/db");
 const ESTADOS_VALIDOS = ["pendiente", "completado", "cancelado"];
 
 module.exports = {
-  getAll: async (req, res) => {
-   try {
-       const estado = req.query.estado;
-       let estados;
-       if (estado === "cancelado") {
-         estados = ["cancelado"];
-       } else {
-         estados = ["pendiente", "completada"];
-       }
-       const data = await pedidoModel.getAll(estados);
-       res.json(data);
-     } catch (err) {
-       res.status(500).json({ error: "Error al obtener órdenes de venta." });
-     }
-   },
- 
+ getAll: async (req, res) => {
+    try {
+      const { estado } = req.query; 
+
+    
+      const pedidos = await pedidoModel.getAll(estado);
+      
+      res.status(200).json(pedidos);
+    } catch (error) {
+      console.error("Error al obtener pedidos:", error);
+      res.status(500).json({ error: "Error interno del servidor al obtener pedidos." });
+    }
+  },
   getById: async (req, res) => {
     try {
       const id = req.params.id;

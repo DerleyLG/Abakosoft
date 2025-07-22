@@ -5,6 +5,6 @@ const lotesFabricadosController = require('../controllers/lotesFabricadosControl
 
 router.get('/', lotesFabricadosController.getAll);
 router.get('/:id', lotesFabricadosController.getById);
-router.delete('/:id_orden', lotesFabricadosController.eliminar);
+router.delete('/:id_lote', lotesFabricadosController.eliminar);
 
 module.exports = router;

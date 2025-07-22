@@ -97,14 +97,7 @@ const cargarTrabajadores = async () => {
           Crear trabajador
         </button>
 
-        <button
-          onClick={() => navigate('/trabajadores/pagos')}
-          className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          title="Ver pagos registrados"
-        >
-          <FiDollarSign size={20} />
-          Ver pagos
-        </button>
+    
       </div>
       </div>
 

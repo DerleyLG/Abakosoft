@@ -5,9 +5,7 @@ import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
-import { FiTrash2, FiPlus, FiArrowLeft, FiEye } from "react-icons/fi";
-
-
+import { FiTrash2, FiPlus, FiArrowLeft, FiArrowUp } from "react-icons/fi";
 
 const ListaOrdenesFabricacion = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -21,10 +19,11 @@ const ListaOrdenesFabricacion = () => {
   const [articulos, setArticulos] = useState([]);
   const [articulosPorOrden, setArticulosPorOrden] = useState({});
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
+  const [articulosPendientesPorOrden, setArticulosPendientesPorOrden] = useState({});
   const [etapasDisponiblesPorOrden, setEtapasDisponiblesPorOrden] = useState(
     {}
   );
-  
+
   const [etapasDisponibles, setEtapasDisponibles] = useState({});
 
   useEffect(() => {
@@ -72,6 +71,8 @@ const ListaOrdenesFabricacion = () => {
           nuevosDatos[orden.id_orden_fabricacion] = res.data.map((item) => ({
             value: item.id_articulo,
             label: item.descripcion,
+            cantidadRequerida: item.cantidad, 
+          idEtapaFinal: item.id_etapa_final,
           }));
         } catch (error) {
           console.error("Error al cargar artículos de la orden:", error);
@@ -90,75 +91,45 @@ const ListaOrdenesFabricacion = () => {
         ...prev[idOrden],
         [campo]: valor,
       },
-      
     }));
-    
+  };
+useEffect(() => {
+  const cargarEtapas = async () => {
+    const disponiblesPorOrden = {};
+    const disponiblesGlobal = {};
+
+    for (const orden of ordenes) {
+      const idOrden = orden.id_orden_fabricacion;
+      const idArticulo = formularios[idOrden]?.articulo;
+
+      if (!idArticulo) continue;
+
+      try {
+        const res = await api.get(
+          `/avances-etapa/completadas/${idOrden}/${idArticulo}`
+        );
+        const etapasCompletadas = res.data;
+
+        const disponibles = etapas.filter(
+          (et) => !etapasCompletadas.includes(et.value)
+        );
+
+        disponiblesPorOrden[idOrden] = disponibles;
+        disponiblesGlobal[idOrden] = disponibles;
+      } catch (error) {
+        console.error("Error al cargar etapas:", error);
+        toast.error("Error al filtrar etapas");
+      }
+    }
+
+    setEtapasDisponiblesPorOrden(disponiblesPorOrden);
+    setEtapasDisponibles(disponiblesGlobal);
   };
 
-  useEffect(() => {
-    const cargarEtapasPorOrdenYArticulo = async () => {
-      for (const orden of ordenes) {
-        const formulario = formularios[orden.id_orden_fabricacion];
-        const idOrden = orden.id_orden_fabricacion;
-        const idArticulo = formulario?.articulo;
-
-        if (!idArticulo) continue;
-
-        try {
-          const res = await api.get(
-            `/avances-etapa/completadas/${idOrden}/${idArticulo}`
-          );
-          const etapasCompletadas = res.data;
-
-          const disponibles = etapas.filter(
-            (et) => !etapasCompletadas.includes(et.value)
-          );
-
-          setEtapasDisponiblesPorOrden((prev) => ({
-            ...prev,
-            [idOrden]: disponibles,
-          }));
-        } catch (error) {
-          console.error("Error al cargar etapas completadas:", error);
-          toast.error("Error al filtrar etapas");
-        }
-      }
-    };
-
-    if (ordenes.length > 0 && etapas.length > 0) {
-      cargarEtapasPorOrdenYArticulo();
-    }
-  }, [formularios, etapas, ordenes]);
-
-  useEffect(() => {
-    const cargarEtapasDisponibles = async () => {
-      for (const orden of ordenes) {
-        const idOrden = orden.id_orden_fabricacion;
-        const idArticulo = formularios[idOrden]?.articulo;
-
-        if (!idArticulo) continue;
-
-        try {
-          const res = await api.get(
-            `/avances-etapa/completadas/${idOrden}/${idArticulo}`
-          );
-          const etapasCompletadas = res.data;
-          const disponibles = etapas.filter(
-            (et) => !etapasCompletadas.includes(et.value)
-          );
-
-          setEtapasDisponibles((prev) => ({
-            ...prev,
-            [idOrden]: disponibles,
-          }));
-        } catch (error) {
-          console.error("Error al cargar etapas no completadas", error);
-        }
-      }
-    };
-
-    cargarEtapasDisponibles();
-  }, [ordenes, formularios, etapas]);
+  if (ordenes.length > 0 && etapas.length > 0) {
+    cargarEtapas();
+  }
+}, [formularios, etapas, ordenes]);
 
   useEffect(() => {
     const fetchEtapas = async () => {
@@ -209,6 +180,77 @@ const ListaOrdenesFabricacion = () => {
 
     fetchOrdenes();
   }, [mostrarCanceladas]);
+
+
+
+useEffect(() => {
+  const filtrarArticulosCompletados = async () => {
+    const nuevosArticulosPendientes = {};
+
+    for (const orden of ordenes) {
+      const idOrden = orden.id_orden_fabricacion;
+      const articulosEnOrden = articulosPorOrden[idOrden] || [];
+  
+      const avancesDeLaOrden = orden.avances || [];
+
+   
+      console.log(`--- Procesando Orden ${idOrden} ---`);
+      console.log("Artículos registrados en la orden:", articulosEnOrden);
+      console.log("Avances cargados para la orden:", avancesDeLaOrden);
+ 
+
+      const articulosFiltrados = await Promise.all(
+        articulosEnOrden.map(async (articulo) => {
+          const { value: idArticulo, cantidadRequerida, idEtapaFinal } = articulo;
+
+
+          console.log(
+            `  -> Artículo ${articulo.label} (ID: ${idArticulo}) | Requerido: ${cantidadRequerida} | Etapa Final ID: ${idEtapaFinal}`
+          );
+
+
+          if (!idEtapaFinal) {
+          
+            console.warn(`    Advertencia: idEtapaFinal no definida para artículo ${idArticulo} en Orden ${idOrden}. Se considera pendiente.`);
+            return articulo;
+          }
+
+          const cantidadAvanzadaEnEtapaFinal = avancesDeLaOrden
+            .filter(
+              (avance) =>
+                avance.id_articulo === idArticulo &&
+                avance.id_etapa_produccion === idEtapaFinal &&
+                avance.estado === 'completado' 
+            )
+            .reduce((sum, avance) => sum + avance.cantidad, 0);
+
+     
+          console.log(
+            `    Cantidad avanzada en etapa final (${idEtapaFinal}): ${cantidadAvanzadaEnEtapaFinal}`
+          );
+          console.log(
+            `    Comparación: ${cantidadAvanzadaEnEtapaFinal} < ${cantidadRequerida} = ${cantidadAvanzadaEnEtapaFinal < cantidadRequerida}`
+          );
+    
+
+          if (cantidadAvanzadaEnEtapaFinal < cantidadRequerida) {
+            return articulo; 
+          }
+          return null;
+        })
+      );
+      nuevosArticulosPendientes[idOrden] = articulosFiltrados.filter(Boolean);
+
+   
+    }
+    setArticulosPendientesPorOrden(nuevosArticulosPendientes);
+  };
+
+  if (ordenes.length > 0 && Object.keys(articulosPorOrden).length > 0) {
+    filtrarArticulosCompletados();
+  }
+}, [ordenes, articulosPorOrden]);
+
 
   const eliminarOrden = async (id) => {
     confirmAlert({
@@ -289,26 +331,34 @@ const ListaOrdenesFabricacion = () => {
     console.log("orden detalles", orden.detalles);
 
     return (
-      <table className="w-full text-sm border border-gray-300 mt-2 rounded">
-        <thead>
-          <tr className="bg-slate-300 text-gray-700">
-            <th className="px-2 py-1 border">Artículo</th>
-            <th className="px-2 py-1 border">Cantidad</th>
-            <th className="px-2 py-1 border">Etapa final</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orden.detalles.map((detalle, idx) => (
-            <tr key={idx} className="hover:bg-slate-200">
-              <td className="px-2 py-1 border">
-                {detalle.descripcion || "N/A"}
-              </td>
-              <td className="px-2 py-1 border">{detalle.cantidad}</td>
-              <td className="px-2 py-1 border">{detalle.nombre_etapa_final}</td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
+          <thead className="bg-gray-200 text-gray-700">
+            <tr>
+              <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
+              <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
+              <th className="px-2 py-2 border-b border-gray-300">
+                Etapa final
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {orden.detalles.map((detalle, idx) => (
+              <tr key={idx} className="hover:bg-gray-50">
+                <td className="px-2 py-2 border-b border-gray-300">
+                  {detalle.descripcion || "N/A"}
+                </td>
+                <td className="px-2 py-2 border-b border-gray-300">
+                  {detalle.cantidad}
+                </td>
+                <td className="px-2 py-2 border-b border-gray-300">
+                  {detalle.nombre_etapa_final}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   };
 
@@ -325,57 +375,90 @@ const ListaOrdenesFabricacion = () => {
       avancesPorArticulo[avance.id_articulo].push(avance);
     });
 
-    return Object.entries(avancesPorArticulo).map(
-      ([idArticulo, avances], idx) => (
-        <div key={idx} className="mt-6">
-          <h3 className="font-bold text-gray-800 mb-2">
-            Artículo: {avances[0]?.descripcion || "Artículo desconocido"}
-          </h3>
+    return (
+      <>
+        {Object.entries(avancesPorArticulo).map(
+          ([idArticulo, avances], idx) => (
+            <div key={idx} className="mt-6">
+              <h3 className="font-bold text-gray-800 mb-2">
+                Artículo: {avances[0]?.descripcion || "Artículo desconocido"}
+              </h3>
 
-          <table className="w-full text-sm border border-gray-300 rounded">
-            <thead>
-              <tr className="bg-slate-300 text-gray-700">
-                <th className="px-2 py-1 border">Etapa</th>
-                <th className="px-2 py-1 border">Responsable</th>
-                <th className="px-2 py-1 border">Cantidad</th>
-                <th className="px-2 py-1 border">Costo de fabricacion</th>
-                <th className="px-2 py-1 border">Estado</th>
-                <th className="px-2 py-1 border">Fecha</th>
-                <th className="px-2 py-1 border">Observaciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {avances.map((avance, idx2) => (
-                <tr key={idx2} className="hover:bg-slate-200">
-                  <td className="px-2 py-1 border">{avance.nombre || "N/A"}</td>
-                  <td className="px-2 py-1 border">
-                    {avance.nombre_trabajador || "N/A"}
-                  </td>
-                  <td className="px-2 py-1 border">{avance.cantidad}</td>
-                  <td className="px-2 py-1 border">
-                    ${avance.costo_fabricacion}
-                  </td>
-                  <td className="px-2 py-1 border">{avance.estado}</td>
-                  <td className="px-2 py-1 border">
-                    {avance.fecha_registro
-                      ? new Date(avance.fecha_registro).toLocaleDateString()
-                      : "N/A"}
-                  </td>
-                  <td className="px-2 py-1 border">
-                    {avance.observaciones || "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden">
+                  <thead className="bg-gray-200 text-gray-700">
+                    <tr>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Etapa
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Responsable
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Cantidad
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Costo de fabricacion
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Estado
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Fecha
+                      </th>
+                      <th className="px-2 py-2 border-b border-gray-300">
+                        Observaciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {avances.map((avance, idx2) => (
+                      <tr key={idx2} className="hover:bg-gray-50">
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.nombre || "N/A"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.nombre_trabajador || "N/A"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.cantidad}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          ${avance.costo_fabricacion}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.estado}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.fecha_registro
+                            ? new Date(avance.fecha_registro).toLocaleDateString()
+                            : "N/A"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.observaciones || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        )}
+        {/* Botón para cerrar la lista de avances */}
+        <button
+          onClick={() => setExpandedOrden(null)}
+          className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 flex items-center gap-2 cursor-pointer"
+        >
+          <FiArrowUp /> Cerrar Avances
+        </button>
+      </>
     );
   };
 
   const manejarRegistroAvance = async (idOrden, formulario) => {
     if (!formulario) {
-      toast.error("Formulario no inicializado.");
+      toast.error("Formulario vacio");
       return;
     }
 
@@ -417,26 +500,25 @@ const ListaOrdenesFabricacion = () => {
       console.log("Formulario a enviar:", datos);
 
       await api.post("/avances-etapa", datos);
+
+toast.success("Avance registrado");
+
       await cargarOrdenes();
-
-      toast.success("Avance registrado correctamente");
-      await expandirOrden(idOrden);
-
+  
       await expandirOrden(idOrden, true);
-      setMostrarFormularioAvance(null);
-    setFormularios((prev) => ({
-  ...prev,
-  [idOrden]: {
-    ...prev[idOrden],
-    articulo: "",
-    etapa: "",
-    trabajador: "",
-    estado: "",
-    cantidad: "",
-    observaciones: "",
-
-  },
-}));
+      setMostrarFormularioAvance(null); 
+      setFormularios((prev) => ({
+        ...prev,
+        [idOrden]: {
+          ...prev[idOrden],
+          articulo: "",
+          etapa: "",
+          trabajador: "",
+          estado: "",
+          cantidad: "",
+          observaciones: "",
+        },
+      }));
     } catch (error) {
       const mensajeBackend =
         error.response?.data?.error ||
@@ -448,14 +530,14 @@ const ListaOrdenesFabricacion = () => {
     }
   };
 
-const yaConsultadoCosto = useRef({});
-const historialCostos = useRef({});
-const costoManualEditado = useRef({}); // saber si ya fue modificado manualmente
+  const yaConsultadoCosto = useRef({});
+  const historialCostos = useRef({});
+  const costoManualEditado = useRef({});
 
-useEffect(() => {
+ useEffect(() => {
   const cargarCostoAnterior = async () => {
     for (const [idOrden, formulario] of Object.entries(formularios)) {
-      const { articulo, etapa } = formulario || {};
+      const { articulo, etapa, costo_fabricacion: costoActual } = formulario || {}; // Desestructuramos el costo actual
       if (!articulo || !etapa) continue;
 
       const clave = `${idOrden}-${articulo}-${etapa}`;
@@ -463,35 +545,49 @@ useEffect(() => {
       // Si ya fue consultado antes
       if (yaConsultadoCosto.current[clave]) {
         const costoGuardado = historialCostos.current[clave];
-        if (costoGuardado !== undefined && !costoManualEditado.current[clave]) {
-          setFormularios((prev) => ({
-            ...prev,
-            [idOrden]: {
-              ...prev[idOrden],
-              costo_fabricacion: costoGuardado,
-            },
-          }));
+        if (
+          costoGuardado !== undefined &&
+          !costoManualEditado.current[clave]
+        ) {
+          // *** CORRECCIÓN: Comprobar si el costo es diferente antes de actualizar el estado ***
+          if (costoActual !== costoGuardado) {
+            setFormularios((prev) => ({
+              ...prev,
+              [idOrden]: {
+                ...prev[idOrden],
+                costo_fabricacion: costoGuardado,
+              },
+            }));
+          }
         }
         continue;
       }
 
       try {
-        const res = await api.get(`/avances-etapa/costo-anterior/${articulo}/${etapa}`);
+        const res = await api.get(
+          `/avances-etapa/costo-anterior/${articulo}/${etapa}`
+        );
         const costo = res.data?.costo_fabricacion ?? null;
 
-        console.log(` Backend respondió para artículo ${articulo}, etapa ${etapa}:`, costo);
+        console.log(
+          ` Backend respondió para artículo ${articulo}, etapa ${etapa}:`,
+          costo
+        );
 
         yaConsultadoCosto.current[clave] = true;
         historialCostos.current[clave] = costo;
 
         if (costo !== null && !costoManualEditado.current[clave]) {
-          setFormularios((prev) => ({
-            ...prev,
-            [idOrden]: {
-              ...prev[idOrden],
-              costo_fabricacion: costo,
-            },
-          }));
+          // *** CORRECCIÓN: Comprobar si el costo es diferente antes de actualizar el estado ***
+          if (costoActual !== costo) {
+            setFormularios((prev) => ({
+              ...prev,
+              [idOrden]: {
+                ...prev[idOrden],
+                costo_fabricacion: costo,
+              },
+            }));
+          }
         }
       } catch (error) {
         console.error(" Error al cargar costo anterior:", error);
@@ -502,17 +598,12 @@ useEffect(() => {
   cargarCostoAnterior();
 }, [formularios]);
 
-
-
-
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <h2 className="text-4xl font-bold text-gray-800 p-4">
-          Órdenes de fabricación
-        </h2>
+        Órdenes de fabricación
+      </h2>
       <div className="flex flex-col md:flex-row justify-end items-center mb-6 gap-4 m-5">
-        
-
         <div className="flex flex-wrap gap-4  w-full  items-center ">
           <input
             type="text"
@@ -523,7 +614,7 @@ useEffect(() => {
           />
           <button
             onClick={() => navigate("/ordenes_fabricacion/nuevo")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
             <FiPlus size={20} />
             Crear orden
@@ -531,23 +622,21 @@ useEffect(() => {
 
           <button
             onClick={() => navigate("/etapas_produccion")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
             <FiPlus size={20} />
             Nueva etapa
           </button>
           <button
             onClick={() => navigate("/lotes_fabricados")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-       
             Lotes fabricados
           </button>
-            <button
+          <button
             onClick={() => navigate("/avances_fabricacion")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            
             Avances de fabricacion
           </button>
           <button
@@ -560,7 +649,7 @@ useEffect(() => {
           >
             {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
           </button>
-          
+
           <button
             onClick={() => navigate("/ordenes")}
             className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
@@ -572,7 +661,7 @@ useEffect(() => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
             <tr>
               <th className="px-4 py-3">ID</th>
@@ -590,8 +679,8 @@ useEffect(() => {
                   <tr
                     className={`cursor-pointer transition select-none ${
                       expandedOrden === orden.id_orden_fabricacion
-                        ? "bg-slate-300"
-                        : "hover:bg-slate-300"
+                        ? "bg-gray-200"
+                        : "hover:bg-gray-200"
                     }`}
                     onClick={() => expandirOrden(orden.id_orden_fabricacion)}
                     onDoubleClick={() =>
@@ -626,7 +715,7 @@ useEffect(() => {
                           e.stopPropagation();
                           eliminarOrden(orden.id_orden_fabricacion);
                         }}
-                        className="text-red-600 hover:text-red-400 transition"
+                        className="text-red-600 hover:text-red-400 transition cursor-pointer"
                         title="Eliminar orden"
                       >
                         <FiTrash2 size={18} />
@@ -639,7 +728,7 @@ useEffect(() => {
                         colSpan="6"
                         className="bg-gray-100 px-6 py-4 border-b"
                       >
-                        <div className="mb-2 font-semibold text-slate-700">
+                        <div className="mb-2 font-semibold text-slate-700 ">
                           Detalles de la orden:
                         </div>
                         {renderDetalles(orden)}
@@ -653,14 +742,14 @@ useEffect(() => {
                                 : orden.id_orden_fabricacion
                             )
                           }
-                          className="mt-4 text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
+                          className="mt-4 text-slate-700 flex items-center gap-2 hover:underline cursor-pointer "
                         >
                           <FiPlus /> Registrar nuevo avance
                         </button>
 
                         {mostrarFormularioAvance ===
                           orden.id_orden_fabricacion && (
-                          <div className="mt-4 p-4 border rounded-lg bg-white shadow">
+                          <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault();
@@ -672,36 +761,36 @@ useEffect(() => {
                                   formularios[orden.id_orden_fabricacion]
                                 );
                               }}
-                              className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-300"
+                              className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200 "
                             >
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                <select
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.articulo || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "articulo",
-                                      Number(e.target.value)
-                                    )
-                                  }
-                                  className="border rounded px-2 py-1"
-                                >
-                                  <option value="">
-                                    Selecciona el artículo
-                                  </option>
-                                  {(
-                                    articulosPorOrden[
-                                      orden.id_orden_fabricacion
-                                    ] || []
-                                  ).map((art) => (
-                                    <option key={art.value} value={art.value}>
-                                      {art.label}
-                                    </option>
-                                  ))}
-                                </select>
+                               <select
+  value={
+    formularios[orden.id_orden_fabricacion]?.articulo || ""
+  }
+  onChange={(e) =>
+    actualizarFormulario(
+      orden.id_orden_fabricacion,
+      "articulo",
+      Number(e.target.value)
+    )
+  }
+  className="border rounded px-2 py-1 border-slate-300 p-5"
+>
+  <option value="">
+    Selecciona el artículo
+  </option>
+  
+  {(
+    articulosPendientesPorOrden[
+      orden.id_orden_fabricacion
+    ] || []
+  ).map((art) => (
+    <option key={art.value} value={art.value}>
+      {art.label}
+    </option>
+  ))}
+</select>
 
                                 <select
                                   value={
@@ -715,7 +804,7 @@ useEffect(() => {
                                       Number(e.target.value)
                                     )
                                   }
-                                  className="border rounded px-2 py-1"
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
                                 >
                                   <option value="">Selecciona etapa</option>
                                   {(
@@ -744,7 +833,7 @@ useEffect(() => {
                                       e.target.value
                                     )
                                   }
-                                  className="border rounded px-2 py-1"
+                                  className="border rounded px-2 py-1 border-slate-300 p-5 "
                                 >
                                   <option value="">
                                     Selecciona trabajador
@@ -766,27 +855,38 @@ useEffect(() => {
                                       e.target.value
                                     )
                                   }
-                                  className="border rounded px-2 py-1"
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
                                 />
-                            <input
-  type="number"
-  placeholder="Costo de fabricación"
-  value={formularios[orden.id_orden_fabricacion]?.costo_fabricacion || ""}
-  onChange={(e) => {
-    const valor = e.target.value;
-    const clave = `${orden.id_orden_fabricacion}-${formularios[orden.id_orden_fabricacion]?.articulo}-${formularios[orden.id_orden_fabricacion]?.etapa}`;
-    
-    // Marca que el usuario ha editado este campo
-    costoManualEditado.current[clave] = true;
+                                <input
+                                  type="number"
+                                  placeholder="Costo de fabricación"
+                                  value={
+                                    formularios[orden.id_orden_fabricacion]
+                                      ?.costo_fabricacion || ""
+                                  }
+                                  onChange={(e) => {
+                                    const valor = e.target.value;
+                                    const clave = `${
+                                      orden.id_orden_fabricacion
+                                    }-${
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.articulo
+                                    }-${
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.etapa
+                                    }`;
 
-    actualizarFormulario(
-      orden.id_orden_fabricacion,
-      "costo_fabricacion",
-      valor
-    );
-  }}
-  className="border rounded px-2 py-1"
-/>
+                                    // Marca que el usuario ha editado este campo
+                                    costoManualEditado.current[clave] = true;
+
+                                    actualizarFormulario(
+                                      orden.id_orden_fabricacion,
+                                      "costo_fabricacion",
+                                      valor
+                                    );
+                                  }}
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
+                                />
 
                                 <input
                                   type="text"
@@ -802,15 +902,24 @@ useEffect(() => {
                                       e.target.value
                                     )
                                   }
-                                  className="border rounded px-2 py-1"
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
                                 />
                               </div>
-                              <button
-                                type="submit"
-                                className="mt-2 px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600"
-                              >
-                                Registrar avance
-                              </button>
+                              <div className="flex justify-end gap-2 mt-4">
+                                <button
+                                  type="submit"
+                                  className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 cursor-pointer"
+                                >
+                                  Registrar avance
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMostrarFormularioAvance(null)}
+                                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 cursor-pointer"
+                                >
+                                  Cerrar
+                                </button>
+                              </div>
                             </form>
                           </div>
                         )}
