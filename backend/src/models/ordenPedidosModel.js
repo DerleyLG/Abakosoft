@@ -22,7 +22,7 @@ getAll: async (estadoQueryParam) => {
       WHERE p.estado IN (${placeholders})
       GROUP BY p.id_pedido
       ORDER BY p.fecha_pedido DESC;
-    `, estadosToFilter); // Aquí pasamos el array de estados para la consulta SQL
+    `, estadosToFilter); 
     return rows;
   },
  create: async ({ id_cliente, estado, observaciones }, connection = db) => {

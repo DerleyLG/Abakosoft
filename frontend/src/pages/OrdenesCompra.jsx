@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api";
-import { FiEye, FiArrowLeft, FiTrash2, FiPlus } from "react-icons/fi";
+import api from "../services/api"; // ajusta según tu estructura
+import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle } from "react-icons/fi"; // Añadido FiCheckCircle
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -13,12 +13,15 @@ const OrdenesCompra = () => {
   const [ordenes, setOrdenes] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mostrarCanceladas, setMostrarCanceladas] = useState(false); // NUEVO ESTADO
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchOrdenes = async () => {
       try {
-        const res = await api.get("/ordenes-compra");
+        // MODIFICADO: Ajustar el endpoint basado en el estado de mostrarCanceladas
+        const endpoint = mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra";
+        const res = await api.get(endpoint);
         setOrdenes(res.data);
       } catch (error) {
         console.error("Error al cargar las órdenes de compra:", error);
@@ -27,24 +30,24 @@ const OrdenesCompra = () => {
     };
 
     fetchOrdenes();
-  }, []);
+  }, [mostrarCanceladas]); // Añadido mostrarCanceladas como dependencia
 
   const handleCrear = () => navigate("/ordenes_compra/nuevo");
 
   const handleDelete = (id) => {
     confirmAlert({
-      title: "Confirmar eliminación",
-      message: "¿Seguro que quieres eliminar esta orden?",
+      title: "Confirmar cancelación", // Cambiado a "cancelación"
+      message: "¿Seguro que quieres cancelar esta orden? Si ya fue recibida, se revertirá el stock de los artículos.",
       buttons: [
         {
           label: "Sí",
           onClick: async () => {
             try {
               await api.delete(`/ordenes-compra/${id}`);
-              toast.success("Orden eliminada");
-              setOrdenes((prev) =>
-                prev.filter((o) => o.id_orden_compra !== id)
-              );
+              toast.success("Orden cancelada y stock ajustado correctamente");
+
+              const res = await api.get(mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra");
+              setOrdenes(res.data);
             } catch (error) {
               const mensaje =
                 error.response?.data?.error ||
@@ -59,6 +62,42 @@ const OrdenesCompra = () => {
     });
   };
 
+  // NUEVA FUNCIÓN: Manejar la confirmación de recepción
+  const handleConfirmarRecepcion = (id) => {
+    confirmAlert({
+      title: "Confirmar Recepción de Mercancía",
+      message: "¿Estás seguro de que deseas confirmar la recepción de esta orden? Esto aumentará el stock en inventario.",
+      buttons: [
+        {
+          label: "Sí",
+          onClick: async () => {
+            try {
+              await api.post(`/ordenes-compra/${id}/recibir`);
+              toast.success("Recepción confirmada y stock actualizado.");
+            
+              const res = await api.get(mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra");
+              setOrdenes(res.data);
+            } catch (error) {
+              const mensaje =
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message;
+              toast.error(mensaje);
+            }
+          },
+        },
+        { label: "No", onClick: () => {} },
+      ],
+    });
+  };
+
+  // NUEVA FUNCIÓN: Alternar la visibilidad de órdenes canceladas
+  const toggleMostrarCanceladas = () => {
+    setMostrarCanceladas((prev) => !prev);
+    setExpandedId(null); // Colapsar cualquier detalle expandido al cambiar el filtro
+  };
+
+
   const toggleExpand = async (id) => {
     if (expandedId === id) {
       setExpandedId(null);
@@ -68,15 +107,15 @@ const OrdenesCompra = () => {
     const orden = ordenes.find((o) => o.id_orden_compra === id);
     if (!orden.detalles) {
       try {
-        const res = await api.get(`/detalles-orden-compra/orden/${id}`);
+        const res = await api.get(`/ordenes-compra/${id}`);
         setOrdenes((prev) =>
           prev.map((o) =>
-            o.id_orden_compra === id ? { ...o, detalles: res.data } : o
+            o.id_orden_compra === id ? { ...o, detalles: res.data.detalles } : o
           )
         );
       } catch (error) {
         console.error("Error al cargar detalles:", error);
-        toast.error("No se pudieron cargar los detalles");
+        toast.error("No se pudieron cargar los detalles de la orden.");
         return;
       }
     }
@@ -86,7 +125,7 @@ const OrdenesCompra = () => {
 
   const filteredOrdenes = ordenes.filter((orden) => {
     const term = searchTerm.toLowerCase();
-    const proveedor = orden.proveedor?.toLowerCase() || "";
+    const proveedor = orden.proveedor_nombre?.toLowerCase() || "";
     const fechaStr = new Date(orden.fecha).toLocaleDateString("es-ES", {
       day: "2-digit",
       month: "2-digit",
@@ -120,6 +159,18 @@ const OrdenesCompra = () => {
             Nueva orden
           </button>
 
+          {/* NUEVO BOTÓN: Alternar mostrar/ocultar canceladas */}
+          <button
+            onClick={toggleMostrarCanceladas}
+            className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
+              mostrarCanceladas
+                ? "bg-red-600 hover:bg-red-500 text-white"
+                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+            }`}
+          >
+            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
+          </button>
+
           <button
             onClick={() => navigate(-1)}
             className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
@@ -131,7 +182,7 @@ const OrdenesCompra = () => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
               <th className="px-4 py-3">Proveedor</th>
@@ -147,38 +198,46 @@ const OrdenesCompra = () => {
                 <React.Fragment key={orden.id_orden_compra}>
                   <tr
                     onClick={() => toggleExpand(orden.id_orden_compra)}
-                    className="hover:bg-slate-300 transition cursor-pointer"
+                    className={`cursor-pointer ${expandedId === orden.id_orden_compra ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'} transition`}
                   >
-                    <td className="px-4 py-3">{orden.proveedor}</td>
+                    <td className="px-4 py-3">{orden.proveedor_nombre}</td>
                     <td className="px-4 py-3">
                       {new Date(orden.fecha).toLocaleDateString("es-ES")}
                     </td>
                     <td className="px-4 py-3">
-                      ${Number(orden.total || 0).toLocaleString()}
+                      ${Number(orden.monto_total || 0).toLocaleString()}
                     </td>
                     <td className="px-4 py-3">{orden.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpand(orden.id_orden_compra);
-                        }}
-                        className="text-blue-600 hover:text-blue-400 cursor-pointer"
-                        title="Ver detalle"
-                      >
-                        <FiEye size={18} />
-                      </button>
+                   
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(orden.id_orden_compra);
-                        }}
-                        className="text-red-600 hover:text-red-400 cursor-pointer"
-                        title="Eliminar"
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
+                
+                      {orden.estado === 'pendiente' && !mostrarCanceladas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfirmarRecepcion(orden.id_orden_compra);
+                          }}
+                          className="text-green-600 hover:text-green-400 cursor-pointer"
+                          title="Confirmar Recepción"
+                        >
+                          <FiCheckCircle size={18} />
+                        </button>
+                      )}
+
+                    
+                      {orden.estado !== 'cancelada' && !mostrarCanceladas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(orden.id_orden_compra);
+                          }}
+                          className="text-red-600 hover:text-red-400 cursor-pointer"
+                          title="Cancelar Orden"
+                        >
+                          <FiTrash2 size={18} />
+                        </button>
+                      )}
                     </td>
                   </tr>
 
@@ -188,24 +247,24 @@ const OrdenesCompra = () => {
                         <div className="mt-3">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="bg-slate-300 text-gray-700">
-                                <th className="px-2 py-1">Descripción</th>
-                                <th className="px-2 py-1">Cantidad</th>
-                                <th className="px-2 py-1">Precio Unitario</th>
-                                <th className="px-2 py-1">Subtotal</th>
+                              <tr className="bg-gray-200 text-gray-700">
+                                <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Precio Unitario</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Subtotal</th>
                               </tr>
                             </thead>
-                            <tbody className="hover:bg-slate-200">
+                            <tbody className="hover:bg-gray-100">
                               {orden.detalles && orden.detalles.length > 0 ? (
                                 orden.detalles.map((d, i) => (
                                   <tr key={i}>
-                                    <td className="px-2 py-1">{d.descripcion_articulo}</td>
-                                    <td className="px-2 py-1">{d.cantidad}</td>
-                                    <td className="px-2 py-1">
+                                    <td className="px-2 py-2 border-b border-gray-300">{d.descripcion_articulo}</td>
+                                    <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
+                                    <td className="px-2 py-2 border-b border-gray-300">
                                       ${Number(d.precio_unitario).toLocaleString()}
                                     </td>
-                                    <td className="px-2 py-1">
-                                      ${Number(d.subtotal || d.cantidad * d.precio_unitario).toLocaleString()}
+                                    <td className="px-2 py-2 border-b border-gray-300">
+                                      ${Number(d.cantidad * d.precio_unitario).toLocaleString()}
                                     </td>
                                   </tr>
                                 ))

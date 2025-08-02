@@ -2,35 +2,50 @@ const dashboardModel = require("../models/dashboardModel");
 
 const getDashboardData = async (req, res) => {
   try {
-    const totalArticulos = await dashboardModel.getTotalArticulos();
-    const ordenesPendientes = await dashboardModel.getOrdenesPendientes();
-    const trabajadoresActivos = await dashboardModel.getTrabajadoresActivos();
-    const TotalClientes = await dashboardModel.getTotalClientes();
-    const costosIndirectos = Number(await dashboardModel.getCostosIndirectos());
-    const pagosTrabajadores = await dashboardModel.getpagosTrabajadores();
-    const egresosPagos = Number(await dashboardModel.getPagosTrabajadoresMes());
+    // Usamos Promise.all para hacer las llamadas al modelo de forma concurrente
+    // esto es más eficiente que hacer cada llamada con await individualmente.
+    const [
+      totalArticulos,
+      ordenesPendientes,
+      trabajadoresActivos,
+      TotalClientes,
+      ingresosMes,
+      egresosMes,
+      pagosTrabajadoresSemana,
+      produccionMensual,
+      articulosBajoStock,
+      ordenesEnProceso
+    ] = await Promise.all([
+      dashboardModel.getTotalArticulos(),
+      dashboardModel.getOrdenesPendientes(),
+      dashboardModel.getTrabajadoresActivos(),
+      dashboardModel.getTotalClientes(),
+      dashboardModel.getIngresosMes(),
+      dashboardModel.getEgresosMes(),
+      dashboardModel.getPagosTrabajadoresSemana(),
+      dashboardModel.getProduccionMensual(),
+      dashboardModel.getArticulosBajoStock(),
+      dashboardModel.getOrdenesEnProceso()
+    ]);
 
-    const egresosServicios = Number(
-      await dashboardModel.getServiciosTercerosMes()
-    );
-    const ingresos = Number(await dashboardModel.getIngresosMes());
-    const produccionMensual = await dashboardModel.getProduccionMensual();
+    // Cálculo del margen de utilidad
+    const margenUtilidad = ingresosMes > 0 ? ((ingresosMes - egresosMes) / ingresosMes) * 100 : 0;
+  
 
-    const egresos = costosIndirectos + egresosPagos + egresosServicios;
-    const margen = ingresos > 0 ? ((ingresos - egresos) / ingresos) * 100 : 0;
-
-    console.log({ produccionMensual });
+    // Enviamos los datos en una única respuesta JSON
     res.json({
       totalArticulos,
       ordenesPendientes,
       trabajadoresActivos,
       TotalClientes,
-      costosIndirectos,
-      pagosTrabajadores,
-      ingresosMes: ingresos,
-      egresosMes: egresos,
-      margenUtilidad: parseFloat(margen.toFixed(2)),
+      ingresosMes: Number(ingresosMes),
+      egresosMes: Number(egresosMes),
+  
+      pagosTrabajadores: Number(pagosTrabajadoresSemana),
+      margenUtilidad: parseFloat(margenUtilidad.toFixed(2)),
       produccionMensual,
+      articulosBajoStock,
+      ordenesEnProceso,
     });
   } catch (error) {
     console.error("Error en dashboardController:", error);

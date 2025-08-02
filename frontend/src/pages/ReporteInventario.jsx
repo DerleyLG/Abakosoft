@@ -5,10 +5,7 @@ const ReporteInventario = () => {
     <ReporteBase
       titulo="Reporte de Inventario"
       endpoint="http://localhost:3300/api/reportes/inventario"
-      filtros={[
-        { name: "categoria", label: "Categoría" },
-        { name: "articulo", label: "Nombre del Artículo" },
-      ]}
+
       columnas={[
         { header: "Artículo", accessor: "descripcion" },
         { header: "Categoría", accessor: "categoria" }, 

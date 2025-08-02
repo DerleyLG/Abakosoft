@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { confirmAlert } from 'react-confirm-alert';
 import 'react-confirm-alert/src/react-confirm-alert.css';
 import '../styles/confirmAlert.css';
-import { FiTrash2, FiPlus, FiArrowLeft } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 
 const CostosIndirectos = () => {
   const [costos, setCostos] = useState([]);
@@ -74,8 +74,15 @@ const CostosIndirectos = () => {
             <FiPlus size={20} />
             Registrar nuevo
           </button>
+           <button
+            onClick={() => navigate('/costos_materia_prima')}
+            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+          >
+           <FiArrowRight />
+            Costos de materia prima
+          </button>
           <button
-            onClick={() => navigate('/ordenes')}
+            onClick={() => navigate(-1)}
             className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
           >
             <FiArrowLeft />
@@ -85,7 +92,7 @@ const CostosIndirectos = () => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
          

@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 
@@ -33,9 +34,8 @@ const ordenPedidosRoutes = require('./src/routes/ordenPedidosRoutes.js');
 const detalleOrdenPedidoRoutes = require('./src/routes/detalleOrdenPedidoRoutes.js');
 const lotesFabricadosRoutes = require('./src/routes/lotesFabricadosRoutes.js');
 const anticiposRoutes = require('./src/routes/anticiposRoutes.js');
-
-
 const detalleOrdenCompraRoutes = require('./src/routes/detalleOrdenCompraRoutes');
+const compraMateriaPrimaRoutes = require('./src/routes/compraMateriaPrimaRoutes.js');
 
 
 
@@ -100,8 +100,7 @@ app.use('/api/etapas-produccion', etapasProduccionRoutes);
 // Montaje del modulo serviciosTercerizados
 app.use('/api/servicios-tercerizados', serviciosTercerizadosRoutes);
 
-//autenticacion
-app.use('/api/auth', authRoutes);
+
 
 // Montaje del modulo serviciosTercerizadosAsignados
 app.use('/api/servicios-tercerizados-asignados', serviciosTercerizadosAsignadosRoutes);
@@ -109,13 +108,14 @@ app.use('/api/servicios-tercerizados-asignados', serviciosTercerizadosAsignadosR
 //Montaje del modulo reportes
 app.use('/api/reportes', reportesRoutes);
 
+//autenticacion
+app.use('/api/auth', authRoutes);
+
 app.use('/api/detalle-pago-trabajador', detallePagoRoutes);
 
 app.use('/api/dashboard', dashboardRouter);
 
-
 app.use('/api/inventario', inventarioRoutes);
-
 
 app.use('/api/ordenes', ordenesRoutes);
 
@@ -132,6 +132,15 @@ app.use('/api/lotes-fabricados', lotesFabricadosRoutes);
 app.use('/api/anticipos', anticiposRoutes);
 
 app.use('/api/detalles-orden-compra', detalleOrdenCompraRoutes);
+
+app.use('/api/compras_materia_prima', compraMateriaPrimaRoutes);
+
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
+
+
+app.get(/^\/(?!api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'));
+});
 
 const PORT = process.env.PORT || 3300;
 app.listen(PORT, () => {

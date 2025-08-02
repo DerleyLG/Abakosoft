@@ -327,4 +327,13 @@ module.exports = {
       res.status(500).json({ error: err.message || "Error al anular la orden de venta." });
     }
   },
+   getArticulosConStock: async (req, res) => {
+    try {
+      const articulos = await ordenModel.getArticulosConStock();
+      res.json(articulos);
+    } catch (error) {
+      console.error('Error al obtener artículos con stock:', error);
+      res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+  },
 };

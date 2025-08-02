@@ -34,7 +34,7 @@ const OrdenVentaForm = () => {
 
     const fetchArticulos = async () => {
       try {
-        const res = await api.get("/articulos");
+        const res = await api.get("ordenes-venta/articulos-con-stock");
         setArticulos(Array.isArray(res.data) ? res.data : []);
       } catch {
         toast.error("Error al cargar artículos");

@@ -45,9 +45,9 @@ module.exports = {
   return rows;
 },
 
-async  getAvanceFabricacion({ orden, desde, hasta, estado }) {
+async getAvanceFabricacion({ orden, desde, hasta, estado }) {
   let sql = `
-    SELECT 
+    SELECT
       ofab.id_orden_fabricacion,
       ep.nombre AS etapa,
       aep.fecha_registro,
@@ -59,30 +59,44 @@ async  getAvanceFabricacion({ orden, desde, hasta, estado }) {
     JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
     LEFT JOIN trabajadores t ON aep.id_trabajador = t.id_trabajador
   `;
-  const params = [];
+
+  const conditions = []; // Array para almacenar las condiciones WHERE
+  const params = [];    // Array para almacenar los parámetros
 
   if (orden) {
-    sql += ' AND ofab.id_orden_fabricacion = ?';
+    conditions.push('ofab.id_orden_fabricacion = ?');
     params.push(orden);
   }
   if (desde) {
-    sql += ' AND aep.fecha_registro >= ?';
+    conditions.push('aep.fecha_registro >= ?');
     params.push(desde);
   }
   if (hasta) {
-    sql += ' AND aep.fecha_registro <= ?';
+    conditions.push('aep.fecha_registro <= ?');
     params.push(hasta);
   }
   if (estado) {
-    sql += ' AND aep.estado = ?';
+    conditions.push('aep.estado = ?');
     params.push(estado);
+  }
+
+
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND '); 
   }
 
   sql += ' ORDER BY ofab.id_orden_fabricacion, aep.fecha_registro';
 
-  const [rows] = await db.query(sql, params);
-  return rows;
+  try {
+    const [rows] = await db.query(sql, params);
+    return rows;
+  } catch (error) {
+    console.error('Error en la consulta SQL de getAvanceFabricacion:', error);
+    throw error; // Propaga el error para que el controlador lo maneje
+  }
 },
+
+
 
 async getReporteOrdenesCompra({ proveedor, desde, hasta, estado }) {
     let filtros = [];
@@ -165,143 +179,117 @@ async getReporteOrdenesCompra({ proveedor, desde, hasta, estado }) {
 },
 
 
-async getCostosProduccion({ desde, hasta, orden }) {
-  let filtros = [];
-  let valores = [];
+ async getCostosProduccion({ desde, hasta, orden }) {
+    let conditions = [];
+    let params = [];
+    
 
-  if (desde && hasta) {
-    filtros.push('ofab.fecha_creacion BETWEEN ? AND ?');
-    valores.push(desde, hasta);
-  }
+    if (desde) {
+        conditions.push('ofab.fecha_inicio >= ?');
+        params.push(desde);
+    }
+    if (hasta) {
+        conditions.push('ofab.fecha_inicio <= ?');
+        params.push(hasta);
+    }
+    
+   
+    if (orden) {
+      conditions.push('ofab.id_orden_fabricacion = ?');
+      params.push(orden);
+    }
 
-  if (orden) {
-    filtros.push('ofab.id_orden_fabricacion = ?');
-    valores.push(orden);
-  }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-
-  const [rows] = await db.query(`
-      SELECT 
+    const sql = `
+      SELECT
         ofab.id_orden_fabricacion,
-        a.descripcion AS articulo,
-        df.cantidad,
-        a.costo AS costo_unitario,
-        (df.cantidad * a.costo) AS costo_total_articulo,
-        (
-          SELECT COALESCE(SUM(cia.valor_asignado), 0)
-          FROM costos_indirectos_asignados cia
-          WHERE cia.id_orden_fabricacion = ofab.id_orden_fabricacion
-        ) AS costo_indirecto
-      FROM detalle_orden_fabricacion df
-      JOIN ordenes_fabricacion ofab ON df.id_orden_fabricacion = ofab.id_orden_fabricacion
-      JOIN articulos a ON df.id_articulo = a.id_articulo
-      ORDER BY ofab.id_orden_fabricacion;
-    `);
-    return rows;
+        ofab.fecha_inicio,
+        COALESCE(SUM(df.cantidad * a.precio_costo), 0) AS costo_articulos,
+        COALESCE(SUM(aep.cantidad * aep.costo_fabricacion), 0) AS costo_mano_obra
+    
+      FROM ordenes_fabricacion ofab
+      LEFT JOIN detalle_orden_fabricacion df ON ofab.id_orden_fabricacion = df.id_orden_fabricacion
+      LEFT JOIN articulos a ON df.id_articulo = a.id_articulo
+      LEFT JOIN avance_etapas_produccion aep ON ofab.id_orden_fabricacion = aep.id_orden_fabricacion
+      ${where}
+      GROUP BY ofab.id_orden_fabricacion
+      ORDER BY ofab.fecha_inicio DESC;
+    `;
+
+    try {
+      const [rows] = await db.query(sql, params);
+      return rows;
+    } catch (error) {
+      console.error('Error en la consulta SQL de getCostosProduccion:', error);
+      throw error;
+    }
   },
 
-  async getVentasPorFiltros({ desde, hasta, estado, id_cliente, monto_min, monto_max }) {
-  let sql = `
-    SELECT
-      ov.id_orden_venta,
-      ov.fecha,
-      c.nombre AS cliente,
-      ov.estado
-    FROM ordenes_venta ov
-    JOIN clientes c ON ov.id_cliente = c.id_cliente
-    WHERE 1=1
-  `;
+ 
+async getUtilidadPorOrden({ desde, hasta, orden }) {
+    let conditions = [];
+    let params = [];
 
-  const params = [];
+    if (desde) {
+      conditions.push('ofab.fecha_inicio >= ?');
+      params.push(desde);
+    }
+    if (hasta) {
+      conditions.push('ofab.fecha_inicio <= ?');
+      params.push(hasta);
+    }
+    
+    if (orden) {
+      conditions.push('ofab.id_orden_fabricacion = ?');
+      params.push(orden);
+    }
 
-  if (desde) {
-    sql += ' AND ov.fecha >= ? ';
-    params.push(desde);
-  }
-  if (hasta) {
-    sql += ' AND ov.fecha <= ? ';
-    params.push(hasta);
-  }
-  if (estado) {
-    sql += ' AND ov.estado = ? ';
-    params.push(estado);
-  }
-  if (id_cliente) {
-    sql += ' AND ov.id_cliente = ? ';
-    params.push(id_cliente);
-  }
-  if (monto_min) {
-    sql += ' AND ov.total >= ? ';
-    params.push(monto_min);
-  }
-  if (monto_max) {
-    sql += ' AND ov.total <= ? ';
-    params.push(monto_max);
-  }
+     let where = "WHERE ofab.estado = 'completada'";
+    if (conditions.length > 0) {
+      where += ` AND ${conditions.join(' AND ')}`;
+    }
 
-  sql += ' ORDER BY ov.fecha DESC;';
+    const sql = `
+   SELECT
+        ofab.id_orden_fabricacion,
+        ofab.fecha_inicio,
+        
+        COALESCE(SUM(df.cantidad * a_material.precio_costo), 0) AS costo_articulos,
+       
+        COALESCE(SUM(aep.cantidad * aep.costo_fabricacion), 0) AS costo_mano_obra,
+       
+        COALESCE(SUM(aep.cantidad * a_venta.precio_venta), 0) AS total_ingresos
+      FROM ordenes_fabricacion ofab
+      LEFT JOIN detalle_orden_fabricacion df ON ofab.id_orden_fabricacion = df.id_orden_fabricacion
+      LEFT JOIN articulos a_material ON df.id_articulo = a_material.id_articulo
+      LEFT JOIN avance_etapas_produccion aep ON ofab.id_orden_fabricacion = aep.id_orden_fabricacion
+     
+      LEFT JOIN articulos a_venta ON aep.id_articulo = a_venta.id_articulo
+      ${where}
+      GROUP BY ofab.id_orden_fabricacion
+      ORDER BY ofab.fecha_inicio DESC;
+    `;
+    try {
+      const [rows] = await db.query(sql, params);
+      return rows;
+    } catch (error) {
+      console.error('Error en la consulta SQL de getUtilidadPorOrden:', error);
+      throw error;
+    }
+  },
+  
 
-  const [rows] = await db.query(sql, params);
-  return rows;
-},
-async getUtilidadPorOrden({ desde, hasta, estado }) {
-  let sql = `
-    SELECT
-      ov.id_orden_venta,
-      ov.fecha,
-      c.nombre AS cliente,
-      SUM(dov.cantidad * a.precio_venta) AS total_venta,
-      SUM(dov.cantidad * a.costo) AS costo_total,
-      SUM(dov.cantidad * a.precio_venta) - SUM(dov.cantidad * a.costo) AS utilidad,
-      ov.estado
-    FROM ordenes_venta ov
-    JOIN clientes c ON ov.id_cliente = c.id_cliente
-    JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
-    JOIN articulos a ON dov.id_articulo = a.id_articulo
-    WHERE 1=1
-  `;
-
-  const params = [];
-
-  if (desde) {
-    sql += " AND ov.fecha >= ? ";
-    params.push(desde);
-  }
-
-  if (hasta) {
-    sql += " AND ov.fecha <= ? ";
-    params.push(hasta);
-  }
-
-  if (estado) {
-    sql += " AND ov.estado = ? ";
-    params.push(estado);
-  }
-
-  sql += `
-    GROUP BY ov.id_orden_venta
-    ORDER BY ov.fecha DESC
-  `;
-
-  const [rows] = await db.query(sql, params);
-  return rows;
-},
-
-async getPagosTrabajadores({ id_trabajador, desde, hasta, es_anticipo }) {
+async getPagosTrabajadores({ id_trabajador, desde, hasta }) {
   let sql = `
     SELECT 
       pt.id_pago,
       pt.fecha_pago,
       pt.monto_total,
-      t.nombre AS trabajador,
-      dpt.cantidad,
-      dpt.pago_unitario,
-      dpt.subtotal,
-      pt.es_anticipo
+      t.nombre AS trabajador
     FROM pagos_trabajadores pt
     JOIN trabajadores t ON pt.id_trabajador = t.id_trabajador
     JOIN detalle_pago_trabajador dpt ON pt.id_pago = dpt.id_pago
-    WHERE 1=1
   `;
 
   const params = [];
@@ -318,16 +306,155 @@ async getPagosTrabajadores({ id_trabajador, desde, hasta, es_anticipo }) {
     sql += ' AND pt.fecha_pago <= ?';
     params.push(hasta);
   }
-  if (es_anticipo !== undefined) {
-    sql += ' AND pt.es_anticipo = ?';
-    params.push(es_anticipo);
-  }
+
 
   sql += ' ORDER BY pt.fecha_pago DESC';
 
   const [rows] = await db.query(sql, params);
   return rows;
-}
+},
+
+async getVentasPorPeriodo({ desde, hasta, estado, id_cliente, groupBy = 'orden' }) {
 
 
+  const filtros = ['1=1'];
+  const params = [];
+
+  
+  if (desde) {
+    const desdeConHora = /^\d{4}-\d{2}-\d{2}$/.test(desde) ? `${desde} 00:00:00` : desde;
+    filtros.push('ov.fecha >= ?');
+    params.push(desdeConHora);
+  }
+  if (hasta) {
+    const hastaConHora = /^\d{4}-\d{2}-\d{2}$/.test(hasta) ? `${hasta} 23:59:59` : hasta;
+    filtros.push('ov.fecha <= ?');
+    params.push(hastaConHora);
+  }
+
+  if (estado) {
+    filtros.push('ov.estado = ?');
+    params.push(estado);
+  }
+
+  if (id_cliente) {
+    filtros.push('ov.id_cliente = ?');
+    params.push(id_cliente);
+  }
+
+  const where = `WHERE ${filtros.join(' AND ')}`;
+
+  // SELECT y GROUP BY dinámicos según el tipo de agrupación
+  let select, groupBySql, orderBy;
+
+  if (groupBy === 'dia') {
+    select = `
+      SELECT
+        DATE(ov.fecha) AS fecha,
+        COUNT(DISTINCT ov.id_orden_venta) AS ordenes,
+        COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) AS total_venta
+      FROM ordenes_venta ov
+      JOIN clientes c ON ov.id_cliente = c.id_cliente
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+    `;
+    groupBySql = `GROUP BY DATE(ov.fecha)`;
+    orderBy = `ORDER BY fecha DESC`;
+
+  } else if (groupBy === 'mes') {
+    // YYYY-MM para visualización; se agrupa por YEAR y MONTH para ordenar correctamente.
+    select = `
+      SELECT
+        DATE_FORMAT(ov.fecha, '%Y-%m') AS periodo,
+        COUNT(DISTINCT ov.id_orden_venta) AS ordenes,
+        COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) AS total_venta
+      FROM ordenes_venta ov
+      JOIN clientes c ON ov.id_cliente = c.id_cliente
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+    `;
+    groupBySql = `GROUP BY YEAR(ov.fecha), MONTH(ov.fecha)`;
+    orderBy = `ORDER BY YEAR(ov.fecha) DESC, MONTH(ov.fecha) DESC`;
+
+  } else {
+    // Por orden (detalle por cada OV con su total)
+    select = `
+      SELECT
+        ov.id_orden_venta,
+        ov.fecha,
+        c.nombre AS cliente,
+        ov.estado,
+        COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) AS total_venta
+      FROM ordenes_venta ov
+      JOIN clientes c ON ov.id_cliente = c.id_cliente
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+    `;
+    groupBySql = `GROUP BY ov.id_orden_venta`;
+    orderBy = `ORDER BY ov.fecha DESC`;
+  }
+
+  const sql = `
+    ${select}
+    ${where}
+    ${groupBySql}
+    ${orderBy}
+  `;
+
+  const [rows] = await db.query(sql, params);
+  return rows;
+},
+
+async getMovimientosInventario({ id_articulo, tipo_movimiento, tipo_origen_movimiento, fecha_desde, fecha_hasta }) {
+  let sql = `
+    SELECT 
+      mi.id_movimiento,
+      mi.fecha_movimiento AS fecha,
+      mi.tipo_movimiento,
+      mi.cantidad_movida AS cantidad,
+      mi.observaciones,
+      mi.tipo_origen_movimiento,
+      mi.referencia_documento_id,
+      mi.referencia_documento_tipo,
+      a.descripcion AS articulo,
+      c.nombre AS categoria
+    FROM movimientos_inventario mi
+    JOIN articulos a ON mi.id_articulo = a.id_articulo
+    LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+  `;
+
+  const conditions = [];
+  const params = [];
+
+  if (id_articulo) {
+    conditions.push('mi.id_articulo = ?');
+    params.push(id_articulo);
+  }
+
+  if (tipo_movimiento) {
+    conditions.push('mi.tipo_movimiento = ?');
+    params.push(tipo_movimiento);
+  }
+
+  if (tipo_origen_movimiento) {
+    conditions.push('mi.tipo_origen_movimiento = ?');
+    params.push(tipo_origen_movimiento);
+  }
+
+  if (fecha_desde && fecha_hasta) {
+    conditions.push('mi.fecha_movimiento BETWEEN ? AND ?');
+    params.push(fecha_desde, fecha_hasta);
+  }
+
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`;
+  }
+
+  sql += ' ORDER BY mi.fecha_movimiento DESC';
+
+  try {
+    const [rows] = await db.query(sql, params);
+    return rows;
+  } catch (error) {
+    console.error('Error en la consulta SQL de getMovimientosInventario:', error);
+    throw error;
+  }
+},
 };
