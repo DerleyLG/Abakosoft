@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+
 require('dotenv').config();
 
 
@@ -135,12 +135,7 @@ app.use('/api/detalles-orden-compra', detalleOrdenCompraRoutes);
 
 app.use('/api/compras_materia_prima', compraMateriaPrimaRoutes);
 
-app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 
-
-app.get(/^\/(?!api).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'));
-});
 
 const PORT = process.env.PORT || 3300;
 app.listen(PORT, () => {

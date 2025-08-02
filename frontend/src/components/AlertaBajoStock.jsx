@@ -41,7 +41,7 @@ const AlertaBajoStock = ({ articulos, className, to }) => {
   return (
     <Link 
       to={to} 
-      className={`relative block h-full bg-white rounded-lg shadow-md p-4 transition-transform duration-200 hover:scale-105 group ${className}`}
+      className={`relative block h-full bg-white rounded-lg shadow-md p-4 transition-transform duration-200 group ${className}`}
     >
       <h2 className="text-xl font-bold mb-4 flex items-center text-green-700">
         <FaCheckCircle className="h-6 w-6 mr-3" />
