@@ -11,7 +11,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "3300:3306"
+      - "3300:3300"
     depends_on:
       - db
     environment:
