@@ -1,47 +1,54 @@
-const db = require("../database/db");
+const db = require('../database/db');
 
-const detalleOrdenCompra = {
-  // Obtener todos los detalles de una orden de compra
-  async getByOrdenCompra(id_orden_compra) {
-    const [rows] = await db.query(
-      "SELECT *, (cantidad * precio_unitario) AS total FROM detalle_orden_compra WHERE id_orden_compra = ?",
+module.exports = {
+  getAll: async (connection = db) => {
+    const [rows] = await (connection || db).query('SELECT * FROM detalle_orden_compra');
+    return rows;
+  },
+
+  // MODIFICADO: Ahora usa id_articulo y hace JOIN con articulos para obtener la descripción
+  getByOrdenCompra: async (id_orden_compra, connection = db) => {
+    const [rows] = await (connection || db).query(
+      `SELECT doc.*, a.descripcion AS descripcion_articulo, a.precio_venta
+       FROM detalle_orden_compra doc
+       JOIN articulos a ON doc.id_articulo = a.id_articulo
+       WHERE doc.id_orden_compra = ?`,
       [id_orden_compra]
     );
     return rows;
   },
 
-  // Insertar un detalle de orden de compra
-  async create({ id_orden_compra, descripcion_articulo, cantidad, precio_unitario }) {
-    if (!id_orden_compra || !descripcion_articulo || !cantidad || !precio_unitario) {
-      throw new Error("Todos los campos son obligatorios: id_orden_compra, descripcion_articulo, cantidad, precio_unitario");
-    }
-    const [result] = await db.query(
-      'INSERT INTO detalle_orden_compra (id_orden_compra, descripcion_articulo, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
-      [id_orden_compra, descripcion_articulo, cantidad, precio_unitario]
+  // MODIFICADO: Ahora acepta id_articulo en lugar de descripcion_articulo
+  create: async ({ id_orden_compra, id_articulo, cantidad, precio_unitario }, connection = db) => {
+    const [result] = await (connection || db).query(
+      `INSERT INTO detalle_orden_compra
+       (id_orden_compra, id_articulo, cantidad, precio_unitario)
+       VALUES (?, ?, ?, ?)`,
+      [id_orden_compra, id_articulo, cantidad, precio_unitario]
     );
     return result.insertId;
   },
 
-  // Actualizar un detalle de orden de compra
-  async update(id_detalle_compra, { cantidad, precio_unitario }) {
-    if (cantidad === undefined || precio_unitario === undefined) {
-      throw new Error("Todos los campos son obligatorios: cantidad, precio_unitario");
-    }
-    const [result] = await db.query(
-      "UPDATE detalle_orden_compra SET cantidad = ?, precio_unitario = ? WHERE id_detalle_compra = ?",
-      [cantidad, precio_unitario, id_detalle_compra]
+  // MODIFICADO: Ahora usa id_articulo en lugar de descripcion_articulo
+  update: async (id_detalle_compra, { id_orden_compra, id_articulo, cantidad, precio_unitario }, connection = db) => {
+    const [result] = await (connection || db).query(
+      `UPDATE detalle_orden_compra
+       SET id_orden_compra = ?, id_articulo = ?, cantidad = ?, precio_unitario = ?
+       WHERE id_detalle_compra = ?`,
+      [id_orden_compra, id_articulo, cantidad, precio_unitario, id_detalle_compra]
     );
-    return result;
+    return result.affectedRows;
   },
 
-  // Eliminar un detalle de orden de compra
-  async delete(id_detalle_compra) {
-    const [result] = await db.query(
-      "DELETE FROM detalle_orden_compra WHERE id_detalle_compra = ?",
-      [id_detalle_compra]
-    );
-    return result;
+  // MODIFICADO: Acepta 'connection' opcional
+  delete: async (id_detalle_compra, connection = db) => {
+    const [result] = await (connection || db).query('DELETE FROM detalle_orden_compra WHERE id_detalle_compra = ?', [id_detalle_compra]);
+    return result.affectedRows;
   },
+
+  // Añadido: Eliminar todos los detalles de una orden de compra específica
+  deleteByOrdenCompraId: async (id_orden_compra, connection = db) => {
+    const [result] = await (connection || db).query('DELETE FROM detalle_orden_compra WHERE id_orden_compra = ?', [id_orden_compra]);
+    return result.affectedRows;
+  }
 };
-
-module.exports = detalleOrdenCompra;

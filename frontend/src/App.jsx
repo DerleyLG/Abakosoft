@@ -39,14 +39,49 @@ import CostosIndirectosNuevo from "./pages/CostosIndirectosForm";
 import VistaReportes from "./pages/Reportes";
 import ReporteInventario from "./pages/ReporteInventario";
 import ListaAnticipos from "./pages/Anticipos";
+import CostosMateriaPrima from "./pages/costosMateriaPrima";
+import ReporteAvanceFabricacion from "./pages/ReporteAvanceFabricacion";
+import ReporteVentasPorPeriodo from "./pages/ReporteVentasPorPeriodo";
+import ReporteOrdenesCompra from "./pages/ReporteOrdenesCompra";
+import ReportePagosTrabajadores from "./pages/ReportePagosTrabajadores";
+import ReporteCostosProduccion from "./pages/ReporteCostosFabricacion";
+import ReporteUtilidadPorOrden from "./pages/ReporteUtilidadPorOrden";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import { AuthProvider, useAuth } from './context/AuthContext';
+import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 
+/*const ProtectedRoute = ({ children }) => {
+  
+    const { isAuthenticated, loading } = useAuth();
+    
+ 
+    if (loading) {
+        return <div>Cargando...</div>;
+    }
+
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+
+    return children;
+
+       <Route path="/login" element={<Login/>} />
+        <Route path="/register" element={<Register />} />
+          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+         </AuthProvider>
+};*/
 
 export default function App() {
   return (
     <>
+    
       <Toaster position="top-right" reverseOrder={false} />
       <Routes>
-        <Route path="/" element={<Layout />}>
+       
+      <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="articulos" element={<Articulos />} />
@@ -84,12 +119,19 @@ export default function App() {
           <Route path="costos_indirectos/nuevo" element={<CostosIndirectosNuevo/>} />
           <Route path="reportes" element={<VistaReportes/>} />
           <Route path="reportes/inventario" element={<ReporteInventario/>} />
+          
           <Route path="pagos_anticipados" element={<ListaAnticipos/>} />
-
-
-
+          <Route path="costos_materia_prima" element={<CostosMateriaPrima/>} />
+          <Route path="reportes/avances_fabricacion" element={<ReporteAvanceFabricacion/>} />
+          <Route path="reportes/ventas_por_periodo" element={<ReporteVentasPorPeriodo/>} />
+          <Route path="reportes/ordenes_compra" element={<ReporteOrdenesCompra/>} />
+          <Route path="reportes/pagos_trabajadores" element={<ReportePagosTrabajadores/>} />
+          <Route path="reportes/costos_fabricacion" element={<ReporteCostosProduccion/>} />
+           <Route path="reportes/utilidad_por_orden" element={<ReporteUtilidadPorOrden/>} />
+           <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />
         </Route>
       </Routes>
+     
     </>
   );
 }

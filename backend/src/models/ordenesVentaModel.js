@@ -16,6 +16,20 @@ module.exports = {
     `, estados);
     return rows;
   },
+  
+getArticulosConStock: async () => {
+    const [rows] = await db.query(
+      `SELECT
+         a.id_articulo,
+         a.descripcion,
+         i.stock
+       FROM articulos AS a
+       JOIN inventario AS i ON a.id_articulo = i.id_articulo
+       WHERE i.stock > 0
+       ORDER BY a.descripcion ASC`
+    );
+    return rows;
+  },
 
   // MODIFICADO: Acepta 'connection' opcional
   getById: async (id, connection = db) => {

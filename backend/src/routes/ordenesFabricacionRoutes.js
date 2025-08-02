@@ -5,6 +5,8 @@ const controller = require('../controllers/ordenesFabricacionController');
 // Obtener todas las órdenes de fabricación
 router.get('/', controller.getAll);
 
+router.get('/existe/:id_pedido', controller.existe);
+
 // Obtener una orden de fabricación por ID
 router.get('/:id', controller.getById);
 

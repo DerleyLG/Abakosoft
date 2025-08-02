@@ -4,13 +4,13 @@ import { FiBarChart2, FiDollarSign, FiPackage, FiClipboard, FiSettings } from 'r
 
 const reportes = [
   { titulo: "Reporte de Inventario", ruta: "/reportes/inventario", icono: <FiPackage /> },
-  { titulo: "Avance de Fabricación", ruta: "/reportes/avance-fabricacion", icono: <FiClipboard /> },
-  { titulo: "Ventas por Período", ruta: "/reportes/ventas", icono: <FiDollarSign /> },
-  { titulo: "Órdenes de Compra", ruta: "/reportes/ordenes-compra", icono: <FiClipboard /> },
-  { titulo: "Pagos a Trabajadores", ruta: "/reportes/pagos-trabajadores", icono: <FiDollarSign /> },
-  { titulo: "Costos de Producción", ruta: "/reportes/costos", icono: <FiBarChart2 /> },
-  { titulo: "Utilidad por Orden", ruta: "/reportes/utilidad", icono: <FiBarChart2 /> },
-  { titulo: "Servicios Tercerizados", ruta: "/reportes/servicios", icono: <FiSettings /> },
+  { titulo: "Avance de Fabricación", ruta: "/reportes/avances_fabricacion", icono: <FiClipboard /> },
+  { titulo: "Ventas por Período", ruta: "/reportes/ventas_por_periodo", icono: <FiDollarSign /> },
+  { titulo: "Órdenes de Compra", ruta: "/reportes/ordenes_compra", icono: <FiClipboard /> },
+  { titulo: "Pagos a Trabajadores", ruta: "/reportes/pagos_trabajadores", icono: <FiDollarSign /> },
+  { titulo: "Costos de Producción", ruta: "/reportes/costos_fabricacion", icono: <FiBarChart2 /> },
+  { titulo: "Utilidad por Orden", ruta: "/reportes/utilidad_por_orden", icono: <FiBarChart2 /> },
+  { titulo: "Movimientos de inventario", ruta: "/reportes/movimientos_inventario", icono: <FiSettings /> },
 ];
 
 const VistaReportes = () => {

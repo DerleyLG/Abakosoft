@@ -15,6 +15,7 @@ const OrdenesVenta = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
+
   useEffect(() => {
     const fetchOrdenes = async () => {
       try {
@@ -166,7 +167,7 @@ const OrdenesVenta = () => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
               <th className="px-4 py-3">Cliente</th>
@@ -180,9 +181,11 @@ const OrdenesVenta = () => {
             {filteredOrdenes.length > 0 ? (
               filteredOrdenes.map((orden) => (
                 <React.Fragment key={orden.id_orden_venta}>
-                  <tr
+                   <tr
                     onClick={() => toggleExpand(orden.id_orden_venta)}
-                    className="hover:bg-slate-300 transition cursor-pointer"
+                    className={`cursor-pointer ${
+                      expandedId === orden.id_orden_venta ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'
+                    } transition`}
                   >
                     <td className="px-4 py-3">{orden.cliente_nombre}</td>
                     <td className="px-4 py-3">
@@ -229,24 +232,24 @@ const OrdenesVenta = () => {
                       <td colSpan="5" className="bg-gray-100 px-6 py-4 border-b">
                         <div className="mt-3">
                           <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-slate-300 text-gray-700">
-                                <th className="px-2 py-1">Artículo</th>
-                                <th className="px-2 py-1">Cantidad</th>
-                                <th className="px-2 py-1">Precio Unitario</th>
-                                <th className="px-2 py-1">Subtotal</th>
+                            <thead className="bg-gray-200 text-gray-700">
+                              <tr className="px-2 py-2 border-b border-gray-300">
+                                <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Precio Unitario</th>
+                                <th className="px-2 py-2 border-b border-gray-300">Subtotal</th>
                               </tr>
                             </thead>
-                            <tbody className="hover:bg-slate-200">
+                            <tbody className="hover:bg-gray-100">
                               {orden.detalles && orden.detalles.length > 0 ? (
                                 orden.detalles.map((d, i) => (
                                   <tr key={i}>
-                                    <td className="px-2 py-1">{d.descripcion}</td>
-                                    <td className="px-2 py-1">{d.cantidad}</td>
-                                    <td className="px-2 py-1">
+                                    <td className="px-2 py-2 border-b border-gray-300">{d.descripcion}</td>
+                                    <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
+                                    <td className="px-2 py-2 border-b border-gray-300">
                                       ${Number(d.precio_unitario).toLocaleString()}
                                     </td>
-                                    <td className="px-2 py-1">${Number(d.subtotal).toLocaleString()}</td>
+                                    <td className="px-2 py-2 border-b border-gray-300">${Number(d.subtotal).toLocaleString()}</td>
                                   </tr>
                                 ))
                               ) : (

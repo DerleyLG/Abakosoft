@@ -31,34 +31,52 @@ module.exports = {
     return rows;
   },
 
-  getAllPagados: async (id_trabajador) => {
-    const [rows] = await db.query(`
-      SELECT 
-        a.id_avance_etapa, 
-        a.id_orden_fabricacion, 
-        a.id_etapa_produccion, 
-        a.id_trabajador,
-        a.cantidad, 
-        a.estado,
-        a.fecha_registro, 
-        a.costo_fabricacion,
-        e.nombre AS nombre_etapa,
-        t.nombre AS nombre_trabajador,
-        art.descripcion,
-        c.nombre AS nombre_cliente
-      FROM avance_etapas_produccion a
-      JOIN articulos art ON a.id_articulo = art.id_articulo
-      JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
-      JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
-      JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
-      JOIN pedidos p ON ofa.id_pedido = p.id_pedido
-      JOIN clientes c ON p.id_cliente = c.id_cliente
-      WHERE a.pagado = 1
-      AND a.id_trabajador = ?
-      ORDER BY a.fecha_registro DESC;
-    `, [id_trabajador]);
+  getAllPagados: async (id_trabajador = null) => {
+    let query = `
+      SELECT
+          ae.id_avance_etapa,
+          ae.id_orden_fabricacion,
+          COALESCE(c.nombre, '') AS nombre_cliente,
+          ae.id_articulo,
+          COALESCE(a.descripcion, '') AS descripcion,
+          ae.id_etapa_produccion,
+          COALESCE(ep.nombre, '') AS nombre_etapa,
+          ae.id_trabajador,
+          COALESCE(t.nombre, '') AS nombre_trabajador,
+          ae.cantidad,
+          ae.costo_fabricacion AS costo_fabricacion, -- CORREGIDO: Ahora toma el costo de la tabla 'avance_etapas_produccion' (ae)
+          ae.fecha_registro,
+          ae.estado,
+          ae.pagado
+      FROM avance_etapas_produccion ae
+      LEFT JOIN ordenes_fabricacion ofab ON ae.id_orden_fabricacion = ofab.id_orden_fabricacion
+      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      LEFT JOIN articulos a ON ae.id_articulo = a.id_articulo
+      LEFT JOIN etapas_produccion ep ON ae.id_etapa_produccion = ep.id_etapa
+      LEFT JOIN trabajadores t ON ae.id_trabajador = t.id_trabajador
+      WHERE ae.pagado = 1
+    `;
+    const params = [];
 
-    return rows;
+    if (id_trabajador) {
+        query += ` AND ae.id_trabajador = ?`;
+        params.push(id_trabajador);
+    }
+    query += ` ORDER BY ae.fecha_registro DESC`;
+
+
+
+    try {
+        const [rows] = await db.query(query, params);
+   
+        return rows;
+    } catch (dbError) {
+        // --- LOG DE ERROR EN EL MODELO ---
+        console.error("Error durante la ejecución de la consulta en getAllPagados (modelo):", dbError);
+        // --- FIN LOG DE ERROR ---
+        throw dbError; // Re-lanzar el error para que el controlador lo capture
+    }
   },
 
   getById: async (id) => {

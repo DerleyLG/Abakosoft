@@ -67,6 +67,22 @@ module.exports = {
         return rows;
     },
 
+getArticulosBajoStock: async () => {
+        const [rows] = await db.query(`
+            SELECT
+                a.descripcion,
+                i.stock,
+                i.stock_minimo
+            FROM
+                inventario i
+            JOIN
+                articulos a ON i.id_articulo = a.id_articulo
+            WHERE
+                i.stock <= i.stock_minimo AND
+        `);
+        return rows;
+    },
+
     eliminarDelInventario: async (id_articulo) => {
         const [result] = await db.query('DELETE FROM inventario WHERE id_articulo = ?', [id_articulo]);
         return result.affectedRows > 0;

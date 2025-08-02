@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
-import { FiTrash2, FiPlus, FiArrowLeft, FiArrowUp } from "react-icons/fi";
+import { FiTrash2, FiPlus, FiArrowLeft, FiArrowUp, FiArrowRight } from "react-icons/fi";
 
 const ListaOrdenesFabricacion = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -631,12 +631,14 @@ toast.success("Avance registrado");
             onClick={() => navigate("/lotes_fabricados")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
+             <FiArrowRight />
             Lotes fabricados
           </button>
           <button
             onClick={() => navigate("/avances_fabricacion")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
+             <FiArrowRight />
             Avances de fabricacion
           </button>
           <button
@@ -651,7 +653,7 @@ toast.success("Avance registrado");
           </button>
 
           <button
-            onClick={() => navigate("/ordenes")}
+            onClick={() => navigate(-1)}
             className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
             <FiArrowLeft />
@@ -683,12 +685,7 @@ toast.success("Avance registrado");
                         : "hover:bg-gray-200"
                     }`}
                     onClick={() => expandirOrden(orden.id_orden_fabricacion)}
-                    onDoubleClick={() =>
-                      navigate(
-                        `/ordenes_fabricacion/editar/${orden.id_orden_fabricacion}`
-                      )
-                    }
-                    title="Click para ver detalles, doble click para editar"
+                  
                   >
                     <td className="px-4 py-2">{orden.id_orden_fabricacion}</td>
                     <td className="px-4 py-2">

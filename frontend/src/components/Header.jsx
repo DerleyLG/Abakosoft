@@ -1,9 +1,11 @@
 import { UserCircle, Menu } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link} from 'react-router-dom';
 
 
 const Header = ({ toggleSidebar }) => {
+
   return (
+    
     <header className="flex justify-between items-center p-4 bg-white border-b shadow-sm">
       {/* IZQUIERDA: Botón hamburguesa + logo */}
     
@@ -24,17 +26,6 @@ const Header = ({ toggleSidebar }) => {
 
 
 
-      {/* DERECHA: Home + Usuario */}
-      <div className="flex items-center gap-4">
-        <nav className="font-semibold uppercase text-sm cursor-pointer hover:underline ">
-          <span>
-          <Link to="/dashboard" className="">
-          HOME
-            </Link></span>
-        </nav>
-        <span className="font-semibold uppercase text-sm cursor-pointer hover:underline ">Usuario</span>
-        <UserCircle size={28} className="text-slate-700 cursor-pointer" />
-      </div>
     </header>
   );
 };

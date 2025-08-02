@@ -14,17 +14,18 @@ router.get('/ordenes-compra', reportesController.getReporteOrdenesCompra);
 // Ruta para inventario
 router.get('/inventario', reportesController.getInventarioActual);
 
+router.get('/ventas-periodo', reportesController.getVentasPorPeriodo);
+
 // Ruta para costos de produccion
 router.get('/costos-produccion', reportesController.getCostosProduccion);
 
-// Ruta para costos de produccion
-router.get('/ventas', reportesController.getVentasPorPeriodo);
-
 // Ruta para utilidad por orden de venta
-router.get('/utilidad', reportesController.getUtilidadPorOrden);
+router.get('/utilidad-por-orden', reportesController.getUtilidadPorOrden);
 
 //Ruta para pagos de trabajadores
 router.get('/pagos-trabajadores', reportesController.getPagosTrabajadores);
+
+router.get('/movimientos-inventario', reportesController.getMovimientosInventario);
 
 
 module.exports = router;

@@ -19,6 +19,14 @@ getAll: async (estados = ['pendiente', 'en proceso', 'completada']) => {
   `, estados);
   return rows;
 },
+checkIfExistsByPedidoId: async (idPedido) => {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ?`,
+      [idPedido]
+    );
+    // Retorna true si el conteo es mayor a 0, de lo contrario, false.
+    return rows[0].count > 0;
+  },
 
 
 getById: async (id) => {

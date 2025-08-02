@@ -130,5 +130,15 @@ delete: async (req, res) => {
     console.error('Error al cancelar la orden de fabricación:', error);
     res.status(500).json({ error: 'Error al cancelar la orden de fabricación.' });
   }
-}
+},
+ existe: async  (req, res) => {
+  try {
+    const { id_pedido } = req.params;
+    const existe = await ordenesFabricacionModel.checkIfExistsByPedidoId(id_pedido);
+    res.json({ existe });
+  } catch (error) {
+    console.error('Error al verificar la orden de fabricación:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+ }
 };

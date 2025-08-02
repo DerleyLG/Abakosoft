@@ -113,7 +113,7 @@ const PagosTrabajadores = () => {
       
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
               <th className="px-4 py-3">Trabajador</th>
@@ -127,7 +127,9 @@ const PagosTrabajadores = () => {
               <React.Fragment key={pago.id_pago}>
                 <tr
                   onClick={() => toggleExpand(pago.id_pago)}
-                  className="hover:bg-slate-300 transition cursor-pointer"
+                  className={`cursor-pointer ${
+                    expandedPago === pago.id_pago ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'
+                  }`}
                 >
                   <td className="px-4 py-3">{pago.trabajador}</td>
                   <td className="px-4 py-3">
@@ -148,38 +150,39 @@ const PagosTrabajadores = () => {
                   </td>
                 </tr>
                 {expandedPago === pago.id_pago && (
+                  
                   <tr>
-                    <td colSpan="5" className="bg-gray-100 px-6 py-4 border-b">
+                    <td colSpan="5" className="px-2 py-2 border-b border-gray-300">
                       <strong>Observaciones:</strong>{' '}
                       {pago.observaciones || 'Ninguna'}
 
                       <div className="mt-3">
-                        <table className="w-full text-sm ">
-                          <thead>
-                            <tr className="bg-slate-300 text-gray-700">
-                              <th className="px-2 py-1">
+                        <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
+                          <thead className='bg-gray-200 text-gray-700'>
+                            <tr className="px-2 py-2 border-b border-gray-300">
+                              <th className="px-2 py-2 border-b border-gray-300">
                                 Orden de fabricacion - etapa
                               </th>
-                              <th className="px-2 py-1">Cantidad</th>
-                              <th className="px-2 py-1">Pago Unitario</th>
-                              <th className="px-2 py-1">Subtotal</th>
+                              <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
+                              <th className="px-2 py-2 border-b border-gray-300">Pago Unitario</th>
+                              <th className="ppx-2 py-2 border-b border-gray-300">Subtotal</th>
                             </tr>
                           </thead>
-                          <tbody className="hover:bg-slate-200">
+                          <tbody className="hover:bg-gray-50">
                             {pago.detalles && pago.detalles.length > 0 ? (
                               pago.detalles.map((d, index) => (
                                 <tr key={index}>
-                                  <td className="px-2 py-1">
+                                  <td className="px-2 py-2 border-b border-gray-300">
   {parseInt(d.es_descuento) === 1
     ? "Descuento por anticipo"
     : `#${d.id_orden_fabricacion}  -  ${d.nombre_cliente} --- ${d.nombre_etapa}`
   }
 </td>
-                                  <td className="px-2 py-1">{d.cantidad}</td>
-                                  <td className="px-2 py-1">
+                                  <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
+                                  <td className="px-2 py-2 border-b border-gray-300">
                                     ${Number(d.pago_unitario).toLocaleString()}
                                   </td>
-                                  <td className="px-2 py-1">
+                                  <td className="px-2 py-2 border-b border-gray-300">
                                     ${Number(d.subtotal).toLocaleString()}
                                   </td>
                                 </tr>

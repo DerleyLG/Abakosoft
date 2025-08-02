@@ -66,13 +66,6 @@ module.exports = {
           throw new Error(`El artículo con ID ${id_articulo} no existe.`);
         }
 
-        // --- ELIMINADA LA VALIDACIÓN DE INVENTARIO AQUÍ ---
-        // La validación de si el artículo está en inventario y la opción de agregarlo
-        // con stock 0 se maneja completamente en el frontend (OrdenPedidoForm.jsx).
-        // El backend asume que si el pedido llega aquí, el artículo ya está en 'inventario'
-        // o el usuario decidió no agregarlo y asume el riesgo.
-        // --- FIN DE LA ELIMINACIÓN ---
-
         if (cantidad <= 0) {
           throw new Error(`Cantidad inválida para el artículo ${articuloExistente.descripcion}.`);
         }
@@ -173,5 +166,6 @@ module.exports = {
       console.error("Error al anular el pedido:", err);
       res.status(500).json({ error: "Error al cancelar el pedido." });
     }
-  }
+  },
+ 
 };
