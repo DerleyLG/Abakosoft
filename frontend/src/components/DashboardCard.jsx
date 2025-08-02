@@ -7,8 +7,8 @@ const DashboardCard = ({ title, value, className, to}) => {
       to={to} 
       className={`relative h-full bg-white rounded-lg shadow-md p-4 transition-transform duration-200  group flex flex-col justify-between items-center ${className}`}
     >
-      <h2 className="text-xl font-bold text-center text-gray-800 mb-2">{title}</h2>
-      <p className="text-3xl font-bold text-gray-800">{value}</p>
+      <h2 className=" font-semibold text-center text-gray-800 mb-2">{title}</h2>
+      <p className="text-2xl font-semibold text-gray-800">{value}</p>
       
       {/* Tooltip para el efecto de hover */}
       <div 
