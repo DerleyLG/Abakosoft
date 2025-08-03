@@ -11,10 +11,10 @@ const etapasProduccionModel = {
     return rows[0];
   },
 
-  create: async ({ nombre, descripcion }) => {
+  create: async ({ nombre, descripcion, orden }) => {
     const [result] = await db.query(
-      'INSERT INTO etapas_produccion (nombre, descripcion) VALUES (?, ?)',
-      [nombre, descripcion || null]
+      'INSERT INTO etapas_produccion (nombre, descripcion, orden) VALUES (?, ?, ?)',
+      [nombre, descripcion || null, orden]
     );
     return result.insertId;
   },

@@ -6,7 +6,7 @@ module.exports = {
     return rows;
   },
 
-  // MODIFICADO: Ahora usa id_articulo y hace JOIN con articulos para obtener la descripción
+  // JOIN con artículos para obtener descripción y precio
   getByOrdenCompra: async (id_orden_compra, connection = db) => {
     const [rows] = await (connection || db).query(
       `SELECT doc.*, a.descripcion AS descripcion_articulo, a.precio_venta
@@ -18,7 +18,7 @@ module.exports = {
     return rows;
   },
 
-  // MODIFICADO: Ahora acepta id_articulo en lugar de descripcion_articulo
+  // Crear nuevo detalle de orden de compra
   create: async ({ id_orden_compra, id_articulo, cantidad, precio_unitario }, connection = db) => {
     const [result] = await (connection || db).query(
       `INSERT INTO detalle_orden_compra
@@ -29,7 +29,7 @@ module.exports = {
     return result.insertId;
   },
 
-  // MODIFICADO: Ahora usa id_articulo en lugar de descripcion_articulo
+  // Actualizar detalle de orden
   update: async (id_detalle_compra, { id_orden_compra, id_articulo, cantidad, precio_unitario }, connection = db) => {
     const [result] = await (connection || db).query(
       `UPDATE detalle_orden_compra
@@ -40,15 +40,21 @@ module.exports = {
     return result.affectedRows;
   },
 
-  // MODIFICADO: Acepta 'connection' opcional
+  // Eliminar por ID de detalle
   delete: async (id_detalle_compra, connection = db) => {
-    const [result] = await (connection || db).query('DELETE FROM detalle_orden_compra WHERE id_detalle_compra = ?', [id_detalle_compra]);
+    const [result] = await (connection || db).query(
+      'DELETE FROM detalle_orden_compra WHERE id_detalle_compra = ?',
+      [id_detalle_compra]
+    );
     return result.affectedRows;
   },
 
-  // Añadido: Eliminar todos los detalles de una orden de compra específica
+  // Eliminar todos los detalles por orden de compra
   deleteByOrdenCompraId: async (id_orden_compra, connection = db) => {
-    const [result] = await (connection || db).query('DELETE FROM detalle_orden_compra WHERE id_orden_compra = ?', [id_orden_compra]);
+    const [result] = await (connection || db).query(
+      'DELETE FROM detalle_orden_compra WHERE id_orden_compra = ?',
+      [id_orden_compra]
+    );
     return result.affectedRows;
   }
 };
