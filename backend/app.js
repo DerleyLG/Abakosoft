@@ -100,8 +100,6 @@ app.use('/api/etapas-produccion', etapasProduccionRoutes);
 // Montaje del modulo serviciosTercerizados
 app.use('/api/servicios-tercerizados', serviciosTercerizadosRoutes);
 
-
-
 // Montaje del modulo serviciosTercerizadosAsignados
 app.use('/api/servicios-tercerizados-asignados', serviciosTercerizadosAsignadosRoutes);
 
@@ -138,7 +136,7 @@ app.use('/api/compras_materia_prima', compraMateriaPrimaRoutes);
 
 
 const PORT = process.env.PORT;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0' ,() => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
 
