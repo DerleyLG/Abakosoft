@@ -2,7 +2,6 @@
 FROM node:18 AS build
 WORKDIR /app
 COPY . .
-ENV VITE_API_URL=http://abakosoft-backend-ed7tli-7232ca-148-230-91-63.traefik.me/api
 
 RUN npm install
 RUN npm run build
