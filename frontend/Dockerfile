@@ -5,19 +5,20 @@ FROM node:18 AS build
 WORKDIR /app
 
 # Define el argumento de compilación para VITE_API_URL
+# Esto permite que Docker Compose le pase el valor
 ARG VITE_API_URL
 
 # Copia los archivos de configuración y dependencias
 COPY package*.json ./
 
-# Instala las dependencias. Este paso es necesario.
+# Instala las dependencias
 RUN npm install
 
 # Copia el resto del código de la aplicación
 COPY . .
 
-# Ejecuta el comando de compilación, pasando la variable de entorno.
-# Este paso es el que soluciona tu problema.
+# Ejecuta el comando de compilación, pasando la variable de entorno
+# Esto asegura que Vite tenga acceso al valor durante la compilación
 RUN VITE_API_URL=${VITE_API_URL} npm run build
 
 # ---
