@@ -17,6 +17,7 @@ const ListaArticulos = () => {
     const fetchArticulos = async () => {
       try {
         const res = await api.get('/articulos');
+        console.log("🟡 Respuesta de /articulos:", res.data);  
         setArticulos(res.data);
       } catch (error) {
         console.error('Error cargando artículos', error);

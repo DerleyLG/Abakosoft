@@ -42,7 +42,12 @@ const compraMateriaPrimaRoutes = require('./src/routes/compraMateriaPrimaRoutes.
 
 
 const app = express();
-app.use(cors());
+app.use(cors(
+  {
+      origin: ['http://abakosoft-frontend-bef8en-1dc861-148-230-91-63.traefik.me/'], 
+  credentials: true
+  }
+));
 app.use(express.json());
 
 
