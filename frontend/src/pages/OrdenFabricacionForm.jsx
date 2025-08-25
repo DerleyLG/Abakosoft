@@ -19,8 +19,9 @@ const CrearOrdenFabricacion = () => {
   const [articulos, setArticulos] = useState([]);
   const [etapasProduccion, setEtapasProduccion] = useState([]);
   const [idEtapaDefault, setIdEtapaDefault] = useState(null);
-
+const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
   const [detalles, setDetalles] = useState([]);
+
   useEffect(() => {
     if (etapasProduccion.length > 0) {
       const tapizado = etapasProduccion.find(
@@ -42,43 +43,7 @@ const CrearOrdenFabricacion = () => {
     }
   }, [etapasProduccion]);
 
-  useEffect(() => {
-    const cargarArticulosDelPedido = async () => {
-      try {
-        const res = await api.get(
-          `/detalle-orden-pedido/${idPedidoSeleccionado}`
-        );
-        const detallesPedido = res.data || [];
-
-        const nuevosDetalles = detallesPedido.map((item) => {
-          const articulo = articulos.find(
-            (a) => a.id_articulo === item.id_articulo
-          );
-          return {
-            id: Date.now() + Math.random(),
-            articulo: articulo || {
-              id_articulo: item.id_articulo,
-              descripcion: item.descripcion,
-            },
-            cantidad: item.cantidad,
-            descripcion: "",
-            id_etapa_final: idEtapaDefault || "",
-          };
-        });
-
-        setDetalles(nuevosDetalles);
-      } catch (error) {
-        toast.error("Error al cargar los artículos del pedido");
-        console.error(error);
-      }
-    };
-
-    if (idPedidoSeleccionado && articulos.length > 0) {
-      cargarArticulosDelPedido();
-    }
-  }, [idPedidoSeleccionado, articulos, idEtapaDefault]);
-
-  useEffect(() => {
+ useEffect(() => {
     const fetchOrdenesPedido = async () => {
       try {
         const res = await api.get("/pedidos");
@@ -121,11 +86,78 @@ const CrearOrdenFabricacion = () => {
     fetchEtapas();
   }, []);
 
+  useEffect(() => {
+    const cargarArticulosDelPedido = async () => {
+      try {
+        const res = await api.get(
+          `/detalle-orden-pedido/${idPedidoSeleccionado}`
+        );
+        const detallesPedido = res.data || [];
+
+        // manejar artículos compuestos y no compuestos
+        const nuevosDetallesPromises = detallesPedido.map(async (item) => {
+          const articuloOriginal = articulos.find(
+            (a) => a.id_articulo === item.id_articulo
+          );
+
+          // Si el artículo es compuesto, hace una llamada para obtener sus componentes
+          if (articuloOriginal?.es_compuesto) {
+            const componentesRes = await api.get(
+              `/articulos/componentes/${articuloOriginal.id_articulo}?cantidad_padre=${item.cantidad}`
+            );
+            return componentesRes.data.map((comp) => ({
+              id: Date.now() + Math.random(),
+              articulo: comp,
+              cantidad: comp.cantidad, 
+              descripcion: `Componente para: ${articuloOriginal.descripcion}`,
+              id_etapa_final: idEtapaDefault || "",
+            }));
+          } else {
+            // Si no es compuesto, devolvemos el artículo original
+            return [{
+              id: Date.now() + Math.random(),
+              articulo: articuloOriginal || {
+                id_articulo: item.id_articulo,
+                descripcion: item.descripcion,
+              },
+              cantidad: item.cantidad,
+              descripcion: "",
+              id_etapa_final: idEtapaDefault || "",
+            }];
+          }
+        });
+
+        const nuevosDetallesArray = await Promise.all(nuevosDetallesPromises);
+        setDetalles(nuevosDetallesArray.flat());
+      } catch (error) {
+        toast.error("Error al cargar los artículos del pedido");
+        console.error(error);
+      }
+    };
+
+    if (idPedidoSeleccionado && articulos.length > 0) {
+      cargarArticulosDelPedido();
+    }
+  }, [idPedidoSeleccionado, articulos, idEtapaDefault]);
+ 
+
   const handleDetalleChange = (index, campo, valor) => {
     const nuevosDetalles = [...detalles];
     nuevosDetalles[index][campo] = campo === "cantidad" ? Number(valor) : valor;
-    setDetalles(nuevosDetalles);
+
+   if (campo === "articulo") {
+    const esCompuesto = valor?.es_compuesto === 1;
+    nuevosDetalles[index].mensajeError = esCompuesto
+      ? 'Este artículo es compuesto. No se puede fabricar manualmente.'
+      : null;
+  }
+
+  setDetalles(nuevosDetalles);
+  const tieneCompuesto = nuevosDetalles.some(d => d.articulo?.es_compuesto === 1);
+  setHayArticuloCompuesto(tieneCompuesto);
   };
+
+
   const handleRemoveDetalle = (index) => {
     setDetalles((prevDetalles) => prevDetalles.filter((_, i) => i !== index));
   };
@@ -178,8 +210,7 @@ const CrearOrdenFabricacion = () => {
           id_etapa_final: parseInt(d.id_etapa_final),
         })),
       };
-      console.log("Payload que se enviará al backend:", payload);
-      console.log("Enviando orden de fabricación:", ordenPedido);
+      
       await api.post("/ordenes-fabricacion", payload);
 
       toast.success("Orden de fabricación creada");
@@ -192,6 +223,8 @@ const CrearOrdenFabricacion = () => {
       toast.error(mensajeBackend);
     }
   };
+
+
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
@@ -283,6 +316,7 @@ const CrearOrdenFabricacion = () => {
           </div>
 
           {/* Detalles */}
+        
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Detalles de la orden</h3>
@@ -389,7 +423,11 @@ const CrearOrdenFabricacion = () => {
                     className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                   />
                 </div>
-
+{detalle.mensajeError && (
+      <div className="md:col-span-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <span className="block sm:inline">{detalle.mensajeError}</span>
+      </div>
+    )}
                 {index > 0 && (
                   <button
                     type="button"
@@ -402,12 +440,14 @@ const CrearOrdenFabricacion = () => {
               </div>
             ))}
           </div>
-
+          
+           
           {/* Botón submit */}
           <div className="pt-4 border-t flex justify-end">
             <button
+              disabled={hayArticuloCompuesto}
               type="submit"
-              className="bg-slate-700 hover:bg-slate-900 text-white font-semibold px-8 py-3 rounded-md transition cursor-pointer"
+              className={`${hayArticuloCompuesto ? 'opacity-50 cursor-not-allowed': 'bg-slate-700 hover:bg-slate-900 text-white font-semibold px-8 py-3 rounded-md transition cursor-pointer'}`}
             >
               Crear orden de fabricación
             </button>

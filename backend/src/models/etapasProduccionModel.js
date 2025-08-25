@@ -11,6 +11,11 @@ const etapasProduccionModel = {
     return rows[0];
   },
 
+  async existsByOrden(orden) {
+        const [rows] = await db.query('SELECT 1 FROM etapas_produccion WHERE orden = ? LIMIT 1', [orden]);
+        return rows.length > 0;
+    },
+
   create: async ({ nombre, descripcion, orden }) => {
     const [result] = await db.query(
       'INSERT INTO etapas_produccion (nombre, descripcion, orden) VALUES (?, ?, ?)',
@@ -19,12 +24,12 @@ const etapasProduccionModel = {
     return result.insertId;
   },
 
-  update: async (id, { nombre_etapa, descripcion }) => {
-    await db.query(
-      'UPDATE etapas_produccion SET nombre_etapa = ?, descripcion = ? WHERE id_etapa = ?',
-      [nombre_etapa, descripcion || null, id]
-    );
-  },
+  update: async (id, { nombre, descripcion, orden }) => { 
+        await db.query(
+            'UPDATE etapas_produccion SET nombre = ?, descripcion = ?, orden = ? WHERE id_etapa = ?', 
+            [nombre, descripcion || null, orden, id]
+        );
+    },
 
   delete: async (id) => {
     await db.query('DELETE FROM etapas_produccion WHERE id_etapa = ?', [id]);

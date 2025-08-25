@@ -1,4 +1,7 @@
 const db = require('../database/db');
+const detalleOrdenesFabricacionModel = require("./detalleOrdenFabricacionModel");
+const inventarioModel = require("./inventarioModel"); 
+const LoteModel = require("./lotesFabricadosModel");
 
 module.exports = {
   getAll: async (id_trabajador) => {
@@ -72,10 +75,8 @@ module.exports = {
    
         return rows;
     } catch (dbError) {
-        // --- LOG DE ERROR EN EL MODELO ---
-        console.error("Error durante la ejecución de la consulta en getAllPagados (modelo):", dbError);
-        // --- FIN LOG DE ERROR ---
-        throw dbError; // Re-lanzar el error para que el controlador lo capture
+        
+        throw dbError; 
     }
   },
 
@@ -330,6 +331,60 @@ module.exports = {
     if (!hayArticulosIncompletos) {
       console.log(`Orden ${id_orden_fabricacion} ha sido completamente completada. Actualizando estados...`);
 
+ const esParaCompuesto = await detalleOrdenesFabricacionModel.esArticuloCompuesto(id_orden_fabricacion);
+
+    if (esParaCompuesto) {
+        console.log(`La orden de fabricación es para un producto compuesto. Procediendo a crear el lote del producto final.`);
+        try {
+            //  Obtener el ID y la cantidad del artículo compuesto del pedido.
+            const [articulosPedido] = await (connection || db).query(
+                `SELECT a.id_articulo, dofp.cantidad FROM detalle_pedido dofp
+                 JOIN ordenes_fabricacion ofab ON dofp.id_pedido = ofab.id_pedido
+                 JOIN articulos a ON dofp.id_articulo = a.id_articulo
+                 WHERE ofab.id_orden_fabricacion = ? AND a.es_compuesto = 1`,
+                [id_orden_fabricacion]
+            );
+
+            if (articulosPedido.length > 0) {
+                const articuloFinal = articulosPedido[0];
+                const id_articulo_final = articuloFinal.id_articulo;
+                const cantidad_final = articuloFinal.cantidad;
+                
+                //  Crear el lote del artículo final (compuesto)
+                const [ultimoAvance] = await (connection || db).query(
+    `SELECT id_trabajador FROM avance_etapas_produccion WHERE id_orden_fabricacion = ? ORDER BY fecha_registro DESC LIMIT 1`,
+    [id_orden_fabricacion]
+);
+
+const id_trabajador_final = ultimoAvance.length > 0 ? ultimoAvance[0].id_trabajador : null;
+
+// Ahora pasas el id_trabajador
+const loteId = await LoteModel.createLote({
+    id_orden_fabricacion,
+    id_articulo: id_articulo_final,
+    id_trabajador: id_trabajador_final, 
+    cantidad: cantidad_final,
+    observaciones: `Lote de producto compuesto creado al completar la OF #${id_orden_fabricacion} de sus componentes.`,
+}, connection);
+                //  Actualizar el inventario para el artículo final.
+                await inventarioModel.processInventoryMovement({
+                    id_articulo: Number(id_articulo_final),
+                    cantidad_movida: Number(cantidad_final),
+                    tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
+                    tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.PRODUCCION,
+                    referencia_documento_id: loteId,
+                    referencia_documento_tipo: 'lote',
+                });
+                
+                console.log(` Lote del producto final (ID: ${id_articulo_final}) creado y stock actualizado.`);
+            } else {
+                console.warn(`No se encontró un artículo compuesto en el pedido asociado a la orden ${id_orden_fabricacion}. No se creó el lote final.`);
+            }
+        } catch (error) {
+            console.error(` Error al crear el lote del producto final para la orden ${id_orden_fabricacion}:`, error);
+            // Considera si quieres lanzar el error o solo registrarlo
+        }
+    }
       await (connection || db).query(
         `UPDATE ordenes_fabricacion SET estado = 'completada' WHERE id_orden_fabricacion = ?`,
         [id_orden_fabricacion]
@@ -376,7 +431,7 @@ module.exports = {
     }
   },
 
-  // AÑADIDO: Exportar getEtapaFinalCliente
+
   getEtapaFinalCliente: async (id_orden_fabricacion, id_articulo, connection = db) => {
     const [rows] = await (connection || db).query(`
       SELECT id_etapa_final
@@ -384,7 +439,10 @@ module.exports = {
       WHERE id_orden_fabricacion = ? AND id_articulo = ?
       LIMIT 1
     `, [id_orden_fabricacion, id_articulo]);
-    console.log('🗂 Resultado crudo de consulta de etapa final:', rows);
+  
     return rows.length > 0 ? rows[0].id_etapa_final : null;
   },
+  
+
+
 };

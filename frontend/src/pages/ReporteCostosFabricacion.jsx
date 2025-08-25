@@ -5,7 +5,7 @@ const ReporteCostosProduccion = () => {
   const titulo = "Costos en la producción";
   
 
-  const endpoint = "http://localhost:3300/api/reportes/costos-produccion";
+  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/costos-produccion` ;
 
 
   const columnas = [

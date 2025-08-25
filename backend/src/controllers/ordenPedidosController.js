@@ -36,16 +36,16 @@ module.exports = {
   },
 
   create: async (req, res) => {
-    let connection; // Para la transacción
+    let connection; 
     try {
       const { id_cliente, estado, observaciones, detalles } = req.body;
 
-      // --- INICIO DE TRANSACCIÓN ---
+   
       connection = await db.getConnection();
       await connection.beginTransaction();
 
       // Validaciones iniciales
-      const cliente = await clienteModel.getById(id_cliente, connection); // Pasamos la conexión
+      const cliente = await clienteModel.getById(id_cliente, connection); 
       if (!cliente) {
         throw new Error("Cliente no encontrado."); // Lanzamos error para que la transacción se revierta
       }
@@ -61,7 +61,7 @@ module.exports = {
       // Validar detalles y obtener precios antes de crear el pedido
       for (const detalle of detalles) {
         const { id_articulo, cantidad } = detalle;
-        const articuloExistente = await articuloModel.getById(id_articulo, connection); // Pasamos la conexión
+        const articuloExistente = await articuloModel.getById(id_articulo, connection); 
         if (!articuloExistente) {
           throw new Error(`El artículo con ID ${id_articulo} no existe.`);
         }
@@ -80,25 +80,25 @@ module.exports = {
       // Crear pedido (pasando la conexión)
       const id_pedido = await pedidoModel.create({ id_cliente, estado, observaciones }, connection);
 
-      // Crear cada detalle de pedido (pasando la conexión)
+      
       for (const detalle of detalles) {
         await detallePedidoModel.create({
           id_pedido,
           id_articulo: detalle.id_articulo,
           cantidad: detalle.cantidad,
           observaciones: detalle.observaciones || "",
-          precio_unitario: detalle.precio_unitario // Usamos el precio ya asignado
+          precio_unitario: detalle.precio_unitario 
         }, connection);
       }
 
       await connection.commit(); // Confirmar la transacción
-      connection.release(); // Liberar la conexión
+      connection.release(); 
 
       res.status(201).json({ message: "Pedido creado correctamente.", id_pedido });
     } catch (err) {
       if (connection) {
         await connection.rollback(); // Revertir la transacción en caso de error
-        connection.release(); // Liberar la conexión
+        connection.release(); 
       }
       console.error("Error al crear el pedido:", err);
       res.status(500).json({ error: err.message || "Error al crear el pedido." });

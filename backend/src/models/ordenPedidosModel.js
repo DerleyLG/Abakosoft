@@ -33,7 +33,7 @@ getAll: async (estadoQueryParam) => {
     return result.insertId;
   },
 
-  getById: async (id, connection = db) => { // Acepta 'connection' opcional
+  getById: async (id, connection = db) => { 
     const [rows] = await (connection || db).query('SELECT * FROM pedidos WHERE id_pedido = ?', [id]);
     return rows[0] || null;
   },
@@ -60,5 +60,7 @@ for (const detalle of detalles) {
     [detalle.cantidad, detalle.id_articulo]
   );
 }
-  }
+  },
+
+    
 };

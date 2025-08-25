@@ -41,5 +41,16 @@ module.exports = {
 
   delete: async (id) => {
     await db.query('DELETE FROM detalle_pedido WHERE id_detalle_pedido = ?', [id]);
-  }
+  },
+
+  async getArticuloFinalFromPedido(id_pedido) {
+       
+            const [rows] = await db.query(
+                `SELECT id_articulo, cantidad FROM detalle_pedido WHERE id_pedido = ?`,
+                [id_pedido]
+            );
+            return rows.length > 0 ? rows[0] : null;
+        
+    },
+    
 };

@@ -3,7 +3,7 @@ import ReporteBase from '../components/ReporteBase';
 
 const ReporteVentasPorPeriodo = () => {
   const titulo = "Ventas por periodo";
-  const endpoint = "http://localhost:3300/api/reportes/ventas-periodo";
+  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/ventas-periodo`;
 
   const columnas = [
     { header: "ID Orden", accessor: "id_orden_venta" },

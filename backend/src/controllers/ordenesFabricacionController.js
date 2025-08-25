@@ -1,6 +1,7 @@
 const ordenesFabricacionModel = require('../models/ordenesFabricacionModel');
 const detalleOrdenFabricacionModel = require('../models/detalleOrdenFabricacionModel');
 const inventarioModel = require('../models/inventarioModel');
+const articulosModel = require('../models/articulosModel');
 
 module.exports = {
  getAll: async (req, res) => {
@@ -56,6 +57,8 @@ create: async (req, res) => {
       return res.status(400).json({ error: 'Estado inválido.' });
     }
 
+
+
     // Crear orden de fabricación
     const id_orden_fabricacion = await ordenesFabricacionModel.create({
       id_orden_venta,
@@ -72,7 +75,6 @@ create: async (req, res) => {
       if (!id_etapa_final || !id_articulo || !cantidad) {
         return res.status(400).json({ error: 'Faltan campos en uno o más detalles.' });
       }
-console.log("Detalles a guardar:", detalles);
       await detalleOrdenFabricacionModel.create({
         id_orden_fabricacion,
         id_articulo,
