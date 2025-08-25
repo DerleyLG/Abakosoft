@@ -4,8 +4,7 @@ services:
   frontend:
     build: 
       context: ./frontend
-      dockerfile: Dockerfile
-      # Pasa el valor a la variable ARG del Dockerfile
+      dockerfile: Dockerfile 
       args:
         VITE_API_URL: /api
     ports:
@@ -16,7 +15,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "3300:3300"
+      - "3000:3000"
     depends_on:
       - db
     environment:
@@ -34,12 +33,13 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: masterkey
       MYSQL_DATABASE: gestion_abako
-      MYSQL_USER: root
-      MYSQL_PASSWORD: masterkey
+     # MYSQL_USER: root
+     # MYSQL_PASSWORD: masterkey
     ports:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
-
+      - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql
+      
 volumes:
   db_data:

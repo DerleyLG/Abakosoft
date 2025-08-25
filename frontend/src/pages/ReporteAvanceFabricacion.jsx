@@ -6,7 +6,7 @@ const ReporteAvanceFabricacion = () => {
     const titulo = "Avances en fabricacion";
 
     // Endpoint de la API para este reporte
-    const endpoint = "http://localhost:3300/api/reportes/avance-fabricacion";
+    const endpoint = `${import.meta.env.VITE_API_URL}/reportes/avance-fabricacion`;
 
 
  const filtros = [

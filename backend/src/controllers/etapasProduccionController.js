@@ -22,33 +22,63 @@ const etapasProduccionController = {
     }
   },
 
-  create: async (req, res) => {
-    try {
-      const { nombre, descripcion } = req.body;
-      if (!nombre)
-        return res
-          .status(400)
-          .json({ error: "El nombre de la etapa es obligatorio" });
+ create: async (req, res) => {
+        try {
+            const { nombre, descripcion, orden } = req.body; // 
 
-      const id = await etapasModel.create({ nombre, descripcion });
-      res.status(201).json({ message: "Etapa creada", id });
-    } catch (error) {
-      console.error("Error al crear etapa:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-  },
+             
+            if (!nombre) {
+                return res.status(400).json({ error: "El nombre de la etapa es obligatorio." });
+            }
+            if (typeof orden === 'undefined' || orden === null || !Number.isInteger(Number(orden)) || Number(orden) <= 0) {
+                return res.status(400).json({ error: "El orden de la etapa es obligatorio y debe ser un número entero positivo." });
+            }
 
-  update: async (req, res) => {
-    try {
-      const etapa = await etapasModel.getById(req.params.id);
-      if (!etapa) return res.status(404).json({ error: "Etapa no encontrada" });
-      const { nombre_etapa, descripcion } = req.body;
-      await etapasModel.update(req.params.id, { nombre_etapa, descripcion });
-      res.json({ message: "Etapa actualizada" });
-    } catch (error) {
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-  },
+            //  Validar que el orden no esté duplicado
+            const ordenExistente = await etapasModel.existsByOrden(orden);
+            if (ordenExistente) {
+                return res.status(400).json({ error: `Ya existe una etapa con el orden ${orden}.` });
+            }
+
+            const id = await etapasModel.create({ nombre, descripcion, orden: Number(orden) }); // 
+            res.status(201).json({ message: "Etapa creada", id });
+        } catch (error) {
+            console.error("Error al crear etapa:", error);
+            res.status(500).json({ error: "Error interno del servidor" });
+        }
+    },
+
+    update: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { nombre, descripcion, orden } = req.body; // 
+            
+            // 
+            if (!nombre) {
+                return res.status(400).json({ error: "El nombre de la etapa es obligatorio." });
+            }
+            if (typeof orden === 'undefined' || orden === null || !Number.isInteger(Number(orden)) || Number(orden) <= 0) {
+                return res.status(400).json({ error: "El orden de la etapa es obligatorio y debe ser un número entero positivo." });
+            }
+
+            const etapa = await etapasModel.getById(id);
+            if (!etapa) return res.status(404).json({ error: "Etapa no encontrada" });
+
+            //  Validar que el orden no esté duplicado por otra etapa
+            if (Number(orden) !== etapa.orden) { // Solo si el orden ha cambiado
+                const ordenExistente = await etapasModel.existsByOrden(orden);
+                if (ordenExistente) {
+                    return res.status(400).json({ error: `Ya existe una etapa con el orden ${orden}.` });
+                }
+            }
+
+            await etapasModel.update(id, { nombre, descripcion, orden: Number(orden) }); // ✅ Pasar 'orden' al modelo
+            res.json({ message: "Etapa actualizada" });
+        } catch (error) {
+            console.error("Error al actualizar etapa:", error);
+            res.status(500).json({ error: "Error interno del servidor" });
+        }
+    },
 
   delete: async (req, res) => {
     const { id } = req.params;

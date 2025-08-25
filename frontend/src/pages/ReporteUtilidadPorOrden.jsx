@@ -7,7 +7,7 @@ const ReporteUtilidadPorOrden = () => {
 
   // 2. Endpoint del API
   // Esta URL debe coincidir con la ruta que definiste en tu router de Node.js
-  const endpoint = "http://localhost:3300/api/reportes/utilidad-por-orden";
+  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/utilidad-por-orden`;
 
   // 3. Definición de las columnas de la tabla
   const columnas = [

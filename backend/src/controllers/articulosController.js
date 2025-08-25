@@ -1,4 +1,5 @@
 const Articulo = require('../models/articulosModel');
+const ArticuloComponente = require('../models/articulosComponentesModel');
 const db = require('../database/db');
 
 const categoriaExiste = async (id_categoria) => {
@@ -11,8 +12,8 @@ const categoriaExiste = async (id_categoria) => {
 
 const getArticulos = async (req, res) => {
   try {
-    const filtro = req.query.buscar || '';  // Obtener filtro o cadena vacía
-    const articulos = await Articulo.buscarArticulos(filtro);  // llamar a la función que busca con filtro
+    const filtro = req.query.buscar || '';  
+    const articulos = await Articulo.buscarArticulos(filtro);  
     res.json(articulos);
   } catch (error) {
     console.error(error);
@@ -33,30 +34,142 @@ const getArticuloById = async (req, res) => {
   }
 };
 
+
+
 const createArticulo = async (req, res) => {
-  const { id_categoria, referencia } = req.body;
+    const {
+        id_categoria,
+        referencia,
+        descripcion,
+        precio_venta,
+        precio_costo,
+        es_compuesto = false, 
+        componentes 
+    } = req.body;
 
-  try {
-    const categoriaValida = await categoriaExiste(id_categoria);
-    if (!categoriaValida) {
-      return res.status(400).json({ error: 'La categoría especificada no existe' });
+    let connection; 
+
+    try {
+        
+
+        const categoriaValida = await categoriaExiste(id_categoria);
+        if (!categoriaValida) {
+            return res.status(400).json({ error: 'La categoría especificada no existe' });
+        }
+
+
+        const [referenciaRows] = await db.query('SELECT id_articulo FROM articulos WHERE referencia = ?', [referencia]);
+        if (referenciaRows.length > 0) {
+            return res.status(400).json({ error: 'Ya existe un artículo con esa referencia' });
+        }
+
+    
+        if (es_compuesto) {
+         
+            if (!Array.isArray(componentes) || componentes.length === 0) {
+                return res.status(400).json({ error: 'Un artículo compuesto debe tener al menos un componente.' });
+            }
+
+            // Validar la estructura y existencia de cada componente
+            for (const comp of componentes) {
+                if (!comp.id || typeof comp.cantidad !== 'number' || comp.cantidad <= 0) {
+                    return res.status(400).json({ error: `Formato de componente inválido: ${JSON.stringify(comp)}. Se requieren 'id' y 'cantidad' (número positivo).` });
+                }
+                
+                // Verificar que el ID del componente exista como un artículo válido
+                
+                const [componenteArticuloRows] = await db.query('SELECT id_articulo FROM articulos WHERE id_articulo = ?', [comp.id]);
+                if (componenteArticuloRows.length === 0) {
+                    return res.status(400).json({ error: `El componente con ID ${comp.id} no es un artículo válido.` });
+                }
+
+                
+            }
+        }
+
+   
+        connection = await db.getConnection(); 
+        await connection.beginTransaction(); 
+
+        // Convertimos es_compuesto a 1 o 0 para la base de datos (tinyint)
+        const esCompuestoParaDB = es_compuesto ? 1 : 0;
+        
+        // Creamos el artículo principal
+        const articuloId = await Articulo.create({
+            referencia,
+            descripcion,
+            precio_venta,
+            precio_costo,
+            id_categoria,
+            es_compuesto: esCompuestoParaDB
+        }, connection); 
+
+     
+        if (es_compuesto) {
+            for (const comp of componentes) {
+                if (comp.id === articuloId) {
+                    await connection.rollback();
+                    return res.status(400).json({ error: `Un artículo compuesto no puede contenerse a sí mismo como componente.` });
+                }
+            }
+         
+            await ArticuloComponente.CreateComponentesEnLote(articuloId, componentes, connection);
+        }
+
+     
+        await connection.commit();
+
+        const articuloCreado = await Articulo.getById(articuloId); 
+
+        res.status(201).json({ message: 'Artículo creado correctamente', articulo: articuloCreado });
+
+    } catch (err) {
+      
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error('Error completo al crear el artículo:', err);
+        // Devolvemos un error 500 si es un error inesperado de servidor
+        return res.status(500).json({ error: 'Error al crear el artículo.' });
+    } finally {
+      
+        if (connection) {
+            connection.release();
+        }
     }
-
-    const [rows] = await db.query('SELECT * FROM articulos WHERE referencia = ?', [referencia]);
-    if (rows.length > 0) {
-      return res.status(400).json({ error: 'Ya existe un artículo con esa referencia' });
-    }
-
-    const id = await Articulo.create(req.body); 
-    const articulo = await Articulo.getById(id); 
-
-    res.status(201).json({ message: 'Artículo creado correctamente', articulo }); 
-  } catch (err) {
-    console.error('Error completo:', err);
-    return res.status(500).json({ error: 'Error al crear el artículo' });
-  }
 };
 
+const getComponentesParaOrdenFabricacion = async (req, res) => {
+    try {
+        const { id } = req.params; // id del artículo padre
+        const cantidad_padre = parseInt(req.query.cantidad_padre) || 1; // Cantidad del artículo padre en el pedido
+
+        // Obtenemos los componentes usando el modelo mejorado
+        const componentesBase = await ArticuloComponente.getByArticuloPadreId(id);
+
+        if (componentesBase.length === 0) {
+            // Si el artículo no tiene componentes o no se encuentra, devuelve un array vacío
+            return res.json([]); 
+        }
+
+        // Calcula la cantidad total requerida para cada componente
+        const componentesFinales = componentesBase.map(comp => ({
+            id_articulo: comp.id_articulo,
+            referencia: comp.referencia,
+            descripcion: comp.descripcion,
+            precio_venta: comp.precio_venta,
+            precio_costo: comp.precio_costo,
+            id_categoria: comp.id_categoria,
+            es_compuesto: comp.es_compuesto,
+            cantidad: comp.cantidad_requerida * cantidad_padre, 
+        }));
+
+        res.json(componentesFinales);
+    } catch (error) {
+        console.error('Error al obtener componentes para orden de fabricación:', error);
+        res.status(500).json({ error: 'Error interno del servidor al obtener los componentes.' });
+    }
+  };
  
 const updateArticulo = async (req, res) => {
   const { id } = req.params;
@@ -113,5 +226,6 @@ module.exports = {
     getArticuloById,
     createArticulo,
     updateArticulo,
-    deleteArticulo
+    deleteArticulo,
+    getComponentesParaOrdenFabricacion
 };

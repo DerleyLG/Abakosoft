@@ -4,7 +4,7 @@ const ReporteMovimientosInventario = () => {
   return (
     <ReporteBase
       titulo="Reporte de Movimientos de Inventario"
-      endpoint="http://localhost:3300/api/reportes/movimientos-inventario"
+      endpoint={`${import.meta.env.VITE_API_URL}/reportes/movimientos-inventario`}
       columnas={[
         { header: "Fecha", accessor: "fecha" },
         { header: "Artículo", accessor: "articulo" },

@@ -31,7 +31,7 @@ const ReporteOrdenesCompra = () => {
   return (
     <ReporteBase
     
-      endpoint="http://localhost:3300/api/reportes/ordenes-compra"
+      endpoint={`${import.meta.env.VITE_API_URL}/reportes/ordenes-compra`}
       columnas={columnasOrdenesCompra}
       titulo="Reporte de órdenes de compra"
       filtros={filtrosOrdenesCompra}

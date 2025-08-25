@@ -4,7 +4,6 @@ const LoteModel = require ('../models/lotesFabricadosModel');
 module.exports = {
 getAll: async (estados = ['pendiente', 'en proceso', 'completada']) => {
   const placeholders = estados.map(() => '?').join(',');
-  console.log("Estados recibidos:", estados);
 
   const [rows] = await db.query(`
     SELECT 
@@ -24,7 +23,6 @@ checkIfExistsByPedidoId: async (idPedido) => {
       `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ?`,
       [idPedido]
     );
-    // Retorna true si el conteo es mayor a 0, de lo contrario, false.
     return rows[0].count > 0;
   },
 
@@ -77,5 +75,19 @@ getById: async (id) => {
     } catch (error) {
       console.error(`Error al eliminar lotes fabricados para la orden ${id}:`, error)
     }
-}
+},
+
+ async getPedidoIdByOrdenId(idOrdenFabricacion) {
+        try {
+            const [rows] = await db.query(
+                `SELECT id_pedido FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
+                [idOrdenFabricacion]
+            );
+            return rows.length > 0 ? rows[0].id_pedido : null;
+        } catch (error) {
+            console.error("Error en OrdenesModel.getPedidoIdByOrdenId:", error);
+            throw error;
+        }
+    },
+    
 };

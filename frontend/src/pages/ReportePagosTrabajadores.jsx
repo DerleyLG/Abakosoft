@@ -4,7 +4,7 @@ const ReportePagosTrabajadores = () => {
 
   const titulo = "Reporte de Pagos a Trabajadores";
 
-  const endpoint = "http://localhost:3300/api/reportes/pagos-trabajadores"; 
+  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/pagos-trabajadores`; 
 
   const columnas = [
     { header: "ID Pago", accessor: "id_pago" },

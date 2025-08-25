@@ -65,13 +65,13 @@ const FormularioPagoAvances = () => {
               ],
             });
           } else {
-            // Si NO hay anticipo activo para este trabajador/orden, aseguramos que la alerta esté desactivada
+            // Si NO hay anticipo activo para este trabajador/orden, aseguraque la alerta esté desactivada
             setMostrarAlertaAnticipo(false);
           }
         })
         .catch((err) => {
           console.error("Error verificando anticipo:", err);
-          // En caso de error, asumimos que no hay anticipo que mostrar y deshabilitamos la alerta
+          
           setMostrarAlertaAnticipo(false);
           toast.error("Error al verificar anticipos disponibles.");
         });

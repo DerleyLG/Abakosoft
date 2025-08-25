@@ -16,6 +16,19 @@ getAll: async (id) => {
   return rows;
 },
 
+  async esArticuloCompuesto(id_orden_fabricacion) {
+        
+        const [rows] = await db.query(
+            `SELECT 1
+             FROM ordenes_fabricacion ofab
+             JOIN detalle_pedido dp ON ofab.id_pedido = dp.id_pedido
+             JOIN articulos a ON dp.id_articulo = a.id_articulo
+             WHERE ofab.id_orden_fabricacion = ? AND a.es_compuesto = 1`,
+            [id_orden_fabricacion]
+        );
+        return rows.length > 0;
+    },
+
   // Obtener detalles por ID de orden de fabricación
   getById: async (id) => {
      const [rows] = await db.query(`
