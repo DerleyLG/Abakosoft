@@ -35,5 +35,5 @@ Este proyecto es una plataforma web desarrollada para facilitar la gestión de i
 ### 🖥️ Clonar el repositorio
 
 ```bash
-git clone https://github.com/TU_USUARIO/plataforma-gestion-fabrica.git
+git clone https://github.com/DerleyLG/plataforma-gestion-fabrica.git
 cd plataforma-gestion-fabrica
