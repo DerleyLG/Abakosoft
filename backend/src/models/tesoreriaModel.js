@@ -110,10 +110,10 @@ const TesoreriaModel = {
       `);
 
       const summary = {
-        totalPagosTrabajadores: pagosTrabajadores[0].totalPagosTrabajadores || 0,
-        totalOrdenesCompra: ordenesCompra[0].totalOrdenesCompra || 0,
-        totalCostos: costosIndirectos[0].totalCostos || 0,
-        totalMateriaPrima: comprasMateriaPrima[0].totalMateriaPrima || 0,
+        totalPagosTrabajadores: Number(pagosTrabajadores[0].totalPagosTrabajadores || 0),
+        totalOrdenesCompra: Number(ordenesCompra[0].totalOrdenesCompra || 0),
+        totalCostos: Number(costosIndirectos[0].totalCostos || 0),
+        totalMateriaPrima: Number(comprasMateriaPrima[0].totalMateriaPrima || 0),
       };
 
       summary.totalEgresos = summary.totalPagosTrabajadores + summary.totalOrdenesCompra + summary.totalCostos + summary.totalMateriaPrima;
