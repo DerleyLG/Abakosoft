@@ -65,22 +65,7 @@ const ProtectedRoute = ({ children }) => {
 
 
 const AppLogic = () => {
-    const { logout, isAuthenticated } = useAuth(); 
-
-    useEffect(() => {
-        const handleLogoutOnUnload = () => {
-            if (isAuthenticated) {
-                logout(); 
-            }
-        };
-
-        window.addEventListener('beforeunload', handleLogoutOnUnload);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleLogoutOnUnload);
-        };
-    }, [logout, isAuthenticated]); 
-
+   
     return (
         <Routes>
             <Route path="/login" element={<Login/>} />

@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Credenciales incorrectas.' });
         }
 
-        const token = jwt.sign({ id: user.id_usuario, rol: user.nombre_rol, nombre_usuario: user.nombre_usuario }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id_usuario, rol: user.nombre_rol, nombre_usuario: user.nombre_usuario }, JWT_SECRET, { expiresIn: '1d' });
 
         return res.status(200).json({ token });
     } catch (error) {
