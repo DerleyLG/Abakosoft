@@ -52,6 +52,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 import Tesoreria from "./pages/Tesoreria";
 
+
 const ProtectedRoute = ({ children }) => {
   
     const { isAuthenticated, loading } = useAuth();
@@ -67,22 +68,36 @@ const ProtectedRoute = ({ children }) => {
     }
 
 
-    return children;
-
-      
-       
-          
+    return children;          
          
 };
 
-export default function App() {
-  return (
-    <>
-    <AuthProvider>
-      <Toaster position="top-right" reverseOrder={false} />
 
-      
+   
+export default function App() {
+   const { logout, isAuthenticated } = useAuth(); 
+
+   
+    useEffect(() => {
+        const handleLogoutOnUnload = () => {
+            if (isAuthenticated) {
+              
+                logout(); 
+            }
+        };
+
+        window.addEventListener('beforeunload', handleLogoutOnUnload);
+
         
+        return () => {
+            window.removeEventListener('beforeunload', handleLogoutOnUnload);
+        };
+    }, [logout, isAuthenticated]); 
+
+
+  return (
+    <AuthProvider>
+      <Toaster position="top-right" reverseOrder={false} /> 
       <Routes>
         <Route path="/login" element={<Login/>} />
         <Route path="/register" element={<Register/>} />
@@ -124,7 +139,6 @@ export default function App() {
           <Route path="costos_indirectos/nuevo" element={<CostosIndirectosNuevo/>} />
           <Route path="reportes" element={<VistaReportes/>} />
           <Route path="reportes/inventario" element={<ReporteInventario/>} />
-          
           <Route path="pagos_anticipados" element={<ListaAnticipos/>} />
           <Route path="costos_materia_prima" element={<CostosMateriaPrima/>} />
           <Route path="reportes/avances_fabricacion" element={<ReporteAvanceFabricacion/>} />
@@ -139,6 +153,6 @@ export default function App() {
       </Routes>
       </AuthProvider>
      
-    </>
+   
   );
 }

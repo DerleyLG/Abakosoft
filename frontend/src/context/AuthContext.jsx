@@ -1,23 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast'; // Importamos toast y Toaster
+import toast, { Toaster } from 'react-hot-toast'; 
 
-// 1. Creamos el contexto de autenticación
+// Crea el contexto de autenticación
 export const AuthContext = createContext();
 
-// 2. Hook personalizado para simplificar el uso del contexto de autenticación
+// Hook personalizado para simplificar el uso del contexto de autenticación
 export const useAuth = () => {
     return useContext(AuthContext);
 };
 
-// 3. Creamos el componente AuthProvider que envolverá nuestra aplicación
+
 export const AuthProvider = ({ children }) => {
     // Estado para almacenar los datos del usuario autenticado
     const [user, setUser] = useState(null);
     // Estado para saber si el proceso de carga inicial ha terminado
     const [loading, setLoading] = useState(true);
 
-    // Efecto que se ejecuta una sola vez al cargar la aplicación
+    // 
     // Intenta obtener el usuario a partir de un token existente
     useEffect(() => {
         const checkUser = async () => {
@@ -91,14 +91,14 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
-        isAuthenticated: !!user, // Propiedad de conveniencia para saber si hay un usuario
+        isAuthenticated: !!user, 
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {/* El componente Toaster es necesario para mostrar las notificaciones */}
+          
             <Toaster position="top-right" />
-            {/* Renderizamos los componentes hijos solo cuando la carga inicial ha terminado */}
+           
             {!loading && children}
         </AuthContext.Provider>
     );
