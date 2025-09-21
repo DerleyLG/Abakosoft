@@ -36,9 +36,8 @@ const lotesFabricadosRoutes = require('./src/routes/lotesFabricadosRoutes.js');
 const anticiposRoutes = require('./src/routes/anticiposRoutes.js');
 const detalleOrdenCompraRoutes = require('./src/routes/detalleOrdenCompraRoutes');
 const compraMateriaPrimaRoutes = require('./src/routes/compraMateriaPrimaRoutes.js');
-
-
-
+const tesoreria = require('./src/routes/tesoreriaRoutes.js');
+const metodosPago = require('./src/routes/metodosDePagoRoutes.js');
 
 
 const app = express();
@@ -137,6 +136,9 @@ app.use('/api/detalles-orden-compra', detalleOrdenCompraRoutes);
 
 app.use('/api/compras_materia_prima', compraMateriaPrimaRoutes);
 
+app.use('/api/tesoreria', tesoreria);
+
+app.use('/api/metodos-pago', metodosPago);
 
 
 const PORT = process.env.PORT;

@@ -22,6 +22,7 @@ getArticulosConStock: async () => {
       `SELECT
          a.id_articulo,
          a.descripcion,
+         a.precio_venta,
          i.stock
        FROM articulos AS a
        JOIN inventario AS i ON a.id_articulo = i.id_articulo
@@ -31,23 +32,22 @@ getArticulosConStock: async () => {
     return rows;
   },
 
-  // MODIFICADO: Acepta 'connection' opcional
+
   getById: async (id, connection = db) => {
     const [rows] = await (connection || db).query('SELECT * FROM ordenes_venta WHERE id_orden_venta = ?', [id]);
     return rows[0];
   },
 
-  // MODIFICADO: Acepta 'connection' opcional
-  create: async ({ id_cliente, estado, fecha }, connection = db) => { // Añadido 'fecha' como parámetro
+ create: async ({ id_cliente, estado, fecha, monto, total } = {}, connection = db) => {
+    
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_venta (id_cliente, estado, fecha)
-       VALUES (?, ?, ?)`,
-      [id_cliente, estado, fecha] // Se usa la fecha proporcionada
+      `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id_cliente, estado, fecha, monto, total]
     );
     return result.insertId;
   },
 
-  // MODIFICADO: Acepta 'connection' opcional
   update: async (id, { id_cliente, estado }, connection = db) => {
     // Actualizar solo si la orden está pendiente
     const [result] = await (connection || db).query(
@@ -59,10 +59,7 @@ getArticulosConStock: async () => {
     return result.affectedRows;
   },
 
-  // MODIFICADO: Acepta 'connection' opcional y delega la lógica de inventario al controlador
-  // Este 'delete' en el modelo ya no manipula el inventario directamente.
-  // Su propósito principal es eliminar los detalles y la orden en caso de un rollback completo.
-  // La lógica de "devolver stock" se manejará en el controlador al anular/eliminar.
+ 
   delete: async (id, connection = db) => {
     // Eliminar los detalles de la orden de venta
     await (connection || db).query('DELETE FROM detalle_orden_venta WHERE id_orden_venta = ?', [id]);

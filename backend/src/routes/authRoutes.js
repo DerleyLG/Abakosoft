@@ -48,7 +48,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Ruta para iniciar sesión buscando en la base de datos
-// URL completa: POST /api/auth/login
+
 router.post('/login', async (req, res) => {
     try {
         const { nombre_usuario, pin } = req.body;
@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: 'Credenciales incorrectas.' });
         }
 
-        const token = jwt.sign({ id: user.id_usuario, rol: user.nombre_rol, nombre_usuario: user.nombre_usuario }, JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.id_usuario, rol: user.nombre_rol, nombre_usuario: user.nombre_usuario }, JWT_SECRET, { expiresIn: '7d' });
 
         return res.status(200).json({ token });
     } catch (error) {
@@ -73,7 +73,6 @@ router.post('/login', async (req, res) => {
 });
 
 // Ruta para obtener los datos del usuario a partir del token, buscando en la base de datos
-// URL completa: GET /api/auth/me
 router.get('/me', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {

@@ -95,24 +95,8 @@ module.exports = {
   deleteMovimiento,
 };
 **/
-const MovimientoInventarioModel = require("../models/movimientosInventarioModel"); // Asegúrate de que la ruta sea correcta
+const MovimientoInventarioModel = require("../models/movimientosInventarioModel"); 
 
-// La creación de movimientos que afectan el stock ahora se maneja centralmente
-// por InventarioModel.processInventoryMovement, usualmente llamada desde InventarioController
-// o desde controladores específicos (ej. LoteController, VentaController).
-// Por lo tanto, esta función 'createMovimiento' aquí se vuelve redundante para
-// la mayoría de los casos que afectan el stock y debería ser eliminada o repensada.
-// Si necesitas un endpoint para crear movimientos *sin* afectar el stock (muy raro),
-// su lógica sería diferente.
-/*
-const createMovimiento = async (req, res) => {
-    // Esta función ya no debería existir o debería ser para casos muy específicos
-    // que NO actualizan el stock en la tabla 'inventario'.
-    // Si el objetivo es registrar un movimiento Y actualizar stock, se usa
-    // InventarioModel.processInventoryMovement.
-    // ... (lógica anterior, pero sin actualizar stock en 'articulos' ni 'inventario')
-};
-*/
 
 module.exports = {
   /**

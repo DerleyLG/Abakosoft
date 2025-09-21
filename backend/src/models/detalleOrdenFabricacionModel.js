@@ -46,6 +46,22 @@ WHERE dof.id_orden_fabricacion = ?
   return rows;
   },
 
+  getByOrdenes: async (ids_orden_fabricacion) => {
+    if (!ids_orden_fabricacion || ids_orden_fabricacion.length === 0) {
+      return [];
+    }
+    const placeholders = ids_orden_fabricacion.map(() => '?').join(',');
+    const query = `
+      SELECT dof.*, a.descripcion, e.nombre AS nombre_etapa_final
+      FROM detalle_orden_fabricacion dof
+      JOIN articulos a ON dof.id_articulo = a.id_articulo
+      LEFT JOIN etapas_produccion e ON dof.id_etapa_final = e.id_etapa
+      WHERE dof.id_orden_fabricacion IN (${placeholders});
+    `;
+    const [rows] = await db.query(query, ids_orden_fabricacion);
+    return rows;
+  },
+  
   // Crear un nuevo detalle
   create: async ({ id_orden_fabricacion, id_articulo, cantidad, id_etapa_final  }) => {
     const [result] = await db.query(

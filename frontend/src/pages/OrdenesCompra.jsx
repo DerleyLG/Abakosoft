@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api"; // ajusta según tu estructura
-import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle } from "react-icons/fi"; // Añadido FiCheckCircle
+import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle,FiArrowRight} from "react-icons/fi"; 
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -13,13 +13,13 @@ const OrdenesCompra = () => {
   const [ordenes, setOrdenes] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [mostrarCanceladas, setMostrarCanceladas] = useState(false); // NUEVO ESTADO
+  const [mostrarCanceladas, setMostrarCanceladas] = useState(false); 
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchOrdenes = async () => {
       try {
-        // MODIFICADO: Ajustar el endpoint basado en el estado de mostrarCanceladas
+        
         const endpoint = mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra";
         const res = await api.get(endpoint);
         setOrdenes(res.data);
@@ -91,10 +91,10 @@ const OrdenesCompra = () => {
     });
   };
 
-  // NUEVA FUNCIÓN: Alternar la visibilidad de órdenes canceladas
+ 
   const toggleMostrarCanceladas = () => {
     setMostrarCanceladas((prev) => !prev);
-    setExpandedId(null); // Colapsar cualquier detalle expandido al cambiar el filtro
+    setExpandedId(null);
   };
 
 
@@ -142,7 +142,7 @@ const OrdenesCompra = () => {
           Órdenes de Compra
         </h2>
 
-        <div className="flex w-full md:w-200 items-center gap-4">
+        <div className="flex w-full md:w-250 items-center gap-4">
           <input
             type="text"
             placeholder="Buscar por proveedor o fecha"
@@ -159,7 +159,13 @@ const OrdenesCompra = () => {
             Nueva orden
           </button>
 
-          {/* NUEVO BOTÓN: Alternar mostrar/ocultar canceladas */}
+          <button
+                      onClick={() => navigate("/tesoreria")}
+                      className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+                    >
+                      <FiArrowRight size={20} />
+                      Ir a tesorería
+                    </button>
           <button
             onClick={toggleMostrarCanceladas}
             className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${

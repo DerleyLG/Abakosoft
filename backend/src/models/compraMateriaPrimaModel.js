@@ -7,7 +7,7 @@ module.exports = {
     const [rows] = await db.query(`
       SELECT
           cmp.id_compra_materia_prima,
-          cmp.descripcion_gasto, -- Nuevo campo
+          cmp.descripcion_gasto, 
           cmp.cantidad,
           cmp.precio_unitario,
           (cmp.cantidad * cmp.precio_unitario) AS valor_total,

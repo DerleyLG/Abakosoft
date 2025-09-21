@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api'; // Ajusta según tu estructura
+import api from '../services/api'; 
 import toast from 'react-hot-toast';
-import Select from 'react-select'; // Importar react-select
-import { X } from 'lucide-react'; // Para el icono de eliminar item
-import { confirmAlert } from 'react-confirm-alert'; // Importar react-confirm-alert
-import 'react-confirm-alert/src/react-confirm-alert.css'; // Importar los estilos CSS de react-confirm-alert
+import Select from 'react-select'; 
+import { X } from 'lucide-react';
+import { confirmAlert } from 'react-confirm-alert'; 
+import 'react-confirm-alert/src/react-confirm-alert.css'; 
 
 const CrearOrdenCompra = () => {
     const [proveedores, setProveedores] = useState([]);
-    const [articulos, setArticulos] = useState([]); // Lista de todos los artículos disponibles
+    const [articulos, setArticulos] = useState([]); 
     const [idProveedor, setIdProveedor] = useState('');
     const [categoriaCosto, setCategoriaCosto] = useState('');
-    const [articulosSeleccionados, setArticulosSeleccionados] = useState([]); // Artículos agregados a la orden
-    const [articuloSeleccionado, setArticuloSeleccionado] = useState(null); // Artículo seleccionado en el Select para agregar
-    const [loading, setLoading] = useState(false); // Estado de carga
+    const [articulosSeleccionados, setArticulosSeleccionados] = useState([]); 
+    const [articuloSeleccionado, setArticuloSeleccionado] = useState(null); 
+    const [loading, setLoading] = useState(false); 
+    const [idMetodoPago, setIdMetodoPago] = useState('');
+    const [referenciaPago, setReferenciaPago] = useState('');
+    const [observacionesPago, setObservacionesPago] = useState('');
+    const [metodosPago, setMetodosPago] = useState([]);
 
     const navigate = useNavigate();
 
@@ -23,16 +27,18 @@ const CrearOrdenCompra = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [resProveedores, resArticulos] = await Promise.all([
+                const [resProveedores, resArticulos, resMetodosPago] = await Promise.all([
                     api.get('/proveedores'),
                     api.get('/articulos'),
+                    api.get('/tesoreria/metodos-pago'),
                 ]);
                 setProveedores(resProveedores.data || []);
+                setMetodosPago(resMetodosPago.data || []);
                 // Mapear artículos para react-select {value, label, ...articuloData}
                 const opcionesArticulos = resArticulos.data.map((art) => ({
                     value: art.id_articulo,
                     label: art.descripcion,
-                    ...art, // Incluir todos los datos del artículo para acceder a precio_venta
+                    ...art, 
                 }));
                 setArticulos(opcionesArticulos || []);
             } catch (error) {
@@ -165,6 +171,10 @@ const CrearOrdenCompra = () => {
             toast.error("Las cantidades de los artículos deben ser mayores a cero");
             return false;
         }
+         if (!idMetodoPago) {
+            toast.error("Selecciona un método de pago");
+            return false;
+        }
         return true;
     };
 
@@ -184,6 +194,9 @@ const CrearOrdenCompra = () => {
                 cantidad: Number(a.cantidad),
                 precio_unitario: Number(a.precio_unitario),
             })),
+            id_metodo_pago: parseInt(idMetodoPago),
+            referencia: referenciaPago.trim() || null,
+            observaciones_pago: observacionesPago.trim() || null,
         };
 
         try {
@@ -273,6 +286,58 @@ const CrearOrdenCompra = () => {
                         />
                     </div>
 
+                      <hr className="my-6 border-gray-300" />
+<h3 className="text-xl font-bold mb-2 text-gray-800">Datos de Pago</h3>
+                    <div>
+                        <label htmlFor="metodoPago" className="block text-sm font-semibold text-gray-700 mb-1">
+                            Método de Pago <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="metodoPago"
+                            value={idMetodoPago}
+                            onChange={(e) => setIdMetodoPago(e.target.value)}
+                            required
+                            className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading}
+                        >
+                            <option value="">-- Seleccione un método de pago --</option>
+                            {metodosPago.map((metodo) => (
+                                <option key={metodo.id_metodo_pago} value={metodo.id_metodo_pago}>
+                                    {metodo.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="referenciaPago" className="block text-sm font-semibold text-gray-700 mb-1">
+                            Referencia de Pago
+                        </label>
+                        <input
+                            id="referenciaPago"
+                            type="text"
+                            value={referenciaPago}
+                            onChange={(e) => setReferenciaPago(e.target.value)}
+                            placeholder="Ej: Numero de cuenta"
+                            className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="observacionesPago" className="block text-sm font-semibold text-gray-700 mb-1">
+                            Observaciones de Pago
+                        </label>
+                        <textarea
+                            id="observacionesPago"
+                            rows="3"
+                            value={observacionesPago}
+                            onChange={(e) => setObservacionesPago(e.target.value)}
+                            placeholder="Notas adicionales sobre el pago"
+                            className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading}
+                        />
+                    </div>
+                    
+                    <hr className="my-6 border-gray-300" />
                     {/* Sección de agregar artículo */}
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">

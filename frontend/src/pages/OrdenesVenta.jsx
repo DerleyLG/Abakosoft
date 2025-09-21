@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { FiEye, FiArrowLeft, FiTrash2, FiPlus } from "react-icons/fi";
+import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiArrowRight } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -35,6 +35,7 @@ const OrdenesVenta = () => {
   const handleCrear = () => {
     navigate("/ordenes_venta/nuevo");
   };
+
 
   const handleDelete = (id) => {
     confirmAlert({
@@ -128,7 +129,7 @@ const OrdenesVenta = () => {
           Órdenes de Venta
         </h2>
 
-        <div className="flex w-full md:w-200 items-center gap-4">
+        <div className="flex w-full md:w-250 items-center gap-4">
           <input
             type="text"
             placeholder="Buscar por cliente o fecha (dd/mm/aa)"
@@ -144,7 +145,13 @@ const OrdenesVenta = () => {
             <FiPlus size={20} />
             Nueva venta
           </button>
-
+    <button
+            onClick={() => navigate("/tesoreria")}
+            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+          >
+            <FiArrowRight size={20} />
+            Ir a tesorería
+          </button>
           <button
             onClick={toggleMostrarAnuladas}
             className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${

@@ -4,7 +4,7 @@ const detalleOrdenCompra = require('../models/detalleOrdenCompraModel');
 const proveedorModel = require('../models/proveedoresModel');
 const articuloModel = require('../models/articulosModel');
 const inventarioModel = require('../models/inventarioModel');
-
+const tesoreriaModel = require('../models/tesoreriaModel');
 // Función auxiliar para verificar si un proveedor existe
 const proveedorExiste = async (id_proveedor, connection = db) => {
     const proveedor = await proveedorModel.getById(id_proveedor, connection);
@@ -62,14 +62,12 @@ const getOrdenCompraById = async (req, res) => {
 async function createOrdenCompra(req, res) {
     let connection;
     try {
-        const { id_proveedor, categoria_costo, id_orden_fabricacion, items } = req.body;
+        const { id_proveedor, categoria_costo, id_orden_fabricacion, items,id_metodo_pago, referencia, observaciones_pago  } = req.body;
 
-        console.log("[OrdenCompraController] Inicio de la creación de la orden de compra.");
-        console.log("[OrdenCompraController] Datos recibidos en el body:", req.body);
-
+   
         connection = await db.getConnection();
         await connection.beginTransaction();
-        console.log("[OrdenCompraController] Transacción iniciada.");
+      
 
         if (!id_proveedor || !Array.isArray(items) || items.length === 0) {
             throw new Error('Faltan datos obligatorios: id_proveedor o items.');
@@ -84,9 +82,10 @@ async function createOrdenCompra(req, res) {
         }
 
         const estadoFinal = 'pendiente';
-        console.log(`[OrdenCompraController] Estado final de la orden: ${estadoFinal}`);
+
 
         const itemsMap = new Map();
+          let totalCompra = 0;
         for (const item of items) {
             const { id_articulo, cantidad, precio_unitario } = item;
 
@@ -99,7 +98,6 @@ async function createOrdenCompra(req, res) {
                 throw new Error(`El artículo con ID ${id_articulo} no existe en la base de datos de artículos.`);
             }
 
-            // --- CAMBIO CLAVE: Verificar si el artículo existe en la tabla 'inventario' ---
             const inventarioArticulo = await inventarioModel.obtenerInventarioPorArticulo(id_articulo, connection);
             if (!inventarioArticulo) {
                 // Si el artículo no está en inventario, enviamos una respuesta específica
@@ -111,11 +109,11 @@ async function createOrdenCompra(req, res) {
                     needsInitialization: true,
                     articulo: {
                         id: id_articulo,
-                        descripcion: articuloInfo.descripcion // Puedes añadir más campos si los necesitas en el frontend
+                        descripcion: articuloInfo.descripcion 
                     }
                 });
             }
-            // --- FIN CAMBIO CLAVE ---
+          
 
             if (itemsMap.has(id_articulo)) {
                 const existente = itemsMap.get(id_articulo);
@@ -125,15 +123,16 @@ async function createOrdenCompra(req, res) {
             } else {
                 itemsMap.set(id_articulo, { id_articulo, cantidad, precio_unitario });
             }
+            totalCompra += cantidad * precio_unitario;
         }
-        console.log('[OrdenCompraController] Items validados y agrupados:', Array.from(itemsMap.values()));
 
-        console.log('[OrdenCompraController] Intentando crear la orden de compra en el modelo...');
+
+       
         const ordenId = await ordenCompras.create(id_proveedor, categoria_costo || null, id_orden_fabricacion || null, estadoFinal, connection);
         if (!ordenId) {
             throw new Error('Error desconocido al crear la cabecera de la orden de compra.');
         }
-        console.log(`[OrdenCompraController] Orden de compra creada con ID: ${ordenId}`);
+    
 
         for (const [id_articulo, item] of itemsMap) {
             const { cantidad, precio_unitario } = item;
@@ -144,13 +143,21 @@ async function createOrdenCompra(req, res) {
                 cantidad: cantidad,
                 precio_unitario: precio_unitario,
             }, connection);
-            console.log(`[OrdenCompraController] Detalle de orden de compra creado para artículo ${id_articulo}.`);
+           
         }
-
-        console.log("[OrdenCompraController] Intentando COMMIT de la transacción...");
+const movimientoData = {
+            id_documento: ordenId,
+            tipo_documento: 'orden_compra',
+            monto: -totalCompra, 
+            id_metodo_pago: id_metodo_pago,
+            referencia: referencia,
+            observaciones: observaciones_pago,
+        };
+        await tesoreriaModel.insertarMovimiento(movimientoData, connection);
+       
         await connection.commit();
         connection.release();
-        console.log("[OrdenCompraController] Transacción COMITADA y conexión liberada.");
+     
 
         return res.status(201).json({ message: 'Orden de compra creada correctamente.', id_orden_compra: ordenId });
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import {  FiPackage, FiArrowLeft, FiTrash2, FiPlus } from "react-icons/fi";
+import {  FiPackage, FiArrowLeft, FiTrash2, FiPlus, FiDollarSign } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -129,6 +129,41 @@ const Pedidos = () => {
     }
   };
   
+const handleCrearOrdenVenta = async (e, id_pedido) => {
+    e.stopPropagation();
+
+    try {
+      // Obteniene todos los detalles del pedido si no se han cargado
+      const pedidoCompleto = pedidos.find(p => p.id_pedido === id_pedido);
+      if (!pedidoCompleto || !pedidoCompleto.detalles) {
+        const resDetalles = await api.get(`/detalle-orden-pedido/${id_pedido}`);
+        pedidoCompleto.detalles = resDetalles.data;
+      }
+
+
+      confirmAlert({
+        title: 'Confirmar orden de venta',
+        message: '¿Está seguro que desea crear una orden de venta a partir de este pedido?',
+        buttons: [
+          {
+            label: 'Sí',
+            onClick: () => {
+              // Navega y pasa los datos del pedido al formulario de Orden de Venta
+              navigate('/ordenes_venta/nuevo', { state: { pedidoData: pedidoCompleto } });
+            }
+          },
+          {
+            label: 'No',
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("Error al crear la orden de venta:", error);
+      toast.error("Error al crear la orden de venta. Inténtalo de nuevo.");
+    }
+  };
+  
+
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -215,7 +250,15 @@ const Pedidos = () => {
                           <FiPackage size={18} />
                         </button>
                       )}
-
+ {!mostrarCancelados && (
+                        <button
+                          onClick={(e) => handleCrearOrdenVenta(e, pedido.id_pedido)}
+                          className="text-blue-600 hover:text-blue-400 cursor-pointer"
+                          title="Crear orden de venta"
+                        >
+                          <FiDollarSign size={18} />
+                        </button>
+                      )}
 
                       {!mostrarCancelados && (
                         <button

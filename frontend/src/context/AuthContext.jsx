@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 try {
                     // Verificamos el token en el backend
-                    const response = await axios.get('http://localhost:3300/api/auth/me', {
+                    const response = await axios.get('http://localhost:3002/api/auth/me', {
                         headers: {
                             Authorization: `Bearer ${token}`
                         }
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
     const login = async (nombre_usuario, pin) => {
         try {
             // Hacemos la llamada al endpoint de login para obtener el token
-            const response = await axios.post('http://localhost:3300/api/auth/login', {
+            const response = await axios.post('http://localhost:3002/api/auth/login', {
                 nombre_usuario,
                 pin,
             });
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', token);
 
             // Después de un login exitoso, obtenemos los datos del usuario
-            const userResponse = await axios.get('http://localhost:3300/api/auth/me', {
+            const userResponse = await axios.get('http://localhost:3002/api/auth/me', {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
