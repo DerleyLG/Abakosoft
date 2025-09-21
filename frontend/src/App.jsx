@@ -50,8 +50,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
+import Tesoreria from "./pages/Tesoreria";
 
-/*const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children }) => {
   
     const { isAuthenticated, loading } = useAuth();
     
@@ -68,20 +69,24 @@ import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 
     return children;
 
-       <Route path="/login" element={<Login/>} />
-        <Route path="/register" element={<Register />} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-         </AuthProvider>
-};*/
+      
+       
+          
+         
+};
 
 export default function App() {
   return (
     <>
-    
+    <AuthProvider>
       <Toaster position="top-right" reverseOrder={false} />
+
+      
+        
       <Routes>
-       
-      <Route path="/" element={<Layout />}>
+        <Route path="/login" element={<Login/>} />
+        <Route path="/register" element={<Register/>} />
+      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="articulos" element={<Articulos />} />
@@ -127,10 +132,12 @@ export default function App() {
           <Route path="reportes/ordenes_compra" element={<ReporteOrdenesCompra/>} />
           <Route path="reportes/pagos_trabajadores" element={<ReportePagosTrabajadores/>} />
           <Route path="reportes/costos_fabricacion" element={<ReporteCostosProduccion/>} />
-           <Route path="reportes/utilidad_por_orden" element={<ReporteUtilidadPorOrden/>} />
-           <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />
+          <Route path="reportes/utilidad_por_orden" element={<ReporteUtilidadPorOrden/>} />
+          <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />
+          <Route path="tesoreria" element={<Tesoreria/>} />
         </Route>
       </Routes>
+      </AuthProvider>
      
     </>
   );

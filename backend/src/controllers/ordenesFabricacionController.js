@@ -1,146 +1,173 @@
 const ordenesFabricacionModel = require('../models/ordenesFabricacionModel');
 const detalleOrdenFabricacionModel = require('../models/detalleOrdenFabricacionModel');
-const inventarioModel = require('../models/inventarioModel');
-const articulosModel = require('../models/articulosModel');
+const avanceEtapasModel = require('../models/avanceEtapasModel');
 
 module.exports = {
- getAll: async (req, res) => {
-    try {
-      const { estados } = req.query; 
+getAll: async (req, res) => {
+  try {
+   const { estados } = req.query; 
 
-      let estadosToFilter = [];
-      if (estados) {
-        estadosToFilter = estados.split(','); 
-      } else {
-        
-        estadosToFilter = ['pendiente', 'en proceso', 'completada'];
-      }
-
+   let estadosToFilter = [];
+   if (estados) {
+    estadosToFilter = estados.split(','); 
+   } else {
     
-      const ordenes = await ordenesFabricacionModel.getAll(estadosToFilter);
+    estadosToFilter = ['pendiente', 'en proceso', 'completada'];
+   }
 
-      res.status(200).json(ordenes);
-    } catch (error) {
-      console.error("Error al obtener órdenes de fabricación:", error);
-      res.status(500).json({ error: "Error interno del servidor al obtener órdenes de fabricación." });
-    }
-  },
+  
+   const ordenes = await ordenesFabricacionModel.getAll(estadosToFilter);
 
-  getById: async (req, res) => {
-    try {
-      const id = req.params.id;
-      const orden = await ordenesFabricacionModel.getById(id);
+if (ordenes.length === 0) {
+    return res.status(200).json([]);
+   }
 
+   // Extrae los IDs de las órdenes.
+   const idOrdenes = ordenes.map(orden => orden.id_orden_fabricacion);
+
+   // 
+   // Llama a los métodos que aceptan un array de IDs.
+   const [allDetalles, allAvances] = await Promise.all([
+    detalleOrdenFabricacionModel.getByOrdenes(idOrdenes),
+    avanceEtapasModel.getByOrdenes(idOrdenes)
+   ]);
+
+   // Combina los datos y retorna la respuesta completa.
+   const ordenesConTodo = ordenes.map(orden => {
+    const detalles = allDetalles.filter(d => d.id_orden_fabricacion === orden.id_orden_fabricacion);
+    const avances = allAvances.filter(a => a.id_orden_fabricacion === orden.id_orden_fabricacion);
+
+    return {
+     ...orden,
+     detalles,
+     avances
+    };
+   });
+
+   res.status(200).json(ordenesConTodo);
+  } catch (error) {
+   console.error("Error al obtener órdenes de fabricación:", error);
+   res.status(500).json({ error: "Error interno del servidor al obtener órdenes de fabricación." });
+  }
+ },
+
+ getById: async (req, res) => {
+  try {
+   const id = req.params.id;
+   const [orden, detalles, avances] = await Promise.all([
+    ordenesFabricacionModel.getById(id),
+    detalleOrdenFabricacionModel.getById(id),
+    avanceEtapasModel.getByOrden(id)
+   ]);
+      // Asegúrate de que la orden exista antes de enviar la respuesta
       if (!orden) {
         return res.status(404).json({ error: 'Orden de fabricación no encontrada.' });
       }
-
-      const detalles = await detalleOrdenFabricacionModel.getAll(id);
-      res.json({ ...orden, detalles });
-    } catch (error) {
-      console.error('Error en getById:', error);
-      res.status(500).json({ error: 'Error al obtener la orden de fabricación.' });
-    }
-  },
+   res.json({ ...orden, detalles, avances });
+  } catch (error) {
+   console.error('Error en getById:', error);
+   res.status(500).json({ error: 'Error al obtener la orden de fabricación.' });
+  }
+ },
 
 create: async (req, res) => {
-   try {
-    const { orden, detalles } = req.body;
+ try {
+  const { orden, detalles } = req.body;
 
-    if (!orden || !Array.isArray(detalles) || detalles.length === 0) {
-      return res.status(400).json({ error: 'Datos incompletos: se requiere orden y al menos un detalle.' });
-    }
-
-    const { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id_pedido } = orden;
-
-    if (!estado || !['pendiente', 'en proceso', 'completado'].includes(estado)) {
-      return res.status(400).json({ error: 'Estado inválido.' });
-    }
-
-
-
-    // Crear orden de fabricación
-    const id_orden_fabricacion = await ordenesFabricacionModel.create({
-      id_orden_venta,
-      fecha_inicio,
-      fecha_fin_estimada,
-      estado,
-      id_pedido
-    });
-
-    // Crear cada detalle de fabricación
-    for (const detalle of detalles) {
-      const { id_articulo, cantidad, id_etapa_final } = detalle;
-
-      if (!id_etapa_final || !id_articulo || !cantidad) {
-        return res.status(400).json({ error: 'Faltan campos en uno o más detalles.' });
-      }
-      await detalleOrdenFabricacionModel.create({
-        id_orden_fabricacion,
-        id_articulo,
-        cantidad,
-        id_etapa_final
-      });
-    }
-    res.status(201).json({
-      message: 'Orden de fabricación y detalles creados correctamente.',
-      id_orden_fabricacion
-    });
-  } catch (error) {
-    console.error('Error al crear orden de fabricación:', error);
-    res.status(500).json({ error: 'Error interno al crear la orden de fabricación.' });
+  if (!orden || !Array.isArray(detalles) || detalles.length === 0) {
+   return res.status(400).json({ error: 'Datos incompletos: se requiere orden y al menos un detalle.' });
   }
+
+  const { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id_pedido } = orden;
+
+  if (!estado || !['pendiente', 'en proceso', 'completado'].includes(estado)) {
+   return res.status(400).json({ error: 'Estado inválido.' });
+  }
+
+
+
+  // Crear orden de fabricación
+  const id_orden_fabricacion = await ordenesFabricacionModel.create({
+   id_orden_venta,
+   fecha_inicio,
+   fecha_fin_estimada,
+   estado,
+   id_pedido
+  });
+
+  // Crear cada detalle de fabricación
+  for (const detalle of detalles) {
+   const { id_articulo, cantidad, id_etapa_final } = detalle;
+
+   if (!id_etapa_final || !id_articulo || !cantidad) {
+    return res.status(400).json({ error: 'Faltan campos en uno o más detalles.' });
+   }
+   await detalleOrdenFabricacionModel.create({
+    id_orden_fabricacion,
+    id_articulo,
+    cantidad,
+    id_etapa_final
+   });
+  }
+  res.status(201).json({
+   message: 'Orden de fabricación y detalles creados correctamente.',
+   id_orden_fabricacion
+  });
+ } catch (error) {
+  console.error('Error al crear orden de fabricación:', error);
+  res.status(500).json({ error: 'Error interno al crear la orden de fabricación.' });
+ }
 },
-  update: async (req, res) => {
-    try {
-      const id = req.params.id;
-      const { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado } = req.body;
+ update: async (req, res) => {
+  try {
+   const id = req.params.id;
+   const { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado } = req.body;
 
-      await ordenesFabricacionModel.update(id, {
-        id_orden_venta,
-        fecha_inicio,
-        fecha_fin_estimada,
-        estado
-      });
+   await ordenesFabricacionModel.update(id, {
+    id_orden_venta,
+    fecha_inicio,
+    fecha_fin_estimada,
+    estado
+   });
 
-      res.json({ message: 'Orden de fabricación actualizada correctamente.' });
-    } catch (error) {
-      console.error('Error en update:', error);
-      res.status(500).json({ error: 'Error al actualizar la orden de fabricación.' });
-    }
-  },
+   res.json({ message: 'Orden de fabricación actualizada correctamente.' });
+  } catch (error) {
+   console.error('Error en update:', error);
+   res.status(500).json({ error: 'Error al actualizar la orden de fabricación.' });
+  }
+ },
 
 
 delete: async (req, res) => {
-  try {
-    const id = req.params.id;
+ try {
+  const id = req.params.id;
 
-    // Verificar si la orden ya está cancelada
-    const orden = await ordenesFabricacionModel.getById(id);
-    if (!orden) {
-      return res.status(404).json({ error: 'Orden no encontrada.' });
-    }
-    if (orden.estado === 'cancelada') {
-      return res.status(400).json({ error: 'La orden ya está cancelada.' });
-    }
-
-    // Marcar como cancelada (ya no eliminamos detalles)
-    await ordenesFabricacionModel.delete(id);
-
-    res.json({ message: 'Orden de fabricación cancelada correctamente.' });
-  } catch (error) {
-    console.error('Error al cancelar la orden de fabricación:', error);
-    res.status(500).json({ error: 'Error al cancelar la orden de fabricación.' });
+  // Verificar si la orden ya está cancelada
+  const orden = await ordenesFabricacionModel.getById(id);
+  if (!orden) {
+   return res.status(404).json({ error: 'Orden no encontrada.' });
   }
-},
- existe: async  (req, res) => {
-  try {
-    const { id_pedido } = req.params;
-    const existe = await ordenesFabricacionModel.checkIfExistsByPedidoId(id_pedido);
-    res.json({ existe });
-  } catch (error) {
-    console.error('Error al verificar la orden de fabricación:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+  if (orden.estado === 'cancelada') {
+   return res.status(400).json({ error: 'La orden ya está cancelada.' });
   }
+
+  // Marcar como cancelada (ya no eliminamos detalles)
+  await ordenesFabricacionModel.delete(id);
+
+  res.json({ message: 'Orden de fabricación cancelada correctamente.' });
+ } catch (error) {
+  console.error('Error al cancelar la orden de fabricación:', error);
+  res.status(500).json({ error: 'Error al cancelar la orden de fabricación.' });
  }
+},
+existe: async (req, res) => {
+ try {
+  const { id_pedido } = req.params;
+  const existe = await ordenesFabricacionModel.checkIfExistsByPedidoId(id_pedido);
+  res.json({ existe });
+ } catch (error) {
+  console.error('Error al verificar la orden de fabricación:', error);
+  res.status(500).json({ error: 'Error interno del servidor' });
+ }
+}
 };

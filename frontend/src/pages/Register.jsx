@@ -34,7 +34,7 @@ const Register = () => {
             }
 
             // Llama al endpoint de registro para crear un nuevo usuario
-            const response = await axios.post('http://localhost:3300/api/auth/register', {
+            const response = await axios.post('http://localhost:3002/api/auth/register', {
                 nombre_usuario,
                 pin,
                 id_trabajador,

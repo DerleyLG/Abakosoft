@@ -104,7 +104,7 @@ const FormularioPagoAvances = () => {
   useEffect(() => {
     if (esAnticipo) {
       // Cargar órdenes de fabricación disponibles para anticipo
-      api.get("/ordenes-fabricacion?estados=pendiente,en proceso")
+      api.get("/ordenes-fabricacion?estados=pendiente,en proceso,completada")
         .then((res) => {
           setOrdenes(res.data || []);
         })
@@ -358,6 +358,7 @@ const FormularioPagoAvances = () => {
               <table className="w-full table-auto text-sm">
                 <thead className="bg-slate-100 text-slate-700">
                   <tr>
+                  
                     <th className="px-4 py-2 text-left">Artículo</th>
                     <th className="px-4 py-2 text-left">Etapa</th>
                     <th className="px-4 py-2 text-left">Cantidad</th>

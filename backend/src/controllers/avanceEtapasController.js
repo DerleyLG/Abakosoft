@@ -24,7 +24,7 @@ function validarEstado(estado) {
 
 module.exports = {
   create: async (req, res) => {
-    let connection; // Declarar la conexión aquí para que sea accesible en el catch final
+    let connection; 
     try {
       const {
         id_orden_fabricacion,
@@ -32,11 +32,11 @@ module.exports = {
         id_etapa_produccion,
         costo_fabricacion,
         id_trabajador,
-        cantidad, // Cantidad de avance para esta etapa
+        cantidad,
         observaciones,
       } = req.body;
 
-      // Validaciones iniciales
+    
       if (
         !id_trabajador ||
         !cantidad ||
@@ -133,7 +133,7 @@ module.exports = {
         id_orden_fabricacion,
         id_articulo
       );
-      // Calcular lo que ya se ha registrado en esta etapa (antes de insertar este avance)
+      // Calcular lo que ya se ha registrado en esta etapa 
       const cantidadRegistradaAntes =
         await AvanceModel.getCantidadRegistradaEtapa(
           id_orden_fabricacion,
@@ -141,8 +141,7 @@ module.exports = {
           id_etapa_produccion
         );
 
-      const totalAcumulado = cantidadRegistradaAntes + cantidad; // Usar 'cantidad' directamente, ya validada como number
-
+      const totalAcumulado = cantidadRegistradaAntes + cantidad;
       // Determinar el estado del avance
       const estadoAvance =
         totalAcumulado >= cantidadTotalEsperada ? "completado" : "en proceso";
@@ -153,13 +152,11 @@ module.exports = {
         id_articulo
       );
 
-      // Iniciar una transacción para el avance, lote e inventario
-      // Nota: InventarioModel.processInventoryMovement ya maneja su propia transacción interna.
-      // Aquí, la transacción es para AvanceModel.create y LoteModel.createLote.
+     
       connection = await db.getConnection();
       await connection.beginTransaction();
 
-      // 1. Registrar el avance de etapa
+      // Registrar el avance de etapa
       const avanceId = await AvanceModel.create(
         {
           id_orden_fabricacion,
@@ -167,12 +164,12 @@ module.exports = {
           id_etapa_produccion,
           id_trabajador,
           cantidad,
-          estado: estadoAvance, // Usar el estado calculado
+          estado: estadoAvance, 
           observaciones,
           costo_fabricacion,
         },
         connection
-      ); // Pasar la conexión para la transacción
+      ); 
 
       // Si el avance actual completa la etapa, actualizar el estado de los avances de esa etapa
       if (estadoAvance === "completado") {
@@ -180,7 +177,7 @@ module.exports = {
           id_orden_fabricacion,
           id_articulo,
           id_etapa_produccion,
-          connection // Pasar la conexión
+          connection 
         );
       }
 
@@ -235,17 +232,17 @@ module.exports = {
           id_orden_fabricacion,
           "en proceso",
           connection
-        ); // Pasar la conexión
+        ); 
       }
 
       //  Verificar si la orden de fabricación está completamente terminada
       await AvanceModel.checkearSiOrdenCompleta(
         id_orden_fabricacion,
         connection
-      ); // Pasar la conexión
+      );
 
-      await connection.commit(); // Confirmar la transacción
-      connection.release(); // Liberar la conexión
+      await connection.commit(); 
+      connection.release(); 
 
       res
         .status(201)
@@ -253,7 +250,7 @@ module.exports = {
     } catch (error) {
       if (connection) {
         await connection.rollback(); // Revertir la transacción en caso de error
-        connection.release(); // Liberar la conexión
+        connection.release(); 
       }
       console.error("Error al crear el avance de etapa:", error);
       res

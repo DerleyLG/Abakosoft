@@ -4,7 +4,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const CrearArticulo = () => {
-    // 🚀 Estado para los campos del artículo principal
+    //  Estado para los campos del artículo principal
     const [referencia, setReferencia] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [precioVenta, setPrecioVenta] = useState('');
@@ -12,14 +12,14 @@ const CrearArticulo = () => {
     const [categorias, setCategorias] = useState([]);
     const [idCategoria, setIdCategoria] = useState('');
 
-    // 🚀 Estado para artículos compuestos
+    //  Estado para artículos compuestos
     const [esCompuesto, setEsCompuesto] = useState(false);
     const [componentes, setComponentes] = useState([{ id: '', cantidad: '' }]);
     const [articulos, setArticulos] = useState([]);
 
     const navigate = useNavigate();
 
-    // 🚀 Efecto para cargar categorías y todos los artículos disponibles
+    //  Efecto para cargar categorías y todos los artículos disponibles
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -40,7 +40,7 @@ const CrearArticulo = () => {
         fetchData();
     }, []);
 
-    // 🚀 Funciones para manejar los componentes
+    //  Funciones para manejar los componentes
     const handleAddComponente = () => {
         setComponentes([...componentes, { id: '', cantidad: '' }]);
     };

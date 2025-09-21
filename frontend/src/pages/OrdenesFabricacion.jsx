@@ -5,7 +5,13 @@ import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
-import { FiTrash2, FiPlus, FiArrowLeft, FiArrowUp, FiArrowRight } from "react-icons/fi";
+import {
+  FiTrash2,
+  FiPlus,
+  FiArrowLeft,
+  FiArrowUp,
+  FiArrowRight,
+} from "react-icons/fi";
 
 const ListaOrdenesFabricacion = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -16,73 +22,156 @@ const ListaOrdenesFabricacion = () => {
   const [formularios, setFormularios] = useState({});
   const [etapas, setEtapas] = useState([]);
   const [trabajadores, setTrabajadores] = useState([]);
-  const [articulos, setArticulos] = useState([]);
-  const [articulosPorOrden, setArticulosPorOrden] = useState({});
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
-  const [articulosPendientesPorOrden, setArticulosPendientesPorOrden] = useState({});
-  const [etapasDisponiblesPorOrden, setEtapasDisponiblesPorOrden] = useState(
-    {}
-  );
-
+  const [articulosPendientesPorOrden, setArticulosPendientesPorOrden] =
+    useState({});
   const [etapasDisponibles, setEtapasDisponibles] = useState({});
+  const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState({});
 
+  const yaConsultadoCosto = useRef({});
+  const historialCostos = useRef({});
+  const costoManualEditado = useRef({});
+
+  // Carga los datos estáticos al montar el componente
   useEffect(() => {
-    const fetchTrabajadores = async () => {
+    const fetchInitialData = async () => {
       try {
-        const res = await api.get("/trabajadores");
-        const opciones = res.data.map((trab) => ({
-          value: trab.id_trabajador,
-          label: trab.nombre,
-        }));
-        setTrabajadores(opciones);
+        const [resTrabajadores, resEtapas] = await Promise.all([
+          api.get("/trabajadores"),
+          api.get("/etapas-produccion"),
+        ]);
+        setTrabajadores(
+          resTrabajadores.data.map((trab) => ({
+            value: trab.id_trabajador,
+            label: trab.nombre,
+            cargo: trab.cargo,
+          }))
+        );
+        setEtapas(
+          resEtapas.data.map((etp) => ({
+            value: etp.id_etapa,
+            label: etp.nombre,
+            orden: etp.orden,
+            cargo: etp.cargo,
+          }))
+        );
       } catch (error) {
-        console.error("Error al cargar trabajadores", error);
-        toast.error("Error al cargar trabajadores");
+        console.error("Error al cargar datos iniciales", error);
+        toast.error("Error al cargar datos iniciales");
       }
     };
-    fetchTrabajadores();
+    fetchInitialData();
   }, []);
 
+  // Carga las órdenes de fabricación al cambiar el estado de `mostrarCanceladas`
   useEffect(() => {
-    const fetchArticulos = async () => {
+    const fetchOrdenes = async () => {
       try {
-        const res = await api.get("/articulos");
-        const opciones = res.data.map((art) => ({
-          value: art.id_articulo,
-          label: art.descripcion,
-        }));
-        setArticulos(opciones);
+        const endpoint = mostrarCanceladas
+          ? "/ordenes-fabricacion?estados=cancelada"
+          : "/ordenes-fabricacion?estados=pendiente,en proceso,completada";
+        const res = await api.get(endpoint);
+
+        // Establece las órdenes en el estado
+        setOrdenes(res.data);
+
+        //  Calcula y establece los artículos pendientes para la carga inicial
+        const nuevosArticulosPendientes = {};
+        res.data.forEach((orden) => {
+          // Parsea los arrays JSON de forma segura
+          const detallesEnOrden = Array.isArray(orden.detalles)
+            ? orden.detalles
+            : JSON.parse(orden.detalles || "[]");
+          const avancesDeLaOrden = Array.isArray(orden.avances)
+            ? orden.avances
+            : JSON.parse(orden.avances || "[]");
+
+          const articulosFiltrados = detallesEnOrden.filter((articulo) => {
+            const cantidadAvanzadaEnEtapaFinal = avancesDeLaOrden
+              .filter(
+                (avance) =>
+                  avance.id_articulo === articulo.id_articulo &&
+                  avance.id_etapa_produccion === articulo.id_etapa_final
+              )
+              .reduce((sum, avance) => sum + avance.cantidad, 0);
+            return cantidadAvanzadaEnEtapaFinal < articulo.cantidad;
+          });
+
+          nuevosArticulosPendientes[orden.id_orden_fabricacion] =
+            articulosFiltrados.map((art) => ({
+              value: art.id_articulo,
+              label: art.descripcion,
+              cantidadRequerida: art.cantidad,
+              idEtapaFinal: art.id_etapa_final,
+            }));
+        });
+        setArticulosPendientesPorOrden(nuevosArticulosPendientes);
       } catch (error) {
-        console.error("Error al cargar articulos", error);
-        toast.error("Error al cargar articulos");
+        console.error("Error al cargar órdenes:", error);
+        toast.error("Error al cargar órdenes");
       }
     };
-    fetchArticulos();
-  }, []);
+    fetchOrdenes();
+  }, [mostrarCanceladas]);
 
+  // Carga el costo de fabricación anterior cuando cambian los formularios
   useEffect(() => {
-    const cargarArticulosOrden = async () => {
-      const nuevosDatos = {};
-      for (const orden of ordenes) {
+    const cargarCostoAnterior = async () => {
+      for (const [idOrden, formulario] of Object.entries(formularios)) {
+        const {
+          articulo,
+          etapa,
+          costo_fabricacion: costoActual,
+        } = formulario || {};
+        if (!articulo || !etapa) continue;
+
+        const clave = `${idOrden}-${articulo}-${etapa}`;
+
+        if (yaConsultadoCosto.current[clave]) {
+          const costoGuardado = historialCostos.current[clave];
+          if (
+            costoGuardado !== undefined &&
+            !costoManualEditado.current[clave]
+          ) {
+            if (costoActual !== costoGuardado) {
+              setFormularios((prev) => ({
+                ...prev,
+                [idOrden]: {
+                  ...prev[idOrden],
+                  costo_fabricacion: costoGuardado,
+                },
+              }));
+            }
+          }
+          continue;
+        }
+
         try {
           const res = await api.get(
-            `/detalle-ordenF/${orden.id_orden_fabricacion}`
+            `/avances-etapa/costo-anterior/${articulo}/${etapa}`
           );
-          nuevosDatos[orden.id_orden_fabricacion] = res.data.map((item) => ({
-            value: item.id_articulo,
-            label: item.descripcion,
-            cantidadRequerida: item.cantidad, 
-          idEtapaFinal: item.id_etapa_final,
-          }));
+          const costo = res.data?.costo_fabricacion ?? null;
+          yaConsultadoCosto.current[clave] = true;
+          historialCostos.current[clave] = costo;
+
+          if (costo !== null && !costoManualEditado.current[clave]) {
+            if (costoActual !== costo) {
+              setFormularios((prev) => ({
+                ...prev,
+                [idOrden]: {
+                  ...prev[idOrden],
+                  costo_fabricacion: costo,
+                },
+              }));
+            }
+          }
         } catch (error) {
-          console.error("Error al cargar artículos de la orden:", error);
+          console.error("Error al cargar costo anterior:", error);
         }
       }
-      setArticulosPorOrden(nuevosDatos);
     };
-
-    if (ordenes.length > 0) cargarArticulosOrden();
-  }, [ordenes]);
+    cargarCostoAnterior();
+  }, [formularios]);
 
   const actualizarFormulario = (idOrden, campo, valor) => {
     setFormularios((prev) => ({
@@ -92,165 +181,116 @@ const ListaOrdenesFabricacion = () => {
         [campo]: valor,
       },
     }));
-  };
-useEffect(() => {
-  const cargarEtapas = async () => {
-    const disponiblesPorOrden = {};
-    const disponiblesGlobal = {};
 
-    for (const orden of ordenes) {
-      const idOrden = orden.id_orden_fabricacion;
-      const idArticulo = formularios[idOrden]?.articulo;
-
-      if (!idArticulo) continue;
-
-      try {
-        const res = await api.get(
-          `/avances-etapa/completadas/${idOrden}/${idArticulo}`
-        );
-        const etapasCompletadas = res.data;
-
-        const disponibles = etapas.filter(
-          (et) => !etapasCompletadas.includes(et.value)
-        );
-
-        disponiblesPorOrden[idOrden] = disponibles;
-        disponiblesGlobal[idOrden] = disponibles;
-      } catch (error) {
-        console.error("Error al cargar etapas:", error);
-        toast.error("Error al filtrar etapas");
-      }
-    }
-
-    setEtapasDisponiblesPorOrden(disponiblesPorOrden);
-    setEtapasDisponibles(disponiblesGlobal);
-  };
-
-  if (ordenes.length > 0 && etapas.length > 0) {
-    cargarEtapas();
-  }
-}, [formularios, etapas, ordenes]);
-
-  useEffect(() => {
-    const fetchEtapas = async () => {
-      try {
-        const res = await api.get("/etapas-produccion");
-
-        const opciones = res.data.map((etp) => ({
-          value: etp.id_etapa,
-          label: etp.nombre,
-        }));
-        setEtapas(opciones);
-      } catch (error) {
-        console.error("Error al cargar etapas", error);
-        toast.error("Error al cargar etapas");
-      }
-    };
-    fetchEtapas();
-  }, []);
-
-  useEffect(() => {
-    cargarOrdenes();
-  }, []);
-
-  const cargarOrdenes = async () => {
-    try {
-      const res = await api.get("/ordenes-fabricacion");
-      console.log("Órdenes desde backend:", res.data);
-      setOrdenes(res.data);
-    } catch (error) {
-      console.error("Error cargando órdenes de fabricación", error);
-    }
-  };
-  useEffect(() => {
-    const fetchOrdenes = async () => {
-      try {
-        const endpoint = mostrarCanceladas
-          ? "/ordenes-fabricacion?estados=cancelada"
-          : "/ordenes-fabricacion?estados=pendiente,en proceso,completada";
-
-        const res = await api.get(endpoint);
-        console.log("Órdenes recibidas:", res.data);
-        setOrdenes(res.data);
-      } catch (error) {
-        console.error("Error al cargar órdenes:", error);
-        toast.error("Error al cargar órdenes");
-      }
-    };
-
-    fetchOrdenes();
-  }, [mostrarCanceladas]);
-
-
-
-useEffect(() => {
-  const filtrarArticulosCompletados = async () => {
-    const nuevosArticulosPendientes = {};
-
-    for (const orden of ordenes) {
-      const idOrden = orden.id_orden_fabricacion;
-      const articulosEnOrden = articulosPorOrden[idOrden] || [];
-  
-      const avancesDeLaOrden = orden.avances || [];
-
-   
-      console.log(`--- Procesando Orden ${idOrden} ---`);
-      console.log("Artículos registrados en la orden:", articulosEnOrden);
-      console.log("Avances cargados para la orden:", avancesDeLaOrden);
- 
-
-      const articulosFiltrados = await Promise.all(
-        articulosEnOrden.map(async (articulo) => {
-          const { value: idArticulo, cantidadRequerida, idEtapaFinal } = articulo;
-
-
-          console.log(
-            `  -> Artículo ${articulo.label} (ID: ${idArticulo}) | Requerido: ${cantidadRequerida} | Etapa Final ID: ${idEtapaFinal}`
-          );
-
-
-          if (!idEtapaFinal) {
-          
-            console.warn(`    Advertencia: idEtapaFinal no definida para artículo ${idArticulo} en Orden ${idOrden}. Se considera pendiente.`);
-            return articulo;
-          }
-
-          const cantidadAvanzadaEnEtapaFinal = avancesDeLaOrden
-            .filter(
-              (avance) =>
-                avance.id_articulo === idArticulo &&
-                avance.id_etapa_produccion === idEtapaFinal &&
-                avance.estado === 'completado' 
-            )
-            .reduce((sum, avance) => sum + avance.cantidad, 0);
-
-     
-          console.log(
-            `    Cantidad avanzada en etapa final (${idEtapaFinal}): ${cantidadAvanzadaEnEtapaFinal}`
-          );
-          console.log(
-            `    Comparación: ${cantidadAvanzadaEnEtapaFinal} < ${cantidadRequerida} = ${cantidadAvanzadaEnEtapaFinal < cantidadRequerida}`
-          );
-    
-
-          if (cantidadAvanzadaEnEtapaFinal < cantidadRequerida) {
-            return articulo; 
-          }
-          return null;
-        })
+    if (campo === "articulo") {
+      const ordenSeleccionada = ordenes.find(
+        (o) => o.id_orden_fabricacion === idOrden
       );
-      nuevosArticulosPendientes[idOrden] = articulosFiltrados.filter(Boolean);
+      if (!ordenSeleccionada) return;
 
-   
+      const articuloSeleccionado = ordenSeleccionada.detalles.find(
+        (art) => art.id_articulo === Number(valor)
+      );
+      if (!articuloSeleccionado) return;
+
+      const cantidadTotalRequerida = articuloSeleccionado.cantidad;
+      const idEtapaFinal = articuloSeleccionado.id_etapa_final;
+      const avancesPorEtapa = (ordenSeleccionada.avances || [])
+        .filter((avance) => avance.id_articulo === Number(valor))
+        .reduce((acc, avance) => {
+          acc[avance.id_etapa_produccion] =
+            (acc[avance.id_etapa_produccion] || 0) + avance.cantidad;
+          return acc;
+        }, {});
+
+      const etapasDisponiblesParaArticulo = [];
+      const etapasOrdenadas = etapas.sort((a, b) => a.orden - b.orden);
+
+      for (const etapa of etapasOrdenadas) {
+        // Verifica si la etapa está en el proceso de producción del artículo
+        if (
+          etapa.orden <= etapas.find((e) => e.value === idEtapaFinal)?.orden
+        ) {
+          const cantidadAvanzadaEnEstaEtapa = avancesPorEtapa[etapa.value] || 0;
+          // Si la cantidad avanzada en esta etapa es MENOR que la cantidad total
+          // requerida, la etapa está disponible.
+          if (cantidadAvanzadaEnEstaEtapa < cantidadTotalRequerida) {
+            etapasDisponiblesParaArticulo.push(etapa);
+          }
+        }
+      }
+      setEtapasDisponibles((prev) => ({
+        ...prev,
+        [idOrden]: etapasDisponiblesParaArticulo,
+      }));
+      // Restablecer la etapa y el trabajador
+      setFormularios((prev) => ({
+        ...prev,
+        [idOrden]: {
+          ...prev[idOrden],
+          etapa: null,
+          trabajador: null,
+        },
+      }));
+    } else if (campo === "etapa") {
+      const etapaSeleccionada = etapas.find((et) => et.value === Number(valor));
+      const nombreCargoEtapa = etapaSeleccionada?.cargo;
+
+      const trabajadoresFiltrados = trabajadores.filter(
+        (trab) =>
+          trab.cargo &&
+          nombreCargoEtapa &&
+          trab.cargo.toLowerCase().trim() ===
+            nombreCargoEtapa.toLowerCase().trim()
+      );
+
+      setTrabajadoresDisponibles((prev) => ({
+        ...prev,
+        [idOrden]: trabajadoresFiltrados,
+      }));
+
+      setFormularios((prev) => ({
+        ...prev,
+        [idOrden]: {
+          ...prev[idOrden],
+          trabajador: null,
+        },
+      }));
+    } else if (campo === "cantidad") {
+      const cantidadIngresada = Number(valor);
+      const { articulo, etapa } = formularios[idOrden] || {};
+      const ordenSeleccionada = ordenes.find(
+        (o) => o.id_orden_fabricacion === idOrden
+      );
+
+      if (ordenSeleccionada && articulo && etapa) {
+        const cantidadTotalRequerida = ordenSeleccionada.detalles.find(
+          (art) => art.id_articulo === Number(articulo)
+        )?.cantidad;
+
+        const avancesExistentes = ordenSeleccionada.avances
+          .filter(
+            (avance) =>
+              avance.id_articulo === Number(articulo) &&
+              avance.id_etapa_produccion === Number(etapa)
+          )
+          .reduce((sum, avance) => sum + avance.cantidad, 0);
+
+        if (avancesExistentes + cantidadIngresada > cantidadTotalRequerida) {
+          toast.error(
+            `La cantidad total de esta etapa no puede exceder las ${cantidadTotalRequerida} unidades.`
+          );
+          setFormularios((prev) => ({
+            ...prev,
+            [idOrden]: {
+              ...prev[idOrden],
+              cantidad: cantidadTotalRequerida - avancesExistentes,
+            },
+          }));
+        }
+      }
     }
-    setArticulosPendientesPorOrden(nuevosArticulosPendientes);
   };
-
-  if (ordenes.length > 0 && Object.keys(articulosPorOrden).length > 0) {
-    filtrarArticulosCompletados();
-  }
-}, [ordenes, articulosPorOrden]);
-
 
   const eliminarOrden = async (id) => {
     confirmAlert({
@@ -288,38 +328,10 @@ useEffect(() => {
     setMostrarCanceladas((prev) => !prev);
   };
 
-  const expandirOrden = async (id, forzar = false) => {
-    if (expandedOrden === id && !forzar) {
-      return setExpandedOrden(null);
-    }
-
-    const ordenActualizada = await api.get(`/ordenes-fabricacion/${id}`);
-    const orden = ordenActualizada.data;
-
-    try {
-      // Siempre recarga detalles y avances
-      const resDetalles = await api.get(`/detalle-ordenF/${id}`);
-      const resAvances = await api.get(`/avances-etapa/${id}`);
-
-      orden.detalles = resDetalles.data;
-      orden.avances = resAvances.data;
-
-      setOrdenes((prev) =>
-        prev.map((o) =>
-          o.id_orden_fabricacion === id ? { ...o, ...orden } : o
-        )
-      );
-
-      setExpandedOrden(id);
-    } catch (error) {
-      const mensajeBackend =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message;
-
-      toast.error(mensajeBackend);
-    }
+  const expandirOrden = (id) => {
+    setExpandedOrden((prevId) => (prevId === id ? null : id));
   };
+
   const ordenesFiltradas = ordenes.filter((o) =>
     o.estado?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -328,8 +340,6 @@ useEffect(() => {
     if (!orden.detalles || orden.detalles.length === 0) {
       return <div>No hay detalles para mostrar.</div>;
     }
-    console.log("orden detalles", orden.detalles);
-
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
@@ -369,83 +379,96 @@ useEffect(() => {
 
     const avancesPorArticulo = {};
     orden.avances.forEach((avance) => {
+      // Intenta encontrar la descripción del artículo desde los detalles de la orden
+      const articuloAsociado = orden.detalles.find(
+        (det) => det.id_articulo === avance.id_articulo
+      );
+      const nombreEtapa = etapas.find(
+        (etp) => etp.value === avance.id_etapa_produccion
+      )?.label;
+      const nombreTrabajador = trabajadores.find(
+        (trab) => trab.value === avance.id_trabajador
+      )?.label;
+
       if (!avancesPorArticulo[avance.id_articulo]) {
-        avancesPorArticulo[avance.id_articulo] = [];
+        avancesPorArticulo[avance.id_articulo] = {
+          descripcion: articuloAsociado?.descripcion || "Artículo desconocido",
+          avances: [],
+        };
       }
-      avancesPorArticulo[avance.id_articulo].push(avance);
+
+      avancesPorArticulo[avance.id_articulo].avances.push({
+        ...avance,
+        nombre_etapa: nombreEtapa,
+        nombre_trabajador: nombreTrabajador,
+      });
     });
 
     return (
       <>
-        {Object.entries(avancesPorArticulo).map(
-          ([idArticulo, avances], idx) => (
-            <div key={idx} className="mt-6">
-              <h3 className="font-bold text-gray-800 mb-2">
-                Artículo: {avances[0]?.descripcion || "Artículo desconocido"}
-              </h3>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden">
-                  <thead className="bg-gray-200 text-gray-700">
-                    <tr>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Etapa
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Responsable
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Cantidad
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Costo de fabricacion
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Estado
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Fecha
-                      </th>
-                      <th className="px-2 py-2 border-b border-gray-300">
-                        Observaciones
-                      </th>
+        {Object.entries(avancesPorArticulo).map(([idArticulo, data], idx) => (
+          <div key={idx} className="mt-6">
+            <h3 className="font-bold text-gray-800 mb-2">
+              Artículo: {data.descripcion}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden">
+                <thead className="bg-gray-200 text-gray-700">
+                  <tr>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Etapa
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Responsable
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Cantidad
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Costo de fabricación
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Estado
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Observaciones
+                    </th>
+                    <th className="px-2 py-2 border-b border-gray-300">
+                      Fecha
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.avances.map((avance, idx2) => (
+                    <tr key={idx2} className="hover:bg-gray-50">
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {avance.nombre_etapa || "N/A"}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {avance.nombre_trabajador || "N/A"}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {avance.cantidad}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        ${avance.costo_fabricacion}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {avance.estado || "-"}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {avance.observaciones || "-"}
+                      </td>
+                      <td className="px-2 py-2 border-b border-gray-300">
+                        {new Date(avance.fecha_registro).toLocaleDateString()}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {avances.map((avance, idx2) => (
-                      <tr key={idx2} className="hover:bg-gray-50">
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.nombre || "N/A"}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.nombre_trabajador || "N/A"}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.cantidad}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          ${avance.costo_fabricacion}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.estado}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.fecha_registro
-                            ? new Date(avance.fecha_registro).toLocaleDateString()
-                            : "N/A"}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.observaciones || "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )
-        )}
-        {/* Botón para cerrar la lista de avances */}
+          </div>
+        ))}
         <button
           onClick={() => setExpandedOrden(null)}
           className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 flex items-center gap-2 cursor-pointer"
@@ -458,16 +481,14 @@ useEffect(() => {
 
   const manejarRegistroAvance = async (idOrden, formulario) => {
     if (!formulario) {
-      toast.error("Formulario vacio");
+      toast.error("Formulario vacío");
       return;
     }
-
     try {
       const {
         articulo,
         etapa,
         trabajador,
-        estado,
         cantidad,
         observaciones,
         costo_fabricacion,
@@ -478,11 +499,10 @@ useEffect(() => {
         id_articulo: articulo ? parseInt(articulo) : null,
         id_etapa_produccion: etapa ? parseInt(etapa) : null,
         id_trabajador: trabajador ? parseInt(trabajador) : null,
-        estado,
         cantidad: cantidad ? parseInt(cantidad) : null,
         observaciones: observaciones || "",
         costo_fabricacion: costo_fabricacion
-          ? parseInt(costo_fabricacion)
+          ? parseFloat(costo_fabricacion)
           : null,
       };
 
@@ -491,155 +511,115 @@ useEffect(() => {
         !etapa ||
         !trabajador ||
         !cantidad ||
-        isNaN(parseInt(etapa)) ||
         !costo_fabricacion
       ) {
         toast.error("Por favor completa todos los campos obligatorios.");
         return;
       }
-      console.log("Formulario a enviar:", datos);
 
+      // Envía el avance.
       await api.post("/avances-etapa", datos);
 
-toast.success("Avance registrado");
+      // Obtiene los datos de la orden actualizada.
+      const res = await api.get(`/ordenes-fabricacion/${idOrden}`);
+      const updatedOrden = res.data;
 
-      await cargarOrdenes();
-  
-      await expandirOrden(idOrden, true);
-      setMostrarFormularioAvance(null); 
+      // Procesa los datos de forma segura.
+      updatedOrden.detalles =
+        typeof updatedOrden.detalles === "string"
+          ? JSON.parse(updatedOrden.detalles)
+          : updatedOrden.detalles || [];
+
+      updatedOrden.avances =
+        typeof updatedOrden.avances === "string"
+          ? JSON.parse(updatedOrden.avances)
+          : updatedOrden.avances || [];
+
+      // Calcula la nueva lista de artículos pendientes para la orden actualizada.
+      const articulosPendientes = updatedOrden.detalles
+        .filter((articulo) => {
+          const cantidadAvanzadaEnEtapaFinal = updatedOrden.avances
+            .filter(
+              (avance) =>
+                avance.id_articulo === articulo.id_articulo &&
+                avance.id_etapa_produccion === articulo.id_etapa_final
+            )
+            .reduce((sum, avance) => sum + avance.cantidad, 0);
+          return cantidadAvanzadaEnEtapaFinal < articulo.cantidad;
+        })
+        .map((art) => ({
+          value: art.id_articulo,
+          label: art.descripcion,
+          cantidadRequerida: art.cantidad,
+          idEtapaFinal: art.id_etapa_final,
+        }));
+
+      // Actualiza el estado de las órdenes y los artículos pendientes.
+      setOrdenes((prevOrdenes) =>
+        prevOrdenes.map((o) =>
+          o.id_orden_fabricacion === idOrden ? updatedOrden : o
+        )
+      );
+
+      setArticulosPendientesPorOrden((prev) => ({
+        ...prev,
+        [idOrden]: articulosPendientes,
+      }));
+
+      toast.success("Avance registrado");
+
+      setExpandedOrden(idOrden);
+      setMostrarFormularioAvance(null);
       setFormularios((prev) => ({
         ...prev,
-        [idOrden]: {
-          ...prev[idOrden],
-          articulo: "",
-          etapa: "",
-          trabajador: "",
-          estado: "",
-          cantidad: "",
-          observaciones: "",
-        },
+        [idOrden]: {},
       }));
     } catch (error) {
       const mensajeBackend =
         error.response?.data?.error ||
         error.response?.data?.message ||
         "Error al registrar avance.";
-
       toast.error(mensajeBackend);
-      console.error("Error al registrar avance:", error);
+      console.error("Error al manejar el avance:", error);
     }
   };
-
-  const yaConsultadoCosto = useRef({});
-  const historialCostos = useRef({});
-  const costoManualEditado = useRef({});
-
- useEffect(() => {
-  const cargarCostoAnterior = async () => {
-    for (const [idOrden, formulario] of Object.entries(formularios)) {
-      const { articulo, etapa, costo_fabricacion: costoActual } = formulario || {}; // Desestructuramos el costo actual
-      if (!articulo || !etapa) continue;
-
-      const clave = `${idOrden}-${articulo}-${etapa}`;
-
-      // Si ya fue consultado antes
-      if (yaConsultadoCosto.current[clave]) {
-        const costoGuardado = historialCostos.current[clave];
-        if (
-          costoGuardado !== undefined &&
-          !costoManualEditado.current[clave]
-        ) {
-          // *** CORRECCIÓN: Comprobar si el costo es diferente antes de actualizar el estado ***
-          if (costoActual !== costoGuardado) {
-            setFormularios((prev) => ({
-              ...prev,
-              [idOrden]: {
-                ...prev[idOrden],
-                costo_fabricacion: costoGuardado,
-              },
-            }));
-          }
-        }
-        continue;
-      }
-
-      try {
-        const res = await api.get(
-          `/avances-etapa/costo-anterior/${articulo}/${etapa}`
-        );
-        const costo = res.data?.costo_fabricacion ?? null;
-
-        console.log(
-          ` Backend respondió para artículo ${articulo}, etapa ${etapa}:`,
-          costo
-        );
-
-        yaConsultadoCosto.current[clave] = true;
-        historialCostos.current[clave] = costo;
-
-        if (costo !== null && !costoManualEditado.current[clave]) {
-          // *** CORRECCIÓN: Comprobar si el costo es diferente antes de actualizar el estado ***
-          if (costoActual !== costo) {
-            setFormularios((prev) => ({
-              ...prev,
-              [idOrden]: {
-                ...prev[idOrden],
-                costo_fabricacion: costo,
-              },
-            }));
-          }
-        }
-      } catch (error) {
-        console.error(" Error al cargar costo anterior:", error);
-      }
-    }
-  };
-
-  cargarCostoAnterior();
-}, [formularios]);
-
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <h2 className="text-4xl font-bold text-gray-800 p-4">
         Órdenes de fabricación
       </h2>
       <div className="flex flex-col md:flex-row justify-end items-center mb-6 gap-4 m-5">
-        <div className="flex flex-wrap gap-4  w-full  items-center ">
+        <div className="flex flex-wrap gap-4 w-full items-center">
           <input
             type="text"
             placeholder="Buscar por estado..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-gray-500 rounded-md px-4 py-2  focus:ring-slate-600 h-[42px] flex-grow"
+            className="border border-gray-500 rounded-md px-4 py-2 focus:ring-slate-600 h-[42px] flex-grow"
           />
           <button
             onClick={() => navigate("/ordenes_fabricacion/nuevo")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            <FiPlus size={20} />
-            Crear orden
+            <FiPlus size={20} /> Crear orden
           </button>
-
           <button
             onClick={() => navigate("/etapas_produccion")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            <FiPlus size={20} />
-            Nueva etapa
+            <FiPlus size={20} /> Nueva etapa
           </button>
           <button
             onClick={() => navigate("/lotes_fabricados")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-             <FiArrowRight />
-            Lotes fabricados
+            <FiArrowRight /> Lotes fabricados
           </button>
           <button
             onClick={() => navigate("/avances_fabricacion")}
             className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-             <FiArrowRight />
-            Avances de fabricacion
+            <FiArrowRight /> Avances de fabricacion
           </button>
           <button
             onClick={toggleMostrarCanceladas}
@@ -651,17 +631,14 @@ toast.success("Avance registrado");
           >
             {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
           </button>
-
           <button
             onClick={() => navigate(-1)}
             className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            <FiArrowLeft />
-            Volver
+            <FiArrowLeft /> Volver
           </button>
         </div>
       </div>
-
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
@@ -685,7 +662,6 @@ toast.success("Avance registrado");
                         : "hover:bg-gray-200"
                     }`}
                     onClick={() => expandirOrden(orden.id_orden_fabricacion)}
-                  
                   >
                     <td className="px-4 py-2">{orden.id_orden_fabricacion}</td>
                     <td className="px-4 py-2">
@@ -725,25 +701,23 @@ toast.success("Avance registrado");
                         colSpan="6"
                         className="bg-gray-100 px-6 py-4 border-b"
                       >
-                        <div className="mb-2 font-semibold text-slate-700 ">
+                        <div className="mb-2 font-semibold text-slate-700">
                           Detalles de la orden:
                         </div>
                         {renderDetalles(orden)}
                         {renderAvancesPorArticulo(orden)}
                         <button
                           onClick={() =>
-                            setMostrarFormularioAvance(
-                              mostrarFormularioAvance ===
-                                orden.id_orden_fabricacion
+                            setMostrarFormularioAvance((prev) =>
+                              prev === orden.id_orden_fabricacion
                                 ? null
                                 : orden.id_orden_fabricacion
                             )
                           }
-                          className="mt-4 text-slate-700 flex items-center gap-2 hover:underline cursor-pointer "
+                          className="mt-4 text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
                         >
                           <FiPlus /> Registrar nuevo avance
                         </button>
-
                         {mostrarFormularioAvance ===
                           orden.id_orden_fabricacion && (
                           <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
@@ -754,41 +728,37 @@ toast.success("Avance registrado");
                                   orden.id_orden_fabricacion,
                                   formularios[orden.id_orden_fabricacion]
                                 );
-                                console.log(
-                                  formularios[orden.id_orden_fabricacion]
-                                );
                               }}
-                              className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200 "
+                              className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
                             >
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                               <select
-  value={
-    formularios[orden.id_orden_fabricacion]?.articulo || ""
-  }
-  onChange={(e) =>
-    actualizarFormulario(
-      orden.id_orden_fabricacion,
-      "articulo",
-      Number(e.target.value)
-    )
-  }
-  className="border rounded px-2 py-1 border-slate-300 p-5"
->
-  <option value="">
-    Selecciona el artículo
-  </option>
-  
-  {(
-    articulosPendientesPorOrden[
-      orden.id_orden_fabricacion
-    ] || []
-  ).map((art) => (
-    <option key={art.value} value={art.value}>
-      {art.label}
-    </option>
-  ))}
-</select>
-
+                                <select
+                                  value={
+                                    formularios[orden.id_orden_fabricacion]
+                                      ?.articulo || ""
+                                  }
+                                  onChange={(e) =>
+                                    actualizarFormulario(
+                                      orden.id_orden_fabricacion,
+                                      "articulo",
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
+                                >
+                                  <option value="">
+                                    Selecciona el artículo
+                                  </option>
+                                  {(
+                                    articulosPendientesPorOrden[
+                                      orden.id_orden_fabricacion
+                                    ] || []
+                                  ).map((art) => (
+                                    <option key={art.value} value={art.value}>
+                                      {art.label}
+                                    </option>
+                                  ))}
+                                </select>
                                 <select
                                   value={
                                     formularios[orden.id_orden_fabricacion]
@@ -817,7 +787,6 @@ toast.success("Avance registrado");
                                     </option>
                                   ))}
                                 </select>
-
                                 <select
                                   value={
                                     formularios[orden.id_orden_fabricacion]
@@ -827,24 +796,31 @@ toast.success("Avance registrado");
                                     actualizarFormulario(
                                       orden.id_orden_fabricacion,
                                       "trabajador",
-                                      e.target.value
+                                      Number(e.target.value)
                                     )
                                   }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5 "
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
                                 >
                                   <option value="">
                                     Selecciona trabajador
                                   </option>
-                                  {trabajadores.map((trab) => (
+                                  {(
+                                    trabajadoresDisponibles[
+                                      orden.id_orden_fabricacion
+                                    ] || []
+                                  ).map((trab) => (
                                     <option key={trab.value} value={trab.value}>
                                       {trab.label}
                                     </option>
                                   ))}
                                 </select>
-
                                 <input
                                   type="number"
                                   placeholder="Cantidad"
+                                  value={
+                                    formularios[orden.id_orden_fabricacion]
+                                      ?.cantidad || ""
+                                  }
                                   onChange={(e) =>
                                     actualizarFormulario(
                                       orden.id_orden_fabricacion,
@@ -872,10 +848,7 @@ toast.success("Avance registrado");
                                       formularios[orden.id_orden_fabricacion]
                                         ?.etapa
                                     }`;
-
-                                    // Marca que el usuario ha editado este campo
                                     costoManualEditado.current[clave] = true;
-
                                     actualizarFormulario(
                                       orden.id_orden_fabricacion,
                                       "costo_fabricacion",
@@ -884,7 +857,6 @@ toast.success("Avance registrado");
                                   }}
                                   className="border rounded px-2 py-1 border-slate-300 p-5"
                                 />
-
                                 <input
                                   type="text"
                                   placeholder="Observaciones"
@@ -911,7 +883,9 @@ toast.success("Avance registrado");
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setMostrarFormularioAvance(null)}
+                                  onClick={() =>
+                                    setMostrarFormularioAvance(null)
+                                  }
                                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 cursor-pointer"
                                 >
                                   Cerrar

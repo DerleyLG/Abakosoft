@@ -2,7 +2,8 @@ const ordenModel = require("../models/ordenesVentaModel");
 const detalleOrdenModel = require("../models/detalleOrdenVentaModel");
 const clienteModel = require("../models/clientesModel");
 const articuloModel = require("../models/articulosModel");
-const inventarioModel = require("../models/inventarioModel"); // Importamos el modelo de inventario
+const inventarioModel = require("../models/inventarioModel");
+const tesoreriaModel = require("../models/tesoreriaModel");
 const db = require("../database/db");
 
 // Función auxiliar para verificar existencia de cliente
@@ -60,15 +61,12 @@ module.exports = {
     }
   },
 
-  create: async (req, res) => {
+  /*create: async (req, res) => {
     let connection; // Para la transacción
     try {
       const { id_cliente, estado, fecha, detalles } = req.body;
 
-      console.log("[OrdenVentaController] Inicio de la creación de la orden de venta.");
-      console.log("[OrdenVentaController] Datos recibidos en el body:", req.body);
 
-      // --- INICIO DE TRANSACCIÓN GLOBAL ---
       connection = await db.getConnection();
       await connection.beginTransaction();
       console.log("[OrdenVentaController] Transacción iniciada.");
@@ -115,7 +113,7 @@ module.exports = {
         if (!inventarioArticulo || inventarioArticulo.stock < cantidad) {
           throw new Error(`Stock insuficiente para el artículo ${articuloExistente.descripcion}. Stock disponible: ${inventarioArticulo?.stock || 0}, solicitado: ${cantidad}`);
         }
-        console.log(`[OrdenVentaController] Stock suficiente para artículo ${id_articulo}.`);
+        
 
         const precio_unitario = articuloExistente.precio_venta;
         if (precio_unitario == null) {
@@ -123,12 +121,12 @@ module.exports = {
         }
         // Asignar el precio_unitario del artículo existente al detalle
         detalle.precio_unitario = precio_unitario;
-        console.log(`[OrdenVentaController] Precio unitario asignado para artículo ${id_articulo}.`);
+ 
       }
-      console.log("[OrdenVentaController] Todas las validaciones de detalles y stock pasaron.");
+    
 
       // Todas las validaciones pasaron, crea la orden de venta
-      console.log("[OrdenVentaController] Intentando crear la orden de venta en el modelo...");
+
       const id_orden_venta = await ordenModel.create({
         id_cliente,
         estado,
@@ -138,10 +136,10 @@ module.exports = {
 
       // Crear detalles y descontar stock
       for (const detalle of detalles) {
-        const { id_articulo, cantidad } = detalle; // No se espera 'observaciones' en el detalle del frontend
-        console.log(`[OrdenVentaController] Procesando detalle para artículo ${id_articulo} (cantidad: ${cantidad})`);
+        const { id_articulo, cantidad } = detalle; 
+       
 
-        // 1. Descontar stock del inventario
+        //  Descontar stock del inventario
         try {
             console.log(`[OrdenVentaController] Descontando stock para artículo ${id_articulo}...`);
             await inventarioModel.processInventoryMovement({
@@ -153,13 +151,13 @@ module.exports = {
                 referencia_documento_id: id_orden_venta,
                 referencia_documento_tipo: 'orden_venta',
             }, connection); // Pasamos la conexión para que processInventoryMovement use la misma transacción
-            console.log(`[OrdenVentaController] Stock descontado para artículo ${id_articulo}.`);
+          
         } catch (inventoryError) {
             console.error(`[OrdenVentaController] Error al descontar stock para artículo ${id_articulo}:`, inventoryError.message);
             throw new Error(`Stock insuficiente para el artículo ${detalle.descripcion} (ID: ${id_articulo}). Error: ${inventoryError.message}`);
         }
 
-        // 2. Crear el detalle de la orden de venta
+        //  Crear el detalle de la orden de venta
         console.log(`[OrdenVentaController] Preparando datos para detalle de orden de venta para artículo ${id_articulo}:`, {
             id_orden_venta,
             id_articulo: detalle.id_articulo,
@@ -182,10 +180,10 @@ module.exports = {
         }
       }
 
-      console.log("[OrdenVentaController] Intentando COMMIT de la transacción...");
-      await connection.commit(); // Confirmar la transacción
-      connection.release(); // Liberar la conexión
-      console.log("[OrdenVentaController] Transacción COMITADA y conexión liberada.");
+   
+      await connection.commit(); 
+      connection.release(); 
+  
 
       return res.status(201).json({
         message: "Orden de venta creada con sus detalles y stock descontado.",
@@ -193,10 +191,161 @@ module.exports = {
       });
     } catch (error) {
       if (connection) {
-        console.log("[OrdenVentaController] Error detectado. Intentando ROLLBACK de la transacción...");
+        console.error("[OrdenVentaController] Error detectado. Intentando ROLLBACK de la transacción...");
         await connection.rollback(); // Revertir la transacción en caso de error
         connection.release(); // Liberar la conexión
-        console.log("[OrdenVentaController] Transacción ROLLEADA y conexión liberada.");
+        console.error("[OrdenVentaController] Transacción ROLLEADA y conexión liberada.");
+      }
+      console.error("Detalles del error al crear orden de venta:", {
+        message: error.message,
+        stack: error.stack,
+        body: req.body,
+      });
+      return res
+        .status(500)
+        .json({ error: error.message || "Error al crear la orden de venta." });
+    }
+  },
+*/
+
+create: async (req, res) => {
+    let connection; // Para la transacción
+    try {
+      const { 
+        id_cliente, 
+        estado, 
+        fecha, 
+        detalles, 
+        id_metodo_pago,
+        referencia,
+        observaciones_pago,
+      } = req.body;
+
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+
+      // Validar cliente
+      const clienteExistente = await clienteModel.getById(id_cliente, connection); 
+      if (!clienteExistente) {
+        throw new Error("El cliente especificado no existe.");
+      }
+    
+
+      // Validar estado
+      if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
+        throw new Error(`Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`);
+      }
+    
+
+      // Validar fecha
+      if (!fecha || isNaN(Date.parse(fecha))) {
+        throw new Error("Fecha inválida o no proporcionada.");
+      }
+   
+
+      // Validar detalles
+      if (!Array.isArray(detalles) || detalles.length === 0) {
+        throw new Error("Debe incluir al menos un detalle.");
+      }
+  
+
+      //  Validar cada detalle y stock antes de crear la orden
+      let totalVenta = 0; 
+      for (const detalle of detalles) {
+        const { id_articulo, cantidad } = detalle;
+        const articuloExistente = await articuloModel.getById(id_articulo, connection);
+        if (!articuloExistente) {
+          throw new Error(`El artículo con ID ${id_articulo} no existe.`);
+        }
+        
+        const inventarioArticulo = await inventarioModel.obtenerInventarioPorArticulo(id_articulo, connection); 
+        
+        if (!inventarioArticulo || inventarioArticulo.stock < cantidad) {
+          throw new Error(`Stock insuficiente para el artículo ${articuloExistente.descripcion}. Stock disponible: ${inventarioArticulo?.stock || 0}, solicitado: ${cantidad}`);
+        }
+        
+        const precio_unitario = articuloExistente.precio_venta;
+        if (precio_unitario == null) {
+          throw new Error(`El artículo con ID ${id_articulo} no tiene precio de venta definido.`);
+        }
+        // Asignar el precio_unitario del artículo existente al detalle
+        detalle.precio_unitario = precio_unitario;
+        totalVenta += precio_unitario * cantidad;
+      }
+    
+      // Todas las validaciones pasaron, crea la orden de venta
+      const id_orden_venta = await ordenModel.create({
+        id_cliente,
+        estado,
+        fecha,
+        total: totalVenta, //  Pasamos el total calculado al modelo
+        monto: totalVenta 
+      }, connection); 
+     
+
+      // Crear detalles y descontar stock
+      for (const detalle of detalles) {
+        const { id_articulo, cantidad } = detalle; 
+        
+        // Descontar stock del inventario
+        try {
+          await inventarioModel.processInventoryMovement({
+            id_articulo: Number(id_articulo),
+            cantidad_movida: Number(cantidad),
+            tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.SALIDA,
+            tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.VENTA,
+            observaciones: `Salida por orden de venta #${id_orden_venta}`,
+            referencia_documento_id: id_orden_venta,
+            referencia_documento_tipo: 'orden_venta',
+          }, connection); 
+        } catch (inventoryError) {
+          console.error(`[OrdenVentaController] Error al descontar stock para artículo ${id_articulo}:`, inventoryError.message);
+          throw new Error(`Stock insuficiente para el artículo ${detalle.descripcion} (ID: ${id_articulo}). Error: ${inventoryError.message}`);
+        }
+
+        // Crear el detalle de la orden de venta
+        try {
+          await detalleOrdenModel.create({
+            id_orden_venta,
+            id_articulo: detalle.id_articulo,
+            cantidad: detalle.cantidad,
+            observaciones: '',
+            precio_unitario: detalle.precio_unitario,
+          }, connection); 
+        } catch (detailError) {
+          console.error(`[OrdenVentaController] ERROR CRÍTICO al crear detalle de orden de venta para artículo ${id_articulo}:`, detailError);
+          throw new Error(`Error al crear detalle para artículo ${detalle.descripcion} (ID: ${id_articulo}). Detalle: ${detailError.message}`);
+        }
+      }
+
+      //  Lógica para la Tesorería: Registrar el movimiento de pago
+   
+      const movimientoData = {
+        id_documento: id_orden_venta, 
+        tipo_documento: 'orden_venta', 
+        monto: totalVenta,
+        id_metodo_pago: id_metodo_pago,
+        referencia: referencia,
+        observaciones: observaciones_pago,
+      };
+      await tesoreriaModel.insertarMovimiento(movimientoData, connection); 
+     
+      
+      await connection.commit(); 
+      connection.release(); 
+      
+      return res.status(201).json({
+        message: "Orden de venta y movimiento de tesorería creados.",
+        id_orden_venta,
+      });
+
+    } catch (error) {
+      if (connection) {
+        console.error("[OrdenVentaController] Error detectado. Intentando ROLLBACK de la transacción...");
+        await connection.rollback(); 
+        connection.release();
+        console.error("[OrdenVentaController] Transacción ROLLEADA y conexión liberada.");
       }
       console.error("Detalles del error al crear orden de venta:", {
         message: error.message,
@@ -290,7 +439,7 @@ module.exports = {
         throw new Error("Orden de venta no encontrada.");
       }
 
-      console.log("Estado pedido:", orden.estado);
+    
 
       // Si la orden no está pendiente, no se puede anular (y no se devuelve stock)
       if (orden.estado.toLowerCase().trim() !== "pendiente") {

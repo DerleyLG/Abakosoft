@@ -63,9 +63,11 @@ const Login = () => {
                         </button>
                     </div>
                 </form>
+                {/*
                 <div className="text-center">
-                    <p className="text-sm text-gray-600">¿No tienes una cuenta? <span onClick={() => navigate('/register')} className="text-slate-600 hover:text-slate-800 font-medium cursor-pointer">Registrate aqui</span></p>
+                    <p className="text-sm text-gray-600"><span onClick={() => navigate('/register')} className="text-slate-600 hover:text-slate-800 font-medium cursor-pointer">Registrate</span></p>
                 </div>
+                */}
             </div>
         </div>
     );

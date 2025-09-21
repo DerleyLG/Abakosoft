@@ -47,7 +47,7 @@ module.exports = {
           ae.id_trabajador,
           COALESCE(t.nombre, '') AS nombre_trabajador,
           ae.cantidad,
-          ae.costo_fabricacion AS costo_fabricacion, -- CORREGIDO: Ahora toma el costo de la tabla 'avance_etapas_produccion' (ae)
+          ae.costo_fabricacion AS costo_fabricacion, 
           ae.fecha_registro,
           ae.estado,
           ae.pagado
@@ -89,7 +89,7 @@ module.exports = {
   },
 
   getByOrden: async (id_orden_fabricacion) => {
-    console.log('Buscando avances para orden:', id_orden_fabricacion)
+ 
     const [rows] = await db.query(`
       SELECT 
         ae.*, 
@@ -103,6 +103,29 @@ module.exports = {
       WHERE ae.id_orden_fabricacion = ?
       ORDER BY ae.fecha_registro DESC
     `, [id_orden_fabricacion]);
+    return rows;
+  },
+getByOrdenes: async (ids_orden_fabricacion) => {
+    // Si el array está vacío, retorna un array vacío
+    if (!ids_orden_fabricacion || ids_orden_fabricacion.length === 0) {
+      return [];
+    }
+   
+    const placeholders = ids_orden_fabricacion.map(() => '?').join(',');
+    const query = `
+      SELECT 
+        ae.*, 
+        ar.descripcion,
+        ep.nombre AS nombre_etapa,
+        t.nombre AS nombre_trabajador
+      FROM avance_etapas_produccion ae
+      JOIN articulos ar ON ae.id_articulo = ar.id_articulo
+      JOIN etapas_produccion ep ON ae.id_etapa_produccion = ep.id_etapa
+      JOIN trabajadores t ON ae.id_trabajador = t.id_trabajador
+      WHERE ae.id_orden_fabricacion IN (${placeholders})
+      ORDER BY ae.fecha_registro DESC;
+    `;
+    const [rows] = await db.query(query, ids_orden_fabricacion);
     return rows;
   },
 
