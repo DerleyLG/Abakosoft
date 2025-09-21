@@ -66,9 +66,9 @@ export const AuthProvider = ({ children }) => {
                     Authorization: `Bearer ${token}`
                 }
             });
-            // Establecemos el usuario en el estado
+            
             setUser(userResponse.data);
-            return true; // Indicamos que el login fue exitoso
+            return true; 
         } catch (error) {
             console.error('Error en el login:', error);
            
