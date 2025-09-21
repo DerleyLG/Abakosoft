@@ -74,7 +74,7 @@ const ProtectedRoute = ({ children }) => {
 
 
    
-export default function App() {
+const AppLogic = () => {
    const { logout, isAuthenticated } = useAuth(); 
 
    
@@ -96,8 +96,8 @@ export default function App() {
 
 
   return (
-    <AuthProvider>
-      <Toaster position="top-right" reverseOrder={false} /> 
+   
+      
       <Routes>
         <Route path="/login" element={<Login/>} />
         <Route path="/register" element={<Register/>} />
@@ -151,8 +151,17 @@ export default function App() {
           <Route path="tesoreria" element={<Tesoreria/>} />
         </Route>
       </Routes>
-      </AuthProvider>
      
+     
+ 
    
   );
+}
+    export default function App() {
+    return(
+       <AuthProvider>
+        <Toaster position="top-right" reverseOrder={false} /> 
+        <AppLogic />
+       </AuthProvider>
+    );
 }
