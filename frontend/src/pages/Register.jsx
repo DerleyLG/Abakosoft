@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 const Register = () => {
     // Estado para los campos del formulario de registro
     const [nombre_usuario, setNombreUsuario] = useState('');
