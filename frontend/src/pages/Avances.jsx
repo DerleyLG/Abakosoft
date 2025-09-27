@@ -152,6 +152,7 @@ const ListaAvances = () => {
               <th className="px-4 py-2 text-left">Trabajador</th>
               <th className="px-4 py-2 text-left">Cantidad</th>
               <th className="px-4 py-2 text-left">Costo unitario</th>
+              <th className="px-4 py-2 text-left">Anticipo</th>
               <th className="px-4 py-2 text-left">Fecha</th>
               <th className="px-4 py-2 text-left">Estado</th>
               <th className="px-4 py-2 text-left">Estado de pago</th>
@@ -177,6 +178,17 @@ const ListaAvances = () => {
                 <td className="px-4 py-2">{avance.nombre_trabajador || avance.id_trabajador}</td>
                 <td className="px-4 py-2">{avance.cantidad}</td>
                 <td className="px-4 py-2">${avance.costo_fabricacion?.toLocaleString() || 0}</td>
+                <td className="px-4 py-2">
+                  {avance.monto_anticipo > 0 ? (
+                    <span className="text-red-600 font-semibold">
+                    Si,  ${avance.monto_anticipo.toLocaleString()}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500 italic text-sm">
+                      Sin anticipo
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   {new Date(avance.fecha_registro).toLocaleDateString()}
                 </td>

@@ -18,12 +18,14 @@ module.exports = {
         e.nombre AS nombre_etapa,
         t.nombre AS nombre_trabajador,
         art.descripcion,
-        c.nombre AS nombre_cliente
+        c.nombre AS nombre_cliente,
+        COALESCE(ant.monto, 0) AS monto_anticipo
       FROM avance_etapas_produccion a
       JOIN articulos art ON a.id_articulo = art.id_articulo
       JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
       JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
       JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
+          LEFT JOIN anticipos_trabajadores ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
       LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
       LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
       WHERE a.pagado = 0 AND ofa.estado NOT IN ('cancelada')

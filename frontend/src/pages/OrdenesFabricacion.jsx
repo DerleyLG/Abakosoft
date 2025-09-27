@@ -828,11 +828,11 @@ const ListaOrdenesFabricacion = () => {
                                       e.target.value
                                     )
                                   }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
+                                   className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                                 <input
                                   type="number"
-                                  placeholder="Costo de fabricación"
+                                  placeholder="Costo de fabricación unitario"
                                   value={
                                     formularios[orden.id_orden_fabricacion]
                                       ?.costo_fabricacion || ""
@@ -855,7 +855,7 @@ const ListaOrdenesFabricacion = () => {
                                       valor
                                     );
                                   }}
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                                 <input
                                   type="text"

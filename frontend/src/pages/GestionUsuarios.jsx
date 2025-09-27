@@ -120,7 +120,7 @@ const ListaUsuarios = () => {
          className="hover:bg-slate-300 cursor-pointer transition select-none"
         >
          <td className="px-4 py-3">{user.nombre_usuario}</td>
-         \
+         
          <td className="px-4 py-3">{user.nombre_rol}</td>
          <td className="px-4 py-3 text-center">
           <button
