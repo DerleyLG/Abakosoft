@@ -19,6 +19,7 @@ module.exports = {
     FROM anticipos_trabajadores a
     JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
     JOIN ordenes_fabricacion o ON a.id_orden_fabricacion = o.id_orden_fabricacion
+
     LEFT JOIN pedidos p ON o.id_pedido = p.id_pedido
     LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
     ORDER BY a.fecha DESC
