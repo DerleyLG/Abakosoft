@@ -15,6 +15,28 @@ const ListaAvances = () => {
   const [seleccionados, setSeleccionados] = useState([]);
   const navigate = useNavigate();
 
+  const handleToggle = (avance) => {
+    const isSelected = seleccionados.includes(avance.id_avance_etapa);
+    if (isSelected) {
+      setSeleccionados(seleccionados.filter((id) => id !== avance.id_avance_etapa));
+      return;
+    }
+
+    // Si ya hay selecciones, solo permitir agregar si pertenecen a la misma orden y mismo trabajador
+    if (seleccionados.length > 0) {
+      const primeraId = seleccionados[0];
+      const primera = avances.find((a) => a.id_avance_etapa === primeraId);
+      if (primera) {
+        if (primera.id_orden_fabricacion !== avance.id_orden_fabricacion || primera.id_trabajador !== avance.id_trabajador) {
+          toast.error('Solo puedes seleccionar avances de la misma orden y mismo trabajador.');
+          return;
+        }
+      }
+    }
+
+    setSeleccionados([...seleccionados, avance.id_avance_etapa]);
+  };
+
   useEffect(() => {
     const fetchTrabajadores = async () => {
       try {
@@ -22,7 +44,7 @@ const ListaAvances = () => {
         setTrabajadores(res.data);
       } catch (error) {
         console.error('Error al cargar trabajadores:', error);
-        toast.error('Error al cargar trabajadores.'); // Usar toast para notificar
+        toast.error('Error al cargar trabajadores.'); 
       }
     };
     fetchTrabajadores();
@@ -140,16 +162,11 @@ const ListaAvances = () => {
               <tr key={avance.id_avance_etapa} className="border-t border-slate-300 hover:bg-slate-50">
                 {!mostrarPagados && (
                   <td className="px-4 py-2">
-                    <input
-                      type="checkbox"
-                      checked={seleccionados.includes(avance.id_avance_etapa)}
-                      onChange={(e) => {
-                        const updated = e.target.checked
-                          ? [...seleccionados, avance.id_avance_etapa]
-                          : seleccionados.filter((id) => id !== avance.id_avance_etapa);
-                        setSeleccionados(updated);
-                      }}
-                    />
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.includes(avance.id_avance_etapa)}
+                          onChange={() => handleToggle(avance)}
+                        />
                   </td>
                 )}
                 <td className="px-4 py-2">

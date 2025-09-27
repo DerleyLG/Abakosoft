@@ -1,16 +1,31 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'Token no proporcionado' });
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) {
+        console.warn('[verifyToken] Authorization header missing');
+        return res.status(401).json({ error: 'Token no proporcionado' });
+    }
 
-  const token = authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token mal formado' });
+    const parts = authHeader.split(' ');
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        console.warn('[verifyToken] Authorization header malformed:', authHeader);
+        return res.status(401).json({ error: 'Token mal formado' });
+    }
+    const token = parts[1];
+    
+ 
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+          
+            console.warn('[verifyToken] jwt.verify error:', err && err.message);
+            return res.status(401).json({ error: 'Token inválido o expirado' });
+        }
 
-    req.user = decoded; // datos del usuario
-    next();
-  });
+      
+        req.user = decoded; 
+      
+        next();
+    });
 };

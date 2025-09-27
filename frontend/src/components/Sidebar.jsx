@@ -214,7 +214,7 @@ const Sidebar = ({ isOpen }) => {
          
 
           <NavLink
-            to="/usuarios"
+            to="/gestionUsuarios"
             className={({ isActive }) =>
               `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
                 isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'

@@ -7,12 +7,12 @@ const Login = () => {
     const [nombre_usuario, setNombreUsuario] = useState('');
     const [pin, setPin] = useState('');
     const navigate = useNavigate();
-    const { login } = useAuth(); // Usamos el hook para obtener la función de login
+    const { login } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // La función login del contexto ahora se encarga de todo el proceso de la API
+        
         const success = await login(nombre_usuario, pin);
 
         if (success) {

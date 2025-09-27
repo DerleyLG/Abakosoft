@@ -5,17 +5,17 @@ const verifyToken = require('../middlewares/verifyToken');
 const checkRole = require('../middlewares/checkRole');
 
 
-router.get('/', verifyToken, checkRole(['administrador', 'supervisor']), usuariosController.getAll);
+router.get('/', verifyToken, checkRole(['admin', 'supervisor']), usuariosController.getAll);
 
 
-router.get('/:id', verifyToken, checkRole(['administrador', 'supervisor']), usuariosController.getById);
+router.get('/:id', verifyToken, checkRole(['admin', 'supervisor']), usuariosController.getById);
 
 
-router.post('/', verifyToken, checkRole(['administrador']), usuariosController.create);
+router.post('/', verifyToken, checkRole(['admin']), usuariosController.create);
 
-router.put('/:id', verifyToken, checkRole(['administrador']), usuariosController.update);
+router.put('/:id', verifyToken, checkRole(['admin']), usuariosController.update);
 
 
-router.delete('/:id', verifyToken, checkRole(['administrador']), usuariosController.delete);
+router.delete('/:id', verifyToken, checkRole(['admin']), usuariosController.delete);
 
 module.exports = router;
