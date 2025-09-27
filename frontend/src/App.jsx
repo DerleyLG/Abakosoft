@@ -51,6 +51,7 @@ import Register from "./pages/Register";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 import Tesoreria from "./pages/Tesoreria";
+import GestionUsuarios from "./pages/GestionUsuarios";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -118,6 +119,7 @@ const AppLogic = () => {
                 <Route path="reportes/utilidad_por_orden" element={<ReporteUtilidadPorOrden/>} />
                 <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />
                 <Route path="tesoreria" element={<Tesoreria/>} />
+                <Route path="gestionUsuarios" element={<GestionUsuarios/>} />
             </Route>
         </Routes>
     );

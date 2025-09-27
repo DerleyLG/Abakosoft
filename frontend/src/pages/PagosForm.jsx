@@ -22,27 +22,33 @@ const FormularioPagoAvances = () => {
   const [ordenSeleccionada, setOrdenSeleccionada] = useState("");
   const [trabajadorSeleccionado, setTrabajadorSeleccionado] = useState("");
   const [trabajadores, setTrabajadores] = useState([]);
-  // --- CORRECCIÓN 1: Inicializar a false ---
+ 
   const [mostrarAlertaAnticipo, setMostrarAlertaAnticipo] = useState(false);
 
-  // --- CORRECCIÓN 2: Lógica del useEffect para anticipos ---
+
   useEffect(() => {
     // Solo si estamos en modo "pago normal" y tenemos avances cargados
     if (!esAnticipo && state?.avances && state.avances.length > 0) {
-      const avanceInicial = state.avances[0]; // Tomamos el primer avance para obtener trabajador/orden
+      // Buscar el primer avance válido que tenga trabajador y orden y que no sea un descuento
+      const avanceInicial = state.avances.find(a => a && a.id_trabajador && a.id_orden_fabricacion && !a.es_descuento);
+      if (!avanceInicial) {
+        setMostrarAlertaAnticipo(false);
+        return;
+      }
+
       const idTrabajador = avanceInicial.id_trabajador;
       const idOrdenFabricacion = avanceInicial.id_orden_fabricacion;
 
       // Si no tenemos la info necesaria, no hacemos la llamada
       if (!idTrabajador || !idOrdenFabricacion) {
-        setMostrarAlertaAnticipo(false); // Aseguramos que no se muestre la alerta
+        setMostrarAlertaAnticipo(false);
         return;
       }
 
       api
         .get(`/anticipos/${idTrabajador}/${idOrdenFabricacion}`)
         .then((res) => {
-          if (res.data) { // Si la API devuelve un anticipo activo
+          if (res.data) {
             // Mostramos la alerta de confirmación
             confirmAlert({
               title: 'Anticipo disponible',
@@ -51,35 +57,33 @@ const FormularioPagoAvances = () => {
                 {
                   label: 'Sí, aplicar',
                   onClick: () => {
-                    setMostrarAlertaAnticipo(true); // El usuario elige aplicar, la alerta se mantiene 'activa' para el disabled
+                    setMostrarAlertaAnticipo(true);
                     toast.success("Puedes aplicar el descuento para este pago");
                   },
                 },
                 {
                   label: 'No, dejarlo para después',
                   onClick: () => {
-                    setMostrarAlertaAnticipo(false); // El usuario elige NO aplicar, la alerta se desactiva
+                    setMostrarAlertaAnticipo(false);
                     toast("Descuento no aplicado");
                   },
                 },
               ],
             });
           } else {
-            // Si NO hay anticipo activo para este trabajador/orden, aseguraque la alerta esté desactivada
             setMostrarAlertaAnticipo(false);
           }
         })
         .catch((err) => {
           console.error("Error verificando anticipo:", err);
-          
           setMostrarAlertaAnticipo(false);
           toast.error("Error al verificar anticipos disponibles.");
         });
     } else if (esAnticipo) {
-        // Si el modo es "registrar anticipo", no hay necesidad de mostrar la alerta de anticipo para pagos normales
-        setMostrarAlertaAnticipo(false);
+      // Si el modo es "registrar anticipo", no hay necesidad de mostrar la alerta de anticipo para pagos normales
+      setMostrarAlertaAnticipo(false);
     }
-  }, [state, esAnticipo]); 
+  }, [state?.avances, esAnticipo]); 
 
   useEffect(() => {
     if (state?.avances?.length > 0) {
@@ -103,8 +107,8 @@ const FormularioPagoAvances = () => {
 
   useEffect(() => {
     if (esAnticipo) {
-      // Cargar órdenes de fabricación disponibles para anticipo
-      api.get("/ordenes-fabricacion?estados=pendiente,en proceso,completada")
+      // Cargar órdenes de fabricación disponibles para anticipo (solo pendientes o en proceso)
+      api.get("/ordenes-fabricacion?estados=pendiente,en proceso")
         .then((res) => {
           setOrdenes(res.data || []);
         })
@@ -282,13 +286,20 @@ const FormularioPagoAvances = () => {
                 if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
               }}
               className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
+              disabled={ordenes.length === 0}
             >
-              <option value="">Seleccione una orden</option>
-              {ordenes.map((o) => (
-                <option key={o.id_orden_fabricacion} value={o.id_orden_fabricacion}>
-                  #{o.id_orden_fabricacion} - {o.nombre_cliente || "Cliente"}
-                </option>
-              ))}
+              {ordenes.length === 0 ? (
+                <option value="" disabled>No hay órdenes pendientes o en proceso</option>
+              ) : (
+                <>
+                  <option value="">Seleccione una orden</option>
+                  {ordenes.map((o) => (
+                    <option key={o.id_orden_fabricacion} value={o.id_orden_fabricacion}>
+                      #{o.id_orden_fabricacion} - {o.nombre_cliente || "Cliente"}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
 
           </div>
@@ -358,7 +369,7 @@ const FormularioPagoAvances = () => {
               <table className="w-full table-auto text-sm">
                 <thead className="bg-slate-100 text-slate-700">
                   <tr>
-                  
+                    <th className="px-4 py-2 text-left">Orden fabricacion</th>
                     <th className="px-4 py-2 text-left">Artículo</th>
                     <th className="px-4 py-2 text-left">Etapa</th>
                     <th className="px-4 py-2 text-left">Cantidad</th>
@@ -369,6 +380,11 @@ const FormularioPagoAvances = () => {
                 <tbody>
                   {avances.map((a, index) => (
                     <tr key={index} className="border-t border-slate-300">
+                      <td className="px-4 py-2">
+                        {a.es_descuento
+                          ? "—"
+                          : `#${a.id_orden_fabricacion}${a.nombre_cliente ? ' - ' + a.nombre_cliente : ''}`}
+                      </td>
                       <td className="px-4 py-2">{a.descripcion || "—"}</td>
                       <td className="px-4 py-2">{a.es_descuento ? "—" : a.nombre_etapa}</td>
                       <td className="px-4 py-2">{a.cantidad}</td>

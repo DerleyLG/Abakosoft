@@ -9,7 +9,7 @@ module.exports = {
         u.id_trabajador,
         t.nombre AS nombre_trabajador,
         u.id_rol,
-        r.nombre AS nombre_rol
+        r.nombre_rol
       FROM usuarios u
       JOIN trabajadores t ON u.id_trabajador = t.id_trabajador
       JOIN roles r ON u.id_rol = r.id_rol
