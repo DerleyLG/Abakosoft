@@ -1,17 +1,19 @@
 const TesoreriaModel = require("../models/tesoreriaModel");
 
 const tesoreriaController = {
- 
   getMetodosPago: async (req, res) => {
     try {
       const metodos = await TesoreriaModel.getMetodosPago();
       res.json(metodos);
     } catch (error) {
       console.error("Error al obtener métodos de pago:", error);
-      res.status(500).json({ error: "Error interno del servidor al obtener métodos de pago." });
+      res
+        .status(500)
+        .json({
+          error: "Error interno del servidor al obtener métodos de pago.",
+        });
     }
   },
-
 
   getMovimientosTesoreria: async (req, res) => {
     try {
@@ -19,7 +21,12 @@ const tesoreriaController = {
       res.json(movimientos);
     } catch (error) {
       console.error("Error al obtener movimientos de tesorería:", error);
-      res.status(500).json({ error: "Error interno del servidor al obtener movimientos de tesorería." });
+      res
+        .status(500)
+        .json({
+          error:
+            "Error interno del servidor al obtener movimientos de tesorería.",
+        });
     }
   },
   getIngresosSummary: async (req, res) => {
@@ -28,17 +35,22 @@ const tesoreriaController = {
       res.json(summary);
     } catch (error) {
       console.error("Error al obtener el resumen de ingresos:", error);
-      res.status(500).json({ error: "Error interno del servidor al obtener el resumen de ingresos." });
+      res
+        .status(500)
+        .json({
+          error:
+            "Error interno del servidor al obtener el resumen de ingresos.",
+        });
     }
   },
 
-   getEgresosSummary: async (req, res) => {
+  getEgresosSummary: async (req, res) => {
     try {
       const egresosSummary = await TesoreriaModel.getEgresosSummary();
       res.json(egresosSummary);
     } catch (error) {
-      console.error('Error al obtener el resumen de egresos:', error);
-      res.status(500).json({ error: 'Error al obtener el resumen de egresos' });
+      console.error("Error al obtener el resumen de egresos:", error);
+      res.status(500).json({ error: "Error al obtener el resumen de egresos" });
     }
   },
   getPagosTrabajadoresCount: async (req, res) => {
@@ -46,8 +58,13 @@ const tesoreriaController = {
       const count = await TesoreriaModel.getPagosTrabajadoresCount();
       res.json({ count });
     } catch (error) {
-      console.error('Error al obtener el conteo de pagos a trabajadores:', error);
-      res.status(500).json({ error: 'Error al obtener el conteo de pagos a trabajadores' });
+      console.error(
+        "Error al obtener el conteo de pagos a trabajadores:",
+        error
+      );
+      res
+        .status(500)
+        .json({ error: "Error al obtener el conteo de pagos a trabajadores" });
     }
   },
 
@@ -56,8 +73,10 @@ const tesoreriaController = {
       const count = await TesoreriaModel.getOrdenesCompraCount();
       res.json({ count });
     } catch (error) {
-      console.error('Error al obtener el conteo de órdenes de compra:', error);
-      res.status(500).json({ error: 'Error al obtener el conteo de órdenes de compra' });
+      console.error("Error al obtener el conteo de órdenes de compra:", error);
+      res
+        .status(500)
+        .json({ error: "Error al obtener el conteo de órdenes de compra" });
     }
   },
 
@@ -66,42 +85,91 @@ const tesoreriaController = {
       const count = await TesoreriaModel.getCostosIndirectosCount();
       res.json({ count });
     } catch (error) {
-      console.error('Error al obtener el conteo de costos indirectos:', error);
-      res.status(500).json({ error: 'Error al obtener el conteo de costos indirectos' });
+      console.error("Error al obtener el conteo de costos indirectos:", error);
+      res
+        .status(500)
+        .json({ error: "Error al obtener el conteo de costos indirectos" });
     }
   },
-  
+
   getMateriaPrimaCount: async (req, res) => {
     try {
       const count = await TesoreriaModel.getMateriaPrimaCount();
       res.json({ count });
     } catch (error) {
-      console.error('Error al obtener el conteo de materia prima:', error);
-      res.status(500).json({ error: 'Error al obtener el conteo de materia prima' });
+      console.error("Error al obtener el conteo de materia prima:", error);
+      res
+        .status(500)
+        .json({ error: "Error al obtener el conteo de materia prima" });
     }
   },
   getMovimientoByDocumento: async (req, res) => {
     try {
-      const idDocumento = req.params.idDocumento; 
-      const tipoDocumento = req.query.tipo;     
-      
+      const idDocumento = req.params.idDocumento;
+      const tipoDocumento = req.query.tipo;
+
       if (!idDocumento || !tipoDocumento) {
-        return res.status(400).json({ message: 'Faltan parámetros: idDocumento y tipo.' });
+        return res
+          .status(400)
+          .json({ message: "Faltan parámetros: idDocumento y tipo." });
       }
-      
-      const movimiento = await TesoreriaModel.getByDocumentoIdAndTipo(idDocumento, tipoDocumento);
+
+      const movimiento = await TesoreriaModel.getByDocumentoIdAndTipo(
+        idDocumento,
+        tipoDocumento
+      );
       console.log("Movimiento recuperado del modelo:", movimiento);
       if (!movimiento) {
-
-        return res.status(200).json(null); 
+        return res.status(200).json(null);
       }
-      
-    
+
       res.json(movimiento);
-      
     } catch (error) {
-      console.error('Error al obtener movimiento de tesorería por documento:', error);
-      res.status(500).json({ error: 'Error interno del servidor al obtener movimiento de tesorería.' });
+      console.error(
+        "Error al obtener movimiento de tesorería por documento:",
+        error
+      );
+      res
+        .status(500)
+        .json({
+          error:
+            "Error interno del servidor al obtener movimiento de tesorería.",
+        });
+    }
+  },
+  createMovimiento: async (req, res) => {
+    try {
+      const {
+        id_documento = null,
+        tipo_documento,
+        monto,
+        id_metodo_pago = null,
+        referencia = null,
+        observaciones = null,
+        fecha_movimiento = null,
+      } = req.body;
+
+      if (!tipo_documento)
+        return res.status(400).json({ error: "tipo_documento es obligatorio" });
+      if (typeof monto === "undefined" || monto === null)
+        return res.status(400).json({ error: "monto es obligatorio" });
+
+      const insertId = await TesoreriaModel.insertarMovimiento({
+        id_documento,
+        tipo_documento,
+        monto,
+        id_metodo_pago,
+        referencia,
+        observaciones,
+        fecha_movimiento,
+      });
+
+      res.status(201).json({ id_movimiento: insertId });
+    } catch (error) {
+      console.error("Error creando movimiento de tesorería:", error);
+      res
+        .status(500)
+        .json({ error: "Error interno al crear movimiento de tesorería" });
     }
   },
 };

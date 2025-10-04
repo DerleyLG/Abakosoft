@@ -263,36 +263,37 @@ const OrdenVentaForm = () => {
 
         try {
     // 1. Crear orden
-    const ordenRes = await api.post("/ordenes-venta", payload);
-    const { id_orden_venta } = ordenRes.data;
+        const ordenRes = await api.post("/ordenes-venta", payload);
+        // Algunos entornos pueden devolver diferentes nombres de campo; robustecemos la lectura
+        const id_orden_venta = ordenRes?.data?.id_orden_venta ?? ordenRes?.data?.id ?? ordenRes?.data?.insertId ?? null;
+        if (!id_orden_venta) {
+            console.warn('La respuesta de creación de orden no contiene id_orden_venta:', ordenRes?.data);
+        }
 
-    // 2. Si el método de pago no es crédito -> crear movimiento en tesorería
-    if (metodoPago.tipo !== "credito") {
-      const movPayload = {
-        id_orden_venta,
-        id_metodo_pago: metodoPago.id_metodo_pago,
-        fecha,
-        monto: totalGeneral,
-        referencia,
-        observaciones: observaciones
-      };
-
-      await api.post("/tesoreria/movimientos", movPayload);
-    } else {
-      // Si es crédito, solo mostramos aviso
-      toast("Orden registrada como crédito. Pendiente de pago.", {
-        
-      });
-    }
+        // Nota: el backend ya crea el movimiento en tesorería cuando el método
+        // de pago no es 'credito' (ver lógica en ordenesVentaController).
+        // Por eso evitamos hacer aquí un POST duplicado a /tesoreria/movimientos.
+        if (metodoPago.tipo === "credito") {
+            toast("Orden registrada como crédito. Pendiente de pago.");
+        }
 
     toast.success("Orden de venta creada correctamente");
     navigate("/ordenes_venta");
         } catch (error) {
-            const mensajeBackend =
-                error.response?.data?.error ||
-                error.response?.data?.message ||
-                "Error al crear la orden de venta.";
-            console.error("Error al enviar formulario:", error);
+            // Mejor extracción del mensaje del backend y logging detallado
+            const respData = error?.response?.data;
+            let mensajeBackend = "Error al crear la orden de venta.";
+            try {
+                if (respData?.error) mensajeBackend = respData.error;
+                else if (respData?.message) mensajeBackend = respData.message;
+                else if (typeof respData === 'string') mensajeBackend = respData;
+            } catch (e) {}
+            console.error("Error al enviar formulario:", {
+                message: error?.message,
+                status: error?.response?.status,
+                responseData: respData,
+                stack: error?.stack,
+            });
             toast.error(mensajeBackend);
         }
     };
