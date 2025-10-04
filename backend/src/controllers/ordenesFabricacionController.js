@@ -5,51 +5,52 @@ const avanceEtapasModel = require('../models/avanceEtapasModel');
 module.exports = {
 getAll: async (req, res) => {
   try {
-   const { estados } = req.query; 
+    const { estados } = req.query;
 
-   let estadosToFilter = [];
-   if (estados) {
-    estadosToFilter = estados.split(','); 
-   } else {
+   
+    let estadosToFilter = [];
+    if (estados) {
+      estadosToFilter = estados.split(",").map(e => e.trim());
+    } else {
+     
+      estadosToFilter = ["pendiente", "en proceso", "completada"];
+    }
+
+ 
+    const ordenes = await ordenesFabricacionModel.getAll(estadosToFilter);
+
+    if (ordenes.length === 0) {
+      return res.status(200).json([]); 
+    }
+
+    const idOrdenes = ordenes.map(o => o.id_orden_fabricacion);
+
     
-    estadosToFilter = ['pendiente', 'en proceso', 'completada'];
-   }
+    const [allDetalles, allAvances] = await Promise.all([
+      detalleOrdenFabricacionModel.getByOrdenes(idOrdenes),
+      avanceEtapasModel.getByOrdenes(idOrdenes),
+    ]);
 
-  
-   const ordenes = await ordenesFabricacionModel.getAll(estadosToFilter);
+ 
+    const ordenesConTodo = ordenes.map(orden => {
+      const detalles = allDetalles.filter(d => d.id_orden_fabricacion === orden.id_orden_fabricacion);
+      const avances = allAvances.filter(a => a.id_orden_fabricacion === orden.id_orden_fabricacion);
 
-if (ordenes.length === 0) {
-    return res.status(200).json([]);
-   }
+      return {
+        ...orden,
+        detalles,
+        avances,
+      };
+    });
 
-   // Extrae los IDs de las órdenes.
-   const idOrdenes = ordenes.map(orden => orden.id_orden_fabricacion);
+    
+    res.status(200).json(ordenesConTodo);
 
-   // 
-   // Llama a los métodos que aceptan un array de IDs.
-   const [allDetalles, allAvances] = await Promise.all([
-    detalleOrdenFabricacionModel.getByOrdenes(idOrdenes),
-    avanceEtapasModel.getByOrdenes(idOrdenes)
-   ]);
-
-   // Combina los datos y retorna la respuesta completa.
-   const ordenesConTodo = ordenes.map(orden => {
-    const detalles = allDetalles.filter(d => d.id_orden_fabricacion === orden.id_orden_fabricacion);
-    const avances = allAvances.filter(a => a.id_orden_fabricacion === orden.id_orden_fabricacion);
-
-    return {
-     ...orden,
-     detalles,
-     avances
-    };
-   });
-
-   res.status(200).json(ordenesConTodo);
   } catch (error) {
-   console.error("Error al obtener órdenes de fabricación:", error);
-   res.status(500).json({ error: "Error interno del servidor al obtener órdenes de fabricación." });
+    console.error("Error al obtener órdenes de fabricación:", error);
+    res.status(500).json({ error: "Error interno del servidor al obtener órdenes de fabricación." });
   }
- },
+},
 
  getById: async (req, res) => {
   try {
@@ -59,7 +60,7 @@ if (ordenes.length === 0) {
     detalleOrdenFabricacionModel.getById(id),
     avanceEtapasModel.getByOrden(id)
    ]);
-      // Asegúrate de que la orden exista antes de enviar la respuesta
+      
       if (!orden) {
         return res.status(404).json({ error: 'Orden de fabricación no encontrada.' });
       }
@@ -86,7 +87,7 @@ create: async (req, res) => {
 
 
 
-  // Crear orden de fabricación
+ 
   const id_orden_fabricacion = await ordenesFabricacionModel.create({
    id_orden_venta,
    fecha_inicio,
@@ -95,7 +96,7 @@ create: async (req, res) => {
    id_pedido
   });
 
-  // Crear cada detalle de fabricación
+ 
   for (const detalle of detalles) {
    const { id_articulo, cantidad, id_etapa_final } = detalle;
 
@@ -142,7 +143,7 @@ delete: async (req, res) => {
  try {
   const id = req.params.id;
 
-  // Verificar si la orden ya está cancelada
+
   const orden = await ordenesFabricacionModel.getById(id);
   if (!orden) {
    return res.status(404).json({ error: 'Orden no encontrada.' });
@@ -151,7 +152,6 @@ delete: async (req, res) => {
    return res.status(400).json({ error: 'La orden ya está cancelada.' });
   }
 
-  // Marcar como cancelada (ya no eliminamos detalles)
   await ordenesFabricacionModel.delete(id);
 
   res.json({ message: 'Orden de fabricación cancelada correctamente.' });
@@ -160,6 +160,7 @@ delete: async (req, res) => {
   res.status(500).json({ error: 'Error al cancelar la orden de fabricación.' });
  }
 },
+
 existe: async (req, res) => {
  try {
   const { id_pedido } = req.params;
@@ -169,5 +170,29 @@ existe: async (req, res) => {
   console.error('Error al verificar la orden de fabricación:', error);
   res.status(500).json({ error: 'Error interno del servidor' });
  }
+},
+
+getEstadoOFByPedidoId : async (req, res) => {
+    const { id_pedido } = req.params;
+
+    if (!id_pedido) {
+        return res.status(400).json({ error: "El ID del pedido es obligatorio." });
+    }
+
+    try {
+        const estado = await ordenesFabricacionModel.getEstadoByPedidoId(id_pedido);
+        
+   
+        if (estado === 'no existe') {
+            return res.status(200).json({ estado: 'no existe', message: 'No existe Orden de Fabricación asociada.' });
+        }
+
+        res.status(200).json({ estado: estado });
+
+    } catch (error) {
+        console.error("Error al obtener estado de OF:", error);
+        res.status(500).json({ error: "Error interno al validar la orden de fabricación." });
+    }
 }
+
 };

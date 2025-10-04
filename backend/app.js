@@ -38,7 +38,7 @@ const detalleOrdenCompraRoutes = require('./src/routes/detalleOrdenCompraRoutes'
 const compraMateriaPrimaRoutes = require('./src/routes/compraMateriaPrimaRoutes.js');
 const tesoreria = require('./src/routes/tesoreriaRoutes.js');
 const metodosPago = require('./src/routes/metodosDePagoRoutes.js');
-
+const ventascreditos = require('./src/routes/ventasCreditoRoutes.js');
 
 const app = express();
 app.use(cors(
@@ -140,6 +140,7 @@ app.use('/api/tesoreria', tesoreria);
 
 app.use('/api/metodos-pago', metodosPago);
 
+app.use('/api/creditos', ventascreditos);
 
 const PORT = process.env.PORT;
 app.listen(PORT, '0.0.0.0' ,() => {

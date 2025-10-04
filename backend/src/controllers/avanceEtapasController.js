@@ -128,12 +128,12 @@ module.exports = {
         });
       }
 
-      // Obtener cantidad total esperada para el artículo en esta OF
+     
       const cantidadTotalEsperada = await AvanceModel.getCantidadTotalArticulo(
         id_orden_fabricacion,
         id_articulo
       );
-      // Calcular lo que ya se ha registrado en esta etapa 
+     
       const cantidadRegistradaAntes =
         await AvanceModel.getCantidadRegistradaEtapa(
           id_orden_fabricacion,

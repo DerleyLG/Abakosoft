@@ -52,6 +52,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 import Tesoreria from "./pages/Tesoreria";
 import GestionUsuarios from "./pages/GestionUsuarios";
+import EditarPedido from "./pages/EditarOrdenesPedido";
+import EditarOrdenCompra from "./pages/EditarOrdenesCompra";
+import OrdenesVentaEdit from "./pages/EditarOrdenesVenta";
+import VentasCredito from "./pages/VentasCredito";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -120,6 +124,10 @@ const AppLogic = () => {
                 <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />
                 <Route path="tesoreria" element={<Tesoreria/>} />
                 <Route path="gestionUsuarios" element={<GestionUsuarios/>} />
+                <Route path="ordenes_pedido/editar/:id" element={<EditarPedido/>} />
+                <Route path="ordenes_compra/editar/:id" element={<EditarOrdenCompra />} />
+                <Route path="ordenes_venta/editar/:id" element={<OrdenesVentaEdit/>} />
+                <Route path="ventas_credito" element={<VentasCredito/>} />
             </Route>
         </Routes>
     );

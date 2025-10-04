@@ -91,13 +91,13 @@ module.exports = {
         }, connection);
       }
 
-      await connection.commit(); // Confirmar la transacción
+      await connection.commit(); 
       connection.release(); 
 
       res.status(201).json({ message: "Pedido creado correctamente.", id_pedido });
     } catch (err) {
       if (connection) {
-        await connection.rollback(); // Revertir la transacción en caso de error
+        await connection.rollback(); 
         connection.release(); 
       }
       console.error("Error al crear el pedido:", err);
@@ -105,43 +105,95 @@ module.exports = {
     }
   },
 
-  update: async (req, res) => {
+ update: async (req, res) => {
+    let connection; 
     try {
-      const id = +req.params.id;
-      const { id_cliente, estado, observaciones } = req.body;
+        const id = +req.params.id;
+        const { id_cliente, estado, observaciones, detalles } = req.body;
 
-      const pedido = await pedidoModel.getById(id);
-      if (!pedido) {
-        return res.status(404).json({ error: "Pedido no encontrado." });
-      }
+        connection = await db.getConnection();
+        await connection.beginTransaction();
 
-      if (pedido.estado !== "pendiente") {
-        return res.status(400).json({ error: "Solo se pueden actualizar pedidos en estado pendiente." });
-      }
+      
+        const pedido = await pedidoModel.getById(id, connection);
+        if (!pedido) {
+            connection.release();
+            return res.status(404).json({ error: "Pedido no encontrado." });
+        }
+        
+   
+      
+        if (!id_cliente || !estado) {
+            throw new Error("Faltan campos obligatorios (cliente o estado).");
+        }
+        if (!ESTADOS_VALIDOS.includes(estado)) {
+            throw new Error(`Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`);
+        }
+        const cliente = await clienteModel.getById(id_cliente, connection);
+        if (!cliente) {
+            throw new Error("Cliente no encontrado.");
+        }
+        if (!Array.isArray(detalles) || detalles.length === 0) {
+            throw new Error("Debe incluir al menos un detalle.");
+        }
 
-      if (!id_cliente || !estado) {
-        return res.status(400).json({ error: "Faltan campos obligatorios." });
-      }
+        
+        for (const detalle of detalles) {
+            const { id_articulo, cantidad, precio_unitario } = detalle;
+            const articuloExistente = await articuloModel.getById(id_articulo, connection); 
+            
+            if (!articuloExistente) {
+                throw new Error(`El artículo con ID ${id_articulo} no existe.`);
+            }
+            if (cantidad <= 0 || precio_unitario < 0) {
+                throw new Error(`Cantidad o Precio inválido para el artículo ${articuloExistente.descripcion}.`);
+            }
+        
+        }
 
-      if (!ESTADOS_VALIDOS.includes(estado)) {
-        return res.status(400).json({ error: `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}` });
-      }
+     
+        await pedidoModel.update(id, { id_cliente, estado, observaciones });
 
-      const cliente = await clienteModel.getById(id_cliente);
-      if (!cliente) {
-        return res.status(400).json({ error: "Cliente no encontrado." });
-      }
+        await detallePedidoModel.deleteByPedido(id, connection); 
+        
+        for (const detalle of detalles) {
+            await detallePedidoModel.create({
+                id_pedido: id,
+                id_articulo: detalle.id_articulo,
+                cantidad: detalle.cantidad,
+                observaciones: detalle.observaciones || null,
+                precio_unitario: detalle.precio_unitario 
+            }, connection);
+        }
 
-      const updatedRows = await pedidoModel.update(id, { id_cliente, estado, observaciones });
 
-      if (updatedRows === 0) {
-        return res.status(400).json({ error: "No se pudo actualizar el pedido." });
-      }
+        await connection.commit();
+        connection.release();
 
-      res.json({ message: "Pedido actualizado correctamente." });
+        res.json({ message: "Pedido y detalles actualizados correctamente." });
     } catch (err) {
-      console.error("Error al actualizar el pedido:", err);
-      res.status(500).json({ error: "Error al actualizar el pedido." });
+        if (connection) {
+            await connection.rollback();
+            connection.release();
+        }
+        console.error("Error al actualizar el pedido:", err);
+        res.status(500).json({ error: err.message || "Error al actualizar el pedido." });
+    }
+},
+
+  complete: async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await PedidoModel.completar(id);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Pedido no encontrado" });
+      }
+
+      res.json({ message: "Pedido marcado como completado" });
+    } catch (err) {
+      console.error("Error al completar pedido:", err);
+      res.status(500).json({ error: "Error al completar pedido" });
     }
   },
 

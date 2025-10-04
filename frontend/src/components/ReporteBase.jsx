@@ -63,11 +63,114 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [] }) => {
   };
 
   const generarPDF = () => {
-    // ... (sin cambios)
+   try {
+    if (!datos || datos.length === 0) return toast.error('No hay datos para exportar');
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const headers = columnas.map(c => c.header);
+    const body = datos.map((row) => {
+      return columnas.map((col) => {
+        let value;
+        if (typeof col.accessor === 'function') {
+          value = col.accessor(row);
+        } else {
+          value = row[col.accessor];
+        }
+    
+        const isDateColumn = ["fecha_registro", "ultima_actualizacion", "fecha", "fecha_pago", "fecha_inicio"].includes(col.accessor);
+        if (isDateColumn && value) return new Date(value).toLocaleDateString();
+        if (col.isCurrency) return formatCurrencyCOP(value);
+        return value == null ? '' : String(value);
+      });
+    });
+
+    doc.setFontSize(14);
+    doc.text(titulo || 'Reporte', 40, 40);
+    doc.setFontSize(10);
+    const dateStr = new Date().toLocaleString();
+    doc.text(`Generado: ${dateStr}`, 40, 56);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [headers],
+      body: body,
+      theme: 'striped',
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+    });
+
+    const fileName = `${(titulo || 'reporte').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF generado');
+  } catch (e) {
+    console.error('Error generando PDF', e);
+    toast.error('Error al generar PDF');
+  }
   };
 
   const handleDownloadExcel = () => {
-    // ... (sin cambios)
+    try {
+      if (!datos || datos.length === 0) return toast.error('No hay datos para exportar');
+
+      // preparar cabeceras y filas alineadas
+      const headers = columnas.map((c) => c.header || (typeof c.accessor === 'string' ? c.accessor : 'col'));
+      const rows = datos.map((row) => {
+        return columnas.map((col) => {
+          let value;
+          if (typeof col.accessor === 'function') value = col.accessor(row);
+          else value = row[col.accessor];
+
+          const isDateColumn = ["fecha_registro", "ultima_actualizacion", "fecha", "fecha_pago", "fecha_inicio"].includes(col.accessor);
+          if (isDateColumn && value) return new Date(value).toLocaleDateString();
+
+          if (col.isCurrency) {
+            const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : Number(value);
+            return isNaN(num) ? '' : num;
+          }
+
+          return value == null ? '' : value;
+        });
+      });
+
+      const aoa = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // calcular anchos de columna basados en contenido
+      const colWidths = headers.map((h, colIndex) => {
+        let max = String(h).length;
+        for (let r = 0; r < rows.length; r++) {
+          const cell = rows[r][colIndex];
+          const len = cell == null ? 0 : String(cell).length;
+          if (len > max) max = len;
+        }
+        return { wch: Math.min(Math.max(max + 2, 10), 50) };
+      });
+      ws['!cols'] = colWidths;
+
+      // asegurar formatos numéricos para columnas currency
+      columnas.forEach((col, colIndex) => {
+        if (col.isCurrency) {
+          // establecer tipo numérico en cada celda de esa columna (filas 2..)
+          for (let r = 2; r <= rows.length + 1; r++) {
+            const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: r - 1 });
+            const cell = ws[cellAddress];
+            if (cell && (typeof cell.v === 'number')) {
+              cell.t = 'n';
+              // opcional: aplicar formato numérico (sin símbolo)
+              cell.z = '#,##0';
+            }
+          }
+        }
+      });
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+      const fileName = `${(titulo || 'reporte').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success('Excel descargado');
+    } catch (e) {
+      console.error('Error exportando Excel', e);
+      toast.error('Error al exportar Excel');
+    }
   };
 
   const formatCurrencyCOP = (value) => {

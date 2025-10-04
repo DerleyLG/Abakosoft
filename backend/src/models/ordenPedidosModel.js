@@ -2,14 +2,22 @@ const db = require('../database/db');
 const detalleOrdenModel = require('../models/detalleOrdenPedidosModel');
 
 module.exports = {
-getAll: async (estadoQueryParam) => {
+  getAll: async (estadoQueryParam) => {
+    
+  
+    const ALL_STATUSES = ['pendiente', 'en fabricacion', 'listo para entrega', 'completado', 'cancelado'];
+   
+    const ACTIVE_STATUSES = ['pendiente', 'en fabricacion', 'listo para entrega', 'completado'];
+    
     let estadosToFilter = [];
 
-    if (estadoQueryParam === 'cancelado') {
-      estadosToFilter = ['cancelado'];
+ 
+    if (ALL_STATUSES.includes(estadoQueryParam)) {
+    
+      estadosToFilter = [estadoQueryParam];
     } else {
      
-      estadosToFilter = ['pendiente', 'en fabricacion', 'listo para entrega', 'completado'];
+      estadosToFilter = ACTIVE_STATUSES;
     }
 
     const placeholders = estadosToFilter.map(() => '?').join(',');
@@ -23,6 +31,7 @@ getAll: async (estadoQueryParam) => {
       GROUP BY p.id_pedido
       ORDER BY p.fecha_pedido DESC;
     `, estadosToFilter); 
+    
     return rows;
   },
  create: async ({ id_cliente, estado, observaciones }, connection = db) => {
@@ -37,6 +46,14 @@ getAll: async (estadoQueryParam) => {
     const [rows] = await (connection || db).query('SELECT * FROM pedidos WHERE id_pedido = ?', [id]);
     return rows[0] || null;
   },
+
+completar: async (id) => {
+    const [result] = await db.query(
+      `UPDATE pedidos SET estado = 'completado' WHERE id_pedido = ?`,
+      [id]
+    );
+    return result;
+  },
   
 update: async (id, { id_cliente, estado, observaciones }) => {
   
@@ -45,7 +62,7 @@ update: async (id, { id_cliente, estado, observaciones }) => {
      SET id_cliente = COALESCE(?, id_cliente),
          estado = COALESCE(?, estado),
          observaciones = COALESCE(?, observaciones)
-     WHERE id_pedido = ? AND estado = 'pendiente'`,
+     WHERE id_pedido = ? `,
     [id_cliente, estado, observaciones, id]
   );
   return result.affectedRows;

@@ -6,6 +6,13 @@ module.exports = {
     return rows;
   },
 
+  getIdByName: async (name) => {
+    if (!name) return null;
+    const like = `%${name}%`;
+    const [rows] = await db.query('SELECT id_metodo_pago FROM metodos_pago WHERE nombre LIKE ? LIMIT 1', [like]);
+    return rows.length ? rows[0].id_metodo_pago : null;
+  },
+
    create: async (req, res) => {
     try {
       const { nombre } = req.body; 

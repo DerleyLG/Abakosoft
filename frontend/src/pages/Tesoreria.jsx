@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { FiDollarSign, FiCreditCard, FiBarChart2, FiPlusCircle } from 'react-icons/fi';
+import { FiDollarSign, FiCreditCard, FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 
 const TesoreriaDashboard = () => {
   const [movimientos, setMovimientos] = useState([]);
@@ -9,9 +10,10 @@ const TesoreriaDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 👇 Estados para los filtros
-  const [filtroTipo, setFiltroTipo] = useState('');
+
+  const [filtroTipo, setFiltroTipo] = useState('abono_credito');
   const [filtroMetodo, setFiltroMetodo] = useState('');
+  const [cacheCreditos, setCacheCreditos] = useState({});
  
 
   const [resumenFinanciero, setResumenFinanciero] = useState({
@@ -40,11 +42,20 @@ const TesoreriaDashboard = () => {
       comprasEfectivo: 0,
       comprasTransferencia: 0,
     };
+   
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
     const efectivoId = metodos.find(m => m.nombre.toLowerCase().includes('efectivo'))?.id_metodo_pago;
     const transferenciaId = metodos.find(m => m.nombre.toLowerCase().includes('transferencia'))?.id_metodo_pago;
 
     movs.forEach(mov => {
+      
+      const fecha = mov.fecha_movimiento ? new Date(mov.fecha_movimiento) : null;
+      if (!fecha) return;
+      if (fecha.getMonth() !== currentMonth || fecha.getFullYear() !== currentYear) return;
+
       const tipo = getTipoMovimiento(mov);
       const montoAbsoluto = Math.abs(mov.monto);
 
@@ -110,6 +121,8 @@ const TesoreriaDashboard = () => {
     fetchTesoreriaData();
   }, []);
 
+  const navigate = useNavigate();
+
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateString).toLocaleDateString('es-ES', options);
@@ -144,18 +157,18 @@ const TesoreriaDashboard = () => {
     return mov.id_documento ?? mov.id_orden_venta ?? mov.id_orden_compra ?? '-';
   };
 
-  // 👇 Lógica de filtrado
+
   const movimientosFiltrados = movimientos.filter(mov => {
     const tipo = getTipoMovimiento(mov);
 
 
 
-    // Filtro por tipo
-    if (filtroTipo && tipo !== filtroTipo) {
+   
+    if (filtroTipo && filtroTipo !== 'todos' && tipo !== filtroTipo) {
       return false;
     }
 
-    // Filtro por método de pago
+   
     if (filtroMetodo && mov.id_metodo_pago.toString() !== filtroMetodo) {
       return false;
     }
@@ -164,6 +177,41 @@ const TesoreriaDashboard = () => {
 
     return true;
   });
+
+  
+  useEffect(() => {
+    let mounted = true;
+    const creditosIds = Array.from(new Set(
+      movimientosFiltrados
+        .filter(m => getTipoMovimiento(m) === 'abono_credito' && m.id_documento)
+        .map(m => m.id_documento)
+    ));
+
+    if (creditosIds.length === 0) return;
+
+    const fetchAll = async () => {
+      try {
+        
+        await Promise.all(creditosIds.map(async (id) => {
+          if (!mounted) return;
+          if (cacheCreditos[id]) return;
+          try {
+            const res = await api.get(`/creditos/${id}`);
+            if (mounted) {
+              setCacheCreditos(prev => ({ ...prev, [id]: res.data }));
+            }
+          } catch (e) {
+           
+            console.error('Error fetching credito', id, e);
+          }
+        }));
+      } catch (e) {
+        console.error('Error preloading creditos', e);
+      }
+    };
+    fetchAll();
+    return () => { mounted = false; };
+  }, [movimientosFiltrados]);
 
   if (loading) {
     return <div className="text-center py-10 text-gray-500">Cargando datos de tesorería...</div>;
@@ -175,108 +223,61 @@ const TesoreriaDashboard = () => {
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <h2 className="text-4xl font-bold text-gray-800 mb-6">Panel de Tesorería</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-4xl font-bold text-gray-800">Panel de Tesorería</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 cursor-pointer">
+            <FiArrowLeft />
+            Volver
+          </button>
+          <button onClick={() => navigate('/ventas_credito')} className="flex items-center gap-2 px-3 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 cursor-pointer">
+            Ir a Créditos
+            <FiArrowRight />
+          </button>
+        </div>
+      </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-700">Ventas por Efectivo</h3>
+            <h3 className="text-lg font-semibold text-gray-700">Balance Efectivo</h3>
             <span className="text-2xl font-bold text-green-600">
-              {formatCurrency(resumenFinanciero.ventasEfectivo)}
+              {formatCurrency(resumenFinanciero.ventasEfectivo - resumenFinanciero.comprasEfectivo)}
             </span>
+            <div className="text-sm text-gray-500 mt-1">Ventas: {formatCurrency(resumenFinanciero.ventasEfectivo)} · Compras: {formatCurrency(resumenFinanciero.comprasEfectivo)}</div>
           </div>
-          <FiDollarSign size={40} className="text-green-400" />
+          <FiDollarSign size={40} className="text-gray-400" />
         </div>
         <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-700">Ventas por Transferencia</h3>
+            <h3 className="text-lg font-semibold text-gray-700">Balance Transferencia</h3>
             <span className="text-2xl font-bold text-green-600">
-              {formatCurrency(resumenFinanciero.ventasTransferencia)}
+              {formatCurrency(resumenFinanciero.ventasTransferencia - resumenFinanciero.comprasTransferencia)}
             </span>
+            <div className="text-sm text-gray-500 mt-1">Ventas: {formatCurrency(resumenFinanciero.ventasTransferencia)} · Compras: {formatCurrency(resumenFinanciero.comprasTransferencia)}</div>
           </div>
-          <FiCreditCard size={40} className="text-green-400" />
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700">Compras por Efectivo</h3>
-            <span className="text-2xl font-bold text-red-600">
-              {formatCurrency(resumenFinanciero.comprasEfectivo)}
-            </span>
-          </div>
-          <FiBarChart2 size={40} className="text-red-400" />
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700">Compras por Transferencia</h3>
-            <span className="text-2xl font-bold text-red-600">
-              {formatCurrency(resumenFinanciero.comprasTransferencia)}
-            </span>
-          </div>
-          <FiCreditCard size={40} className="text-red-400" />
+          <FiCreditCard size={40} className="text-gray-400 cursor-pointer" />
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 mb-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg flex-1">
-          <h3 className="text-xl font-semibold text-gray-700 mb-4">Análisis de Ingresos (Mes)</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-              <span className="font-medium text-green-700">Total Ingresado </span>
-              <span className="text-2xl font-bold text-green-600">
-                {formatCurrency(ingresosSummary.totalMes)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-              <span className="font-medium text-blue-700">Ventas Registradas</span>
-              <span className="text-2xl font-bold text-blue-600">
-                {ingresosSummary.ventasMensual}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-lg flex-1">
-          <h3 className="text-xl font-semibold text-gray-700 mb-4">Análisis de Egresos (Mes)</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-              <span className="font-medium text-red-700">Total de Egresos</span>
-              <span className="text-2xl font-bold text-red-600">
-                {formatCurrency(egresosSummary.totalEgresos)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <div className="flex flex-col p-1 bg-red-50 rounded-lg text-center flex-1">
-                <span className="text-2xl font-bold text-red-600">{egresosSummary.ordenesCompraCount}</span>
-                <span className="text-sm font-medium text-red-700">Compras registradas</span>
-              </div>
-              <div className="flex flex-col p-1 bg-red-50 rounded-lg text-center flex-1">
-                <span className="text-2xl font-bold text-red-600">{egresosSummary.pagosTrabajadoresCount}</span>
-                <span className="text-sm font-medium text-red-700">Pagos registrados</span>
-              </div>
-              <div className="flex flex-col p-1 bg-red-50 rounded-lg text-center flex-1">
-                <span className="text-2xl font-bold text-red-600">{egresosSummary.costosCount}</span>
-                <span className="text-sm font-medium text-red-700">Costos registrados</span>
-              </div>
-             
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <h3 className="text-xl font-semibold text-gray-700 mb-4">Movimientos Recientes</h3>
         <div className="mb-4 flex flex-wrap gap-8 items-end">
           <div className="flex-1 max-w-[200px]">
             <label htmlFor="filtroTipo" className="block text-sm font-medium text-gray-700">Filtrar por Tipo</label>
-            <select
-              id="filtroTipo"
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="">Todos</option>
+              <select
+                id="filtroTipo"
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              >
+                <option value="todos">Todos</option>
               <option value="venta">Venta</option>
               <option value="compra">Compra</option>
               <option value="pago_trabajadores">Pagos</option>
+              <option value="abono_credito">Abonos Crédito</option>
             </select>
           </div>
           <div className="flex-1 max-w-[200px]">
@@ -308,6 +309,7 @@ const TesoreriaDashboard = () => {
               <th className="px-4 py-3">Método de Pago</th>
               <th className="px-4 py-3">Referencia</th>
               <th className="px-4 py-3">Observaciones</th>
+                <th className="px-4 py-3">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -316,10 +318,12 @@ const TesoreriaDashboard = () => {
                 const tipo = getTipoMovimiento(mov);
                 const idRef = getIdReferencia(mov);
                 const montoColor = tipo === 'compra' ? 'text-red-700' : 'text-green-700';
+                const creditoInfo = mov.id_documento ? cacheCreditos[mov.id_documento] : null;
+                const clienteNombre = creditoInfo ? creditoInfo.cliente_nombre : null;
                 return (
                   <tr key={mov.id_movimiento} className="hover:bg-slate-100 transition">
                     <td className="px-4 py-3 font-medium">{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</td>
-                    <td className="px-4 py-3">{idRef}</td>
+                    <td className="px-4 py-3">#{idRef}{clienteNombre ? ` · ${clienteNombre}` : ''}</td>
                     <td className="px-4 py-3">{formatDate(mov.fecha_movimiento)}</td>
                     <td className={`px-4 py-3 font-semibold ${montoColor}`}>
                       {formatCurrency(mov.monto)}
@@ -327,6 +331,17 @@ const TesoreriaDashboard = () => {
                     <td className="px-4 py-3">{getMetodoNombre(mov.id_metodo_pago)}</td>
                     <td className="px-4 py-3">{mov.referencia || '-'}</td>
                     <td className="px-4 py-3">{mov.observaciones || '-'}</td>
+                    <td className="px-4 py-3">
+                      {tipo === 'abono_credito' && mov.id_documento && (
+                        <button
+                          onClick={() => navigate('/ventas_credito', { state: { openCreditId: mov.id_documento } })}
+                          className="p-2 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                          title="Ver crédito"
+                        >
+                          <FiCreditCard />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })

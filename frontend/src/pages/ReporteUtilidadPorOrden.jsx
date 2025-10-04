@@ -2,14 +2,13 @@ import React from 'react';
 import ReporteBase from '../components/ReporteBase';
 
 const ReporteUtilidadPorOrden = () => {
-  // 1. Título del reporte
+
   const titulo = "Reporte de Utilidad por Orden";
 
-  // 2. Endpoint del API
-  // Esta URL debe coincidir con la ruta que definiste en tu router de Node.js
+
   const endpoint = `${import.meta.env.VITE_API_URL}/reportes/utilidad-por-orden`;
 
-  // 3. Definición de las columnas de la tabla
+
   const columnas = [
     { header: "ID Orden", accessor: "id_orden_fabricacion" },
     { header: "Fecha", accessor: "fecha_inicio" },

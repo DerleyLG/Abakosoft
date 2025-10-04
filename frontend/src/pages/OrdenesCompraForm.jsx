@@ -22,7 +22,7 @@ const CrearOrdenCompra = () => {
 
     const navigate = useNavigate();
 
-    // Cargar proveedores y artículos al inicio
+
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -34,7 +34,7 @@ const CrearOrdenCompra = () => {
                 ]);
                 setProveedores(resProveedores.data || []);
                 setMetodosPago(resMetodosPago.data || []);
-                // Mapear artículos para react-select {value, label, ...articuloData}
+              
                 const opcionesArticulos = resArticulos.data.map((art) => ({
                     value: art.id_articulo,
                     label: art.descripcion,
@@ -51,12 +51,12 @@ const CrearOrdenCompra = () => {
         fetchData();
     }, []);
 
-    // Función para verificar si el artículo existe en inventario y, si no, preguntar para inicializar
+  
     const verificarYAgregarAlInventario = async (idArticulo, descripcionArticulo) => {
         setLoading(true);
         try {
             await api.get(`/inventario/${idArticulo}`);
-            return true; // Artículo encontrado en inventario
+            return true; 
         } catch (error) {
             if (error.response?.status === 404) {
                 let seAceptoAgregar = false;
@@ -69,7 +69,7 @@ const CrearOrdenCompra = () => {
                                 label: "Sí",
                                 onClick: async () => {
                                     try {
-                                        // Usamos el endpoint /inventario/inicializar
+                                       
                                         await api.post("/inventario/inicializar", {
                                             id_articulo: Number(idArticulo),
                                         });
@@ -89,8 +89,8 @@ const CrearOrdenCompra = () => {
                                 },
                             },
                         ],
-                        closeOnEscape: false, // Evitar que se cierre sin una elección
-                        closeOnClickOutside: false, // Evitar que se cierre sin una elección
+                        closeOnEscape: false, 
+                        closeOnClickOutside: false, 
                     });
                 });
                 return seAceptoAgregar;
@@ -103,49 +103,49 @@ const CrearOrdenCompra = () => {
         }
     };
 
-    // Función para agregar un artículo a la lista de seleccionados
+ 
     const agregarArticulo = async (articulo) => {
-        // Verificar si el artículo ya está seleccionado para evitar duplicados en la UI
+     
         const yaExiste = articulosSeleccionados.some(
             (a) => a.id_articulo === articulo.id_articulo
         );
         if (yaExiste) {
             toast.error("Este artículo ya ha sido añadido a la orden de compra.");
-            setArticuloSeleccionado(null); // Limpiar la selección en el Select
+            setArticuloSeleccionado(null); 
             return;
         }
 
         const puedeAgregar = await verificarYAgregarAlInventario(
-            articulo.value, // Usamos 'value' que es el id_articulo en react-select
-            articulo.label // Usamos 'label' que es la descripción en react-select
+            articulo.value, 
+            articulo.label 
         );
 
         if (!puedeAgregar) {
-            // Si el usuario canceló la inicialización o hubo un error
-            setArticuloSeleccionado(null); // Limpiar la selección en el Select
+       
+            setArticuloSeleccionado(null); 
             return;
         }
 
         setArticulosSeleccionados((prev) => [
             ...prev,
             {
-                id_articulo: articulo.value, // Usar el value del Select
-                descripcion: articulo.label, // Usar la descripción de la opción de Select
+                id_articulo: articulo.value, 
+                descripcion: articulo.label, 
                 cantidad: 1,
-                precio_unitario: articulo.precio_venta || 0, // Usar precio_venta del artículo
+                precio_unitario: articulo.precio_costo || 0, 
             },
         ]);
-        setArticuloSeleccionado(null); // Limpiar la selección después de agregar
+        setArticuloSeleccionado(null);
     };
 
-    // Función para eliminar un artículo de la lista de seleccionados
+
     const eliminarArticulo = (id_articulo) => {
         setArticulosSeleccionados((prev) =>
             prev.filter((a) => a.id_articulo !== id_articulo)
         );
     };
 
-    // Función para cambiar la cantidad de un artículo seleccionado
+ 
     const cambiarCantidad = (id_articulo, cantidad) => {
         const numCantidad = parseInt(cantidad, 10);
         if (isNaN(numCantidad) || numCantidad < 1) {
@@ -157,7 +157,16 @@ const CrearOrdenCompra = () => {
         );
     };
 
-    // Función para validar el formulario antes de enviar
+   const cambiarPrecioUnitario = (id_articulo, precio) => {
+    const numPrecio = parseFloat(precio);
+    if (isNaN(numPrecio) || numPrecio < 0) {
+        toast.error("El precio unitario debe ser un número positivo o cero.");
+        return;
+    }
+    setArticulosSeleccionados((prev) =>
+        prev.map((a) => (a.id_articulo === id_articulo ? { ...a, precio_unitario: numPrecio } : a))
+    );
+};
     const validarFormulario = () => {
         if (!idProveedor) {
             toast.error('Selecciona un proveedor');
@@ -178,7 +187,7 @@ const CrearOrdenCompra = () => {
         return true;
     };
 
-    // Manejador para el envío del formulario
+   
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validarFormulario()) return;
@@ -187,8 +196,8 @@ const CrearOrdenCompra = () => {
         const payload = {
             id_proveedor: parseInt(idProveedor),
             categoria_costo: categoriaCosto.trim() || null,
-            id_orden_fabricacion: null, // Asumiendo que no se usa en este formulario
-            estado: 'pendiente', // Estado inicial de la orden de compra
+            id_orden_fabricacion: null, 
+            estado: 'pendiente', 
             items: articulosSeleccionados.map((a) => ({
                 id_articulo: Number(a.id_articulo),
                 cantidad: Number(a.cantidad),
@@ -225,7 +234,7 @@ const CrearOrdenCompra = () => {
         }
     };
 
-    // Manejador para el botón de cancelar
+
     const handleCancelar = () => {
         navigate('/ordenes_compra');
     };
@@ -248,7 +257,7 @@ const CrearOrdenCompra = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Selección de proveedor */}
+           
                     <div>
                         <label htmlFor="proveedor" className="block text-sm font-semibold text-gray-700 mb-1">
                             Proveedor <span className="text-red-500">*</span>
@@ -270,7 +279,6 @@ const CrearOrdenCompra = () => {
                         </select>
                     </div>
 
-                    {/* Categoria de costo */}
                     <div>
                         <label htmlFor="categoriaCosto" className="block text-sm font-semibold text-gray-700 mb-1">
                             Categoría de costo
@@ -338,7 +346,7 @@ const CrearOrdenCompra = () => {
                     </div>
                     
                     <hr className="my-6 border-gray-300" />
-                    {/* Sección de agregar artículo */}
+                
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">
                             Agregar artículo
@@ -348,9 +356,9 @@ const CrearOrdenCompra = () => {
                                 options={articulos}
                                 value={articuloSeleccionado}
                                 onChange={(option) => {
-                                    setArticuloSeleccionado(option); // Actualiza el estado del Select
+                                    setArticuloSeleccionado(option); 
                                     if (option) {
-                                        agregarArticulo(option); // Llama a agregarArticulo si se selecciona una opción
+                                        agregarArticulo(option); 
                                     }
                                 }}
                                 placeholder="Selecciona un artículo"
@@ -367,11 +375,11 @@ const CrearOrdenCompra = () => {
                                 }}
                                 isDisabled={loading}
                             />
-                            {/* El botón "Crear artículo" ha sido eliminado según tu solicitud */}
+                          
                         </div>
                     </div>
 
-                    {/* Tabla de artículos seleccionados */}
+                 
                     <div>
                         <h3 className="text-2xl font-bold mb-4 text-gray-800">
                             Artículos seleccionados
@@ -412,6 +420,7 @@ const CrearOrdenCompra = () => {
                                                     min="0"
                                                     step="0.01"
                                                     value={art.precio_unitario}
+                                                    onChange={(e) => cambiarPrecioUnitario(art.id_articulo, e.target.value)}
                                                     readOnly
                                                     className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     disabled={loading}
@@ -434,7 +443,7 @@ const CrearOrdenCompra = () => {
                         </table>
                     </div>
 
-                    {/* Botones de acción */}
+                    
                     <div className="flex gap-4 justify-end mt-8">
                         <button
                             type="button"
@@ -446,7 +455,7 @@ const CrearOrdenCompra = () => {
                         </button>
                         <button
                             type="submit"
-                            className="bg-slate-700 text-white px-6 py-3 rounded-xl hover:bg-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-slate-700 text-white px-6 py-3 rounded-xl hover:bg-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed "
                             disabled={loading}
                         >
                             Guardar Orden

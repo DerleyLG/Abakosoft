@@ -5,26 +5,21 @@ const proveedorModel = require('../models/proveedoresModel');
 const articuloModel = require('../models/articulosModel');
 const inventarioModel = require('../models/inventarioModel');
 const tesoreriaModel = require('../models/tesoreriaModel');
-// Función auxiliar para verificar si un proveedor existe
+
 const proveedorExiste = async (id_proveedor, connection = db) => {
     const proveedor = await proveedorModel.getById(id_proveedor, connection);
     return !!proveedor;
 };
 
-// Función auxiliar para verificar si un artículo existe
-const articuloExiste = async (id_articulo, connection = db) => {
-    const articulo = await articuloModel.getById(id_articulo, connection);
-    return !!articulo;
-};
 
-// Función auxiliar para verificar si una orden de fabricación existe (si es relevante)
+
 const ordenFabricacionExiste = async (id_orden_fabricacion, connection = db) => {
     if (!id_orden_fabricacion) return true;
     const [rows] = await (connection || db).query('SELECT 1 FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?', [id_orden_fabricacion]);
     return rows.length > 0;
 };
 
-// Obtener todas las órdenes de compra (ahora con filtro por estado)
+
 const getOrdenesCompra = async (req, res) => {
     try {
         const { estado } = req.query;
@@ -42,7 +37,7 @@ const getOrdenesCompra = async (req, res) => {
     }
 };
 
-// Obtener una orden de compra por ID
+
 const getOrdenCompraById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -58,7 +53,7 @@ const getOrdenCompraById = async (req, res) => {
     }
 };
 
-// Crear una nueva orden de compra
+
 async function createOrdenCompra(req, res) {
     let connection;
     try {
@@ -100,8 +95,8 @@ async function createOrdenCompra(req, res) {
 
             const inventarioArticulo = await inventarioModel.obtenerInventarioPorArticulo(id_articulo, connection);
             if (!inventarioArticulo) {
-                // Si el artículo no está en inventario, enviamos una respuesta específica
-                await connection.rollback(); // Hacemos rollback antes de responder
+               
+                await connection.rollback(); 
                 connection.release();
                 console.log(`[OrdenCompraController] Artículo ${id_articulo} no inicializado en inventario. Enviando 409.`);
                 return res.status(409).json({
@@ -136,7 +131,7 @@ async function createOrdenCompra(req, res) {
 
         for (const [id_articulo, item] of itemsMap) {
             const { cantidad, precio_unitario } = item;
-            console.log(`[OrdenCompraController] Creando detalle de orden de compra para artículo ${id_articulo}...`);
+            
             await detalleOrdenCompra.create({
                 id_orden_compra: ordenId,
                 id_articulo: id_articulo,
@@ -169,14 +164,14 @@ const movimientoData = {
             console.log("[OrdenCompraController] Transacción ROLLEADA y conexión liberada.");
         }
         console.error('Error creando orden de compra:', error);
-        // Si el error ya fue manejado y se envió una respuesta 409, no enviar otra 500
+        
         if (!res.headersSent) {
             res.status(500).json({ message: error.message || 'Error al crear la orden de compra' });
         }
     }
 }
 
-// Confirmar Recepción de Mercancía y Actualizar Inventario
+
 async function confirmarRecepcion(req, res) {
     let connection;
     try {
@@ -198,7 +193,7 @@ async function confirmarRecepcion(req, res) {
             throw new Error('La orden de compra no tiene detalles para recibir.');
         }
 
-        console.log(`[OrdenCompraController] Confirmando recepción para orden #${id}...`);
+        
 
         for (const detalle of detalles) {
             await inventarioModel.processInventoryMovement({
@@ -214,7 +209,7 @@ async function confirmarRecepcion(req, res) {
         }
 
         await ordenCompras.update(id, { estado: 'completada' }, connection);
-        console.log(`[OrdenCompraController] Estado de orden #${id} actualizado a 'completada'.`);
+     
 
         await connection.commit();
         connection.release();
@@ -230,14 +225,25 @@ async function confirmarRecepcion(req, res) {
     }
 }
 
-// Actualizar una orden de compra
+
 async function updateOrdenCompra(req, res) {
     let connection;
     try {
         const id_orden_compra = req.params.id;
-        console.log('→ updateOrdenCompra id:', id_orden_compra);
-
-        const { id_proveedor, categoria_costo, id_orden_fabricacion, estado, items } = req.body;
+        
+     
+        const { 
+            id_proveedor, 
+            categoria_costo, 
+            id_orden_fabricacion, 
+            estado, 
+            fecha, 
+            detalles,
+      
+            id_metodo_pago,
+            referencia,
+            observaciones_pago,
+        } = req.body;
 
         connection = await db.getConnection();
         await connection.beginTransaction();
@@ -247,35 +253,37 @@ async function updateOrdenCompra(req, res) {
             throw new Error('Orden de compra no encontrada.');
         }
 
+      
         if (ordenActual.estado !== 'pendiente') {
-            throw new Error('Solo se pueden actualizar órdenes de compra en estado pendiente.');
+            throw new Error(`Solo se pueden actualizar órdenes de compra en estado 'pendiente'. Estado actual: ${ordenActual.estado}.`);
+        }
+        
+       
+        if (!Array.isArray(detalles) || detalles.length === 0) {
+            throw new Error('Debe proporcionar al menos un detalle de orden de compra.');
         }
 
-        await ordenCompras.update(id_orden_compra, { id_proveedor, categoria_costo, id_orden_fabricacion, estado }, connection);
-
-        if (!Array.isArray(items) || items.length === 0) {
-            throw new Error('El campo items debe ser un array no vacío');
-        }
-
-        const detallesExistentes = await detalleOrdenCompra.getByOrdenCompra(id_orden_compra, connection);
-        const detallesMap = new Map(detallesExistentes.map(d => [d.id_articulo, d]));
-
-        const itemsMap = new Map();
-        for (const item of items) {
+        const detallesAgrupados = new Map();
+        let totalCompra = 0; 
+        
+        for (const item of detalles) {
             const { id_articulo, cantidad, precio_unitario } = item;
-            if (!id_articulo || isNaN(cantidad) || isNaN(precio_unitario)) {
-                throw new Error('Cada item requiere id_articulo, cantidad y precio_unitario válidos');
+
+            if (!id_articulo || isNaN(cantidad) || cantidad <= 0 || isNaN(precio_unitario) || precio_unitario < 0) {
+                throw new Error('Cada detalle requiere un artículo, cantidad positiva y precio unitario válido.');
             }
+            
             const articuloInfo = await articuloModel.getById(id_articulo, connection);
             if (!articuloInfo) {
                 throw new Error(`El artículo con ID ${id_articulo} no existe.`);
             }
-            // --- CAMBIO CLAVE: Verificar si el artículo existe en la tabla 'inventario' ---
+            
+            
             const inventarioArticulo = await inventarioModel.obtenerInventarioPorArticulo(id_articulo, connection);
             if (!inventarioArticulo) {
-                await connection.rollback(); // Hacemos rollback antes de responder
+                await connection.rollback(); 
                 connection.release();
-                console.log(`[OrdenCompraController] Artículo ${id_articulo} no inicializado en inventario durante la actualización. Enviando 409.`);
+                
                 return res.status(409).json({
                     message: `El artículo "${articuloInfo.descripcion}" (ID: ${id_articulo}) no está inicializado en el inventario.`,
                     needsInitialization: true,
@@ -285,64 +293,70 @@ async function updateOrdenCompra(req, res) {
                     }
                 });
             }
-            // --- FIN CAMBIO CLAVE ---
 
-            if (itemsMap.has(id_articulo)) {
-                const e = itemsMap.get(id_articulo);
-                e.cantidad += cantidad;
-                e.precio_unitario = precio_unitario;
+            
+            if (detallesAgrupados.has(id_articulo)) {
+                const existente = detallesAgrupados.get(id_articulo);
+                existente.cantidad += cantidad;
+                
+                detallesAgrupados.set(id_articulo, existente);
             } else {
-                itemsMap.set(id_articulo, { id_articulo, cantidad, precio_unitario });
+                detallesAgrupados.set(id_articulo, { id_articulo, cantidad, precio_unitario });
             }
+            
+            totalCompra += cantidad * precio_unitario; 
         }
-        console.log('→ items agrupados para actualización:', Array.from(itemsMap.values()));
+        
+        
+       
+        const ordenData = { 
+            id_proveedor, 
+            categoria_costo, 
+            id_orden_fabricacion, 
+            estado: ordenActual.estado, 
+            fecha,
+        };
+        await ordenCompras.update(id_orden_compra, ordenData, connection);
 
-        for (const [id_articulo, { cantidad: nuevaCantidad, precio_unitario: nuevoPrecio }] of itemsMap) {
-            if (detallesMap.has(id_articulo)) {
-                const det = detallesMap.get(id_articulo);
-                const cantidadAnterior = det.cantidad;
-                const diferenciaCantidad = nuevaCantidad - cantidadAnterior;
 
-                if (diferenciaCantidad !== 0) {
-                    await inventarioModel.processInventoryMovement({
-                        id_articulo: Number(id_articulo),
-                        cantidad_movida: Math.abs(diferenciaCantidad),
-                        tipo_movimiento: diferenciaCantidad > 0 ? inventarioModel.TIPOS_MOVIMIENTO.ENTRADA : inventarioModel.TIPOS_MOVIMIENTO.SALIDA,
-                        tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.AJUSTE_MANUAL,
-                        observaciones: `Ajuste por actualización de orden de compra #${id_orden_compra}. Cantidad ${cantidadAnterior} -> ${nuevaCantidad}`,
-                        referencia_documento_id: id_orden_compra,
-                        referencia_documento_tipo: 'orden_compra_ajuste',
-                    }, connection);
-                    console.log(`→ Stock ajustado para artículo ${id_articulo}: ${diferenciaCantidad > 0 ? '+' : ''}${diferenciaCantidad}`);
-                }
-
-                await detalleOrdenCompra.update(det.id_detalle_compra, {
-                    id_orden_compra,
-                    id_articulo,
-                    cantidad: nuevaCantidad,
-                    precio_unitario: nuevoPrecio
-                }, connection);
-                console.log(`→ Detalle actualizado para artículo ${id_articulo}`);
-                detallesMap.delete(id_articulo);
-            } else {
-                await detalleOrdenCompra.create({
-                    id_orden_compra,
-                    id_articulo,
-                    cantidad: nuevaCantidad,
-                    precio_unitario: nuevoPrecio
-                }, connection);
-                console.log(`→ Nuevo detalle insertado para artículo ${id_articulo}. (Stock no afectado, se hará en recepción)`);
-            }
+        await detalleOrdenCompra.deleteByOrdenCompraId(id_orden_compra, connection); 
+        
+        for (const item of detallesAgrupados.values()) {
+            await detalleOrdenCompra.create({
+                id_orden_compra,
+                id_articulo: item.id_articulo,
+                cantidad: item.cantidad,
+                precio_unitario: item.precio_unitario,
+            }, connection);
         }
 
-        for (const det of detallesMap.values()) {
-            await detalleOrdenCompra.delete(det.id_detalle_compra, connection);
-            console.log(`→ Detalle eliminado ID ${det.id_detalle_compra} (art ${det.id_articulo})`);
+      
+        if (id_metodo_pago && id_metodo_pago !== '0') { 
+            const movimientoData = {
+                id_documento: id_orden_compra,
+                tipo_documento: 'orden_compra',
+                monto: -totalCompra, 
+                id_metodo_pago: id_metodo_pago,
+                referencia: referencia || null,
+                observaciones: observaciones_pago || null,
+              
+            };
+            
+            await tesoreriaModel.updateOrCreateMovimiento(movimientoData, connection);
+        } else {
+            
+            console.log(`[OrdenCompraController] No se actualizó el pago para OC #${id_orden_compra} porque no se proporcionó id_metodo_pago.`);
         }
 
+        
+     
         await connection.commit();
         connection.release();
-        return res.status(200).json({ message: 'Orden de compra actualizada correctamente.' });
+        return res.status(200).json({ 
+            message: 'Orden de compra y movimiento de tesorería actualizados correctamente.',
+            id_orden_compra: id_orden_compra
+        });
+        
     } catch (error) {
         if (connection) {
             await connection.rollback();
@@ -355,7 +369,6 @@ async function updateOrdenCompra(req, res) {
     }
 }
 
-// Eliminar una orden de compra (con sus detalles y reversión de stock si ya fue completada)
 const deleteOrdenCompra = async (req, res) => {
     let connection;
     try {

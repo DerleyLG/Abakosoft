@@ -14,5 +14,6 @@ router.get('/pagos-trabajadores/count', TesoreriaController.getPagosTrabajadores
 router.get('/ordenes-compra/count', TesoreriaController.getOrdenesCompraCount);
 router.get('/costos/count', TesoreriaController.getCostosIndirectosCount);
 router.get('/materia-prima/count', TesoreriaController.getMateriaPrimaCount);
+router.get('/:documento/:idDocumento', TesoreriaController.getMovimientoByDocumento);
 
 module.exports = router;

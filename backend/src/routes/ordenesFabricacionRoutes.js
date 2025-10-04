@@ -7,6 +7,8 @@ router.get('/', controller.getAll);
 
 router.get('/existe/:id_pedido', controller.existe);
 
+router.get('/estado-pedido/:id_pedido', controller.getEstadoOFByPedidoId);
+
 // Obtener una orden de fabricación por ID
 router.get('/:id', controller.getById);
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api"; // ajusta según tu estructura
-import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle,FiArrowRight} from "react-icons/fi"; 
+import { FiEdit, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle,FiArrowRight} from "react-icons/fi"; 
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -14,6 +14,7 @@ const OrdenesCompra = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false); 
+  const [filtroEstado, setFiltroEstado] = useState('todos');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,13 +31,13 @@ const OrdenesCompra = () => {
     };
 
     fetchOrdenes();
-  }, [mostrarCanceladas]); // Añadido mostrarCanceladas como dependencia
+  }, [mostrarCanceladas]); 
 
   const handleCrear = () => navigate("/ordenes_compra/nuevo");
 
   const handleDelete = (id) => {
     confirmAlert({
-      title: "Confirmar cancelación", // Cambiado a "cancelación"
+      title: "Confirmar cancelación", 
       message: "¿Seguro que quieres cancelar esta orden? Si ya fue recibida, se revertirá el stock de los artículos.",
       buttons: [
         {
@@ -62,7 +63,6 @@ const OrdenesCompra = () => {
     });
   };
 
-  // NUEVA FUNCIÓN: Manejar la confirmación de recepción
   const handleConfirmarRecepcion = (id) => {
     confirmAlert({
       title: "Confirmar Recepción de Mercancía",
@@ -132,7 +132,16 @@ const OrdenesCompra = () => {
       year: "numeric",
     });
 
-    return proveedor.includes(term) || fechaStr.includes(term);
+    // filtro por texto
+    const textMatch = proveedor.includes(term) || fechaStr.includes(term);
+    if (!textMatch) return false;
+
+    // filtro por estado (cliente-side)
+    if (filtroEstado && filtroEstado !== 'todos') {
+      return orden.estado === filtroEstado;
+    }
+
+    return true;
   });
 
   return (
@@ -145,11 +154,25 @@ const OrdenesCompra = () => {
         <div className="flex w-full md:w-250 items-center gap-4">
           <input
             type="text"
-            placeholder="Buscar por proveedor o fecha"
+            placeholder="proveedor o fecha"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
+
+          {/* Select para filtrar por estado (cliente-side) */}
+          <div>
+            <select
+              value={filtroEstado}
+              onChange={(e) => { setFiltroEstado(e.target.value); setExpandedId(null); }}
+              className="h-[42px] border border-gray-300 rounded-md px-3"
+              title="Filtrar por estado"
+            >
+              <option value="todos">Todos</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="completada">Completadas</option>
+            </select>
+          </div>
 
           <button
             onClick={handleCrear}
@@ -216,7 +239,20 @@ const OrdenesCompra = () => {
                     <td className="px-4 py-3">{orden.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
                    
+{orden.estado === 'pendiente' && !mostrarCanceladas && (
 
+    <button
+        onClick={(e) => {
+            e.stopPropagation();
+            
+            navigate(`/ordenes_compra/editar/${orden.id_orden_compra}`); 
+        }}
+        className="text-blue-600 hover:text-blue-400 cursor-pointer"
+        title="Editar Orden"
+    >
+        <FiEdit size={18} /> 
+    </button>
+)}
                 
                       {orden.estado === 'pendiente' && !mostrarCanceladas && (
                         <button
