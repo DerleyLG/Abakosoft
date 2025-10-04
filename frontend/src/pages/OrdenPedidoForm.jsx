@@ -3,17 +3,17 @@ import { Listbox } from "@headlessui/react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import api from "../services/api"; // Asegúrate de que esta ruta sea correcta
-import Select from "react-select"; // Asegúrate de tener 'react-select' instalado
+import api from "../services/api"; 
+import Select from "react-select"; 
 import { PlusCircle } from "lucide-react";
-import { confirmAlert } from "react-confirm-alert"; // Asegúrate de tener 'react-confirm-alert' instalado
-import "react-confirm-alert/src/react-confirm-alert.css"; // Asegúrate de que esta ruta CSS sea correcta y que tu bundler la soporte
+import { confirmAlert } from "react-confirm-alert";
+import "react-confirm-alert/src/react-confirm-alert.css";
 
 const OrdenPedidoForm = () => {
     const navigate = useNavigate();
     const [clientes, setClientes] = useState([]);
     const [articulos, setArticulos] = useState([]);
-    const [categorias, setCategorias] = useState([]); // Corregido: setCategorias
+    const [categorias, setCategorias] = useState([]); 
     const [cliente, setCliente] = useState(null);
     const [estado, setEstado] = useState("pendiente");
     const [observaciones, setObservaciones] = useState("");
@@ -27,11 +27,11 @@ const OrdenPedidoForm = () => {
         precio_venta: 0,
         id_categoria: "",
     });
-    const [loading, setLoading] = useState(false); // Nuevo estado de carga
+    const [loading, setLoading] = useState(false); 
 
     useEffect(() => {
         const fetchData = async () => {
-            setLoading(true); // Activar carga al inicio
+            setLoading(true); 
             try {
                 const [resClientes, resArticulos, resCategorias] = await Promise.all([
                     api.get("/clientes"),
@@ -40,7 +40,7 @@ const OrdenPedidoForm = () => {
                 ]);
                 setClientes(resClientes.data || []);
                 setArticulos(resArticulos.data || []);
-                setCategorias(resCategorias.data || []); // Corregido: setCategorias
+                setCategorias(resCategorias.data || []); 
             } catch (error) {
                 console.error("Error al cargar datos iniciales:", error);
                 toast.error("Error al cargar datos iniciales (clientes, artículos, categorías)");
@@ -52,7 +52,7 @@ const OrdenPedidoForm = () => {
     }, []);
 
     const agregarArticulo = async (articulo) => {
-        // Verificar si el artículo ya está seleccionado para evitar duplicados en la UI
+     
         const yaExiste = articulosSeleccionados.some(
             (a) => a.id_articulo === articulo.id_articulo
         );

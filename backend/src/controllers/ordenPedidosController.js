@@ -4,7 +4,7 @@ const clienteModel = require("../models/clientesModel");
 const articuloModel = require("../models/articulosModel");
 const db = require("../database/db");
 
-const ESTADOS_VALIDOS = ["pendiente", "completado", "cancelado"];
+const ESTADOS_VALIDOS = ["pendiente", "en fabricacion", "listo para entrega", "completado", "cancelado"];
 
 module.exports = {
   getAll: async (req, res) => {
