@@ -120,4 +120,20 @@ module.exports = {
       throw error;
     }
   },
+
+  getEstadoByPedidoId: async (id_pedido) => {
+    const [rows] = await db.query(
+      `SELECT estado 
+       FROM ordenes_fabricacion 
+       WHERE id_pedido = ? 
+       ORDER BY id_orden_fabricacion DESC 
+       LIMIT 1`,
+      [id_pedido]
+    );
+
+    if (rows.length === 0) {
+      return 'no existe'; 
+    }
+    return rows[0].estado;
+  },
 };

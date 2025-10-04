@@ -19,7 +19,8 @@ module.exports = {
         t.nombre AS nombre_trabajador,
         art.descripcion,
         c.nombre AS nombre_cliente,
-        COALESCE(ant.monto, 0) AS monto_anticipo
+        COALESCE(ant.monto, 0) AS monto_anticipo,
+        ant.estado AS estado_anticipo
       FROM avance_etapas_produccion a
       JOIN articulos art ON a.id_articulo = art.id_articulo
       JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
@@ -108,7 +109,7 @@ module.exports = {
     return rows;
   },
 getByOrdenes: async (ids_orden_fabricacion) => {
-    // Si el array está vacío, retorna un array vacío
+  
     if (!ids_orden_fabricacion || ids_orden_fabricacion.length === 0) {
       return [];
     }
@@ -149,12 +150,36 @@ getByOrdenes: async (ids_orden_fabricacion) => {
     return rows[0]?.estado || null;
   },
 
-  actualizarEstadoOrden: async (id_orden_fabricacion, nuevoEstado, connection = db) => {
-    await (connection || db).query(
-      `UPDATE ordenes_fabricacion SET estado = ? WHERE id_orden_fabricacion = ?`,
-      [nuevoEstado, id_orden_fabricacion]
-    );
-  },
+actualizarEstadoOrden: async (id_orden_fabricacion, nuevoEstado, connection = db) => {
+  // actualizar la OF
+  await (connection || db).query(
+    `UPDATE ordenes_fabricacion SET estado = ? WHERE id_orden_fabricacion = ?`,
+    [nuevoEstado, id_orden_fabricacion]
+  );
+
+  // obtener pedido asociado
+  const [rows] = await (connection || db).query(
+    `SELECT id_pedido FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
+    [id_orden_fabricacion]
+  );
+
+  if (rows.length && rows[0].id_pedido) {
+    let nuevoEstadoPedido = null;
+
+    if (nuevoEstado === "en proceso") {
+      nuevoEstadoPedido = "en fabricacion";
+    } else if (nuevoEstado === "completada") {
+      nuevoEstadoPedido = "listo para entrega";
+    }
+
+    if (nuevoEstadoPedido) {
+      await (connection || db).query(
+        `UPDATE pedidos SET estado = ? WHERE id_pedido = ?`,
+        [nuevoEstadoPedido, rows[0].id_pedido]
+      );
+    }
+  }
+},
 
   update: async (id, { id_orden_fabricacion, id_articulo, id_etapa_produccion, id_trabajador, cantidad, estado, observaciones = null }) => {
     await db.query(
@@ -305,7 +330,7 @@ getByOrdenes: async (ids_orden_fabricacion) => {
        LIMIT 1`,
       [id_articulo, id_etapaProduccion]
     );
-    console.log("Consulta de costo anterior:", rows);
+
     if (rows.length > 0) {
       return rows[0].costo_fabricacion;
     }
@@ -354,14 +379,14 @@ getByOrdenes: async (ids_orden_fabricacion) => {
     );
 
     if (!hayArticulosIncompletos) {
-      console.log(`Orden ${id_orden_fabricacion} ha sido completamente completada. Actualizando estados...`);
+    
 
  const esParaCompuesto = await detalleOrdenesFabricacionModel.esArticuloCompuesto(id_orden_fabricacion);
 
     if (esParaCompuesto) {
-        console.log(`La orden de fabricación es para un producto compuesto. Procediendo a crear el lote del producto final.`);
+        
         try {
-            //  Obtener el ID y la cantidad del artículo compuesto del pedido.
+            
             const [articulosPedido] = await (connection || db).query(
                 `SELECT a.id_articulo, dofp.cantidad FROM detalle_pedido dofp
                  JOIN ordenes_fabricacion ofab ON dofp.id_pedido = ofab.id_pedido
@@ -375,7 +400,7 @@ getByOrdenes: async (ids_orden_fabricacion) => {
                 const id_articulo_final = articuloFinal.id_articulo;
                 const cantidad_final = articuloFinal.cantidad;
                 
-                //  Crear el lote del artículo final (compuesto)
+              
                 const [ultimoAvance] = await (connection || db).query(
     `SELECT id_trabajador FROM avance_etapas_produccion WHERE id_orden_fabricacion = ? ORDER BY fecha_registro DESC LIMIT 1`,
     [id_orden_fabricacion]
@@ -383,7 +408,6 @@ getByOrdenes: async (ids_orden_fabricacion) => {
 
 const id_trabajador_final = ultimoAvance.length > 0 ? ultimoAvance[0].id_trabajador : null;
 
-// Ahora pasas el id_trabajador
 const loteId = await LoteModel.createLote({
     id_orden_fabricacion,
     id_articulo: id_articulo_final,
@@ -391,7 +415,7 @@ const loteId = await LoteModel.createLote({
     cantidad: cantidad_final,
     observaciones: `Lote de producto compuesto creado al completar la OF #${id_orden_fabricacion} de sus componentes.`,
 }, connection);
-                //  Actualizar el inventario para el artículo final.
+                
                 await inventarioModel.processInventoryMovement({
                     id_articulo: Number(id_articulo_final),
                     cantidad_movida: Number(cantidad_final),
@@ -401,13 +425,13 @@ const loteId = await LoteModel.createLote({
                     referencia_documento_tipo: 'lote',
                 });
                 
-                console.log(` Lote del producto final (ID: ${id_articulo_final}) creado y stock actualizado.`);
+                
             } else {
                 console.warn(`No se encontró un artículo compuesto en el pedido asociado a la orden ${id_orden_fabricacion}. No se creó el lote final.`);
             }
         } catch (error) {
             console.error(` Error al crear el lote del producto final para la orden ${id_orden_fabricacion}:`, error);
-            // Considera si quieres lanzar el error o solo registrarlo
+         
         }
     }
       await (connection || db).query(
@@ -417,10 +441,10 @@ const loteId = await LoteModel.createLote({
 
       if (id_pedido) {
         await (connection || db).query(
-          `UPDATE pedidos SET estado = 'completado' WHERE id_pedido = ?`,
+          `UPDATE pedidos SET estado = 'listo para entrega' WHERE id_pedido = ?`,
           [id_pedido]
         );
-        console.log(`Pedido ${id_pedido} asociado a la orden ${id_orden_fabricacion} marcado como 'completado'.`);
+        
       } else {
         console.warn(`No se encontró id_pedido para la orden ${id_orden_fabricacion}. No se actualizó el pedido.`);
       }

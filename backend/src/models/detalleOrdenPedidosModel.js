@@ -43,6 +43,14 @@ module.exports = {
     await db.query('DELETE FROM detalle_pedido WHERE id_detalle_pedido = ?', [id]);
   },
 
+deleteByPedido: async (id_pedido, connection = db) => {
+    const [result] = await (connection || db).query( 
+        `DELETE FROM detalle_pedido WHERE id_pedido = ?`,
+        [id_pedido]
+    );
+    return result.affectedRows;
+},
+
   async getArticuloFinalFromPedido(id_pedido) {
        
             const [rows] = await db.query(

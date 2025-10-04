@@ -80,6 +80,30 @@ const tesoreriaController = {
       res.status(500).json({ error: 'Error al obtener el conteo de materia prima' });
     }
   },
+  getMovimientoByDocumento: async (req, res) => {
+    try {
+      const idDocumento = req.params.idDocumento; 
+      const tipoDocumento = req.query.tipo;     
+      
+      if (!idDocumento || !tipoDocumento) {
+        return res.status(400).json({ message: 'Faltan parámetros: idDocumento y tipo.' });
+      }
+      
+      const movimiento = await TesoreriaModel.getByDocumentoIdAndTipo(idDocumento, tipoDocumento);
+      console.log("Movimiento recuperado del modelo:", movimiento);
+      if (!movimiento) {
+
+        return res.status(200).json(null); 
+      }
+      
+    
+      res.json(movimiento);
+      
+    } catch (error) {
+      console.error('Error al obtener movimiento de tesorería por documento:', error);
+      res.status(500).json({ error: 'Error interno del servidor al obtener movimiento de tesorería.' });
+    }
+  },
 };
 
 module.exports = tesoreriaController;

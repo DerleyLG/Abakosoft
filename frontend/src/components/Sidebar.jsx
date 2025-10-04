@@ -1,32 +1,24 @@
 import React, { useState } from "react";
 import {
-  Boxes,
-  ClipboardList,
-  Package,
-  Users,
-  Warehouse,
-  FileText,
-  Settings,
-  LayoutDashboard,
-  ChevronDown,
-  ChevronRight,
-  LogOut,
+    Boxes,
+    ClipboardList,
+    Package,
+    Users,
+    Warehouse,
+    FileText,
+    Settings,
+    LayoutDashboard,
+    ChevronDown,
+    ChevronRight,
 } from 'lucide-react';
 import { FiDollarSign, FiCreditCard } from 'react-icons/fi';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; 
+// user / logout moved to Header
 
 const Sidebar = ({ isOpen }) => {
   const [ordenesOpen, setOrdenesOpen] = useState(false);
   const navigate = useNavigate();
-  const { logout, loading, user} = useAuth(); // Obtener la función logout y el estado loading
-
-  const handleLogout = async () => {
-    // Llama a la función de logout del contexto de autenticación
-    await logout();
-    navigate('/login');
-   
-  };
+  
 
   return (
     <aside
@@ -200,6 +192,16 @@ const Sidebar = ({ isOpen }) => {
           >
             <FiDollarSign size={20} /> Costos
           </NavLink>
+         <NavLink
+         	to="/tesoreria"
+         	className={({ isActive }) =>
+         		`flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+         	  isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+         	 }`
+         	}
+        >
+         	<FiDollarSign size={20} /> Tesorería
+         </NavLink>
           <NavLink
             to="/reportes"
             className={({ isActive }) =>
@@ -226,21 +228,10 @@ const Sidebar = ({ isOpen }) => {
         </nav>
       </div>
 
-      <div className="p-4 border-t border-slate-700">
-        {/* Muestra el estado de carga y el nombre del usuario */}
-        {loading ? (
-          <p className="text-gray-400">Cargando...</p>
-        ) : (
-          <p className="text-gray-400">Usuario: {user?.nombre_usuario}</p>
-        )}
-        
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-slate-600 bg-slate-700 text-white font-bold transition-colors duration-200 cursor-pointer mt-3"
-        >
-          <LogOut size={20} /> Cerrar Sesión
-        </button>
-      </div>
+            <div className="p-4 border-t border-slate-700 text-center text-xs text-gray-400">
+                {/* Usuario y logout movidos al Header */}
+                Abakosoft
+            </div>
     </aside>
   );
 };

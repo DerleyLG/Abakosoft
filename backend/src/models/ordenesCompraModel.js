@@ -33,19 +33,19 @@ module.exports = {
     return result.insertId;
   },
 
-  update: async (id, { id_proveedor, categoria_costo, id_orden_fabricacion, estado }, connection = db) => {
-    const [result] = await (connection || db).query(
-      `UPDATE ordenes_compra
-       SET id_proveedor = COALESCE(?, id_proveedor),
-           categoria_costo = COALESCE(?, categoria_costo),
-           id_orden_fabricacion = COALESCE(?, id_orden_fabricacion),
-           estado = COALESCE(?, estado)
-       WHERE id_orden_compra = ?`,
-      [id_proveedor, categoria_costo, id_orden_fabricacion, estado, id]
-    );
-    return result.affectedRows;
-  },
-
+ update: async (id, { id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha }, connection = db) => {
+  const [result] = await (connection || db).query(
+   `UPDATE ordenes_compra
+   SET id_proveedor = COALESCE(?, id_proveedor),
+     categoria_costo = COALESCE(?, categoria_costo),
+     id_orden_fabricacion = COALESCE(?, id_orden_fabricacion),
+     estado = COALESCE(?, estado),
+     fecha = COALESCE(?, fecha) 
+   WHERE id_orden_compra = ?`,
+   [id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, id]
+  );
+  return result.affectedRows;
+ },
   delete: async (id_orden_compra, connection = db) => {
     const [result] = await (connection || db).query('DELETE FROM ordenes_compra WHERE id_orden_compra = ?', [id_orden_compra]);
     return result.affectedRows > 0;

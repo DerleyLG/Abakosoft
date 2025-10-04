@@ -5,6 +5,7 @@ const controller = require('../controllers/ordenesVentaController');
 
 router.get('/articulos-con-stock', controller.getArticulosConStock);
 
+
 router.get('/',      controller.getAll);
 router.get('/:id',   controller.getById);
 router.post('/',     controller.create);

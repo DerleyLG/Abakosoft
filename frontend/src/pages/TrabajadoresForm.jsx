@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api'; // ajusta según tu estructura
+import api from '../services/api'; 
 import toast from 'react-hot-toast';
 
 const CrearTrabajador = () => {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [cargo, setCargo] = useState('');
-  const [activo, setActivo] = useState(true); // true = 1
+  const [activo, setActivo] = useState(true); 
 
   const navigate = useNavigate();
 
@@ -48,7 +48,7 @@ const CrearTrabajador = () => {
       });
 
       setTimeout(() => {
-        navigate('/trabajadores'); // o la ruta que muestre la lista
+        navigate('/trabajadores');
       }, 500);
 
     } catch (error) {

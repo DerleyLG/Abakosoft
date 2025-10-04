@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import {  FiPackage, FiArrowLeft, FiTrash2, FiPlus, FiDollarSign } from "react-icons/fi";
+import {  FiPackage, FiArrowLeft, FiTrash2, FiPlus, FiDollarSign, FiEdit } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -13,19 +13,31 @@ const Pedidos = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas'); 
   const navigate = useNavigate();
 
-  const fetchPedidos = useCallback(async () => {
+ const fetchPedidos = useCallback(async () => {
     try {
-      const endpoint = mostrarCancelados ? "/pedidos?estado=cancelado" : "/pedidos";
-      console.log("Llamando a API en:", endpoint);
+      let endpoint = "/pedidos";
+
+      if (mostrarCancelados) {
+    
+        endpoint = "/pedidos?estado=cancelado";
+      } else if (filtroEstadoActivas !== 'todas') {
+     
+        endpoint = `/pedidos?estado=${filtroEstadoActivas}`;
+      } 
+   
+      
+ 
       const res = await api.get(endpoint);
-      console.log("Datos recibidos:", res.data);
+    
       setPedidos(res.data);
     } catch (error) {
       console.error("Error al cargar pedidos:", error);
+      toast.error("Error al cargar pedidos. Revisa la conexión con el servidor.");
     }
-  }, [mostrarCancelados]);
+  }, [mostrarCancelados, filtroEstadoActivas]);
 
   useEffect(() => {
     fetchPedidos();
@@ -60,6 +72,30 @@ const Pedidos = () => {
     });
   };
 
+const handleEdit = async (e, pedido) => {
+    e.stopPropagation();
+
+    try {
+  
+      const res = await api.get(`/ordenes-fabricacion/estado-pedido/${pedido.id_pedido}`);
+      const estadoOF = res.data.estado; 
+      
+     
+      if (estadoOF && estadoOF !== 'pendiente' && estadoOF !== 'no existe') {
+        toast.error(`No se puede editar. La Orden de Fabricación asociada está en estado: ${estadoOF}.`);
+        return;
+      }
+
+     
+      navigate(`/ordenes_pedido/editar/${pedido.id_pedido}`);
+
+    } catch (error) {
+      console.error("Error al verificar estado de OF:", error);
+      
+      toast.error("Error al validar el estado de producción. Inténtalo de nuevo.");
+    }
+  };
+
   const toggleExpand = async (id) => {
     if (expandedId === id) {
       setExpandedId(null);
@@ -82,7 +118,17 @@ const Pedidos = () => {
   };
 
   const toggleMostrarCancelados = () => {
+    
+    if (!mostrarCancelados) {
+      setFiltroEstadoActivas('todas'); 
+    }
     setMostrarCancelados((prev) => !prev);
+    setExpandedId(null);
+  };
+  
+  const handleFiltroEstadoChange = (e) => {
+    setMostrarCancelados(false); 
+    setFiltroEstadoActivas(e.target.value);
     setExpandedId(null);
   };
 
@@ -130,46 +176,51 @@ const Pedidos = () => {
   };
   
 const handleCrearOrdenVenta = async (e, id_pedido) => {
-    e.stopPropagation();
+  e.stopPropagation();
 
-    try {
-      // Obteniene todos los detalles del pedido si no se han cargado
-      const pedidoCompleto = pedidos.find(p => p.id_pedido === id_pedido);
-      if (!pedidoCompleto || !pedidoCompleto.detalles) {
-        const resDetalles = await api.get(`/detalle-orden-pedido/${id_pedido}`);
-        pedidoCompleto.detalles = resDetalles.data;
-      }
+  try {
+    let pedidoCompleto = pedidos.find(p => p.id_pedido === id_pedido);
 
+    if (!pedidoCompleto || !pedidoCompleto.detalles) {
+      const resDetalles = await api.get(`/detalle-orden-pedido/${id_pedido}`);
+      pedidoCompleto = { ...pedidoCompleto, detalles: resDetalles.data };
+    }
 
-      confirmAlert({
-        title: 'Confirmar orden de venta',
-        message: '¿Está seguro que desea crear una orden de venta a partir de este pedido?',
-        buttons: [
-          {
-            label: 'Sí',
-            onClick: () => {
-              // Navega y pasa los datos del pedido al formulario de Orden de Venta
-              navigate('/ordenes_venta/nuevo', { state: { pedidoData: pedidoCompleto } });
-            }
-          },
-          {
-            label: 'No',
-          },
-        ],
-      });
-    } catch (error) {
-      console.error("Error al crear la orden de venta:", error);
-      toast.error("Error al crear la orden de venta. Inténtalo de nuevo.");
-    }
-  };
-  
+    
+    const hoy = new Date();
+    const fechaActual = hoy.toISOString().split("T")[0]; 
+
+    const pedidoConFechaActual = {
+      ...pedidoCompleto,
+      fecha_pedido: fechaActual,
+    };
+
+    confirmAlert({
+      title: "Confirmar orden de venta",
+      message: "¿Está seguro que desea crear una orden de venta a partir de este pedido?",
+      buttons: [
+        {
+          label: "Sí",
+          onClick: () => {
+            navigate("/ordenes_venta/nuevo", { state: { pedidoData: pedidoConFechaActual } });
+            
+          },
+        },
+        { label: "No" },
+      ],
+    });
+  } catch (error) {
+    console.error("Error al crear la orden de venta:", error);
+    toast.error("Error al crear la orden de venta. Inténtalo de nuevo.");
+  }
+};
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">Pedidos</h2>
 
-        <div className="flex w-full md:w-200 items-center gap-4">
+        <div className="flex w-full md:w-auto items-center gap-4">
           <input
             type="text"
             placeholder="Buscar por cliente o fecha (dd/mm/aa)"
@@ -177,6 +228,24 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
+          
+          
+          <select
+            value={filtroEstadoActivas}
+            onChange={handleFiltroEstadoChange}
+            disabled={mostrarCancelados} 
+            className={`h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
+    mostrarCancelados
+      ? 'bg-gray-200 cursor-not-allowed text-gray-600'
+      : 'bg-gray-100 text-gray-800'
+  }`}
+          >
+            <option value="todas">Todas</option>
+            <option value="pendiente">Pendientes</option>
+<option value="en fabricacion">En fabricacion</option>
+<option value="listo para entrega">Listo para entrega</option>
+            <option value="completado">Completadas</option>
+          </select>
 
           <button
             onClick={handleCrear}
@@ -241,7 +310,7 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                     </td>
                     <td className="px-4 py-3">{pedido.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
-           {!mostrarCancelados && ( 
+           {!mostrarCancelados && pedido.estado == 'pendiente' && ( 
                         <button
                           onClick={(e) => handleCrearOrdenFabricacion(e, pedido.id_pedido)}
                           className="text-green-600 hover:text-green-400 cursor-pointer"
@@ -250,7 +319,7 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                           <FiPackage size={18} />
                         </button>
                       )}
- {!mostrarCancelados && (
+ {!mostrarCancelados && pedido.estado == 'listo para entrega' &&(
                         <button
                           onClick={(e) => handleCrearOrdenVenta(e, pedido.id_pedido)}
                           className="text-blue-600 hover:text-blue-400 cursor-pointer"
@@ -259,7 +328,15 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                           <FiDollarSign size={18} />
                         </button>
                       )}
-
+  {!mostrarCancelados && pedido.estado == 'pendiente' &&(
+                        <button
+                          onClick={(e) => handleEdit(e, pedido)}
+                          className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
+                          title="Editar pedido"
+                        >
+                          <FiEdit size={18} /> 
+                        </button>
+                      )}
                       {!mostrarCancelados && (
                         <button
                           onClick={(e) => {

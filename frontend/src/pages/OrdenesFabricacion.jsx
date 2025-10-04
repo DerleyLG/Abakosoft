@@ -27,7 +27,7 @@ const ListaOrdenesFabricacion = () => {
     useState({});
   const [etapasDisponibles, setEtapasDisponibles] = useState({});
   const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState({});
-
+const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas'); 
   const yaConsultadoCosto = useRef({});
   const historialCostos = useRef({});
   const costoManualEditado = useRef({});
@@ -63,18 +63,21 @@ const ListaOrdenesFabricacion = () => {
     fetchInitialData();
   }, []);
 
-  // Carga las órdenes de fabricación al cambiar el estado de `mostrarCanceladas`
+  
+
   useEffect(() => {
     const fetchOrdenes = async () => {
-      try {
-        const endpoint = mostrarCanceladas
-          ? "/ordenes-fabricacion?estados=cancelada"
-          : "/ordenes-fabricacion?estados=pendiente,en proceso,completada";
-        const res = await api.get(endpoint);
+      try { 
+   let endpoint="/ordenes-fabricacion";
 
-        // Establece las órdenes en el estado
-        setOrdenes(res.data);
-
+   if (mostrarCanceladas) {
+    endpoint = "/ordenes-fabricacion?estados=cancelada";
+   } else if (filtroEstadoActivas !== 'todas') {
+  
+    endpoint = `/ordenes-fabricacion?estados=${filtroEstadoActivas}`;
+   } 
+const res = await api.get(endpoint);
+setOrdenes(res.data);
         //  Calcula y establece los artículos pendientes para la carga inicial
         const nuevosArticulosPendientes = {};
         res.data.forEach((orden) => {
@@ -112,7 +115,7 @@ const ListaOrdenesFabricacion = () => {
       }
     };
     fetchOrdenes();
-  }, [mostrarCanceladas]);
+  }, [mostrarCanceladas, filtroEstadoActivas]);
 
   // Carga el costo de fabricación anterior cuando cambian los formularios
   useEffect(() => {
@@ -324,17 +327,49 @@ const ListaOrdenesFabricacion = () => {
     });
   };
 
-  const toggleMostrarCanceladas = () => {
-    setMostrarCanceladas((prev) => !prev);
-  };
+   const toggleMostrarCanceladas = () => {
+  
+  if (!mostrarCanceladas) {
+   setFiltroEstadoActivas('todas'); 
+  }
+  setMostrarCanceladas((prev) => !prev);
+  setExpandedOrden(null);
+ };
+ 
+ const handleFiltroEstadoChange = (e) => {
+  setMostrarCanceladas(false); 
+  setFiltroEstadoActivas(e.target.value);
+  setExpandedOrden(null);
+ };
 
   const expandirOrden = (id) => {
     setExpandedOrden((prevId) => (prevId === id ? null : id));
   };
 
-  const ordenesFiltradas = ordenes.filter((o) =>
-    o.estado?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const ordenesFiltradas = ordenes.filter((o) => {
+  const estado = o.estado?.toLowerCase() || "";
+  const cliente = o.nombre_cliente?.toLowerCase() || "";
+  const fecha = o.fecha_inicio
+    ? new Date(o.fecha_inicio).toLocaleDateString("es-CO", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "";
+
+  const term = searchTerm.toLowerCase();
+
+  const coincideBusqueda =
+    estado.includes(term) || cliente.includes(term) || fecha.includes(term);
+
+  
+  const coincideEstado =
+    filtroEstadoActivas === "todas"
+      ? true
+      : estado === filtroEstadoActivas.toLowerCase();
+
+  return coincideBusqueda && coincideEstado;
+});
 
   const renderDetalles = (orden) => {
     if (!orden.detalles || orden.detalles.length === 0) {
@@ -554,7 +589,7 @@ const ListaOrdenesFabricacion = () => {
           idEtapaFinal: art.id_etapa_final,
         }));
 
-      // Actualiza el estado de las órdenes y los artículos pendientes.
+      
       setOrdenes((prevOrdenes) =>
         prevOrdenes.map((o) =>
           o.id_orden_fabricacion === idOrden ? updatedOrden : o
@@ -588,57 +623,73 @@ const ListaOrdenesFabricacion = () => {
       <h2 className="text-4xl font-bold text-gray-800 p-4">
         Órdenes de fabricación
       </h2>
-      <div className="flex flex-col md:flex-row justify-end items-center mb-6 gap-4 m-5">
-        <div className="flex flex-wrap gap-4 w-full items-center">
-          <input
-            type="text"
-            placeholder="Buscar por estado..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-gray-500 rounded-md px-4 py-2 focus:ring-slate-600 h-[42px] flex-grow"
-          />
-          <button
-            onClick={() => navigate("/ordenes_fabricacion/nuevo")}
-            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-          >
-            <FiPlus size={20} /> Crear orden
-          </button>
-          <button
-            onClick={() => navigate("/etapas_produccion")}
-            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-          >
-            <FiPlus size={20} /> Nueva etapa
-          </button>
-          <button
-            onClick={() => navigate("/lotes_fabricados")}
-            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-          >
-            <FiArrowRight /> Lotes fabricados
-          </button>
-          <button
-            onClick={() => navigate("/avances_fabricacion")}
-            className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-          >
-            <FiArrowRight /> Avances de fabricacion
-          </button>
-          <button
-            onClick={toggleMostrarCanceladas}
-            className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-              mostrarCanceladas
-                ? "bg-red-600 hover:bg-red-500 text-white"
-                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
-            }`}
-          >
-            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-          >
-            <FiArrowLeft /> Volver
-          </button>
-        </div>
-      </div>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-6 m-5">
+
+  <div className="w-full md:w-auto">
+    <label className="text-gray-700 font-semibold mr-2">
+          Filtrar por estado:
+        </label>
+    <select
+      value={filtroEstadoActivas}
+      onChange={handleFiltroEstadoChange}
+      disabled={mostrarCanceladas}
+      className={`h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
+        mostrarCanceladas
+          ? "bg-gray-200 cursor-not-allowed text-gray-600"
+          : "bg-gray-100 text-gray-800"
+      }`}
+    >
+      <option value="todas">Todas</option>
+      <option value="pendiente">Pendientes</option>
+      <option value="en proceso">En proceso</option>
+      <option value="completada">Completadas</option>
+    </select>
+  </div>
+
+
+  <div className="flex flex-wrap gap-4 items-center justify-end">
+    <button
+      onClick={() => navigate("/ordenes_fabricacion/nuevo")}
+      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+    >
+      <FiPlus size={20} /> Crear orden
+    </button>
+    <button
+      onClick={() => navigate("/etapas_produccion")}
+      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+    >
+      <FiPlus size={20} /> Nueva etapa
+    </button>
+    <button
+      onClick={() => navigate("/lotes_fabricados")}
+      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+    >
+      <FiArrowRight /> Lotes fabricados
+    </button>
+    <button
+      onClick={() => navigate("/avances_fabricacion")}
+      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+    >
+      <FiArrowRight /> Avances de fabricación
+    </button>
+    <button
+      onClick={toggleMostrarCanceladas}
+      className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
+        mostrarCanceladas
+          ? "bg-red-600 hover:bg-red-500 text-white"
+          : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+      }`}
+    >
+      {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
+    </button>
+    <button
+      onClick={() => navigate(-1)}
+      className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+    >
+      <FiArrowLeft /> Volver
+    </button>
+  </div>
+</div>
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
@@ -665,15 +716,16 @@ const ListaOrdenesFabricacion = () => {
                   >
                     <td className="px-4 py-2">{orden.id_orden_fabricacion}</td>
                     <td className="px-4 py-2">
-                      {new Date(orden.fecha_inicio).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      {orden.fecha_fin_estimada
-                        ? new Date(
-                            orden.fecha_fin_estimada
-                          ).toLocaleDateString()
-                        : "N/A"}
-                    </td>
+                     {orden.fecha_inicio
+    ? String(orden.fecha_inicio).substring(0, 10).split("-").reverse().join("/")
+    : ""}
+</td>
+
+<td className="px-4 py-2">
+  {orden.fecha_fin_estimada
+    ? String(orden.fecha_fin_estimada).substring(0, 10).split("-").reverse().join("/")
+    : ""}
+</td>
                     <td className="px-4 py-2 capitalize">{orden.estado}</td>
                     <td className="px-4 py-2">
                       {orden.nombre_cliente
