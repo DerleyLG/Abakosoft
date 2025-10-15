@@ -104,7 +104,7 @@ const EditarArticulo = () => {
             };
 
             await api.put(`/articulos/${id}`, formData);
-            toast.success('✅ Artículo actualizado correctamente');
+            toast.success(' Artículo actualizado correctamente');
             setTimeout(() => {
                 navigate('/articulos');
             }, 500);

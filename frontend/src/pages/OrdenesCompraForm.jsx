@@ -7,6 +7,23 @@ import { X } from 'lucide-react';
 import { confirmAlert } from 'react-confirm-alert'; 
 import 'react-confirm-alert/src/react-confirm-alert.css'; 
 
+
+const formatCOP = (number) => {
+    if (!number) return '0';
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 0,
+    }).format(number);
+};
+
+
+const cleanCOPFormat = (formattedValue) => {
+    
+    return parseInt(formattedValue.replace(/[^0-9]/g, ''), 10) || 0;
+};
+
 const CrearOrdenCompra = () => {
     const [proveedores, setProveedores] = useState([]);
     const [articulos, setArticulos] = useState([]); 
@@ -157,8 +174,8 @@ const CrearOrdenCompra = () => {
         );
     };
 
-   const cambiarPrecioUnitario = (id_articulo, precio) => {
-    const numPrecio = parseFloat(precio);
+   const cambiarPrecioUnitario = (id_articulo, precioFormateado) => {
+    const numPrecio = cleanCOPFormat(precioFormateado);
     if (isNaN(numPrecio) || numPrecio < 0) {
         toast.error("El precio unitario debe ser un número positivo o cero.");
         return;
@@ -416,12 +433,11 @@ const CrearOrdenCompra = () => {
                                             </td>
                                             <td className="px-4 py-2 text-right">
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     min="0"
-                                                    step="0.01"
-                                                    value={art.precio_unitario}
+                                                    value={formatCOP(art.precio_unitario)}
                                                     onChange={(e) => cambiarPrecioUnitario(art.id_articulo, e.target.value)}
-                                                    readOnly
+
                                                     className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     disabled={loading}
                                                 />

@@ -8,6 +8,7 @@ module.exports = {
       `
     SELECT 
       ov.id_orden_venta, 
+      ov.id_pedido,
       vc.id_venta_credito,
       ov.fecha, 
       ov.id_cliente, 
@@ -26,11 +27,11 @@ module.exports = {
       ON mt.id_documento = ov.id_orden_venta 
      AND mt.tipo_documento = 'orden_venta'
     
-    -- Desde el movimiento sacamos el método de pago
+    
     LEFT JOIN metodos_pago mp 
       ON mt.id_metodo_pago = mp.id_metodo_pago
     
-    -- Si es crédito, mostramos estado y saldo
+    
     LEFT JOIN ventas_credito vc 
       ON ov.id_orden_venta = vc.id_orden_venta
     
@@ -40,6 +41,7 @@ module.exports = {
     WHERE ov.estado IN (${placeholders})
     GROUP BY 
       ov.id_orden_venta,
+      ov.id_pedido,
       vc.id_venta_credito,
       ov.fecha,
       ov.id_cliente,
@@ -80,23 +82,23 @@ module.exports = {
   },
 
   create: async (
-    { id_cliente, estado, fecha, monto, total } = {},
+    { id_cliente, estado, fecha, monto, total, id_pedido } = {},
     connection = db
   ) => {
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total)
-       VALUES (?, ?, ?, ?, ?)`,
-      [id_cliente, estado, fecha, monto, total]
+      `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total, id_pedido)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id_cliente, estado, fecha, monto, total, id_pedido]
     );
     return result.insertId;
   },
 
-  update: async (id, { id_cliente, estado }, connection = db) => {
+  update: async (id, { id_cliente, estado, id_pedido }, connection = db) => {
     const [result] = await (connection || db).query(
       `UPDATE ordenes_venta
-       SET id_cliente = COALESCE(?, id_cliente), estado = COALESCE(?, estado)
+       SET id_cliente = COALESCE(?, id_cliente), estado = COALESCE(?, estado), id_pedido = COALESCE(?, id_pedido)
        WHERE id_orden_venta = ? AND estado = 'pendiente'`,
-      [id_cliente, estado, id]
+      [id_cliente, estado, id_pedido, id]
     );
     return result.affectedRows;
   },

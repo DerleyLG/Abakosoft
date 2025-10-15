@@ -11,9 +11,27 @@ import {
   FiArrowLeft,
   FiArrowUp,
   FiArrowRight,
+  FiEdit,
 } from "react-icons/fi";
 
 const ListaOrdenesFabricacion = () => {
+  // Utilidades de formato COP
+  const formatCOP = (number) => {
+    const n = Number(number) || 0;
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(n);
+  };
+
+  const cleanCOPFormat = (formattedValue) => {
+    if (formattedValue === null || formattedValue === undefined) return 0;
+    const s = String(formattedValue);
+    const onlyNums = s.replace(/[^0-9]/g, '');
+    return parseInt(onlyNums, 10) || 0;
+  };
   const [ordenes, setOrdenes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrden, setExpandedOrden] = useState(null);
@@ -31,6 +49,8 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
   const yaConsultadoCosto = useRef({});
   const historialCostos = useRef({});
   const costoManualEditado = useRef({});
+  const [editandoCosto, setEditandoCosto] = useState({}); // edición de costo con formato
+  const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({}); // { [id_avance_etapa]: string COP }
 
   // Carga los datos estáticos al montar el componente
   useEffect(() => {
@@ -486,7 +506,87 @@ setOrdenes(res.data);
                         {avance.cantidad}
                       </td>
                       <td className="px-2 py-2 border-b border-gray-300">
-                        ${avance.costo_fabricacion}
+                        {editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editandoAvanceCosto[avance.id_avance_etapa]}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (!raw || raw.trim() === "") {
+                                  setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: "" }));
+                                  return;
+                                }
+                                const num = cleanCOPFormat(raw);
+                                setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: formatCOP(num) }));
+                              }}
+                              className="border rounded px-2 py-1 border-slate-300"
+                            />
+                            <button
+                              className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
+                              onClick={async () => {
+                                const formVal = editandoAvanceCosto[avance.id_avance_etapa];
+                                const num = cleanCOPFormat(formVal);
+                                if (!num || num <= 0) {
+                                  toast.error("Ingresa un costo válido");
+                                  return;
+                                }
+                                try {
+                                  await api.put(`/avances-etapa/${avance.id_avance_etapa}/costo`, { costo_fabricacion: num });
+                                  // actualizar en memoria
+                                  setOrdenes((prev) => prev.map((o) => {
+                                    if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
+                                    const avancesActualizados = (o.avances || []).map((av) =>
+                                      av.id_avance_etapa === avance.id_avance_etapa
+                                        ? { ...av, costo_fabricacion: num }
+                                        : av
+                                    );
+                                    return { ...o, avances: avancesActualizados };
+                                  }));
+                                  setEditandoAvanceCosto((prev) => {
+                                    const n = { ...prev };
+                                    delete n[avance.id_avance_etapa];
+                                    return n;
+                                  });
+                                  toast.success("Costo actualizado");
+                                } catch (error) {
+                                  const msg = error?.response?.data?.error || "No se pudo actualizar el costo";
+                                  toast.error(msg);
+                                }
+                              }}
+                            >
+                              Guardar
+                            </button>
+                            <button
+                              className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+                              onClick={() =>
+                                setEditandoAvanceCosto((prev) => {
+                                  const n = { ...prev };
+                                  delete n[avance.id_avance_etapa];
+                                  return n;
+                                })
+                              }
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                            <button
+                              className="text-slate-700 hover:text-slate-900 cursor-pointer"
+                              title="Editar costo"
+                              onClick={() =>
+                                setEditandoAvanceCosto((prev) => ({
+                                  ...prev,
+                                  [avance.id_avance_etapa]: formatCOP(Number(avance.costo_fabricacion) || 0),
+                                }))
+                              }
+                            >
+                              <FiEdit />
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-2 py-2 border-b border-gray-300">
                         {avance.estado || "-"}
@@ -776,9 +876,22 @@ setOrdenes(res.data);
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault();
+                                const form = formularios[orden.id_orden_fabricacion] || {};
+                                const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                const valorEnEdicion = editandoCosto[claveCosto];
+                                const costoNormalizado =
+                                  valorEnEdicion !== undefined
+                                    ? cleanCOPFormat(valorEnEdicion)
+                                    : Number(form?.costo_fabricacion) || 0;
+
+                                const formNormalizado = {
+                                  ...form,
+                                  costo_fabricacion: costoNormalizado,
+                                };
+
                                 manejarRegistroAvance(
                                   orden.id_orden_fabricacion,
-                                  formularios[orden.id_orden_fabricacion]
+                                  formNormalizado
                                 );
                               }}
                               className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
@@ -883,31 +996,33 @@ setOrdenes(res.data);
                                    className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                                 <input
-                                  type="number"
+                                  type="text"
                                   placeholder="Costo de fabricación unitario"
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.costo_fabricacion || ""
-                                  }
+                                  value={(() => {
+                                    const form = formularios[orden.id_orden_fabricacion] || {};
+                                    const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                    const enEdicion = editandoCosto[clave];
+                                    if (enEdicion !== undefined) return enEdicion;
+                                    const num = Number(form?.costo_fabricacion);
+                                    return Number.isFinite(num) && num > 0 ? formatCOP(num) : "";
+                                  })()}
                                   onChange={(e) => {
-                                    const valor = e.target.value;
-                                    const clave = `${
-                                      orden.id_orden_fabricacion
-                                    }-${
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.articulo
-                                    }-${
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.etapa
-                                    }`;
+                                    const raw = e.target.value;
+                                    const form = formularios[orden.id_orden_fabricacion] || {};
+                                    const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                    if (!raw || raw.trim() === "") {
+                                      setEditandoCosto((prev) => ({ ...prev, [clave]: "" }));
+                                      actualizarFormulario(orden.id_orden_fabricacion, "costo_fabricacion", "");
+                                      return;
+                                    }
+                                    const num = cleanCOPFormat(raw);
                                     costoManualEditado.current[clave] = true;
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "costo_fabricacion",
-                                      valor
-                                    );
+                                    setEditandoCosto((prev) => ({ ...prev, [clave]: formatCOP(num) }));
+                                    actualizarFormulario(orden.id_orden_fabricacion, "costo_fabricacion", num);
                                   }}
-                                  className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                                  onFocus={() => { /* mantener formato mientras escribe */ }}
+                                  onBlur={() => { /* ya formateado en onChange */ }}
+                                  className="border rounded px-2 py-1 border-slate-300 p-5"
                                 />
                                 <input
                                   type="text"

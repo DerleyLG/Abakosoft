@@ -110,18 +110,18 @@ const handleEdit = (id) => {
     const term = searchTerm.toLowerCase();
     const cliente = orden.cliente_nombre?.toLowerCase() || "";
 
-    // derivar estado del crédito (si aplica) a partir de monto_total y saldo_pendiente
+   
     const montoTotal = Number(orden.monto_total || 0);
     const saldo = Number(orden.saldo_pendiente || 0);
     let estadoDerivado = null;
     if (orden.estado_credito !== null && orden.estado_credito !== undefined) {
-      // si hay información de crédito, derivamos para mayor consistencia
+
       if (saldo === 0) estadoDerivado = 'pagado';
       else if (saldo < montoTotal) estadoDerivado = 'parcial';
       else estadoDerivado = 'pendiente';
     }
 
-    // Si hay filtro por estado y el orden NO es crédito, lo excluimos
+   
     if (estadoFiltro !== 'todos') {
       if (!estadoDerivado) return false;
       if (estadoDerivado !== estadoFiltro) return false;
@@ -171,7 +171,7 @@ const handleEdit = (id) => {
               className="h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
               title="Filtrar por estado de crédito"
             >
-              <option value="todos">Creditos</option>
+              <option value="todos">Todos</option>
               <option value="pendiente">Pendientes</option>
               <option value="parcial">Parciales</option>
               <option value="pagado">Pagados</option>
@@ -222,7 +222,7 @@ const handleEdit = (id) => {
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Monto Total</th>
               <th className="px-4 py-3">Método de pago</th>
-              <th className="px-4 py-3">Estado</th>
+         
               <th className="px-4 py-3">Acciones</th>
             </tr>
           </thead>
@@ -230,9 +230,9 @@ const handleEdit = (id) => {
   {filteredOrdenes.length > 0 ? (
     filteredOrdenes.map((orden) => {
   
-      // Determinar si la orden está asociada a una venta a crédito.
+    
       const tieneVentaCredito = orden.estado_credito !== null && orden.estado_credito !== undefined;
-      const isCreditoPendiente = tieneVentaCredito && orden.estado_credito === "pendiente";
+     
       const isCredito = orden.metodo_pago === "credito" || tieneVentaCredito;
 
       return (
@@ -245,27 +245,24 @@ const handleEdit = (id) => {
                 : "hover:bg-gray-200"
             }`}
           >
-            {/* ID orden */}
+          
             <td className="px-4 py-3 font-mono text-gray-700">
               #{orden.id_orden_venta}
             </td>
 
-            {/* Cliente */}
             <td className="px-4 py-3">{orden.cliente_nombre}</td>
 
-            {/* Fecha */}
             <td className="px-4 py-3">
               {orden.fecha
                 ? orden.fecha.substring(0, 10).split("-").reverse().join("/")
                 : ""}
             </td>
 
-            {/* Monto total */}
             <td className="px-4 py-3">
               ${Number(orden.monto_total || 0).toLocaleString()}
             </td>
 
-            {/* Método de pago */}
+      
             <td className="px-4 py-3">
               {isCredito ? (
                 (() => {
@@ -294,12 +291,12 @@ const handleEdit = (id) => {
               )}
             </td>
 
-            {/* Estado general */}
-            <td className="px-4 py-3">{orden.estado}</td>
+           
+        
 
-            {/* Acciones */}
+         
               <td className="pl-3 py-3 text-center flex gap-4">
-              {!mostrarAnuladas && orden.estado == "pendiente" && (
+              {!mostrarAnuladas && (!orden.id_pedido) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -324,7 +321,7 @@ const handleEdit = (id) => {
                   <FiTrash2 size={18} />
                 </button>
               )}
-              {/* Botón rápido: ir a Ventas por Crédito y abrir drawer para este crédito */}
+              
               {isCredito && orden.id_venta_credito && orden.saldo_pendiente > 0 && (
                 <button
                   onClick={(e) => {
@@ -340,7 +337,7 @@ const handleEdit = (id) => {
             </td>
           </tr>
 
-          {/* Expand detalles */}
+       
           {expandedId === orden.id_orden_venta && (
             <tr>
               <td colSpan="7" className="bg-gray-100 px-6 py-4 border-b">

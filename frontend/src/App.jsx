@@ -44,6 +44,7 @@ import ReporteAvanceFabricacion from "./pages/ReporteAvanceFabricacion";
 import ReporteVentasPorPeriodo from "./pages/ReporteVentasPorPeriodo";
 import ReporteOrdenesCompra from "./pages/ReporteOrdenesCompra";
 import ReportePagosTrabajadores from "./pages/ReportePagosTrabajadores";
+import ReportePagoTrabajadorPorDia from "./pages/ReportePagoTrabajadorPordia";
 import ReporteCostosProduccion from "./pages/ReporteCostosFabricacion";
 import ReporteUtilidadPorOrden from "./pages/ReporteUtilidadPorOrden";
 import Login from "./pages/Login";
@@ -119,6 +120,7 @@ const AppLogic = () => {
                 <Route path="reportes/ventas_por_periodo" element={<ReporteVentasPorPeriodo/>} />
                 <Route path="reportes/ordenes_compra" element={<ReporteOrdenesCompra/>} />
                 <Route path="reportes/pagos_trabajadores" element={<ReportePagosTrabajadores/>} />
+                <Route path="reportes/pagos_trabajadores_dia" element={<ReportePagoTrabajadorPorDia/>} />
                 <Route path="reportes/costos_fabricacion" element={<ReporteCostosProduccion/>} />
                 <Route path="reportes/utilidad_por_orden" element={<ReporteUtilidadPorOrden/>} />
                 <Route path="reportes/movimientos_inventario" element={<ReporteMovimientosInventario/>} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../services/api";
 import { FiLoader, FiArrowLeft, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -20,7 +20,7 @@ const debounce = (func, delay) => {
   };
 };
 
-const ReporteBase = ({ endpoint, columnas, titulo, filtros = [] }) => {
+const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange }) => {
   const [datos, setDatos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [filtrosActivos, setFiltrosActivos] = useState({});
@@ -32,14 +32,16 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [] }) => {
   const obtenerDatos = useCallback(async () => {
     try {
       setCargando(true);
-      const res = await axios.get(endpoint, { params: filtrosParaAPI });
-      
+  const res = await api.get(endpoint, { params: filtrosParaAPI });
+    
       let datosProcesados = Array.isArray(res.data) ? res.data : (res.data?.data || []);
       setDatos(datosProcesados);
+      try { onDataChange && onDataChange(datosProcesados); } catch {}
       toast.success("Datos cargados exitosamente.");
     } catch (error) {
       console.error("Error al cargar los datos:", error);
       toast.error(`Error al cargar los datos: ${error.response?.data?.message || error.message}`);
+      try { onDataChange && onDataChange([]); } catch {}
     } finally {
       setCargando(false);
     }
