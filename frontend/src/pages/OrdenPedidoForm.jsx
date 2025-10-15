@@ -9,6 +9,23 @@ import { PlusCircle } from "lucide-react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 
+const formatCOP = (number) => {
+    if (!number) return '0';
+    return new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 0,
+    }).format(number);
+};
+
+
+const cleanCOPFormat = (formattedValue) => {
+    
+    return parseInt(formattedValue.replace(/[^0-9]/g, ''), 10) || 0;
+};
+
+
 const OrdenPedidoForm = () => {
     const navigate = useNavigate();
     const [clientes, setClientes] = useState([]);
@@ -27,7 +44,8 @@ const OrdenPedidoForm = () => {
         precio_venta: 0,
         id_categoria: "",
     });
-    const [loading, setLoading] = useState(false); 
+    const [loading, setLoading] = useState(false);
+    const [editandoPrecio, setEditandoPrecio] = useState({}); // Para manejar el estado de edición de precios 
 
     useEffect(() => {
         const fetchData = async () => {
@@ -172,15 +190,27 @@ const OrdenPedidoForm = () => {
         if (!validarFormulario()) return;
 
         setLoading(true); // Activar carga al enviar el formulario
+        // Asegurar que si hay un precio en edición (input con foco), se tome ese valor
+        const detallesConPrecios = articulosSeleccionados.map((a) => {
+            const valorEditado = editandoPrecio?.[a.id_articulo];
+            const precio_unitario =
+                valorEditado !== undefined
+                    ? (typeof valorEditado === "string" && valorEditado.includes("$")
+                        ? cleanCOPFormat(valorEditado)
+                        : parseInt(valorEditado, 10) || 0)
+                    : a.precio_unitario;
+            return {
+                id_articulo: a.id_articulo,
+                cantidad: a.cantidad,
+                precio_unitario,
+            };
+        });
+
         const payload = {
             id_cliente: cliente.id_cliente,
             estado,
             observaciones,
-            detalles: articulosSeleccionados.map((a) => ({
-                id_articulo: a.id_articulo,
-                cantidad: a.cantidad,
-                precio_unitario: a.precio_unitario,
-            })),
+            detalles: detallesConPrecios,
         };
 
         try {
@@ -233,6 +263,50 @@ const OrdenPedidoForm = () => {
         } finally {
             setLoading(false); // Desactivar carga al finalizar la creación
         }
+    };
+
+    const cambiarPrecioUnitario = (id_articulo, valor) => {
+        // Actualizar el estado de edición
+        setEditandoPrecio(prev => ({
+            ...prev,
+            [id_articulo]: valor
+        }));
+    };
+
+    const handleFocusPrecio = (id_articulo, precioActual) => {
+        // Al hacer focus, mostrar el valor numérico sin formato
+        setEditandoPrecio(prev => ({
+            ...prev,
+            [id_articulo]: precioActual.toString()
+        }));
+    };
+
+    const handleBlurPrecio = (id_articulo, valor) => {
+        // Al perder focus, procesar y guardar el valor
+        const numPrecio = valor.includes('$') ? cleanCOPFormat(valor) : parseInt(valor, 10) || 0;
+        
+        if (isNaN(numPrecio) || numPrecio < 0) {
+            toast.error("El precio unitario debe ser un número positivo o cero.");
+            // Restaurar el valor original
+            setEditandoPrecio(prev => {
+                const newState = {...prev};
+                delete newState[id_articulo];
+                return newState;
+            });
+            return;
+        }
+        
+        // Actualizar el precio en los artículos seleccionados
+        setArticulosSeleccionados((prev) =>
+            prev.map((a) => (a.id_articulo === id_articulo ? { ...a, precio_unitario: numPrecio } : a))
+        );
+
+        // Limpiar el estado de edición
+        setEditandoPrecio(prev => {
+            const newState = {...prev};
+            delete newState[id_articulo];
+            return newState;
+        });
     };
 
     return (
@@ -390,8 +464,8 @@ const OrdenPedidoForm = () => {
                                             Precio de venta
                                         </label>
                                         <input
-                                            type="number"
-                                            value={nuevoArticulo.precio_venta}
+                                            type="text"
+                                            value={formatCOP(nuevoArticulo.precio_venta)}
                                             onChange={(e) =>
                                                 setNuevoArticulo({
                                                     ...nuevoArticulo,
@@ -488,13 +562,22 @@ const OrdenPedidoForm = () => {
                                             </td>
                                             <td className="px-4 py-2 text-right">
                                                 <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={art.precio_unitario}
-                                                    readOnly
-                                                    className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    type="text"
+                                                    value={editandoPrecio[art.id_articulo] !== undefined 
+                                                        ? editandoPrecio[art.id_articulo] 
+                                                        : formatCOP(art.precio_unitario)
+                                                    }
+                                                    onChange={(e) =>
+                                                        cambiarPrecioUnitario(
+                                                            art.id_articulo,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    onFocus={() => handleFocusPrecio(art.id_articulo, art.precio_unitario)}
+                                                    onBlur={(e) => handleBlurPrecio(art.id_articulo, e.target.value)}
+                                                    className="w-32 border border-gray-300 rounded-md px-2 py-1 text-right focus:ring-2 focus:ring-slate-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                                     disabled={loading}
+                                                    placeholder="$0"
                                                 />
                                             </td>
                                             <td className="px-4 py-2 text-center">
@@ -513,6 +596,32 @@ const OrdenPedidoForm = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    {articulosSeleccionados.length > 0 && (
+                        <div className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 p-6 rounded-xl shadow-sm">
+                            <div className="flex justify-between items-center">
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                                        Total del Pedido
+                                    </span>
+                                    <span className="text-xs text-gray-500 mt-1">
+                                        {articulosSeleccionados.length} artículo{articulosSeleccionados.length !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold text-slate-800">
+                                        {formatCOP(
+                                            articulosSeleccionados.reduce(
+                                                (total, art) => total + (art.precio_unitario * art.cantidad), 
+                                                0
+                                            )
+                                        )}
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex justify-end">
                         <button

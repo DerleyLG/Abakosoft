@@ -28,6 +28,7 @@ const OrdenVentaEdit = () => {
     const navigate = useNavigate();
     const { id } = useParams(); 
     const [loading, setLoading] = useState(true); 
+    const [vieneDeUndefined, setVieneDeUndefined] = useState(false); // Controla si la orden viene de un pedido
     
    
     const [clientes, setClientes] = useState([]);
@@ -58,8 +59,7 @@ const OrdenVentaEdit = () => {
         { id: "anulada", nombre: "Anulada" },
     ];
     
-    const isEditable = estado.toLowerCase() === 'pendiente';
-
+    
 
     const handlePriceChange = (id_articulo, value) => {
         const sanitizedValue = value.replace(/[^0-9.]/g, ''); 
@@ -208,6 +208,15 @@ const OrdenVentaEdit = () => {
                 setArticulos(articulosAPI);
                 setMetodosPago(metodosPagoAPI);
 
+                // Verificar si la orden viene de un pedido
+                const vieneDeUndefinedOrden = ordenData.id_pedido == null || ordenData.id_pedido === undefined;
+                setVieneDeUndefined(vieneDeUndefinedOrden);
+
+                // Si viene de un pedido, mostrar mensaje y no permitir edición
+                if (!vieneDeUndefinedOrden) {
+                    toast.error("Esta orden proviene de un pedido y no puede ser editada directamente.");
+                }
+
              
                 setEstado(ordenData.estado);
                 
@@ -309,7 +318,7 @@ const OrdenVentaEdit = () => {
 
         try {
             await api.put(`/ordenes-venta/${id}`, payload); 
-            toast.success("Orden de venta actualizada ✅");
+            toast.success("Orden de venta actualizada ");
             navigate("/ordenes_venta");
         } catch (error) {
             const mensajeBackend = error.response?.data?.message || 'Error al actualizar la orden de venta.';
@@ -329,7 +338,11 @@ const OrdenVentaEdit = () => {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
                     Editar Orden de Venta <span className="text-slate-500 font-normal">#{id}</span>
-                    {!isEditable && <span className="text-base text-red-500 ml-4 p-1 border border-red-500 rounded font-semibold">(Solo Lectura)</span>}
+                    {!vieneDeUndefined && (
+                        <span className="text-base text-red-500 ml-4 p-1 border border-red-500 rounded font-semibold">
+                            ORDEN DE PEDIDO - SOLO LECTURA
+                        </span>
+                    )}
                 </h2>
                 <button
                     onClick={() => navigate(-1)}
@@ -349,7 +362,7 @@ const OrdenVentaEdit = () => {
                     
                     <div className="flex flex-col">
                         <label htmlFor="cliente" className="mb-2 font-medium text-slate-600">Cliente</label>
-                        <Listbox value={cliente} onChange={setCliente} disabled={!isEditable}>
+                        <Listbox value={cliente} onChange={setCliente} disabled={!vieneDeUndefined}>
                             <div className="relative">
                                 <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
                                     {cliente ? cliente.nombre : "Selecciona un cliente"}
@@ -379,7 +392,7 @@ const OrdenVentaEdit = () => {
                             value={fecha}
                             onChange={(e) => setFecha(e.target.value)}
                             required
-                            disabled={!isEditable}
+                            disabled={!vieneDeUndefined}
                             className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
                         />
                     </div>
@@ -387,7 +400,7 @@ const OrdenVentaEdit = () => {
                 
                     <div className="flex flex-col">
                         <label htmlFor="estado" className="mb-2 font-medium text-slate-600">Estado</label>
-                        <Listbox value={estado} onChange={setEstado} disabled={!isEditable}>
+                        <Listbox value={estado} onChange={setEstado} disabled={!vieneDeUndefined}>
                             <div className="relative">
                                 <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
                                     {estados.find((e) => e.id === estado)?.nombre || "Selecciona un estado"}
@@ -409,7 +422,7 @@ const OrdenVentaEdit = () => {
 
                     <div className="flex flex-col">
                         <label htmlFor="id_metodo_pago" className="mb-2 font-medium text-slate-600">Método de Pago</label>
-                        <Listbox value={metodoPago} onChange={setMetodoPago} disabled={!isEditable}>
+                        <Listbox value={metodoPago} onChange={setMetodoPago} disabled={!vieneDeUndefined}>
                             <div className="relative">
                                 <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
                                     {metodoPago ? metodoPago.nombre : "Selecciona un método"}
@@ -438,7 +451,7 @@ const OrdenVentaEdit = () => {
                             name="referencia"
                             value={referencia}
                             onChange={(e) => setReferencia(e.target.value)}
-                            disabled={!isEditable}
+                            disabled={!vieneDeUndefined}
                             placeholder="Ej: N° de comprobante, tarjeta"
                             className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
                         />
@@ -453,7 +466,7 @@ const OrdenVentaEdit = () => {
                             name="observaciones"
                             value={observaciones}
                             onChange={(e) => setObservaciones(e.target.value)}
-                            disabled={!isEditable}
+                            disabled={!vieneDeUndefined}
                             placeholder="Notas adicionales sobre el pago"
                             className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
                         />
@@ -465,7 +478,7 @@ const OrdenVentaEdit = () => {
                 <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700 mt-10">Detalles de Venta</h3>
                 
                
-                {isEditable && (
+                {vieneDeUndefined && (
                     <div className="flex flex-col mb-6">
                         <label className="mb-2 font-medium text-slate-600">Agregar Artículo</label>
                         <Select
@@ -479,7 +492,7 @@ const OrdenVentaEdit = () => {
                             onChange={agregarArticulo}
                             placeholder="Buscar y seleccionar artículo para agregar"
                             isClearable
-                            isDisabled={!isEditable}
+                           
                             className="text-sm"
                         />
                     </div>
@@ -509,7 +522,7 @@ const OrdenVentaEdit = () => {
                                     onChange={(e) => cambiarCantidad(art.id_articulo, e.target.value)}
                                     min="1"
                                     required
-                                    disabled={!isEditable}
+                                    disabled={!vieneDeUndefined}
                                     className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right"
                                 />
                             </div>
@@ -528,7 +541,7 @@ const OrdenVentaEdit = () => {
                                         onFocus={() => handlePriceFocus(art.id_articulo, art.precio_unitario)}
                                         onBlur={() => handlePriceBlur(art.id_articulo)}
                                         required
-                                        disabled={!isEditable}
+                                        disabled={!vieneDeUndefined}
                                         className="border border-gray-300 rounded-lg pl-10 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full"
                                     />
                                     <FiDollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -548,7 +561,7 @@ const OrdenVentaEdit = () => {
                                 <button
                                     type="button"
                                     onClick={() => eliminarArticulo(art.id_articulo)}
-                                    disabled={articulosSeleccionados.length === 1 || !isEditable}
+                                    disabled={articulosSeleccionados.length === 1 || !vieneDeUndefined}
                                     className="bg-red-500 text-white p-2.5 rounded-lg hover:bg-red-600 disabled:bg-red-300 transition shadow-md"
                                     title="Eliminar artículo"
                                 >
@@ -558,11 +571,11 @@ const OrdenVentaEdit = () => {
                         </div>
                     ))}
                     
-                    {isEditable && (
+                    { (
                         <button
                             type="button"
                             onClick={() => agregarArticulo({ value: null })} 
-                            disabled={!isEditable}
+                          
                             className="hidden items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg font-semibold transition mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             <FiPlus size={20} />
@@ -579,7 +592,7 @@ const OrdenVentaEdit = () => {
 
                     <button
                         type="submit"
-                        disabled={!isEditable}
+                        disabled={!vieneDeUndefined}
                         className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg cursor-pointer"
                     >
                         <FiSave size={20} />

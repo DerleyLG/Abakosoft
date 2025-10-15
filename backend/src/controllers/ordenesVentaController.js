@@ -138,6 +138,7 @@ module.exports = {
           fecha: fechaFormat,
           total: totalVenta,
           monto: totalVenta,
+          id_pedido: id_pedido || null,
         },
         connection
       );
@@ -210,7 +211,10 @@ module.exports = {
         await tesoreriaModel.insertarMovimiento(movimientoData, connection);
       }
 
-      await pedidoModel.completar(req.body.id_pedido, connection);
+      // Solo completar el pedido si existe un id_pedido
+      if (id_pedido) {
+        await pedidoModel.completar(id_pedido, connection);
+      }
 
       await connection.commit();
       connection.release();
@@ -289,18 +293,8 @@ module.exports = {
         connection
       );
 
-      if (
-        updatedRows === 0 &&
-        ordenActual.estado === "pendiente" &&
-        estado === "pendiente"
-      ) {
-        res.json({
-          message: "Orden de venta actualizada (sin cambios en stock).",
-        });
-      } else if (updatedRows === 0) {
-        throw new Error(
-          "No se pudo actualizar la orden de venta. Posiblemente ya no está en estado 'pendiente'."
-        );
+      if (updatedRows === 0) {
+        throw new Error("No se pudo actualizar la orden de venta.");
       }
 
       await connection.commit();
@@ -312,11 +306,9 @@ module.exports = {
         connection.release();
       }
       console.error("Error al actualizar la orden de venta:", err);
-      res
-        .status(500)
-        .json({
-          error: err.message || "Error al actualizar la orden de venta.",
-        });
+      res.status(500).json({
+        error: err.message || "Error al actualizar la orden de venta.",
+      });
     }
   },
 
@@ -333,9 +325,7 @@ module.exports = {
         throw new Error("Orden de venta no encontrada.");
       }
 
-      if (orden.estado.toLowerCase().trim() !== "pendiente") {
-        throw new Error("Solo se pueden anular órdenes pendientes.");
-      }
+      // Permitir anular órdenes en cualquier estado
 
       await ordenModel.update(id, { estado: "anulada" }, connection);
 

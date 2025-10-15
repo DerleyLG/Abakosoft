@@ -11,6 +11,8 @@ const reportes = [
   { titulo: "Costos de Producción", ruta: "/reportes/costos_fabricacion", icono: <FiBarChart2 /> },
   { titulo: "Utilidad por Orden", ruta: "/reportes/utilidad_por_orden", icono: <FiBarChart2 /> },
   { titulo: "Movimientos de inventario", ruta: "/reportes/movimientos_inventario", icono: <FiSettings /> },
+  { titulo: "Pagos a trabajadores por dia", ruta: "/reportes/pagos_trabajadores_dia", icono: <FiDollarSign /> },
+
 ];
 
 const VistaReportes = () => {

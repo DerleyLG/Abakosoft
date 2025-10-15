@@ -24,7 +24,7 @@ function validarEstado(estado) {
 
 module.exports = {
   create: async (req, res) => {
-    let connection; 
+    let connection;
     try {
       const {
         id_orden_fabricacion,
@@ -36,25 +36,20 @@ module.exports = {
         observaciones,
       } = req.body;
 
-    
       if (
         !id_trabajador ||
         !cantidad ||
         typeof cantidad !== "number" ||
         cantidad <= 0
       ) {
-        return res
-          .status(400)
-          .json({
-            error: "Faltan campos obligatorios o la cantidad es inválida.",
-          });
+        return res.status(400).json({
+          error: "Faltan campos obligatorios o la cantidad es inválida.",
+        });
       }
       if (typeof costo_fabricacion === "undefined" || costo_fabricacion <= 0) {
-        return res
-          .status(400)
-          .json({
-            error: "Se esperaba un valor válido para costo de fabricación.",
-          });
+        return res.status(400).json({
+          error: "Se esperaba un valor válido para costo de fabricación.",
+        });
       }
 
       // Validar estado de la orden de fabricación
@@ -71,12 +66,10 @@ module.exports = {
           .json({ error: "Orden de fabricación no encontrada." });
       }
       if (estadoOrden[0].estado === "completada") {
-        return res
-          .status(400)
-          .json({
-            error:
-              "La orden de fabricación ya está completada. No se pueden registrar más avances.",
-          });
+        return res.status(400).json({
+          error:
+            "La orden de fabricación ya está completada. No se pueden registrar más avances.",
+        });
       }
 
       // Validar existencia de entidades relacionadas
@@ -128,12 +121,11 @@ module.exports = {
         });
       }
 
-     
       const cantidadTotalEsperada = await AvanceModel.getCantidadTotalArticulo(
         id_orden_fabricacion,
         id_articulo
       );
-     
+
       const cantidadRegistradaAntes =
         await AvanceModel.getCantidadRegistradaEtapa(
           id_orden_fabricacion,
@@ -152,7 +144,6 @@ module.exports = {
         id_articulo
       );
 
-     
       connection = await db.getConnection();
       await connection.beginTransaction();
 
@@ -164,12 +155,12 @@ module.exports = {
           id_etapa_produccion,
           id_trabajador,
           cantidad,
-          estado: estadoAvance, 
+          estado: estadoAvance,
           observaciones,
           costo_fabricacion,
         },
         connection
-      ); 
+      );
 
       // Si el avance actual completa la etapa, actualizar el estado de los avances de esa etapa
       if (estadoAvance === "completado") {
@@ -177,51 +168,67 @@ module.exports = {
           id_orden_fabricacion,
           id_articulo,
           id_etapa_produccion,
-          connection 
+          connection
         );
       }
 
       // Si es la etapa final del cliente, registrar en lotes y actualizar inventario
-     if (id_etapa_produccion === etapaFinalCliente) {
+      if (id_etapa_produccion === etapaFinalCliente) {
+        const esCompuesto =
+          await detalleOrdenesFabricacionModel.esArticuloCompuesto(
+            id_orden_fabricacion
+          );
 
-          const esCompuesto = await detalleOrdenesFabricacionModel.esArticuloCompuesto(id_orden_fabricacion);
+        console.log(`El artículo ${id_articulo} ¿es compuesto?`, esCompuesto);
 
-          console.log(`El artículo ${id_articulo} ¿es compuesto?`, esCompuesto);
-          
-            if (esCompuesto) {
-                console.log(`Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`);
-            } else {
-                
-                console.log(`Avance final para un artículo simple. Generando lote y actualizando inventario.`);
-                try {
-                    // Registrar el lote
-                    const loteId = await LoteModel.createLote({
-                        id_orden_fabricacion,
-                        id_articulo,
-                        id_trabajador,
-                        cantidad,
-                        observaciones: observaciones || null,
-                    }, connection);
+        if (esCompuesto) {
+          console.log(
+            `Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`
+          );
+        } else {
+          console.log(
+            `Avance final para un artículo simple. Generando lote y actualizando inventario.`
+          );
+          try {
+            // Registrar el lote
+            const loteId = await LoteModel.createLote(
+              {
+                id_orden_fabricacion,
+                id_articulo,
+                id_trabajador,
+                cantidad,
+                observaciones: observaciones || null,
+              },
+              connection
+            );
 
-                    // Actualizar el inventario
-                    await inventarioModel.processInventoryMovement({
-                        id_articulo: Number(id_articulo),
-                        cantidad_movida: Number(cantidad),
-                        tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
-                        tipo_origen_movimiento: inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.PRODUCCION,
-                        observaciones: `Lote #${loteId} de Orden de Fabricación #${id_orden_fabricacion} completado.`,
-                        referencia_documento_id: loteId,
-                        referencia_documento_tipo: "lote",
-                    });
-                } catch (inventoryError) {
-                    console.error(`Error crítico al actualizar inventario para artículo ${id_articulo} al crear lote:`, inventoryError.message);
-                    await connection.rollback();
-                    connection.release();
-              
-                    return res.status(500).json({ error: `Lote listo para ser registrado, pero error al actualizar inventario: ${inventoryError.message}` });
-                }
-            }
+            // Actualizar el inventario
+            await inventarioModel.processInventoryMovement({
+              id_articulo: Number(id_articulo),
+              cantidad_movida: Number(cantidad),
+              tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
+              tipo_origen_movimiento:
+                inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.PRODUCCION,
+              observaciones: `Lote #${loteId} de Orden de Fabricación #${id_orden_fabricacion} completado.`,
+              referencia_documento_id: loteId,
+              referencia_documento_tipo: "lote",
+            });
+          } catch (inventoryError) {
+            console.error(
+              `Error crítico al actualizar inventario para artículo ${id_articulo} al crear lote:`,
+              inventoryError.message
+            );
+            await connection.rollback();
+            connection.release();
+
+            return res
+              .status(500)
+              .json({
+                error: `Lote listo para ser registrado, pero error al actualizar inventario: ${inventoryError.message}`,
+              });
+          }
         }
+      }
 
       // Cambiar estado de la orden si es necesario
       const estadoActualOrden = await AvanceModel.getEstadoOrden(
@@ -232,7 +239,7 @@ module.exports = {
           id_orden_fabricacion,
           "en proceso",
           connection
-        ); 
+        );
       }
 
       //  Verificar si la orden de fabricación está completamente terminada
@@ -241,8 +248,8 @@ module.exports = {
         connection
       );
 
-      await connection.commit(); 
-      connection.release(); 
+      await connection.commit();
+      connection.release();
 
       res
         .status(201)
@@ -250,7 +257,7 @@ module.exports = {
     } catch (error) {
       if (connection) {
         await connection.rollback(); // Revertir la transacción en caso de error
-        connection.release(); 
+        connection.release();
       }
       console.error("Error al crear el avance de etapa:", error);
       res
@@ -286,11 +293,9 @@ module.exports = {
       const { id_trabajador } = req.query;
       const avances = await AvanceModel.getAll(id_trabajador);
       if (avances.length === 0) {
-        return res
-          .status(404)
-          .json({
-            error: "No se encontraron avances de etapas de producción.",
-          });
+        return res.status(404).json({
+          error: "No se encontraron avances de etapas de producción.",
+        });
       }
       res.status(200).json(avances);
     } catch (err) {
@@ -428,11 +433,9 @@ module.exports = {
           .json({ error: "Avance de etapa de producción no encontrado." });
       }
 
-      res
-        .status(200)
-        .json({
-          message: "Avance de etapa de producción eliminado correctamente.",
-        });
+      res.status(200).json({
+        message: "Avance de etapa de producción eliminado correctamente.",
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -449,6 +452,44 @@ module.exports = {
     } catch (error) {
       console.error("Error al obtener etapas finalizadas:", error);
       res.status(500).json({ error: "Error al obtener etapas finalizadas" });
+    }
+  },
+
+  updateCosto: async (req, res) => {
+    const { id } = req.params; // id_avance_etapa
+    const { costo_fabricacion } = req.body;
+
+    try {
+      if (!id || isNaN(Number(id))) {
+        return res.status(400).json({ error: "ID de avance inválido" });
+      }
+      const avance = await AvanceModel.getById(id);
+      if (!avance) {
+        return res.status(404).json({ error: "Avance no encontrado" });
+      }
+      const costo = Number(costo_fabricacion);
+      if (!Number.isFinite(costo) || costo <= 0) {
+        return res.status(400).json({ error: "Costo de fabricación inválido" });
+      }
+
+      // Verificar si la orden tiene pagos vinculados
+      const tienePagos = await AvanceModel.tienePagosVinculadosAOrden(
+        avance.id_orden_fabricacion
+      );
+      if (tienePagos) {
+        return res.status(409).json({
+          error:
+            "No se puede modificar el costo: la orden tiene pagos vinculados.",
+        });
+      }
+
+      await AvanceModel.updateCostoFabricacion(id, costo);
+      return res.json({ message: "Costo de fabricación actualizado" });
+    } catch (error) {
+      console.error("Error actualizando costo de fabricación:", error);
+      return res
+        .status(500)
+        .json({ error: "Error al actualizar el costo de fabricación" });
     }
   },
 };

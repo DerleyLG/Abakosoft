@@ -15,7 +15,7 @@ const TesoreriaModel = {
     return rows;
   },
 
-getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
+  getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
     if (!idDocumento || !tipoDocumento) {
       throw new Error("Se requiere idDocumento y tipoDocumento.");
     }
@@ -35,10 +35,9 @@ getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
         AND tipo_documento = ?
         LIMIT 1
     `;
-  
+
     const [rows] = await db.query(query, [idDocumento, tipoDocumento]);
 
-  
     return rows.length > 0 ? rows[0] : null;
   },
   insertarMovimiento: async (movimientoData, connection = db) => {
@@ -86,16 +85,21 @@ getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
 
   getIngresosSummary: async (connection = db) => {
     const [totalMesResult] = await connection.query(`
-      SELECT SUM(monto) AS total FROM movimientos_tesoreria
-      WHERE DATE_FORMAT(fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      AND tipo_documento = 'orden_venta'
+      SELECT SUM(mt.monto) AS total
+      FROM movimientos_tesoreria mt
+      JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
+      WHERE DATE_FORMAT(mt.fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      AND mt.tipo_documento = 'orden_venta'
+      AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
     `);
 
-    
-     const [ventasMensualResult] = await connection.query(`
-      SELECT COUNT(*) AS total FROM movimientos_tesoreria
-      WHERE DATE_FORMAT(fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      AND tipo_documento = 'orden_venta'
+    const [ventasMensualResult] = await connection.query(`
+      SELECT COUNT(*) AS total
+      FROM movimientos_tesoreria mt
+      JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
+      WHERE DATE_FORMAT(mt.fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      AND mt.tipo_documento = 'orden_venta'
+      AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
     `);
 
     const totalMes = totalMesResult[0].total || 0;
@@ -109,7 +113,6 @@ getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
 
   getEgresosSummary: async () => {
     try {
-      
       const [pagosTrabajadores] = await db.query(`
         SELECT SUM(monto_total) AS totalPagosTrabajadores
         FROM pagos_trabajadores
@@ -136,37 +139,46 @@ getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
       `);
 
       const summary = {
-        totalPagosTrabajadores: Number(pagosTrabajadores[0].totalPagosTrabajadores || 0),
+        totalPagosTrabajadores: Number(
+          pagosTrabajadores[0].totalPagosTrabajadores || 0
+        ),
         totalOrdenesCompra: Number(ordenesCompra[0].totalOrdenesCompra || 0),
         totalCostos: Number(costosIndirectos[0].totalCostos || 0),
-        totalMateriaPrima: Number(comprasMateriaPrima[0].totalMateriaPrima || 0),
+        totalMateriaPrima: Number(
+          comprasMateriaPrima[0].totalMateriaPrima || 0
+        ),
       };
 
-      summary.totalEgresos = summary.totalPagosTrabajadores + summary.totalOrdenesCompra + summary.totalCostos + summary.totalMateriaPrima;
+      summary.totalEgresos =
+        summary.totalPagosTrabajadores +
+        summary.totalOrdenesCompra +
+        summary.totalCostos +
+        summary.totalMateriaPrima;
 
       return summary;
-
     } catch (error) {
-      console.error('Error fetching egresos summary:', error);
+      console.error("Error fetching egresos summary:", error);
       throw error;
     }
   },
 
-   actualizarMovimiento: async (id_movimiento, movimientoData, connection = db) => {
-        const conn = connection || db;
-        const {
-            id_documento,
-            tipo_documento,
-            monto,
-            id_metodo_pago,
-            referencia,
-            observaciones,
-            fecha_movimiento,
-        } = movimientoData;
+  actualizarMovimiento: async (
+    id_movimiento,
+    movimientoData,
+    connection = db
+  ) => {
+    const conn = connection || db;
+    const {
+      id_documento,
+      tipo_documento,
+      monto,
+      id_metodo_pago,
+      referencia,
+      observaciones,
+      fecha_movimiento,
+    } = movimientoData;
 
-   
-
-        const query = `
+    const query = `
             UPDATE movimientos_tesoreria
             SET id_documento = COALESCE(?, id_documento),
                 tipo_documento = COALESCE(?, tipo_documento),
@@ -177,55 +189,58 @@ getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
                 observaciones = COALESCE(?, observaciones)
             WHERE id_movimiento = ?`;
 
-        const [result] = await conn.query(query, [
-            id_documento,
-            tipo_documento,
-            fecha_movimiento,
-            monto,
-            id_metodo_pago,
-            referencia,
-            observaciones,
-            id_movimiento, 
-        ]);
+    const [result] = await conn.query(query, [
+      id_documento,
+      tipo_documento,
+      fecha_movimiento,
+      monto,
+      id_metodo_pago,
+      referencia,
+      observaciones,
+      id_movimiento,
+    ]);
 
-        return result.affectedRows;
-    },
+    return result.affectedRows;
+  },
 
- updateOrCreateMovimiento: async (movimientoData, connection = db) => {
-        const conn = connection || db;
-        const { id_documento, tipo_documento, monto } = movimientoData;
+  updateOrCreateMovimiento: async (movimientoData, connection = db) => {
+    const conn = connection || db;
+    const { id_documento, tipo_documento, monto } = movimientoData;
 
-        if (!id_documento || !tipo_documento) {
-            throw new Error("Se requiere id_documento y tipo_documento para buscar el movimiento asociado.");
-        }
-        
-       
-        const [existingRows] = await conn.query(
-            "SELECT id_movimiento FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
-            [id_documento, tipo_documento]
+    if (!id_documento || !tipo_documento) {
+      throw new Error(
+        "Se requiere id_documento y tipo_documento para buscar el movimiento asociado."
+      );
+    }
+
+    const [existingRows] = await conn.query(
+      "SELECT id_movimiento FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
+      [id_documento, tipo_documento]
+    );
+
+    if (existingRows.length > 0) {
+      const id_movimiento = existingRows[0].id_movimiento;
+
+      const updatedData = { ...movimientoData };
+
+      if (typeof monto === "undefined" || monto === null) {
+        throw new Error(
+          "El monto es obligatorio para actualizar el movimiento."
         );
-        
-        if (existingRows.length > 0) {
-        
-            const id_movimiento = existingRows[0].id_movimiento;
-           
-            const updatedData = { ...movimientoData };
-            
-         
-            if (typeof monto === 'undefined' || monto === null) {
+      }
 
-                throw new Error("El monto es obligatorio para actualizar el movimiento.");
-            }
-            
-            const affected = await TesoreriaModel.actualizarMovimiento(id_movimiento, updatedData, conn);
-            return id_movimiento;
+      const affected = await TesoreriaModel.actualizarMovimiento(
+        id_movimiento,
+        updatedData,
+        conn
+      );
+      return id_movimiento;
+    } else {
+      // 3. Si no existe, lo insertamos
+      return await TesoreriaModel.insertarMovimiento(movimientoData, conn);
+    }
+  },
 
-        } else {
-            // 3. Si no existe, lo insertamos
-            return await TesoreriaModel.insertarMovimiento(movimientoData, conn);
-        }
-    },
- 
   getPagosTrabajadoresCount: async () => {
     const [result] = await db.query(`
       SELECT COUNT(*) as count FROM pagos_trabajadores

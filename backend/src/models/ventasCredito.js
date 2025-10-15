@@ -13,13 +13,21 @@ crearVentaCredito: async (data, connection = db) => {
                 data.id_orden_venta,
                 data.id_cliente,
                 data.monto_total,
-                data.monto_total, // saldo_pendiente se inicializa con monto_total
-                "pendiente", // Estado que ya usas
+                data.monto_total, 
+                "pendiente", 
                 data.observaciones || null
             ]
         );
         return result.insertId;
     },
+
+     getByOrdenVentaId: async (id_orden_venta, connection = db) => {
+    const [rows] = await (connection || db).query(
+      "SELECT * FROM ventas_credito WHERE id_orden_venta = ?",
+      [id_orden_venta]
+    );
+    return rows[0] || null;
+  },
 
   obtenerVentasCredito: async () => {
     const [rows] = await db.query(`
