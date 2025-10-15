@@ -157,6 +157,8 @@ module.exports = {
     },
     connection = db
   ) => {
+    const estadoSeguro = estado ?? "en proceso";
+    const costoSeguro = costo_fabricacion ?? 0;
     const [result] = await (connection || db).query(
       `INSERT INTO avance_etapas_produccion 
        (id_orden_fabricacion,id_articulo, id_etapa_produccion, id_trabajador, cantidad, estado, observaciones, costo_fabricacion) 
@@ -167,9 +169,9 @@ module.exports = {
         id_etapa_produccion,
         id_trabajador,
         cantidad,
-        estado,
+        estadoSeguro,
         observaciones,
-        costo_fabricacion,
+        costoSeguro,
       ]
     );
     return result.insertId;
@@ -575,9 +577,7 @@ module.exports = {
       return true;
     }
 
-    console.log(
-      `Orden ${id_orden_fabricacion} aún tiene artículos pendientes.`
-    );
+  
     return false;
   },
 
@@ -587,24 +587,34 @@ module.exports = {
     id_etapa_produccion,
     connection = db
   ) => {
-    const [[{ cantidad_total }]] = await (connection || db).query(
-      `SELECT cantidad FROM detalle_orden_fabricacion
-       WHERE id_orden_fabricacion = ? AND id_articulo = ?`,
+    const [[detalle]] = await (connection || db).query(
+      `SELECT cantidad AS cantidad_total FROM detalle_orden_fabricacion
+       WHERE id_orden_fabricacion = ? AND id_articulo = ?
+       LIMIT 1`,
       [id_orden_fabricacion, id_articulo]
     );
+    const cantidad_total = Number(detalle?.cantidad_total ?? 0);
 
-    const [[{ total_registrado }]] = await (connection || db).query(
-      `SELECT SUM(cantidad) AS total_registrado
+    const [[suma]] = await (connection || db).query(
+      `SELECT COALESCE(SUM(cantidad), 0) AS total_registrado
        FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
       [id_orden_fabricacion, id_articulo, id_etapa_produccion]
     );
+    const total_registrado = Number(suma?.total_registrado ?? 0);
 
-    if ((total_registrado || 0) >= (cantidad_total || 0)) {
+    if (cantidad_total > 0 && total_registrado >= cantidad_total) {
       await (connection || db).query(
         `UPDATE avance_etapas_produccion
          SET estado = 'completado'
-         WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
+         WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ? AND estado <> 'completado'`,
+        [id_orden_fabricacion, id_articulo, id_etapa_produccion]
+      );
+    } else {
+      await (connection || db).query(
+        `UPDATE avance_etapas_produccion
+         SET estado = 'en proceso'
+         WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ? AND estado <> 'en proceso'`,
         [id_orden_fabricacion, id_articulo, id_etapa_produccion]
       );
     }

@@ -11,9 +11,9 @@ const Header = ({ toggleSidebar }) => {
   };
 
   return (
-    
-    <header className="flex items-center p-4 bg-white border-b shadow-sm">
- 
+
+    <header className="flex items-center p-4 bg-white border-b border-gray-300 shadow-sm">
+
       <div className="flex items-center">
         <button
           className="text-slate-700 cursor-pointer"

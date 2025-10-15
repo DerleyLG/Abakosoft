@@ -269,7 +269,7 @@ module.exports = {
   getCostoAnterior: async (req, res) => {
     const { id_articulo, id_etapa_produccion } = req.params;
 
-    console.log("🔍 Recibido:", id_articulo, id_etapa_produccion);
+  
 
     try {
       const costo = await AvanceModel.obtenerUltimoCosto(
@@ -277,10 +277,6 @@ module.exports = {
         parseInt(id_etapa_produccion)
       );
 
-      console.log(
-        `✔️ Backend - Costo anterior para artículo ${id_articulo}, etapa ${id_etapa_produccion}:`,
-        costo
-      );
       return res.json({ costo_fabricacion: costo });
     } catch (error) {
       console.error(" Error al obtener costo anterior:", error);
