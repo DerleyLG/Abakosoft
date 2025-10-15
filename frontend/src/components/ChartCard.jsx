@@ -1,6 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
-const ChartCard = ({ title, data = [], colors = ['#2563EB'], className = '' }) => {
+const ChartCard = ({ title, data = [], colors = ['#2563EB'], className = '', right = null }) => {
   const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
   const chartData = meses.map((m, i) => {
@@ -10,7 +10,10 @@ const ChartCard = ({ title, data = [], colors = ['#2563EB'], className = '' }) =
 
   return (
     <div className={`bg-white rounded-lg shadow p-4 h-[350px] flex flex-col ${className}`}>
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {right}
+      </div>
       <div className="flex-grow min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
