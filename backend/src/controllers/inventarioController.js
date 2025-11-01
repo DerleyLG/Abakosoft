@@ -128,20 +128,22 @@ module.exports = {
         stock_en_proceso,
         stock_disponible,
       });
-      
+
       // LOG CRITICO: Verificar si id_categoria viene en los datos
       if (data && data.length > 0) {
         console.log("[InventarioController] MUESTRA DE DATOS DEVUELTOS:", {
           primerItem: data[0],
-          tieneIdCategoria: 'id_categoria' in data[0],
-          valorIdCategoria: data[0].id_categoria
+          tieneIdCategoria: "id_categoria" in data[0],
+          valorIdCategoria: data[0].id_categoria,
         });
       }
-      
+
       console.log("[InventarioController.obtenerInventario] resultados =>", {
         count: Array.isArray(data) ? data.length : 0,
         total,
-        muestraData: data.slice(0, 2).map(it => ({ desc: it.descripcion, id_cat: it.id_categoria }))
+        muestraData: data
+          .slice(0, 2)
+          .map((it) => ({ desc: it.descripcion, id_cat: it.id_categoria })),
       });
       const p = Math.max(1, parseInt(page) || 1);
       const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
