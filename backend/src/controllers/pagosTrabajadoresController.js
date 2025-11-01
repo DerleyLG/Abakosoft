@@ -178,14 +178,13 @@ module.exports = {
           await connection.query(
             `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento)
              VALUES (?, ?, ?, ?, 0)`,
-            [
-              id_pago,
-              d.id_avance_etapa,
-              d.cantidad,
-              d.pago_unitario,
-            ]
+            [id_pago, d.id_avance_etapa, d.cantidad, d.pago_unitario]
           );
-          await avanceEtapasModel.updatePagado(d.id_avance_etapa, 1, connection);
+          await avanceEtapasModel.updatePagado(
+            d.id_avance_etapa,
+            1,
+            connection
+          );
         }
       }
 
