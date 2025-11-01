@@ -2,6 +2,31 @@ const AbonosCreditoModel = require("../models/AbonosCredito");
 const VentasCreditoModel = require("../models/ventasCredito");
 
 const VentasCreditoController = {
+  // Crear un crédito manual (factura pendiente sin OV)
+  createManual: async (req, res) => {
+    try {
+      const { id_cliente, monto_total, observaciones } = req.body || {};
+      if (!id_cliente || !monto_total) {
+        return res
+          .status(400)
+          .json({ error: "id_cliente y monto_total son obligatorios" });
+      }
+      const insertId = await VentasCreditoModel.crearVentaCredito({
+        id_orden_venta: null,
+        id_cliente,
+        monto_total,
+        saldo_pendiente: monto_total,
+        estado: "pendiente",
+        observaciones: observaciones || null,
+      });
+      return res
+        .status(201)
+        .json({ message: "Crédito creado", id_venta_credito: insertId });
+    } catch (error) {
+      console.error("Error al crear crédito manual:", error);
+      res.status(500).json({ error: "Error interno al crear crédito" });
+    }
+  },
   getAll: async (req, res) => {
     try {
       const creditos = await VentasCreditoModel.obtenerVentasCredito();

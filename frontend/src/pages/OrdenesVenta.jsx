@@ -7,6 +7,8 @@ import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
 
 const OrdenesVenta = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -14,24 +16,50 @@ const OrdenesVenta = () => {
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.rol;
+  const canCreate = can(role, ACTIONS.SALES_CREATE);
+  const canEdit = can(role, ACTIONS.SALES_EDIT);
+  const canDelete = can(role, ACTIONS.SALES_DELETE);
 
 
   useEffect(() => {
     const fetchOrdenes = async () => {
+      setLoading(true);
       try {
-        const endpoint = mostrarAnuladas
-          ? "/ordenes-venta?estado=anulada"
-          : "/ordenes-venta";
-        const res = await api.get(endpoint);
-        setOrdenes(res.data);
+        const res = await api.get('/ordenes-venta', {
+          params: {
+            estado: mostrarAnuladas ? 'anulada' : undefined,
+            buscar: searchTerm || undefined,
+            page,
+            pageSize,
+            sortBy: 'fecha',
+            sortDir: 'desc',
+          },
+        });
+        const payload = res.data || {};
+        setOrdenes(Array.isArray(payload.data) ? payload.data : []);
+        setTotalPages(Number(payload.totalPages) || 1);
+        setTotal(Number(payload.total) || 0);
+        setHasNext(Boolean(payload.hasNext));
+        setHasPrev(Boolean(payload.hasPrev));
       } catch (error) {
         console.error("Error al cargar las órdenes de venta:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchOrdenes();
-  }, [mostrarAnuladas]);
+  }, [mostrarAnuladas, searchTerm, page, pageSize]);
 
   const handleCrear = () => {
     navigate("/ordenes_venta/nuevo");
@@ -103,51 +131,20 @@ const handleEdit = (id) => {
   const toggleMostrarAnuladas = () => {
     setMostrarAnuladas((prev) => !prev);
     setExpandedId(null);
+    setPage(1);
   };
 
   
   const filteredOrdenes = ordenes.filter((orden) => {
-    const term = searchTerm.toLowerCase();
-    const cliente = orden.cliente_nombre?.toLowerCase() || "";
-
-   
+    // Filtrado por estado de crédito derivado (client-side) sobre la página actual
+    if (estadoFiltro === 'todos') return true;
     const montoTotal = Number(orden.monto_total || 0);
     const saldo = Number(orden.saldo_pendiente || 0);
-    let estadoDerivado = null;
-    if (orden.estado_credito !== null && orden.estado_credito !== undefined) {
-
-      if (saldo === 0) estadoDerivado = 'pagado';
-      else if (saldo < montoTotal) estadoDerivado = 'parcial';
-      else estadoDerivado = 'pendiente';
-    }
-
-   
-    if (estadoFiltro !== 'todos') {
-      if (!estadoDerivado) return false;
-      if (estadoDerivado !== estadoFiltro) return false;
-    }
-
-    if (!orden.fecha) return cliente.includes(term);
-
-    const fecha = new Date(orden.fecha);
-
-    const fechaStr = fecha.toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-
-    const fechaStrShort = fecha.toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-
-    return (
-      cliente.includes(term) ||
-      fechaStr.includes(term) ||
-      fechaStrShort.includes(term)
-    );
+    if (orden.estado_credito === null || orden.estado_credito === undefined) return false;
+    let estadoDerivado = 'pendiente';
+    if (saldo === 0) estadoDerivado = 'pagado';
+    else if (saldo < montoTotal) estadoDerivado = 'parcial';
+    return estadoDerivado === estadoFiltro;
   });
   return (
     <div className="w-full px-4 md:px-10 lg:px-20 py-10 select-none">
@@ -161,7 +158,7 @@ const handleEdit = (id) => {
             type="text"
             placeholder="Buscar por cliente"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
           <div>
@@ -178,13 +175,15 @@ const handleEdit = (id) => {
             </select>
           </div>
 
-          <button
-            onClick={handleCrear}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiPlus size={20} />
-            Nueva venta
-          </button>
+          {canCreate && (
+            <button
+              onClick={handleCrear}
+              className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+            >
+              <FiPlus size={20} />
+              Nueva venta
+            </button>
+          )}
     <button
             onClick={() => navigate("/tesoreria")}
             className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
@@ -227,7 +226,12 @@ const handleEdit = (id) => {
             </tr>
           </thead>
           <tbody>
-  {filteredOrdenes.length > 0 ? (
+  {loading && (
+    <tr>
+      <td colSpan="7" className="text-center py-6 text-gray-500">Cargando...</td>
+    </tr>
+  )}
+  {!loading && filteredOrdenes.length > 0 ? (
     filteredOrdenes.map((orden) => {
   
     
@@ -247,7 +251,7 @@ const handleEdit = (id) => {
           >
           
             <td className="px-4 py-3 font-mono text-gray-700">
-              #{orden.id_orden_venta}
+              {orden.id_orden_venta}
             </td>
 
             <td className="px-4 py-3">{orden.cliente_nombre}</td>
@@ -280,7 +284,7 @@ const handleEdit = (id) => {
 
                   return (
                     <span className={`px-2 py-1 rounded-md font-semibold bg-transparent ${textClass}`}>
-                      Crédito {estadoDerivado === 'pendiente' ? "(Pendiente)" : estadoDerivado === 'parcial' ? "(Parcial)" : "(Pagado)"}
+                      CREDITO {estadoDerivado === 'pendiente' ? "(PENDIENTE)" : estadoDerivado === 'parcial' ? "(PARCIAL)" : "(PAGADO)"}
                     </span>
                   );
                 })()
@@ -296,7 +300,7 @@ const handleEdit = (id) => {
 
          
               <td className="pl-3 py-3 text-center flex gap-4">
-              {!mostrarAnuladas && (!orden.id_pedido) && (
+              {canEdit && !mostrarAnuladas && (!orden.id_pedido) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -309,7 +313,7 @@ const handleEdit = (id) => {
                 </button>
               )}
 
-              {!mostrarAnuladas && (
+              {canDelete && !mostrarAnuladas && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -320,6 +324,9 @@ const handleEdit = (id) => {
                 >
                   <FiTrash2 size={18} />
                 </button>
+              )}
+              {!canEdit && !canDelete && (
+                <span className="text-gray-400 italic select-none">Sin permisos</span>
               )}
               
               {isCredito && orden.id_venta_credito && orden.saldo_pendiente > 0 && (
@@ -381,15 +388,46 @@ const handleEdit = (id) => {
         </React.Fragment>
       );
     })
-  ) : (
+  ) : (!loading && (
     <tr>
       <td colSpan="7" className="text-center py-6 text-gray-500">
         No se encontraron órdenes que coincidan con la búsqueda.
       </td>
     </tr>
-  )}
+  ))}
 </tbody>
         </table>
+        {/* Paginación */}
+        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">Página {page} de {totalPages} {total ? `(total: ${total})` : ''}</div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700">Filas por página</label>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+              className="border border-gray-300 rounded-md px-2 py-1 h-[36px]"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <button
+              onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev || loading}
+              className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => hasNext && setPage((p) => p + 1)}
+              disabled={!hasNext || loading}
+              className={`px-3 py-2 rounded-md border ${hasNext && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

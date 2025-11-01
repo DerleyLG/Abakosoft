@@ -69,6 +69,28 @@ const getPagosTrabajadoresSemana = async () => {
   return rows[0].total_semana;
 };
 
+// Ventas y compras de la semana (para dashboard semanal)
+const getVentasSemana = async () => {
+  const [rows] = await db.query(`
+      SELECT IFNULL(SUM(dov.precio_unitario * dov.cantidad), 0) AS total_ventas
+      FROM ordenes_venta ov
+      JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+      WHERE YEARWEEK(ov.fecha, 1) = YEARWEEK(CURDATE(), 1)
+        AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
+    `);
+  return rows[0].total_ventas;
+};
+
+const getComprasSemana = async () => {
+  const [rows] = await db.query(`
+      SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
+      FROM detalle_orden_compra doc
+      JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
+      WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
+    `);
+  return rows[0].total_compras;
+};
+
 const getAnticiposSemana = async () => {
   const [rows] = await db.query(
     `SELECT IFNULL(SUM(monto), 0) AS total_anticipos
@@ -278,6 +300,8 @@ module.exports = {
   getAnticiposSemana,
   getDescuentosSemana,
   getPagosTrabajadoresSemanaAnterior,
+  getVentasSemana,
+  getComprasSemana,
   getProduccionMensual,
   getProduccionAnual,
   getArticulosBajoStock,

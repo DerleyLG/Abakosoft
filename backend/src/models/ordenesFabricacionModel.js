@@ -21,6 +21,64 @@ module.exports = {
     );
     return rows;
   },
+
+  async getAllPaginated({
+    estados = ["pendiente", "en proceso", "completada"],
+    buscar = "",
+    page = 1,
+    pageSize = 25,
+    sortBy = "id",
+    sortDir = "desc",
+  }) {
+    const SORT_MAP = {
+      id: "ofab.id_orden_fabricacion",
+      fecha_inicio: "ofab.fecha_inicio",
+      cliente: "cli.nombre",
+    };
+    const sortCol = SORT_MAP[sortBy] || SORT_MAP.id;
+    const dir = String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    const p = Math.max(1, parseInt(page) || 1);
+    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+    const offset = (p - 1) * ps;
+
+    const estadoPlaceholders = estados.map(() => "?").join(",");
+    const whereParts = [`ofab.estado IN (${estadoPlaceholders})`];
+    const params = [...estados];
+    if (buscar) {
+      whereParts.push("cli.nombre LIKE ?");
+      params.push(`%${buscar}%`);
+    }
+    const whereSQL = whereParts.length
+      ? `WHERE ${whereParts.join(" AND ")}`
+      : "";
+
+    const base = `
+      FROM ordenes_fabricacion ofab
+      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+      LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
+      ${whereSQL}
+    `;
+
+    const [rows] = await db.query(
+      `SELECT 
+         ofab.*, 
+         p.id_pedido, 
+         cli.nombre AS nombre_cliente
+       ${base}
+       ORDER BY ${sortCol} ${dir}
+       LIMIT ? OFFSET ?`,
+      [...params, ps, offset]
+    );
+
+    const [countRows] = await db.query(
+      `SELECT COUNT(*) AS total ${base}`,
+      params
+    );
+    const total = countRows[0]?.total || 0;
+
+    return { data: rows, total };
+  },
   checkIfExistsByPedidoId: async (idPedido) => {
     const [rows] = await db.query(
       `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ?`,
@@ -132,7 +190,7 @@ module.exports = {
     );
 
     if (rows.length === 0) {
-      return 'no existe'; 
+      return "no existe";
     }
     return rows[0].estado;
   },

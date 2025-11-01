@@ -1,24 +1,58 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/ordenesFabricacionController');
+const controller = require("../controllers/ordenesFabricacionController");
+const verifyToken = require("../middlewares/verifyToken");
+const checkRole = require("../middlewares/checkRole");
+const { ROLES } = require("../constants/roles");
 
-// Obtener todas las órdenes de fabricación
-router.get('/', controller.getAll);
 
-router.get('/existe/:id_pedido', controller.existe);
+router.use(verifyToken);
 
-router.get('/estado-pedido/:id_pedido', controller.getEstadoOFByPedidoId);
 
-// Obtener una orden de fabricación por ID
-router.get('/:id', controller.getById);
+router.get(
+  "/",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  controller.getAll
+);
 
-// Crear una nueva orden de fabricación
-router.post('/', controller.create);
+router.get(
+  "/existe/:id_pedido",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  controller.existe
+);
 
-// Actualizar una orden de fabricación existente
-router.put('/:id', controller.update);
+router.get(
+  "/estado-pedido/:id_pedido",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  controller.getEstadoOFByPedidoId
+);
 
-// Eliminar una orden de fabricación
-router.delete('/:id', controller.delete);
+
+router.get(
+  "/:id",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  controller.getById
+);
+
+// Crear una nueva orden de fabricación (supervisor y admin)
+router.post(
+  "/",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  controller.create
+);
+
+// Actualizar una orden de fabricación existente (supervisor y admin)
+router.put(
+  "/:id",
+  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
+  controller.update
+);
+
+// Eliminar una orden de fabricación (solo admin)
+router.delete(
+  "/:id",
+  checkRole([ROLES.ADMIN, ROLES.SUPERVISOR]),
+  controller.delete
+);
 
 module.exports = router;

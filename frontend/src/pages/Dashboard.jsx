@@ -16,8 +16,10 @@ const Dashboard = () => {
   trabajadoresActivos: 0,
   TotalClientes: 0,
     produccionMensual: [],
-    ingresosMes: 0,
-    egresosMes: 0,
+  ingresosMes: 0,
+  egresosMes: 0,
+  ventasSemana: 0,
+  comprasSemana: 0,
     margenUtilidad: 0,
     costosIndirectos: 0,
     pagosTrabajadores: 0,
@@ -71,8 +73,8 @@ const Dashboard = () => {
       </div>
       <div className="lg:col-span-4 h-[360px] grid grid-rows-[auto_1fr] gap-4">
         <div className="grid grid-cols-2 gap-4">
-          <KpiCard title="INGRESOS MES" value={`$${Number(data.ingresosMes).toLocaleString()}`} />
-          <KpiCard title="EGRESOS MES" value={`$${Number(data.egresosMes).toLocaleString()}`} />
+          <KpiCard title="VENDIDO ESTA SEMANA" value={`$${Number(data.ventasSemana).toLocaleString()}`} />
+          <KpiCard title="COMPRADO ESTA SEMANA" value={`$${Number(data.comprasSemana).toLocaleString()}`} />
         </div>
         <Link to="/tesoreria" className="bg-white rounded-lg shadow p-4 h-full hover:shadow-md transition-shadow">
           <ResumenFinanciero

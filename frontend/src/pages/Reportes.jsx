@@ -6,12 +6,13 @@ const reportes = [
   { titulo: "Reporte de Inventario", ruta: "/reportes/inventario", icono: <FiPackage /> },
   { titulo: "Avance de Fabricación", ruta: "/reportes/avances_fabricacion", icono: <FiClipboard /> },
   { titulo: "Ventas por Período", ruta: "/reportes/ventas_por_periodo", icono: <FiDollarSign /> },
-  { titulo: "Órdenes de Compra", ruta: "/reportes/ordenes_compra", icono: <FiClipboard /> },
-  { titulo: "Pagos a Trabajadores", ruta: "/reportes/pagos_trabajadores", icono: <FiDollarSign /> },
+  { titulo: "Compras por Período", ruta: "/reportes/ordenes_compra", icono: <FiClipboard /> },
+  { titulo: "Pagos a trabajadores", ruta: "/reportes/pagos_trabajadores_dia", icono: <FiDollarSign /> },
   { titulo: "Costos de Producción", ruta: "/reportes/costos_fabricacion", icono: <FiBarChart2 /> },
   { titulo: "Utilidad por Orden", ruta: "/reportes/utilidad_por_orden", icono: <FiBarChart2 /> },
   { titulo: "Movimientos de inventario", ruta: "/reportes/movimientos_inventario", icono: <FiSettings /> },
-  { titulo: "Pagos a trabajadores por dia", ruta: "/reportes/pagos_trabajadores_dia", icono: <FiDollarSign /> },
+  { titulo: "Tesorería: Ventas y Cobros", ruta: "/reportes/tesoreria_ventas", icono: <FiDollarSign /> },
+
 
 ];
 

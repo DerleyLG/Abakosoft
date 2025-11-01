@@ -15,11 +15,58 @@ const ESTADOS_VALIDOS = [
 module.exports = {
   getAll: async (req, res) => {
     try {
-      const { estado } = req.query;
+      const {
+        estado,
+        buscar = "",
+        page = 1,
+        pageSize = 25,
+        sortBy = "fecha",
+        sortDir = "desc",
+      } = req.query;
 
-      const pedidos = await pedidoModel.getAll(estado);
+      const ALL = [
+        "pendiente",
+        "en fabricacion",
+        "listo para entrega",
+        "completado",
+        "cancelado",
+      ];
+      const ACTIVAS = [
+        "pendiente",
+        "en fabricacion",
+        "listo para entrega",
+        "completado",
+      ];
 
-      res.status(200).json(pedidos);
+      let estados = ACTIVAS;
+      if (ALL.includes(estado)) {
+        estados = [estado];
+      }
+
+      const { data, total } = await pedidoModel.getAllPaginated({
+        estados,
+        buscar,
+        page: Number(page) || 1,
+        pageSize: Number(pageSize) || 25,
+        sortBy,
+        sortDir,
+      });
+
+      const p = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+      const totalPages = Math.max(1, Math.ceil(total / ps));
+
+      res.status(200).json({
+        data,
+        page: p,
+        pageSize: ps,
+        total,
+        totalPages,
+        hasNext: p < totalPages,
+        hasPrev: p > 1,
+        sortBy,
+        sortDir: String(sortDir).toLowerCase() === "asc" ? "asc" : "desc",
+      });
     } catch (error) {
       console.error("Error al obtener pedidos:", error);
       res

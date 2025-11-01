@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const VentasCreditoController = require("../controllers/VentasCreditoController");
 
+// Crear crédito manual (factura pendiente sin OV)
+router.post("/manual", VentasCreditoController.createManual);
+
 router.get("/", VentasCreditoController.getAll);
 router.get("/:id", VentasCreditoController.getById);
 router.post("/:id/abonos", VentasCreditoController.registrarAbono);

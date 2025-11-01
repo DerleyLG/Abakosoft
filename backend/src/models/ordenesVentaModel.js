@@ -58,6 +58,89 @@ module.exports = {
     return rows;
   },
 
+  async getAllPaginated({
+    estados = ["pendiente", "completada"],
+    buscar = "",
+    page = 1,
+    pageSize = 25,
+    sortBy = "fecha",
+    sortDir = "desc",
+  }) {
+    const SORT_MAP = {
+      id: "ov.id_orden_venta",
+      fecha: "ov.fecha",
+      cliente: "c.nombre",
+      monto_total: "monto_total",
+    };
+    const sortCol = SORT_MAP[sortBy] || SORT_MAP.fecha;
+    const dir = String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    const p = Math.max(1, parseInt(page) || 1);
+    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+    const offset = (p - 1) * ps;
+
+    const estadoPlaceholders = estados.map(() => "?").join(",");
+    const whereParts = [`ov.estado IN (${estadoPlaceholders})`];
+    const params = [...estados];
+    if (buscar) {
+      whereParts.push("c.nombre LIKE ?");
+      params.push(`%${buscar}%`);
+    }
+    const whereSQL = whereParts.length
+      ? `WHERE ${whereParts.join(" AND ")}`
+      : "";
+
+    const base = `
+      FROM ordenes_venta ov
+      JOIN clientes c ON ov.id_cliente = c.id_cliente
+      LEFT JOIN movimientos_tesoreria mt ON mt.id_documento = ov.id_orden_venta AND mt.tipo_documento = 'orden_venta'
+      LEFT JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
+      LEFT JOIN ventas_credito vc ON ov.id_orden_venta = vc.id_orden_venta
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+      ${whereSQL}
+      GROUP BY 
+        ov.id_orden_venta,
+        ov.id_pedido,
+        vc.id_venta_credito,
+        ov.fecha,
+        ov.id_cliente,
+        c.nombre,
+        ov.estado,
+        mp.nombre,
+        vc.estado,
+        vc.saldo_pendiente
+    `;
+
+    const [rows] = await db.query(
+      `SELECT 
+        ov.id_orden_venta,
+        ov.id_pedido,
+        vc.id_venta_credito,
+        ov.fecha,
+        ov.id_cliente,
+        c.nombre AS cliente_nombre,
+        ov.estado,
+        mp.nombre AS metodo_pago,
+        vc.estado AS estado_credito,
+        vc.saldo_pendiente,
+        SUM(dov.cantidad * dov.precio_unitario) AS monto_total
+       ${base}
+       ORDER BY ${sortCol} ${dir}
+       LIMIT ? OFFSET ?`,
+      [...params, ps, offset]
+    );
+
+    const [countRows] = await db.query(
+      `SELECT COUNT(*) AS total FROM (
+         SELECT ov.id_orden_venta ${base}
+       ) AS sub`,
+      params
+    );
+    const total = countRows[0]?.total || 0;
+
+    return { data: rows, total };
+  },
+
   getArticulosConStock: async () => {
     const [rows] = await db.query(
       `SELECT

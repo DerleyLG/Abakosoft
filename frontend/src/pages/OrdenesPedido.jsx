@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import {  FiPackage, FiArrowLeft, FiTrash2, FiPlus, FiDollarSign, FiEdit } from "react-icons/fi";
@@ -7,41 +7,58 @@ import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
 
 const Pedidos = () => {
   const [pedidos, setPedidos] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas'); 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
- const fetchPedidos = useCallback(async () => {
-    try {
-      let endpoint = "/pedidos";
-
-      if (mostrarCancelados) {
-    
-        endpoint = "/pedidos?estado=cancelado";
-      } else if (filtroEstadoActivas !== 'todas') {
-     
-        endpoint = `/pedidos?estado=${filtroEstadoActivas}`;
-      } 
-   
-      
- 
-      const res = await api.get(endpoint);
-    
-      setPedidos(res.data);
-    } catch (error) {
-      console.error("Error al cargar pedidos:", error);
-      toast.error("Error al cargar pedidos. Revisa la conexión con el servidor.");
-    }
-  }, [mostrarCancelados, filtroEstadoActivas]);
+  const { user } = useAuth();
+  const role = user?.rol;
+  const canCreate = can(role, ACTIONS.SALES_CREATE); // crear pedido no está definido como acción; usamos SALES_CREATE por coherencia general
+  const canEdit = can(role, ACTIONS.SALES_EDIT);
+  const canDelete = can(role, ACTIONS.SALES_DELETE);
 
   useEffect(() => {
+    const fetchPedidos = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/pedidos', {
+          params: {
+            estado: mostrarCancelados ? 'cancelado' : undefined,
+            buscar: searchTerm || undefined,
+            page,
+            pageSize,
+            sortBy: 'fecha',
+            sortDir: 'desc',
+          },
+        });
+        const payload = res.data || {};
+        setPedidos(Array.isArray(payload.data) ? payload.data : []);
+        setTotalPages(Number(payload.totalPages) || 1);
+        setTotal(Number(payload.total) || 0);
+        setHasNext(Boolean(payload.hasNext));
+        setHasPrev(Boolean(payload.hasPrev));
+      } catch (error) {
+        console.error("Error al cargar pedidos:", error);
+        toast.error("Error al cargar pedidos. Revisa la conexión con el servidor.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchPedidos();
-  }, [fetchPedidos]);
+  }, [mostrarCancelados, searchTerm, page, pageSize]);
 
   const handleCrear = () => {
     navigate("/ordenes_pedido/nuevo");
@@ -118,31 +135,12 @@ const handleEdit = async (e, pedido) => {
   };
 
   const toggleMostrarCancelados = () => {
-    
-    if (!mostrarCancelados) {
-      setFiltroEstadoActivas('todas'); 
-    }
     setMostrarCancelados((prev) => !prev);
     setExpandedId(null);
-  };
-  
-  const handleFiltroEstadoChange = (e) => {
-    setMostrarCancelados(false); 
-    setFiltroEstadoActivas(e.target.value);
-    setExpandedId(null);
+    setPage(1);
   };
 
-  const filteredPedidos = pedidos.filter((pedido) => {
-    const term = searchTerm.toLowerCase();
-    const cliente = pedido.cliente_nombre?.toLowerCase() || "";
-    const fecha = new Date(pedido.fecha_pedido);
-    const fechaStr = fecha.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    return cliente.includes(term) || fechaStr.includes(term);
-  });
+  // El backend filtra por cliente (buscar); no aplicamos filtros adicionales en cliente para mantener el formato.
 
   const handleCrearOrdenFabricacion = async (e, id_pedido) => {
     e.stopPropagation();
@@ -220,40 +218,24 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">Pedidos</h2>
 
-        <div className="flex w-full md:w-auto items-center gap-4">
+        <div className="flex w-full md:w-280 items-center gap-4">
           <input
             type="text"
-            placeholder="Buscar por cliente o fecha (dd/mm/aa)"
+            placeholder="Buscar por cliente"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
-          
-          
-          <select
-            value={filtroEstadoActivas}
-            onChange={handleFiltroEstadoChange}
-            disabled={mostrarCancelados} 
-            className={`h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-    mostrarCancelados
-      ? 'bg-gray-200 cursor-not-allowed text-gray-600'
-      : 'bg-gray-100 text-gray-800'
-  }`}
-          >
-            <option value="todas">Todas</option>
-            <option value="pendiente">Pendientes</option>
-<option value="en fabricacion">En fabricacion</option>
-<option value="listo para entrega">Listo para entrega</option>
-            <option value="completado">Completadas</option>
-          </select>
 
-          <button
-            onClick={handleCrear}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiPlus size={20} />
-            Nuevo pedido
-          </button>
+          {canCreate && (
+            <button
+              onClick={handleCrear}
+              className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+            >
+              <FiPlus size={20} />
+              Nuevo pedido
+            </button>
+          )}
 
           <button
             onClick={toggleMostrarCancelados}
@@ -280,6 +262,7 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
+  <th className="px-4 py-3">ID</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Monto Total</th>
@@ -288,14 +271,20 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
             </tr>
           </thead>
           <tbody>
-            {filteredPedidos.length > 0 ? (
-              filteredPedidos.map((pedido) => (
+            {loading && (
+              <tr>
+                <td colSpan="6" className="text-center py-6 text-gray-500">Cargando...</td>
+              </tr>
+            )}
+            {!loading && pedidos.length > 0 ? (
+              pedidos.map((pedido) => (
                 <React.Fragment key={pedido.id_pedido}>
                   <tr
                     onClick={() => toggleExpand(pedido.id_pedido)}
                     className={`cursor-pointer ${expandedId === pedido.id_pedido ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'
                     } transition`}
                   >
+                      <td className="px-4 py-3">{pedido.id_pedido}</td>
                     <td className="px-4 py-3">{pedido.cliente_nombre}</td>
                     <td className="px-4 py-3">
                         
@@ -328,7 +317,7 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                           <FiDollarSign size={18} />
                         </button>
                       )}
-  {!mostrarCancelados && pedido.estado == 'pendiente' &&(
+  {canEdit && !mostrarCancelados && pedido.estado == 'pendiente' &&(
                         <button
                           onClick={(e) => handleEdit(e, pedido)}
                           className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
@@ -337,7 +326,7 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                           <FiEdit size={18} /> 
                         </button>
                       )}
-                      {!mostrarCancelados && (
+                      {canDelete && !mostrarCancelados && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -349,12 +338,15 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                           <FiTrash2 size={18} />
                         </button>
                       )}
+                      {!canEdit && !canDelete && (
+                        <span className="text-gray-400 italic select-none">Sin permisos</span>
+                      )}
                     </td>
                   </tr>
 
-                  {expandedId === pedido.id_pedido && (
-                    <tr>
-                      <td colSpan="5" className="bg-gray-100 px-6 py-4 border-b">
+                  {expandedId === pedido.id_pedido && (
+                    <tr>
+                      <td colSpan="6" className="bg-gray-100 px-6 py-4 border-b">
                         <div className="mt-3">
                           <table className="w-full text-sm">
                             <thead className="bg-gray-200 text-gray-700">
@@ -390,16 +382,46 @@ const handleCrearOrdenVenta = async (e, id_pedido) => {
                   )}
                 </React.Fragment>
               ))
-            ) : (
+            ) : (!loading && (
               <tr>
-                <td colSpan="5" className="text-center py-6 text-gray-500">
+                <td colSpan="6" className="text-center py-6 text-gray-500">
                   No se encontraron pedidos.
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
-        
+        {/* Paginación */}
+        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">Página {page} de {totalPages} {total ? `(total: ${total})` : ''}</div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700">Filas por página</label>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+              className="border border-gray-300 rounded-md px-2 py-1 h-[36px]"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <button
+              onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev || loading}
+              className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => hasNext && setPage((p) => p + 1)}
+              disabled={!hasNext || loading}
+              className={`px-3 py-2 rounded-md border ${hasNext && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

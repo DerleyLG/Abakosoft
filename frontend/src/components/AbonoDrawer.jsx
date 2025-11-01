@@ -84,11 +84,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
     setTimeout(() => onClose && onClose(), 260);
   };
 
-  const formatColombia = (v) => {
-    const n = Number(String(v).replace(/[^0-9.-]+/g, ''));
-    if (isNaN(n)) return '';
-    return n.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+ 
 
   // Formatea valores en COP sin forzar siempre 2 decimales.
   // Si el valor es entero muestra sin decimales, si tiene decimales muestra hasta 2 sin ceros sobrantes.
@@ -103,11 +99,6 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
     return str;
   };
 
-  const parseInput = (str) => {
-    const cleaned = String(str).replace(/[^0-9.-]+/g, '');
-    const n = Number(cleaned);
-    return isNaN(n) ? 0 : n;
-  };
 
   const handleMontoChange = (e) => {
     // Solo enteros: eliminar todo lo que no sean dígitos
@@ -167,7 +158,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold">Registrar Abono - #{credito.id_orden_venta}</h3>
-          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">Cerrar</button>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-900 cursor-pointer">Cerrar</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

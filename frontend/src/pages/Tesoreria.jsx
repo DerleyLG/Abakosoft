@@ -221,6 +221,11 @@ const TesoreriaDashboard = () => {
     return <div className="text-center py-10 text-red-500">{error}</div>;
   }
 
+  const balanceEfectivo = resumenFinanciero.ventasEfectivo - resumenFinanciero.comprasEfectivo;
+  const balanceTransferencia = resumenFinanciero.ventasTransferencia - resumenFinanciero.comprasTransferencia;
+  const efectivoClass = balanceEfectivo >= 0 ? 'text-green-600' : 'text-red-600';
+  const transferenciaClass = balanceTransferencia >= 0 ? 'text-green-600' : 'text-red-600';
+
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <div className="flex items-center justify-between mb-6">
@@ -241,8 +246,8 @@ const TesoreriaDashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-700">Balance Efectivo</h3>
-            <span className="text-2xl font-bold text-green-600">
-              {formatCurrency(resumenFinanciero.ventasEfectivo - resumenFinanciero.comprasEfectivo)}
+            <span className={`text-2xl font-bold ${efectivoClass}`}>
+              {formatCurrency(balanceEfectivo)}
             </span>
             <div className="text-sm text-gray-500 mt-1">Ventas: {formatCurrency(resumenFinanciero.ventasEfectivo)} · Compras: {formatCurrency(resumenFinanciero.comprasEfectivo)}</div>
           </div>
@@ -251,8 +256,8 @@ const TesoreriaDashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-700">Balance Transferencia</h3>
-            <span className="text-2xl font-bold text-green-600">
-              {formatCurrency(resumenFinanciero.ventasTransferencia - resumenFinanciero.comprasTransferencia)}
+            <span className={`text-2xl font-bold ${transferenciaClass}`}>
+              {formatCurrency(balanceTransferencia)}
             </span>
             <div className="text-sm text-gray-500 mt-1">Ventas: {formatCurrency(resumenFinanciero.ventasTransferencia)} · Compras: {formatCurrency(resumenFinanciero.comprasTransferencia)}</div>
           </div>

@@ -272,6 +272,141 @@ const TesoreriaModel = {
     `);
     return result[0].count;
   },
+
+  async getVentasCobrosReport({ desde, hasta, id_cliente, estado_pago }) {
+    const paramsOV = [];
+    const whereOV = ["1=1"]; // filtros sobre OV
+
+    if (desde) {
+      whereOV.push("ov.fecha >= ?");
+      paramsOV.push(desde);
+    }
+    if (hasta) {
+      whereOV.push("ov.fecha <= ?");
+      paramsOV.push(hasta);
+    }
+    if (id_cliente) {
+      whereOV.push("ov.id_cliente = ?");
+      paramsOV.push(id_cliente);
+    }
+
+    const paramsCR = [];
+    const whereCR = ["vc.id_orden_venta IS NULL"]; // solo créditos manuales
+    if (desde) {
+      whereCR.push("vc.fecha >= ?");
+      paramsCR.push(desde);
+    }
+    if (hasta) {
+      whereCR.push("vc.fecha <= ?");
+      paramsCR.push(hasta);
+    }
+    if (id_cliente) {
+      whereCR.push("vc.id_cliente = ?");
+      paramsCR.push(id_cliente);
+    }
+
+    const sql = `
+      /* Documentos basados en OV */
+      SELECT 
+        ov.id_orden_venta,
+        CONCAT('OV #', ov.id_orden_venta) AS documento,
+        MAX(ov.fecha) AS fecha,
+        MAX(c.nombre) AS cliente,
+        COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) AS total_factura,
+        COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0) AS total_pagado,
+        GREATEST(
+          COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) - (COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0)),
+          0
+        ) AS saldo,
+        TRIM(BOTH ', ' FROM CONCAT_WS(
+          ', ',
+          MAX(pd.formas_pago),
+          MAX(ab.formas_pago),
+          CASE WHEN MAX(CASE WHEN vc.id_venta_credito IS NULL THEN 0 ELSE 1 END) = 1 THEN 'Crédito' ELSE NULL END
+        )) AS formas_pago,
+        CASE 
+          WHEN GREATEST(
+                 COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) - (COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0)),
+                 0
+               ) <= 0 THEN 'saldado'
+          ELSE 'pendiente'
+        END AS estado_pago
+      FROM ordenes_venta ov
+      JOIN clientes c ON ov.id_cliente = c.id_cliente
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
+      LEFT JOIN ventas_credito vc ON vc.id_orden_venta = ov.id_orden_venta
+      LEFT JOIN (
+        SELECT 
+          mt.id_documento AS id_orden_venta,
+          SUM(mt.monto) AS total_pagado,
+          GROUP_CONCAT(DISTINCT mp.nombre ORDER BY mp.nombre SEPARATOR ', ') AS formas_pago
+        FROM movimientos_tesoreria mt
+        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = mt.id_metodo_pago
+        WHERE mt.tipo_documento = 'orden_venta'
+        GROUP BY mt.id_documento
+      ) pd ON pd.id_orden_venta = ov.id_orden_venta
+      LEFT JOIN (
+        SELECT 
+          vc2.id_orden_venta,
+          SUM(mt2.monto) AS total_abonos,
+          GROUP_CONCAT(DISTINCT mp2.nombre ORDER BY mp2.nombre SEPARATOR ', ') AS formas_pago
+        FROM ventas_credito vc2
+        LEFT JOIN movimientos_tesoreria mt2 
+          ON mt2.id_documento = vc2.id_venta_credito AND mt2.tipo_documento = 'abono_credito'
+        LEFT JOIN metodos_pago mp2 ON mp2.id_metodo_pago = mt2.id_metodo_pago
+        GROUP BY vc2.id_orden_venta
+      ) ab ON ab.id_orden_venta = ov.id_orden_venta
+      WHERE ${whereOV.join(" AND ")}
+      GROUP BY ov.id_orden_venta
+
+      UNION ALL
+
+      /* Créditos manuales (sin OV) */
+      SELECT 
+        NULL AS id_orden_venta,
+        CONCAT('CR #', vc.id_venta_credito) AS documento,
+        MAX(vc.fecha) AS fecha,
+        MAX(c.nombre) AS cliente,
+        MAX(vc.monto_total) AS total_factura,
+        COALESCE(MAX(ac.total_abonos), 0) AS total_pagado,
+        GREATEST(MAX(vc.monto_total) - COALESCE(MAX(ac.total_abonos), 0), 0) AS saldo,
+        MAX(ac.formas_pago) AS formas_pago,
+        CASE 
+          WHEN GREATEST(MAX(vc.monto_total) - COALESCE(MAX(ac.total_abonos), 0), 0) <= 0 THEN 'saldado'
+          ELSE 'pendiente'
+        END AS estado_pago
+      FROM ventas_credito vc
+      JOIN clientes c ON vc.id_cliente = c.id_cliente
+      LEFT JOIN (
+        SELECT 
+          mt.id_documento AS id_venta_credito,
+          SUM(mt.monto) AS total_abonos,
+          GROUP_CONCAT(DISTINCT mp.nombre ORDER BY mp.nombre SEPARATOR ', ') AS formas_pago
+        FROM movimientos_tesoreria mt
+        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = mt.id_metodo_pago
+        WHERE mt.tipo_documento = 'abono_credito'
+        GROUP BY mt.id_documento
+      ) ac ON ac.id_venta_credito = vc.id_venta_credito
+      WHERE ${whereCR.join(" AND ")}
+      GROUP BY vc.id_venta_credito
+
+      ORDER BY fecha DESC`;
+
+    const [rows] = await db.query(sql, [...paramsOV, ...paramsCR]);
+
+    // filtrar por estado_pago en HAVING equivalente (post-procesado para simplicidad)
+    if (
+      estado_pago &&
+      ["pendiente", "saldado"].includes(String(estado_pago).toLowerCase())
+    ) {
+      return rows.filter(
+        (r) =>
+          String(r.estado_pago).toLowerCase() ===
+          String(estado_pago).toLowerCase()
+      );
+    }
+    return rows;
+  },
 };
 
 module.exports = TesoreriaModel;

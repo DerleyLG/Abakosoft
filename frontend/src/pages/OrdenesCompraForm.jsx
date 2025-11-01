@@ -46,13 +46,13 @@ const CrearOrdenCompra = () => {
             try {
                 const [resProveedores, resArticulos, resMetodosPago] = await Promise.all([
                     api.get('/proveedores'),
-                    api.get('/articulos'),
+                    api.get('/articulos', { params: { page: 1, pageSize: 100, sortBy: 'descripcion', sortDir: 'asc' } }),
                     api.get('/tesoreria/metodos-pago'),
                 ]);
                 setProveedores(resProveedores.data || []);
                 setMetodosPago(resMetodosPago.data || []);
-              
-                const opcionesArticulos = resArticulos.data.map((art) => ({
+                const lista = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
+                const opcionesArticulos = lista.map((art) => ({
                     value: art.id_articulo,
                     label: art.descripcion,
                     ...art, 
@@ -60,7 +60,8 @@ const CrearOrdenCompra = () => {
                 setArticulos(opcionesArticulos || []);
             } catch (error) {
                 console.error('Error al cargar datos iniciales:', error);
-                toast.error('Error al cargar datos iniciales (proveedores, artículos)');
+                const msg = error.response?.data?.mensaje || error.response?.data?.message || error.message;
+                toast.error(`Error al cargar datos iniciales (proveedores, artículos): ${msg}`);
             } finally {
                 setLoading(false);
             }

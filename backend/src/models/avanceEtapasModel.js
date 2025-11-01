@@ -40,6 +40,102 @@ module.exports = {
     return rows;
   },
 
+  /**
+   * Paginated list of non-paid advances with optional search and worker filter.
+   * Params: { id_trabajador, buscar, page, pageSize, sortBy, sortDir }
+   * Returns: { data, total }
+   */
+  getAllPaginated: async ({
+    id_trabajador = null,
+    buscar = "",
+    page = 1,
+    pageSize = 10,
+    sortBy = "fecha",
+    sortDir = "desc",
+  } = {}) => {
+    const SORT_MAP = {
+      fecha: "a.fecha_registro",
+      descripcion: "art.descripcion",
+      etapa: "e.nombre",
+      trabajador: "t.nombre",
+      cantidad: "a.cantidad",
+      costo: "a.costo_fabricacion",
+      orden: "a.id_orden_fabricacion",
+      cliente: "c.nombre",
+    };
+    const sortCol = SORT_MAP[sortBy] || SORT_MAP.fecha;
+    const sortDirection =
+      String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    const whereParts = ["a.pagado = 0", "ofa.estado NOT IN ('cancelada')"];
+    const params = [];
+
+    if (id_trabajador) {
+      whereParts.push("a.id_trabajador = ?");
+      params.push(id_trabajador);
+    }
+
+    if (buscar && buscar.trim()) {
+      const like = `%${buscar.trim()}%`;
+      whereParts.push(
+        "(art.descripcion LIKE ? OR e.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR a.id_orden_fabricacion LIKE ? )"
+      );
+      params.push(like, like, like, like, like);
+    }
+
+    const whereClause = whereParts.length
+      ? `WHERE ${whereParts.join(" AND ")}`
+      : "";
+    const offset = (Number(page) - 1) * Number(pageSize);
+
+    const baseSelect = `
+      SELECT 
+        a.id_avance_etapa, 
+        a.id_orden_fabricacion, 
+        a.id_etapa_produccion, 
+        a.id_trabajador,
+        a.cantidad, 
+        a.estado,
+        a.fecha_registro, 
+        a.costo_fabricacion,
+        e.nombre AS nombre_etapa,
+        t.nombre AS nombre_trabajador,
+        art.descripcion,
+        c.nombre AS nombre_cliente,
+        COALESCE(ant.monto, 0) AS monto_anticipo,
+        ant.estado AS estado_anticipo
+      FROM avance_etapas_produccion a
+      JOIN articulos art ON a.id_articulo = art.id_articulo
+      JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
+      JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
+      JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
+      LEFT JOIN anticipos_trabajadores ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
+      LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      ${whereClause}
+      ORDER BY ${sortCol} ${sortDirection}, a.id_avance_etapa DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const baseCount = `
+      SELECT COUNT(*) AS total
+      FROM avance_etapas_produccion a
+      JOIN articulos art ON a.id_articulo = art.id_articulo
+      JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
+      JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
+      JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
+      LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      ${whereClause}
+    `;
+
+    const paramsData = [...params, Number(pageSize), Number(offset)];
+    const [rows] = await db.query(baseSelect, paramsData);
+    const [countRows] = await db.query(baseCount, params);
+    const total = Number(countRows?.[0]?.total || 0);
+    return { data: rows, total };
+  },
+
   getAllPagados: async (id_trabajador = null) => {
     let query = `
       SELECT
@@ -81,6 +177,96 @@ module.exports = {
     } catch (dbError) {
       throw dbError;
     }
+  },
+
+  /**
+   * Paginated list of paid advances with optional search and worker filter.
+   */
+  getAllPagadosPaginated: async ({
+    id_trabajador = null,
+    buscar = "",
+    page = 1,
+    pageSize = 10,
+    sortBy = "fecha",
+    sortDir = "desc",
+  } = {}) => {
+    const SORT_MAP = {
+      fecha: "ae.fecha_registro",
+      descripcion: "a.descripcion",
+      etapa: "ep.nombre",
+      trabajador: "t.nombre",
+      cantidad: "ae.cantidad",
+      costo: "ae.costo_fabricacion",
+      orden: "ae.id_orden_fabricacion",
+      cliente: "c.nombre",
+    };
+    const sortCol = SORT_MAP[sortBy] || SORT_MAP.fecha;
+    const sortDirection =
+      String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    const whereParts = ["ae.pagado = 1"];
+    const params = [];
+    if (id_trabajador) {
+      whereParts.push("ae.id_trabajador = ?");
+      params.push(id_trabajador);
+    }
+    if (buscar && buscar.trim()) {
+      const like = `%${buscar.trim()}%`;
+      whereParts.push(
+        "(a.descripcion LIKE ? OR ep.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR ae.id_orden_fabricacion LIKE ?)"
+      );
+      params.push(like, like, like, like, like);
+    }
+    const whereClause = whereParts.length
+      ? `WHERE ${whereParts.join(" AND ")}`
+      : "";
+    const offset = (Number(page) - 1) * Number(pageSize);
+
+    const baseSelect = `
+      SELECT
+          ae.id_avance_etapa,
+          ae.id_orden_fabricacion,
+          COALESCE(c.nombre, '') AS nombre_cliente,
+          ae.id_articulo,
+          COALESCE(a.descripcion, '') AS descripcion,
+          ae.id_etapa_produccion,
+          COALESCE(ep.nombre, '') AS nombre_etapa,
+          ae.id_trabajador,
+          COALESCE(t.nombre, '') AS nombre_trabajador,
+          ae.cantidad,
+          ae.costo_fabricacion AS costo_fabricacion,
+          ae.fecha_registro,
+          ae.estado,
+          ae.pagado
+      FROM avance_etapas_produccion ae
+      LEFT JOIN ordenes_fabricacion ofab ON ae.id_orden_fabricacion = ofab.id_orden_fabricacion
+      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      LEFT JOIN articulos a ON ae.id_articulo = a.id_articulo
+      LEFT JOIN etapas_produccion ep ON ae.id_etapa_produccion = ep.id_etapa
+      LEFT JOIN trabajadores t ON ae.id_trabajador = t.id_trabajador
+      ${whereClause}
+      ORDER BY ${sortCol} ${sortDirection}, ae.id_avance_etapa DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const baseCount = `
+      SELECT COUNT(*) AS total
+      FROM avance_etapas_produccion ae
+      LEFT JOIN ordenes_fabricacion ofab ON ae.id_orden_fabricacion = ofab.id_orden_fabricacion
+      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      LEFT JOIN articulos a ON ae.id_articulo = a.id_articulo
+      LEFT JOIN etapas_produccion ep ON ae.id_etapa_produccion = ep.id_etapa
+      LEFT JOIN trabajadores t ON ae.id_trabajador = t.id_trabajador
+      ${whereClause}
+    `;
+
+    const paramsData = [...params, Number(pageSize), Number(offset)];
+    const [rows] = await db.query(baseSelect, paramsData);
+    const [countRows] = await db.query(baseCount, params);
+    const total = Number(countRows?.[0]?.total || 0);
+    return { data: rows, total };
   },
 
   getById: async (id) => {
@@ -450,6 +636,50 @@ module.exports = {
     return null;
   },
 
+  /**
+   * Obtiene, por mes y año, los acumulados por orden de fabricación según un driver.
+   * Params: { anio, mes, driver: 'cantidad' | 'avances' | 'costo', estados = ['pendiente','en proceso'] }
+   * Returns: Array<{ id_orden_fabricacion: number, valor: number }>
+   */
+  getDriverSumByMes: async (
+    {
+      anio,
+      mes,
+      driver = "cantidad",
+      estados = ["pendiente", "en proceso"],
+    } = {},
+    connection = db
+  ) => {
+    if (!anio || !mes) return [];
+    const estadosPlaceholders = estados.map(() => "?").join(",");
+    const baseWhere = `YEAR(ae.fecha_registro) = ? AND MONTH(ae.fecha_registro) = ? AND ofab.estado IN (${estadosPlaceholders})`;
+    const params = [anio, mes, ...estados];
+
+    let selectAgg = "";
+    if (driver === "avances") {
+      selectAgg = "COUNT(*) AS valor";
+    } else if (driver === "costo") {
+      // Interpretamos costo_fabricacion como costo unitario del avance
+      selectAgg =
+        "COALESCE(SUM(ae.costo_fabricacion * ae.cantidad), 0) AS valor";
+    } else {
+      // Default: cantidad
+      selectAgg = "COALESCE(SUM(ae.cantidad), 0) AS valor";
+    }
+
+    const query = `
+      SELECT ae.id_orden_fabricacion, ${selectAgg}
+      FROM avance_etapas_produccion ae
+      JOIN ordenes_fabricacion ofab ON ofab.id_orden_fabricacion = ae.id_orden_fabricacion
+      WHERE ${baseWhere}
+      GROUP BY ae.id_orden_fabricacion
+      HAVING valor > 0
+      ORDER BY valor DESC, ae.id_orden_fabricacion ASC
+    `;
+    const [rows] = await (connection || db).query(query, params);
+    return rows;
+  },
+
   checkearSiOrdenCompleta: async (id_orden_fabricacion, connection = db) => {
     const [ordenData] = await (connection || db).query(
       `SELECT id_pedido, estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
@@ -577,7 +807,6 @@ module.exports = {
       return true;
     }
 
-  
     return false;
   },
 

@@ -1,4 +1,4 @@
-const db = require('../database/db')
+const db = require("../database/db");
 module.exports = {
   // Obtiene todos los usuarios
   getAll: async () => {
@@ -11,7 +11,7 @@ module.exports = {
         u.id_rol,
         r.nombre_rol
       FROM usuarios u
-      JOIN trabajadores t ON u.id_trabajador = t.id_trabajador
+      LEFT JOIN trabajadores t ON u.id_trabajador = t.id_trabajador
       JOIN roles r ON u.id_rol = r.id_rol
       ORDER BY u.nombre_usuario
     `);
@@ -28,9 +28,9 @@ module.exports = {
           t.nombre AS nombre_trabajador,
           u.id_rol,
           r.nombre_rol 
-        FROM usuarios u
-        JOIN trabajadores t ON u.id_trabajador = t.id_trabajador
-        JOIN roles r ON u.id_rol = r.id_rol
+  FROM usuarios u
+  LEFT JOIN trabajadores t ON u.id_trabajador = t.id_trabajador
+  JOIN roles r ON u.id_rol = r.id_rol
         WHERE u.id_usuario = ?`,
       [id]
     );
@@ -39,14 +39,17 @@ module.exports = {
 
   // Obtiene un usuario por su nombre de usuario (para login y validación)
   getByUsername: async (nombre_usuario) => {
-    const [rows] = await db.query(`
+    const [rows] = await db.query(
+      `
       SELECT 
         u.*, 
         r.nombre_rol 
       FROM usuarios u
       JOIN roles r ON u.id_rol = r.id_rol
       WHERE u.nombre_usuario = ?
-    `, [nombre_usuario]);
+    `,
+      [nombre_usuario]
+    );
 
     return rows[0];
   },
@@ -83,9 +86,6 @@ module.exports = {
 
   // Elimina un usuario
   delete: async (id) => {
-    await db.query(
-      `DELETE FROM usuarios WHERE id_usuario = ?`,
-      [id]
-    );
-  }
+    await db.query(`DELETE FROM usuarios WHERE id_usuario = ?`, [id]);
+  },
 };
