@@ -110,19 +110,24 @@ const FormularioPagoAvances = () => {
       // Cargar órdenes de fabricación disponibles para anticipo (solo pendientes o en proceso)
       api.get("/ordenes-fabricacion?estados=pendiente,en proceso")
         .then((res) => {
-          setOrdenes(res.data || []);
+          // La respuesta es paginada, extraer el array 'data'
+          const ordenesArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          setOrdenes(ordenesArray);
         })
         .catch(() => {
           toast.error("Error al cargar órdenes de fabricación");
+          setOrdenes([]); // Asegurar que siempre sea un array
         });
 
       // Cargar trabajadores (siempre que sea anticipo)
       api.get("/trabajadores")
         .then((res) => {
-          setTrabajadores(res.data || []);
+          const trabajadoresArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          setTrabajadores(trabajadoresArray);
         })
         .catch(() => {
           toast.error("Error al cargar trabajadores");
+          setTrabajadores([]); // Asegurar que siempre sea un array
         });
     }
   }, [esAnticipo]);
@@ -282,13 +287,13 @@ const FormularioPagoAvances = () => {
               value={ordenSeleccionada}
               onChange={(e) => {
                 setOrdenSeleccionada(e.target.value);
-                const orden = ordenes.find(o => o.id_orden_fabricacion === Number(e.target.value));
+                const orden = Array.isArray(ordenes) ? ordenes.find(o => o.id_orden_fabricacion === Number(e.target.value)) : null;
                 if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
               }}
               className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
-              disabled={ordenes.length === 0}
+              disabled={!Array.isArray(ordenes) || ordenes.length === 0}
             >
-              {ordenes.length === 0 ? (
+              {!Array.isArray(ordenes) || ordenes.length === 0 ? (
                 <option value="" disabled>No hay órdenes pendientes o en proceso</option>
               ) : (
                 <>
@@ -311,9 +316,8 @@ const FormularioPagoAvances = () => {
               onChange={(e) => setTrabajadorSeleccionado(e.target.value)}
               className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
             >
-
               <option value="">Seleccione un trabajador</option>
-              {trabajadores.map((t) => (
+              {Array.isArray(trabajadores) && trabajadores.map((t) => (
                 <option key={t.id_trabajador} value={t.id_trabajador}>
                   {t.nombre} - {t.cargo}
                 </option>
