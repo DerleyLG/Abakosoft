@@ -347,7 +347,7 @@ module.exports = {
       const id_pago = req.params.id;
 
       // Obtener los detalles del pago antes de eliminarlos para saber qué avances desmarcar
-      const detallesDelPago = await detalleModel.getByPagoId(id_pago);
+      const detallesDelPago = await detalleModel.getById(id_pago);
 
       // Verificar existencia
       const pagoExistente = await pagosModel.getById(id_pago);
