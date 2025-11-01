@@ -176,17 +176,16 @@ module.exports = {
           }
 
           await connection.query(
-            `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, subtotal, es_descuento)
-             VALUES (?, ?, ?, ?, ?, 0)`,
+            `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento)
+             VALUES (?, ?, ?, ?, 0)`,
             [
               id_pago,
               d.id_avance_etapa,
               d.cantidad,
               d.pago_unitario,
-              d.cantidad * d.pago_unitario,
             ]
           );
-          await avanceEtapasModel.updatePagado(d.id_avance_etapa, 1);
+          await avanceEtapasModel.updatePagado(d.id_avance_etapa, 1, connection);
         }
       }
 
@@ -212,9 +211,9 @@ module.exports = {
         }
         // Insertar detalle de descuento por anticipo (subtotal negativo)
         await connection.query(
-          `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, subtotal, es_descuento)
-           VALUES (?, NULL, 1, ?, ?, 1)`,
-          [id_pago, -Math.abs(a.monto_aplicado), -Math.abs(a.monto_aplicado)]
+          `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento)
+           VALUES (?, NULL, 1, ?, 1)`,
+          [id_pago, -Math.abs(a.monto_aplicado)]
         );
         await AnticiposModel.descontar(
           anticipo.id_anticipo,
@@ -223,7 +222,7 @@ module.exports = {
       }
 
       // Recalcular total
-      await pagosModel.calcularMonto(id_pago);
+      await pagosModel.calcularMonto(id_pago, connection);
       await connection.commit();
       return res.status(201).json({ success: true, id_pago });
     } catch (error) {

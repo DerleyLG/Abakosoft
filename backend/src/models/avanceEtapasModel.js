@@ -435,8 +435,9 @@ module.exports = {
     );
   },
 
-  updatePagado: async (id_avance_etapa, pagado = 1) => {
-    const [result] = await db.query(
+  updatePagado: async (id_avance_etapa, pagado = 1, connection = null) => {
+    const dbOrConn = connection || db;
+    const [result] = await dbOrConn.query(
       "UPDATE avance_etapas_produccion SET pagado = ? WHERE id_avance_etapa = ?",
       [pagado, id_avance_etapa]
     );

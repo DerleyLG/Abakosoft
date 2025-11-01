@@ -73,17 +73,15 @@ create: async ({ id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento
   
   insertMany: async (id_pago, detalles) => {
   for (const d of detalles) {
-    const subtotal = d.cantidad * d.pago_unitario;
     await db.query(
       `INSERT INTO detalle_pago_trabajador 
-       (id_pago, id_avance_etapa, cantidad, pago_unitario, subtotal, fecha_pago, observaciones)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id_pago, id_avance_etapa, cantidad, pago_unitario, fecha_pago, observaciones)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         id_pago,
         d.id_avance_etapa,
         d.cantidad,
         d.pago_unitario,
-        subtotal,
         d.fecha_pago,
         d.observaciones || null
       ]
