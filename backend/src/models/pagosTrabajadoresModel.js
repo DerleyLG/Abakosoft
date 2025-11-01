@@ -122,8 +122,9 @@ module.exports = {
     return result.insertId;
   },
 
-  calcularMonto: async (id_pago) => {
-    const [result] = await db.query(
+  calcularMonto: async (id_pago, connection = null) => {
+    const dbOrConn = connection || db;
+    const [result] = await dbOrConn.query(
       `SELECT SUM(subtotal) AS total
      FROM detalle_pago_trabajador
      WHERE id_pago = ?`,
@@ -132,7 +133,7 @@ module.exports = {
 
     const total = result[0]?.total || 0;
 
-    await db.query(
+    await dbOrConn.query(
       `UPDATE pagos_trabajadores SET monto_total = ? WHERE id_pago = ?`,
       [total, id_pago]
     );
