@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { FiPlus, FiEye, FiArrowLeft } from 'react-icons/fi';
+import { FiPlus, FiEye, FiArrowLeft, FiTrash2 } from 'react-icons/fi';
 import React from 'react';
+import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 
 const PagosTrabajadores = () => {
   const [pagos, setPagos] = useState([]);
@@ -69,6 +71,12 @@ const PagosTrabajadores = () => {
     if (!pago.detalles) {
       try {
         const res = await api.get(`/detalle-pago-trabajador/${id_pago}`);
+        console.log('[PagosTrabajadores] Detalles recibidos:', {
+          id_pago,
+          data: res.data,
+          esArray: Array.isArray(res.data),
+          length: res.data?.length
+        });
         setPagos((prev) =>
           prev.map((p) =>
             p.id_pago === id_pago ? { ...p, detalles: res.data } : p
@@ -80,6 +88,45 @@ const PagosTrabajadores = () => {
       }
     }
     setExpandedPago(id_pago);
+  };
+
+  const handleDeletePago = async (id_pago, trabajador) => {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      html: `Esto eliminará el pago del trabajador <strong>${trabajador}</strong>.<br>Los avances volverán a estado "pendiente de pago".`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/pagos/${id_pago}`);
+        toast.success('Pago eliminado correctamente');
+        // Recargar pagos
+        const resPagos = await api.get('/pagos', {
+          params: {
+            page,
+            pageSize,
+            sortBy: 'fecha_pago',
+            sortDir: 'desc',
+            trabajadorId: trabajadorFiltro || undefined,
+          },
+        });
+        const payload = resPagos.data || {};
+        setPagos(Array.isArray(payload.data) ? payload.data : []);
+        setTotalPages(Number(payload.totalPages) || 1);
+        setTotal(Number(payload.total) || 0);
+        setHasNext(Boolean(payload.hasNext));
+        setHasPrev(Boolean(payload.hasPrev));
+      } catch (error) {
+        console.error('Error eliminando pago:', error);
+        toast.error('Error al eliminar el pago');
+      }
+    }
   };
 
   // Al cambiar el filtro de trabajador, volver a página 1
@@ -176,20 +223,43 @@ const PagosTrabajadores = () => {
                 >
                   <td className="px-4 py-3">{pago.trabajador}</td>
                   <td className="px-4 py-3">
-                    {new Date(pago.fecha_pago).toLocaleDateString('es-ES')}
+                    {pago.fecha_pago 
+                      ? (() => {
+                          // Extraer solo la parte de fecha YYYY-MM-DD del string
+                          const fechaStr = String(pago.fecha_pago).split('T')[0].split(' ')[0];
+                          const [year, month, day] = fechaStr.split('-');
+                          return `${day}/${month}/${year}`;
+                        })()
+                      : 'N/A'
+                    }
                   </td>
                   <td className="px-4 py-3">
                     ${Number(pago.total).toLocaleString("es-CO") || '0.00'}
                   </td>
   
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => toggleExpand(pago.id_pago)}
-                      className="flex text-blue-600 hover:text-blue-400 transition cursor-pointer mr-3 gap-3"
-                      title="Ver detalles"
-                    >
-                      <FiEye size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(pago.id_pago);
+                        }}
+                        className="text-blue-600 hover:text-blue-400 transition cursor-pointer"
+                        title="Ver detalles"
+                      >
+                        <FiEye size={20} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePago(pago.id_pago, pago.trabajador);
+                        }}
+                        className="text-red-600 hover:text-red-400 transition cursor-pointer"
+                        title="Eliminar pago"
+                      >
+                        <FiTrash2 size={20} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 {expandedPago === pago.id_pago && (
