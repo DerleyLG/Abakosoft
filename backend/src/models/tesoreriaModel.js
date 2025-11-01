@@ -2,6 +2,21 @@
 
 const db = require("../database/db");
 
+function getTodayYMDForTZ(timeZone) {
+  const tz =
+    timeZone || process.env.APP_TZ || process.env.TZ || "America/Bogota";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value || "1970";
+  const m = parts.find((p) => p.type === "month")?.value || "01";
+  const d = parts.find((p) => p.type === "day")?.value || "01";
+  return `${y}-${m}-${d}`;
+}
+
 const TesoreriaModel = {
   getMetodosPago: async () => {
     const [rows] = await db.query("SELECT * FROM metodos_pago");
@@ -10,7 +25,7 @@ const TesoreriaModel = {
 
   getMovimientosTesoreria: async () => {
     const [rows] = await db.query(
-      "SELECT id_movimiento, id_documento, tipo_documento, fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria ORDER BY fecha_movimiento DESC"
+      "SELECT id_movimiento, id_documento, tipo_documento, DATE(fecha_movimiento) AS fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria ORDER BY DATE(fecha_movimiento) DESC"
     );
     return rows;
   },
@@ -21,16 +36,16 @@ const TesoreriaModel = {
     }
 
     const query = `
-        SELECT 
-            id_movimiento, 
-            id_documento, 
-            tipo_documento, 
-            fecha_movimiento, 
-            monto, 
-            id_metodo_pago, 
-            referencia, 
-            observaciones 
-        FROM movimientos_tesoreria 
+    SELECT 
+      id_movimiento, 
+      id_documento, 
+      tipo_documento, 
+      DATE(fecha_movimiento) AS fecha_movimiento, 
+      monto, 
+      id_metodo_pago, 
+      referencia, 
+      observaciones 
+    FROM movimientos_tesoreria 
         WHERE id_documento = ? 
         AND tipo_documento = ?
         LIMIT 1
@@ -68,7 +83,20 @@ const TesoreriaModel = {
         observaciones)
       VALUES (?, ?, ?, ?, ?, ?, ?) `;
 
-    const fechaFinal = fecha_movimiento || new Date();
+    // Normalizamos fecha_movimiento: si no viene, y es una venta (orden_venta/venta), tomamos la fecha de la OV asociada
+    // Determinar fecha final del movimiento
+    let fechaFinal = fecha_movimiento;
+    // Si viene string con hora, quedarnos con YYYY-MM-DD
+    if (typeof fechaFinal === "string") {
+      const m = fechaFinal.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) {
+        fechaFinal = m[1];
+      }
+    }
+    if (!fechaFinal) {
+      // Por defecto: hoy según TZ definida (no UTC) para todos los movimientos
+      fechaFinal = getTodayYMDForTZ();
+    }
 
     const [result] = await conn.query(query, [
       id_documento,
@@ -88,18 +116,20 @@ const TesoreriaModel = {
       SELECT SUM(mt.monto) AS total
       FROM movimientos_tesoreria mt
       JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
-      WHERE DATE_FORMAT(mt.fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      AND mt.tipo_documento = 'orden_venta'
-      AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
+      WHERE mt.fecha_movimiento >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND mt.fecha_movimiento <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        AND TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%'
+        AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
     `);
 
     const [ventasMensualResult] = await connection.query(`
       SELECT COUNT(*) AS total
       FROM movimientos_tesoreria mt
       JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
-      WHERE DATE_FORMAT(mt.fecha_movimiento, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      AND mt.tipo_documento = 'orden_venta'
-      AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
+      WHERE mt.fecha_movimiento >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND mt.fecha_movimiento <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        AND TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%'
+        AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
     `);
 
     const totalMes = totalMesResult[0].total || 0;

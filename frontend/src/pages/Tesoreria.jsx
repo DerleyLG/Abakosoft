@@ -33,6 +33,28 @@ const TesoreriaDashboard = () => {
     materiaPrimaCount: 0,
   });
 
+  // Utilidad para parsear fechas 'YYYY-MM-DD' (string) o Date a fecha local sin hora
+  const parseFecha = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+    if (typeof value === 'string') {
+      const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) {
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        return new Date(y, (mo || 1) - 1, d || 1);
+      }
+    }
+    try {
+      const dt = new Date(value);
+      if (!isNaN(dt)) return dt;
+    } catch (_) {}
+    return null;
+  };
+
   const calcularResumenFinanciero = (movs, metodos) => {
     const resumen = {
       totalCompras: 0,
@@ -51,8 +73,7 @@ const TesoreriaDashboard = () => {
     const transferenciaId = metodos.find(m => m.nombre.toLowerCase().includes('transferencia'))?.id_metodo_pago;
 
     movs.forEach(mov => {
-      
-      const fecha = mov.fecha_movimiento ? new Date(mov.fecha_movimiento) : null;
+      const fecha = parseFecha(mov.fecha_movimiento);
       if (!fecha) return;
       if (fecha.getMonth() !== currentMonth || fecha.getFullYear() !== currentYear) return;
 
@@ -123,9 +144,10 @@ const TesoreriaDashboard = () => {
 
   const navigate = useNavigate();
 
-  const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
+  const formatDate = (value) => {
+    const dt = parseFecha(value);
+    if (!dt) return '-';
+    return dt.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: '2-digit' });
   };
 
   const formatCurrency = (amount) => {

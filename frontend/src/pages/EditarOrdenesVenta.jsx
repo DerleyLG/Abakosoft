@@ -267,10 +267,7 @@ const OrdenVentaEdit = () => {
             toast.error("Selecciona un cliente");
             return false;
         }
-        if (!fecha) {
-            toast.error("Selecciona una fecha");
-            return false;
-        }
+        // Fecha no es editable ni requerida desde el cliente
         if (!metodoPago) {
             toast.error("Selecciona un método de pago");
             return false;
@@ -308,7 +305,6 @@ const OrdenVentaEdit = () => {
         const payload = {
             id_orden_venta: id,
             id_cliente: cliente.id_cliente,
-            fecha,
             estado,
             detalles: detallesFormateados,
             id_metodo_pago: metodoPago.id_metodo_pago, 
@@ -383,19 +379,7 @@ const OrdenVentaEdit = () => {
                     </div>
 
                    
-                    <div className="flex flex-col">
-                        <label htmlFor="fecha" className="mb-2 font-medium text-slate-600">Fecha de la Orden</label>
-                        <input
-                            type="date"
-                            id="fecha"
-                            name="fecha"
-                            value={fecha}
-                            onChange={(e) => setFecha(e.target.value)}
-                            required
-                            disabled={!vieneDeUndefined}
-                            className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-                        />
-                    </div>
+                    {/* Campo de fecha removido: la fecha está definida por el backend y no es editable */}
 
                 
                     <div className="flex flex-col">
