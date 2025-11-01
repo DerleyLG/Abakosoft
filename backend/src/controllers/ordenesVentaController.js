@@ -9,6 +9,22 @@ const db = require("../database/db");
 const ventasCreditoModel = require("../models/ventasCredito");
 const metodosDePagoModel = require("../models/metodosDePagoModel");
 
+// Utilidad para obtener la fecha local YYYY-MM-DD en una zona horaria dada
+function getTodayYMDForTZ(timeZone) {
+  const tz =
+    timeZone || process.env.APP_TZ || process.env.TZ || "America/Bogota";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value || "1970";
+  const m = parts.find((p) => p.type === "month")?.value || "01";
+  const d = parts.find((p) => p.type === "day")?.value || "01";
+  return `${y}-${m}-${d}`;
+}
+
 async function clienteExists(id_cliente, connection = db) {
   const [rows] = await (connection || db).query(
     "SELECT 1 FROM clientes WHERE id_cliente = ? LIMIT 1",
@@ -83,7 +99,7 @@ module.exports = {
       const {
         id_cliente,
         estado,
-        fecha,
+        // fecha ignorada deliberadamente para seguridad/rigidez
         detalles,
         id_metodo_pago,
         referencia,
@@ -106,12 +122,8 @@ module.exports = {
           `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`
         );
       }
-      if (!fecha || isNaN(Date.parse(fecha))) {
-        throw new Error("Fecha inválida o no proporcionada.");
-      }
-      const fechaFormat = new Date(fecha + "T00:00:00")
-        .toISOString()
-        .split("T")[0];
+      // Fecha de la OV: forzar fecha local del servidor según TZ configurable (por defecto America/Bogota)
+      const fechaFormat = getTodayYMDForTZ();
 
       if (!Array.isArray(detalles) || detalles.length === 0) {
         throw new Error("Debe incluir al menos un detalle.");
@@ -232,6 +244,8 @@ module.exports = {
           id_metodo_pago: resolvedMetodoId,
           referencia,
           observaciones: observaciones_pago,
+          // No pasar fecha_movimiento: el modelo usará la fecha de la OV por defecto
+          fecha_movimiento: null,
         };
         await tesoreriaModel.insertarMovimiento(movimientoData, connection);
       }

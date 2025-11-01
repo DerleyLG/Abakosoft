@@ -16,10 +16,14 @@ const MySwal = withReactContent(Swal);
 
 const Inventario = () => {
   const [inventario, setInventario] = useState([]);
+  const [allItems, setAllItems] = useState([]); // fuente única para filtrar en cliente
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [categorias, setCategorias] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
-  const [articulosIndex, setArticulosIndex] = useState({}); 
+  // Eliminado índice cruzado; el backend ya entrega categoría por ítem
   const [stockFabricadoFilter, setStockFabricadoFilter] = useState('');
   const [stockProcesoFilter, setStockProcesoFilter] = useState('');
   const [stockDisponibleFilter, setStockDisponibleFilter] = useState('');
@@ -30,37 +34,138 @@ const Inventario = () => {
   const canEdit = can(role, ACTIONS.INVENTORY_EDIT);
   const canDelete = can(role, ACTIONS.INVENTORY_DELETE);
 
+  // 1) Cargar categorías e inventario completo una sola vez o cuando se necesite refrescar
   useEffect(() => {
-    const fetchData = async () => {
+    const initialFetch = async () => {
       try {
-        const [resInv, resCat, resArt] = await Promise.all([
-          api.get('/inventario'),
+        const [resCat, resAll, resArticulos] = await Promise.all([
           api.get('/categorias'),
-          api.get('/articulos'),
+          api.get('/inventario', { params: { page: 1, pageSize: 10000 } }),
+          api.get('/articulos'), // Traer artículos con id_categoria
         ]);
-        setInventario(resInv.data);
         setCategorias(Array.isArray(resCat.data) ? resCat.data : []);
-        const idx = {};
-        (Array.isArray(resArt.data) ? resArt.data : []).forEach((a) => {
-          idx[a.id_articulo] = {
-            id_categoria: a.id_categoria,
-            nombre_categoria: a.nombre_categoria,
-          };
+        
+        const payload = resAll.data;
+        let items = Array.isArray(payload) ? payload : (payload?.data || []);
+        
+        // Si los items del inventario no tienen id_categoria, cruzarlos con artículos
+        const articulos = Array.isArray(resArticulos.data) ? resArticulos.data : [];
+        console.log('[Inventario] Artículos recibidos:', {
+          total: articulos.length,
+          muestra: articulos.slice(0, 3).map(a => ({ id: a.id_articulo, desc: a.descripcion, cat: a.id_categoria }))
         });
-        setArticulosIndex(idx);
+        
+        const articulosMap = {};
+        articulos.forEach(art => {
+          articulosMap[art.id_articulo] = art.id_categoria;
+        });
+        
+        items = items.map(item => ({
+          ...item,
+          id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
+        }));
+        
+        console.debug('[Inventario] Cargado total de items:', items.length);
+        console.log('[Inventario] Payload completo recibido del backend:', {
+          esArray: Array.isArray(payload),
+          primerItem: items[0]
+        });
+        setAllItems(items);
       } catch (error) {
         console.error('Error cargando inventario o categorías', error);
         const msg = error.response?.data?.mensaje || error.response?.data?.message || error.message;
         toast.error(msg);
       }
     };
-    fetchData();
+    initialFetch();
   }, []);
+
+  // 2) Aplicar filtro y paginar en cliente cada vez que cambian filtros o paginación
+  useEffect(() => {
+    const term = (searchTerm || '').toLowerCase();
+    const rule = (val, r) => {
+      if (!r) return true;
+      const n = Number(val || 0);
+      if (r === 'gt0') return n > 0;
+      if (r === 'eq0') return n === 0;
+      return true;
+    };
+
+    // Log detallado ANTES de filtrar
+    if (categoriaSeleccionada) {
+      console.log('[Inventario] DEBUG filtro categoría:', {
+        categoriaSeleccionada,
+        tipo: typeof categoriaSeleccionada,
+        totalItems: allItems.length,
+        muestraItems: allItems.slice(0, 5).map(it => ({
+          desc: it.descripcion,
+          id_cat: it.id_categoria,
+          tipo_id_cat: typeof it.id_categoria,
+          coincide: String(it.id_categoria) === String(categoriaSeleccionada)
+        }))
+      });
+    }
+
+    const filtered = (allItems || [])
+      .filter((it) => {
+        const bySearch = term
+          ? ((it.descripcion || '').toLowerCase().includes(term) || (it.referencia || '').toLowerCase().includes(term))
+          : true;
+        const byCat = categoriaSeleccionada
+          ? String(it.id_categoria) === String(categoriaSeleccionada)
+          : true;
+        const okDisp = rule(it.stock_disponible ?? it.stock, stockDisponibleFilter);
+        const okFab = rule(it.stock_fabricado, stockFabricadoFilter);
+        const okProc = (typeof it.stock_en_proceso !== 'undefined')
+          ? rule(it.stock_en_proceso, stockProcesoFilter)
+          : true;
+        return bySearch && byCat && okDisp && okFab && okProc;
+      })
+      .sort((a, b) => String(a.descripcion || '').localeCompare(String(b.descripcion || '')));
+
+    console.debug('[Inventario] Filtro aplicado:', {
+      categoriaSeleccionada,
+      searchTerm,
+      stockDisponibleFilter,
+      stockFabricadoFilter,
+      stockProcesoFilter,
+      totalAntes: allItems.length,
+      totalDespues: filtered.length,
+      ejemploCategorias: filtered.slice(0, 3).map(x => ({id_cat: x.id_categoria, desc: x.descripcion})),
+    });
+
+    const total = filtered.length;
+    const tp = Math.max(1, Math.ceil(total / pageSize));
+    const start = (page - 1) * pageSize;
+    const paged = filtered.slice(start, start + pageSize);
+    setInventario(paged);
+    setTotalPages(tp);
+  }, [allItems, page, pageSize, searchTerm, categoriaSeleccionada, stockDisponibleFilter, stockFabricadoFilter, stockProcesoFilter]);
 
   const cargarInventario = async () => {
     try {
-      const res = await api.get('/inventario');
-      setInventario(res.data);
+      const [resAll, resArticulos] = await Promise.all([
+        api.get('/inventario', { params: { page: 1, pageSize: 10000 } }),
+        api.get('/articulos'),
+      ]);
+      
+      const payload = resAll.data;
+      let items = Array.isArray(payload) ? payload : (payload?.data || []);
+      
+      // Cruzar con artículos para obtener id_categoria si falta
+      const articulos = Array.isArray(resArticulos.data) ? resArticulos.data : [];
+      const articulosMap = {};
+      articulos.forEach(art => {
+        articulosMap[art.id_articulo] = art.id_categoria;
+      });
+      
+      items = items.map(item => ({
+        ...item,
+        id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
+      }));
+      
+      console.debug('[Inventario] Refetch total:', items.length);
+      setAllItems(items);
     } catch (error) {
       console.error('Error al cargar inventario', error);
       toast.error('Error al cargar inventario');
@@ -146,46 +251,8 @@ const Inventario = () => {
     }
   };
 
-  const filteredItems = inventario.filter((item) => {
-    const txt = (item.descripcion || '').toLowerCase();
-    const matchesText = txt.includes((searchTerm || '').toLowerCase());
-
-    
-    const matchesStock = (val, rule) => {
-      const n = Number(val || 0);
-      switch (rule) {
-        case 'gt0':
-          return n > 0;
-        case 'eq0':
-          return n === 0;
-        default:
-          return true;
-      }
-    };
-
-    
-    const okFabricado = matchesStock(item.stock_fabricado, stockFabricadoFilter);
-    const okProceso = matchesStock(item.stock_en_proceso, stockProcesoFilter);
-    const okDisponible = matchesStock(item.stock_disponible, stockDisponibleFilter);
-
-    if (!matchesText || !okFabricado || !okProceso || !okDisponible) return false;
-
-    if (!categoriaSeleccionada) return true;
-
- 
-    const fromItemIdCat = item.id_categoria;
-    const fromItemNomCat = item.nombre_categoria;
-    const fromIdx = articulosIndex[item.id_articulo] || {};
-    const idCat = fromItemIdCat ?? fromIdx.id_categoria;
-    const nomCat = fromItemNomCat ?? fromIdx.nombre_categoria;
-
- 
-    const matchesById = idCat !== undefined && idCat !== null && Number(idCat) === Number(categoriaSeleccionada);
-    if (matchesById) return true;
-    const nombreSel = (categorias.find((c) => Number(c.id_categoria) === Number(categoriaSeleccionada))?.nombre || '').toLowerCase();
-    const matchesByName = nombreSel && String(nomCat || '').toLowerCase() === nombreSel;
-    return matchesByName;
-  });
+  
+  const filteredItems = inventario;
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
@@ -209,7 +276,7 @@ const Inventario = () => {
               type="text"
               placeholder="Buscar artículo..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="w-full border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
             />
           </div>
@@ -217,7 +284,7 @@ const Inventario = () => {
             <label className="block text-gray-700 font-semibold mb-1">Categoría</label>
             <select
               value={categoriaSeleccionada}
-              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+              onChange={(e) => { setCategoriaSeleccionada(e.target.value); setPage(1); }}
               className="w-full md:min-w-[160px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
               title="Filtrar por categoría"
             >
@@ -233,7 +300,7 @@ const Inventario = () => {
             <label className="block text-gray-700 font-semibold mb-1">Stock fabricado</label>
             <select
               value={stockFabricadoFilter}
-              onChange={(e) => setStockFabricadoFilter(e.target.value)}
+              onChange={(e) => { setStockFabricadoFilter(e.target.value); setPage(1); }}
               className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
               title="Filtrar stock fabricado"
             >
@@ -246,7 +313,7 @@ const Inventario = () => {
             <label className="block text-gray-700 font-semibold mb-1">Stock en proceso</label>
             <select
               value={stockProcesoFilter}
-              onChange={(e) => setStockProcesoFilter(e.target.value)}
+              onChange={(e) => { setStockProcesoFilter(e.target.value); setPage(1); }}
               className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
               title="Filtrar stock en proceso"
             >
@@ -259,7 +326,7 @@ const Inventario = () => {
             <label className="block text-gray-700 font-semibold mb-1">Stock disponible</label>
             <select
               value={stockDisponibleFilter}
-              onChange={(e) => setStockDisponibleFilter(e.target.value)}
+              onChange={(e) => { setStockDisponibleFilter(e.target.value); setPage(1); }}
               className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
               title="Filtrar stock disponible"
             >
@@ -269,9 +336,27 @@ const Inventario = () => {
             </select>
           </div>
         </div>
+        {categoriaSeleccionada && filteredItems.length === 0 && allItems.length > 0 && (
+          <div className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+            ⚠️ <strong>Filtro de categoría no disponible:</strong> Los artículos en el inventario no tienen categorías asignadas. 
+            Para habilitar este filtro, asigna categorías a tus artículos desde el módulo de Artículos.
+          </div>
+        )}
+        {categoriaSeleccionada && filteredItems.length === 0 && allItems.length === 0 && (
+          <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+            No hay artículos inicializados en inventario para esta categoría. Puedes agregarlos desde "Agregar artículo" para iniciar con stock 0.
+          </div>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm text-gray-600">Página {page} de {totalPages}</div>
+          <div className="flex items-center gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className={`px-3 py-1 rounded border ${page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer'}`}>Anterior</button>
+            <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className={`px-3 py-1 rounded border ${page >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer'}`}>Siguiente</button>
+          </div>
+        </div>
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>

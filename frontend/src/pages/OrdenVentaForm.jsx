@@ -126,7 +126,8 @@ const OrdenVentaForm = () => {
                         setCliente(clienteExistente);
                     }
 
-                    setFecha(pedidoData.fecha_pedido.split("T")[0]);
+                    // Fecha de la venta: AUTOMÁTICA (hoy). No se toma la del pedido.
+                    setFecha(new Date().toISOString().split('T')[0]);
 
                     const articulosDelPedido = pedidoData.detalles.map((item) => ({
                         id_articulo: item.id_articulo,
@@ -140,7 +141,7 @@ const OrdenVentaForm = () => {
                         "Datos del pedido cargados. Por favor, revisa y completa los campos."
                     );
                 } else {
-                     // Inicializar la fecha a hoy si no hay datos de pedido
+                    // Fecha automática siempre: hoy (solo display interno, no se envía)
                     setFecha(new Date().toISOString().split('T')[0]); 
                 }
             } catch (error) {
@@ -211,10 +212,7 @@ const OrdenVentaForm = () => {
             toast.error("Selecciona un cliente");
             return false;
         }
-        if (!fecha) {
-            toast.error("Selecciona una fecha");
-            return false;
-        }
+        // Fecha ya no es editable ni requerida desde el cliente
         if (!metodoPago || !metodoPago.id_metodo_pago) {
             toast.error("Selecciona un método de pago");
             return false;
@@ -246,7 +244,7 @@ const OrdenVentaForm = () => {
 
         const payload = {
             id_cliente: cliente.id_cliente,
-            fecha,
+            // fecha se determina en el backend (ignora inputs del cliente)
             estado,
             detalles: articulosSeleccionados.map((a) => ({
                 id_articulo: a.id_articulo,
@@ -353,19 +351,7 @@ const OrdenVentaForm = () => {
                             </Listbox>
                         </div>
 
-                        {/* Fecha */}
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                Fecha <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                value={fecha}
-                                onChange={(e) => setFecha(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                                required
-                            />
-                        </div>
+                        {/* Campo de fecha removido: la fecha la define el backend (no visible en UI) */}
 
                         {/* Estado */}
                         <div>

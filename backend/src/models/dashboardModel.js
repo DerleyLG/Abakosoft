@@ -1,5 +1,36 @@
 const db = require("../database/db");
 
+// Zona horaria para métricas mensuales (evita que el mes cambie por UTC)
+const DEFAULT_TZ = process.env.APP_TZ || process.env.TZ || "America/Bogota";
+
+function _datePartsForTZ(tz = DEFAULT_TZ, date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const y = Number(parts.find((p) => p.type === "year")?.value || 1970);
+  const m = Number(parts.find((p) => p.type === "month")?.value || 1);
+  const d = Number(parts.find((p) => p.type === "day")?.value || 1);
+  return { y, m, d };
+}
+
+function _pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function _monthRange(offsetMonths = 0, tz = DEFAULT_TZ) {
+  const { y, m } = _datePartsForTZ(tz);
+  const startDate = new Date(y, m - 1 + offsetMonths, 1);
+  const nextDate = new Date(y, m - 1 + offsetMonths + 1, 1);
+  const start = `${startDate.getFullYear()}-${_pad2(
+    startDate.getMonth() + 1
+  )}-01`;
+  const next = `${nextDate.getFullYear()}-${_pad2(nextDate.getMonth() + 1)}-01`;
+  return { start, next };
+}
+
 const getTotalArticulos = async () => {
   const [rows] = await db.query("SELECT COUNT(*) AS total FROM articulos");
   return rows[0].total;
@@ -25,40 +56,81 @@ const getTotalClientes = async () => {
 };
 
 const getIngresosMes = async () => {
-  const [rows] = await db.query(`
-      SELECT IFNULL(SUM(dov.precio_unitario * dov.cantidad), 0) AS total_ingresos
-      FROM ordenes_venta ov
-      JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
-      WHERE MONTH(ov.fecha) = MONTH(CURDATE())
-        AND YEAR(ov.fecha) = YEAR(CURDATE())
-        AND ov.estado != 'anulada'
-    `);
+  // Ingresos por caja del mes (en TZ definida) usando rango [inicioMes, inicioMesSiguiente)
+  const { start, next } = _monthRange(0, DEFAULT_TZ);
+  const [rows] = await db.query(
+    `
+      SELECT IFNULL(SUM(mt.monto), 0) AS total_ingresos
+      FROM movimientos_tesoreria mt
+      LEFT JOIN ordenes_venta ov 
+        ON mt.id_documento = ov.id_orden_venta
+      WHERE mt.fecha_movimiento >= ?
+        AND mt.fecha_movimiento <  ?
+        AND (
+          (TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%' AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada'))
+          OR TRIM(LOWER(mt.tipo_documento)) = 'abono_credito'
+        )
+    `,
+    [start, next]
+  );
   return rows[0].total_ingresos;
 };
 
 const getEgresosMes = async () => {
-  const [[{ total_pagos }]] = await db.query(`
-        SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
-        FROM pagos_trabajadores
-        WHERE MONTH(fecha_pago) = MONTH(CURDATE()) AND YEAR(fecha_pago) = YEAR(CURDATE())
-    `);
+  // Egresos del mes (caja operativa) en TZ definida, usando rangos de fecha
+  const { start, next } = _monthRange(0, DEFAULT_TZ);
+  const [[{ total_pagos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
+      FROM pagos_trabajadores
+      WHERE fecha_pago >= ? AND fecha_pago < ?
+    `,
+    [start, next]
+  );
 
-  const [[{ total_costos_indirectos }]] = await db.query(`
-        SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
-        FROM costos_indirectos
-        WHERE MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())
-    `);
+  const [[{ total_costos_indirectos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
+      FROM costos_indirectos
+      WHERE fecha >= ? AND fecha < ?
+    `,
+    [start, next]
+  );
 
-  const [[{ total_servicios }]] = await db.query(`
-        SELECT IFNULL(SUM(costo), 0) AS total_servicios
-        FROM servicios_tercerizados
-        WHERE MONTH(fecha_inicio) = MONTH(CURDATE()) AND YEAR(fecha_inicio) = YEAR(CURDATE())
-    `);
+  const [[{ total_servicios }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(costo), 0) AS total_servicios
+      FROM servicios_tercerizados
+      WHERE fecha_inicio >= ? AND fecha_inicio < ?
+    `,
+    [start, next]
+  );
+
+  const [[{ total_compras }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
+      FROM detalle_orden_compra doc
+      JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
+      WHERE oc.fecha >= ? AND oc.fecha < ?
+    `,
+    [start, next]
+  );
+
+  const [[{ total_materia_prima }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
+      FROM compras_materia_prima
+      WHERE fecha_compra >= ? AND fecha_compra < ?
+    `,
+    [start, next]
+  );
 
   const egresos =
     parseFloat(total_pagos) +
     parseFloat(total_costos_indirectos) +
-    parseFloat(total_servicios);
+    parseFloat(total_servicios) +
+    parseFloat(total_compras) +
+    parseFloat(total_materia_prima);
   return egresos;
 };
 
@@ -186,36 +258,51 @@ const getOrdenesEnProceso = async (limit = 3) => {
 
 // Nuevas métricas comparativas y tops
 const getIngresosMesAnterior = async () => {
-  const [rows] = await db.query(`
-      SELECT IFNULL(SUM(dov.precio_unitario * dov.cantidad), 0) AS total_ingresos
-      FROM ordenes_venta ov
-      JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
-      WHERE MONTH(ov.fecha) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-        AND YEAR(ov.fecha) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-        AND ov.estado != 'anulada'
-    `);
+  const { start, next } = _monthRange(-1, DEFAULT_TZ);
+  const [rows] = await db.query(
+    `
+      SELECT IFNULL(SUM(mt.monto), 0) AS total_ingresos
+      FROM movimientos_tesoreria mt
+      LEFT JOIN ordenes_venta ov 
+        ON mt.id_documento = ov.id_orden_venta
+      WHERE mt.fecha_movimiento >= ?
+        AND mt.fecha_movimiento <  ?
+        AND (
+          (TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%' AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada'))
+          OR TRIM(LOWER(mt.tipo_documento)) = 'abono_credito'
+        )
+    `,
+    [start, next]
+  );
   return rows[0].total_ingresos;
 };
 
 const getEgresosMesAnterior = async () => {
-  const [[{ total_pagos }]] = await db.query(`
-        SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
-        FROM pagos_trabajadores
-        WHERE MONTH(fecha_pago) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-          AND YEAR(fecha_pago) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-    `);
-  const [[{ total_costos_indirectos }]] = await db.query(`
-        SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
-        FROM costos_indirectos
-        WHERE MONTH(fecha) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-          AND YEAR(fecha) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-    `);
-  const [[{ total_servicios }]] = await db.query(`
-        SELECT IFNULL(SUM(costo), 0) AS total_servicios
-        FROM servicios_tercerizados
-        WHERE MONTH(fecha_inicio) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-          AND YEAR(fecha_inicio) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-    `);
+  const { start, next } = _monthRange(-1, DEFAULT_TZ);
+  const [[{ total_pagos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
+      FROM pagos_trabajadores
+      WHERE fecha_pago >= ? AND fecha_pago < ?
+    `,
+    [start, next]
+  );
+  const [[{ total_costos_indirectos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
+      FROM costos_indirectos
+      WHERE fecha >= ? AND fecha < ?
+    `,
+    [start, next]
+  );
+  const [[{ total_servicios }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(costo), 0) AS total_servicios
+      FROM servicios_tercerizados
+      WHERE fecha_inicio >= ? AND fecha_inicio < ?
+    `,
+    [start, next]
+  );
   return (
     parseFloat(total_pagos) +
     parseFloat(total_costos_indirectos) +

@@ -83,54 +83,70 @@ const CostosIndirectos = () => {
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className="text-4xl font-bold text-gray-800 w-full md:w-auto">Costos Indirectos</h2>
-        <div className="flex w-full flex-wrap items-center gap-2 md:gap-3 justify-end">
-          <input
-            type="text"
-            placeholder="Buscar por tipo de costo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="min-w-[220px] flex-1 border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
-          />
-          <div className="flex items-center rounded-md border border-slate-300 overflow-hidden h-[42px]">
-            <button
-              type="button"
-              onClick={() => setFilterMode('pendientes')}
-              className={`px-3 h-full text-sm ${filterMode==='pendientes' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
-            >Pendientes</button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('asignados')}
-              className={`px-3 h-full text-sm border-l ${filterMode==='asignados' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
-            >Asignados</button>
-            <button
-              type="button"
-              onClick={() => setFilterMode('todos')}
-              className={`px-3 h-full text-sm border-l ${filterMode==='todos' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
-            >Todos</button>
+      {/* Título */}
+      <div className="mb-2">
+        <h2 className="text-4xl font-bold text-gray-800">Costos Indirectos</h2>
+      </div>
+
+      {/* Barra de controles en una sola línea horizontal (scroll horizontal en pantallas pequeñas) */}
+      <div className="my-5 w-full overflow-x-auto">
+        <div className="flex items-center gap-3 whitespace-nowrap">
+          {/* Filtros en línea */}
+          <div className="inline-flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Buscar tipo de costo…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-gray-500 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[44px] w-[240px]"
+              aria-label="Buscar costos indirectos"
+            />
+            <div className="flex items-center rounded-md border border-slate-300 overflow-hidden h-[44px]" role="group" aria-label="Filtrar estado">
+              <button
+                type="button"
+                onClick={() => setFilterMode('pendientes')}
+                className={`px-3 h-full text-sm ${filterMode==='pendientes' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
+                title="Pendientes"
+              >Pendientes</button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('asignados')}
+                className={`px-3 h-full text-sm border-l ${filterMode==='asignados' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
+                title="Asignados"
+              >Asignados</button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('todos')}
+                className={`px-3 h-full text-sm border-l ${filterMode==='todos' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
+                title="Todos"
+              >Todos</button>
+            </div>
           </div>
-          <button
-            onClick={() => navigate('/costos_indirectos/nuevo')}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiPlus size={20} />
-            Registrar nuevo
-          </button>
-           <button
-            onClick={() => navigate('/costos_materia_prima')}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 rounded-md font-semibold transition cursor-pointer"
-          >
-           <FiArrowRight />
-            Costos de materia prima
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiArrowLeft />
-            Volver
-          </button>
+
+          {/* Botones alineados a la derecha en la misma línea */}
+          <div className="ml-auto inline-flex items-center gap-2">
+            <button
+              onClick={() => navigate('/costos_indirectos/nuevo')}
+              className="h-[44px] inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 rounded-md font-semibold transition cursor-pointer text-base"
+            >
+              <FiPlus size={20} />
+              Registrar
+            </button>
+            <button
+              onClick={() => navigate('/costos_materia_prima')}
+              className="h-[44px] inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 rounded-md font-semibold transition cursor-pointer text-base"
+            >
+              <FiArrowRight size={20} />
+              Costos de materia prima
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="h-[44px] inline-flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 rounded-md font-semibold transition cursor-pointer text-base"
+            >
+              <FiArrowLeft size={20} />
+              Volver
+            </button>
+          </div>
         </div>
       </div>
 
@@ -194,6 +210,8 @@ const CostosIndirectos = () => {
           </tbody>
         </table>
       </div>
+
+      
     </div>
   );
 };

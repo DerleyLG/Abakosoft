@@ -79,8 +79,26 @@ const OrdenesCompra = () => {
               await api.delete(`/ordenes-compra/${id}`);
               toast.success("Orden cancelada y stock ajustado correctamente");
 
-              const res = await api.get(mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra");
-              setOrdenes(res.data);
+              // Re-cargar lista usando el mismo esquema paginado
+              const params = {
+                buscar: searchTerm || undefined,
+                page,
+                pageSize,
+                sortBy: 'fecha',
+                sortDir: 'desc',
+              };
+              if (mostrarCanceladas) {
+                params.estado = 'cancelada';
+              } else if (filtroEstado !== 'todos') {
+                params.estado = filtroEstado;
+              }
+              const res = await api.get('/ordenes-compra', { params });
+              const payload = res.data || {};
+              setOrdenes(Array.isArray(payload.data) ? payload.data : []);
+              setTotal(payload.total || 0);
+              setTotalPages(payload.totalPages || 1);
+              setHasNext(!!payload.hasNext);
+              setHasPrev(!!payload.hasPrev);
             } catch (error) {
               const mensaje =
                 error.response?.data?.error ||
@@ -107,8 +125,26 @@ const OrdenesCompra = () => {
               await api.post(`/ordenes-compra/${id}/recibir`);
               toast.success("Recepción confirmada y stock actualizado.");
             
-              const res = await api.get(mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra");
-              setOrdenes(res.data);
+              // Re-cargar lista usando el mismo esquema paginado
+              const params = {
+                buscar: searchTerm || undefined,
+                page,
+                pageSize,
+                sortBy: 'fecha',
+                sortDir: 'desc',
+              };
+              if (mostrarCanceladas) {
+                params.estado = 'cancelada';
+              } else if (filtroEstado !== 'todos') {
+                params.estado = filtroEstado;
+              }
+              const res = await api.get('/ordenes-compra', { params });
+              const payload = res.data || {};
+              setOrdenes(Array.isArray(payload.data) ? payload.data : []);
+              setTotal(payload.total || 0);
+              setTotalPages(payload.totalPages || 1);
+              setHasNext(!!payload.hasNext);
+              setHasPrev(!!payload.hasPrev);
             } catch (error) {
               const mensaje =
                 error.response?.data?.error ||

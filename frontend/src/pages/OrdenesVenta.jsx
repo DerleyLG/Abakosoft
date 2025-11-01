@@ -367,7 +367,7 @@ const handleEdit = (id) => {
                             <td className="px-2 py-2 border-b border-gray-300">
                               ${Number(d.precio_unitario).toLocaleString()}
                             </td>
-                            <td className="px-2 py-2 border-b">
+                            <td className="px-2 py-2 border-b border-gray-300">
                               ${Number(d.subtotal).toLocaleString()}
                             </td>
                           </tr>
