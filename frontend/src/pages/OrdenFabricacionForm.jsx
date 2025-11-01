@@ -47,11 +47,12 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
     const fetchOrdenesPedido = async () => {
       try {
         const res = await api.get("/pedidos");
-
-        setOrdenesPedido(res.data);
+        const payload = res.data || {};
+        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
+        setOrdenesPedido(rows);
 
         if (idPedidoSeleccionado) {
-          const seleccionada = res.data.find(
+          const seleccionada = rows.find(
             (p) => p.id_pedido === idPedidoSeleccionado
           );
           if (seleccionada) {
@@ -59,14 +60,16 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
           }
         }
       } catch (error) {
-        toast.error("Error al cargar órdenes de venta");
+        toast.error("Error al cargar órdenes de pedido");
       }
     };
 
     const fetchArticulos = async () => {
       try {
-        const res = await api.get("/articulos");
-        setArticulos(res.data);
+        const res = await api.get("/articulos", { params: { page: 1, pageSize: 200, sortBy: 'descripcion', sortDir: 'asc' } });
+        const payload = res.data || {};
+        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
+        setArticulos(rows);
       } catch (error) {
         toast.error("Error al cargar artículos");
       }
@@ -75,7 +78,9 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
     const fetchEtapas = async () => {
       try {
         const res = await api.get("/etapas-produccion");
-        setEtapasProduccion(res.data);
+        const payload = res.data || {};
+        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
+        setEtapasProduccion(rows);
       } catch (error) {
         toast.error("Error al cargar etapas de producción");
       }

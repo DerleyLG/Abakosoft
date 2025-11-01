@@ -25,16 +25,16 @@ const CrearArticulo = () => {
             try {
                 const [resCategorias, resArticulos] = await Promise.all([
                     api.get('/categorias'),
-                    api.get('/articulos'),
+                    api.get('/articulos', { params: { page: 1, pageSize: 100, sortBy: 'descripcion', sortDir: 'asc' } }),
                 ]);
-           
-                setCategorias(resCategorias.data);
-              
-                const articulosSimples = resArticulos.data.filter(art => !art.es_compuesto);
+                setCategorias(Array.isArray(resCategorias.data) ? resCategorias.data : []);
+                const lista = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
+                const articulosSimples = lista.filter(art => !art.es_compuesto);
                 setArticulos(articulosSimples);
             } catch (error) {
                 console.error('Error cargando datos', error);
-                toast.error('Error al cargar categorías o artículos');
+                const msg = error.response?.data?.mensaje || error.response?.data?.message || error.message;
+                toast.error(`Error al cargar categorías o artículos: ${msg}`);
             }
         };
         fetchData();

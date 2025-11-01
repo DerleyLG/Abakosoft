@@ -7,6 +7,8 @@ import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
 
 
 const OrdenesCompra = () => {
@@ -15,23 +17,53 @@ const OrdenesCompra = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false); 
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.rol;
+  const canCreate = can(role, ACTIONS.PURCHASES_CREATE);
+  const canEdit = can(role, ACTIONS.PURCHASES_EDIT);
+  const canDelete = can(role, ACTIONS.PURCHASES_DELETE);
 
   useEffect(() => {
     const fetchOrdenes = async () => {
       try {
-        
-        const endpoint = mostrarCanceladas ? "/ordenes-compra?estado=cancelada" : "/ordenes-compra";
-        const res = await api.get(endpoint);
-        setOrdenes(res.data);
+        setLoading(true);
+        const params = {
+          buscar: searchTerm || undefined,
+          page,
+          pageSize,
+          sortBy: 'fecha',
+          sortDir: 'desc',
+        };
+        if (mostrarCanceladas) {
+          params.estado = 'cancelada';
+        } else if (filtroEstado !== 'todos') {
+          params.estado = filtroEstado;
+        }
+        const res = await api.get('/ordenes-compra', { params });
+        const payload = res.data || {};
+        setOrdenes(Array.isArray(payload.data) ? payload.data : []);
+        setTotal(payload.total || 0);
+        setTotalPages(payload.totalPages || 1);
+        setHasNext(!!payload.hasNext);
+        setHasPrev(!!payload.hasPrev);
       } catch (error) {
         console.error("Error al cargar las órdenes de compra:", error);
         toast.error("Error al cargar las órdenes");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchOrdenes();
-  }, [mostrarCanceladas]); 
+  }, [mostrarCanceladas, filtroEstado, page, pageSize, searchTerm]); 
 
   const handleCrear = () => navigate("/ordenes_compra/nuevo");
 
@@ -95,6 +127,7 @@ const OrdenesCompra = () => {
   const toggleMostrarCanceladas = () => {
     setMostrarCanceladas((prev) => !prev);
     setExpandedId(null);
+    setPage(1);
   };
 
 
@@ -132,7 +165,7 @@ const OrdenesCompra = () => {
       year: "numeric",
     });
 
-    // filtro por texto
+    // el backend ya filtra por proveedor (buscar), complementamos por fecha
     const textMatch = proveedor.includes(term) || fechaStr.includes(term);
     if (!textMatch) return false;
 
@@ -156,7 +189,7 @@ const OrdenesCompra = () => {
             type="text"
             placeholder="proveedor o fecha"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
 
@@ -164,7 +197,7 @@ const OrdenesCompra = () => {
           <div>
             <select
               value={filtroEstado}
-              onChange={(e) => { setFiltroEstado(e.target.value); setExpandedId(null); }}
+              onChange={(e) => { setFiltroEstado(e.target.value); setExpandedId(null); setPage(1); }}
               className="h-[42px] border border-gray-300 rounded-md px-3"
               title="Filtrar por estado"
             >
@@ -174,13 +207,15 @@ const OrdenesCompra = () => {
             </select>
           </div>
 
-          <button
-            onClick={handleCrear}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiPlus size={20} />
-            Nueva orden
-          </button>
+          {canCreate && (
+            <button
+              onClick={handleCrear}
+              className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+            >
+              <FiPlus size={20} />
+              Nueva orden
+            </button>
+          )}
 
           <button
                       onClick={() => navigate("/tesoreria")}
@@ -214,6 +249,7 @@ const OrdenesCompra = () => {
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
+              <th className="px-4 py-3">ID</th>
               <th className="px-4 py-3">Proveedor</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Total</th>
@@ -222,13 +258,18 @@ const OrdenesCompra = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredOrdenes.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="text-center py-6 text-gray-500">Cargando…</td>
+              </tr>
+            ) : filteredOrdenes.length > 0 ? (
               filteredOrdenes.map((orden) => (
                 <React.Fragment key={orden.id_orden_compra}>
                   <tr
                     onClick={() => toggleExpand(orden.id_orden_compra)}
                     className={`cursor-pointer ${expandedId === orden.id_orden_compra ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'} transition`}
                   >
+                    <td className="px-4 py-3">{orden.id_orden_compra}</td>
                     <td className="px-4 py-3">{orden.proveedor_nombre}</td>
                     <td className="px-4 py-3">
                       {new Date(orden.fecha).toLocaleDateString("es-ES")}
@@ -239,7 +280,7 @@ const OrdenesCompra = () => {
                     <td className="px-4 py-3">{orden.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
                    
-{orden.estado === 'pendiente' && !mostrarCanceladas && (
+{canEdit && orden.estado === 'pendiente' && !mostrarCanceladas && (
 
     <button
         onClick={(e) => {
@@ -266,9 +307,12 @@ const OrdenesCompra = () => {
                           <FiCheckCircle size={18} />
                         </button>
                       )}
+                      {!canEdit && !canDelete && (
+                        <span className="text-gray-400 italic select-none">Sin permisos</span>
+                      )}
 
                     
-                      {orden.estado !== 'cancelada' && !mostrarCanceladas && (
+                      {canDelete && orden.estado !== 'cancelada' && !mostrarCanceladas && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -334,6 +378,32 @@ const OrdenesCompra = () => {
             )}
           </tbody>
         </table>
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">
+            Página {page} de {totalPages} — {total} órdenes de compra
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev}
+            >Anterior</button>
+            <button
+              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasNext}
+            >Siguiente</button>
+            <select
+              className="ml-2 border border-gray-400 rounded-md px-2 py-2"
+              value={pageSize}
+              onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );

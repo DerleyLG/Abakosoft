@@ -1,19 +1,38 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const movimientosInventarioController = require('../controllers/movimientosInventarioController'); 
+const movimientosInventarioController = require("../controllers/movimientosInventarioController");
+const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
 
+// Todas las rutas requieren autenticación
+router.use(verifyToken);
 
+// Obtener todos los movimientos (solo supervisor y admin)
+router.get(
+  "/",
+  requirePermission(ACTIONS.MOVEMENTS_VIEW),
+  movimientosInventarioController.getMovimientos
+);
 
-// Obtener todos los movimientos
-router.get('/', movimientosInventarioController.getMovimientos);
+// Obtener movimiento por ID (solo supervisor y admin)
+router.get(
+  "/:id",
+  requirePermission(ACTIONS.MOVEMENTS_VIEW),
+  movimientosInventarioController.getMovimientoById
+);
 
-// Obtener movimiento por ID
-router.get('/:id', movimientosInventarioController.getMovimientoById);
+// Actualizar movimiento (no permitido por diseño)
+router.put(
+  "/:id",
+  requirePermission(ACTIONS.MOVEMENTS_VIEW),
+  movimientosInventarioController.updateMovimiento
+);
 
-// Actualizar movimiento (sigue sin permitirse)
-router.put('/:id', movimientosInventarioController.updateMovimiento);
-
-// Eliminar movimiento (sigue sin permitirse)
-router.delete('/:id', movimientosInventarioController.deleteMovimiento);
+// Eliminar movimiento (no permitido por diseño)
+router.delete(
+  "/:id",
+  requirePermission(ACTIONS.MOVEMENTS_VIEW),
+  movimientosInventarioController.deleteMovimiento
+);
 
 module.exports = router;

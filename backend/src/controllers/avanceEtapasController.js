@@ -221,11 +221,9 @@ module.exports = {
             await connection.rollback();
             connection.release();
 
-            return res
-              .status(500)
-              .json({
-                error: `Lote listo para ser registrado, pero error al actualizar inventario: ${inventoryError.message}`,
-              });
+            return res.status(500).json({
+              error: `Lote listo para ser registrado, pero error al actualizar inventario: ${inventoryError.message}`,
+            });
           }
         }
       }
@@ -269,8 +267,6 @@ module.exports = {
   getCostoAnterior: async (req, res) => {
     const { id_articulo, id_etapa_produccion } = req.params;
 
-  
-
     try {
       const costo = await AvanceModel.obtenerUltimoCosto(
         parseInt(id_articulo),
@@ -286,14 +282,39 @@ module.exports = {
 
   getAll: async (req, res) => {
     try {
-      const { id_trabajador } = req.query;
-      const avances = await AvanceModel.getAll(id_trabajador);
-      if (avances.length === 0) {
-        return res.status(404).json({
-          error: "No se encontraron avances de etapas de producción.",
-        });
-      }
-      res.status(200).json(avances);
+      const {
+        id_trabajador = null,
+        buscar = "",
+        page = 1,
+        pageSize = 10,
+        sortBy = "fecha",
+        sortDir = "desc",
+      } = req.query;
+
+      const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+      const sizeNum = Math.min(Math.max(parseInt(pageSize, 10) || 10, 1), 200);
+
+      const { data, total } = await AvanceModel.getAllPaginated({
+        id_trabajador,
+        buscar,
+        page: pageNum,
+        pageSize: sizeNum,
+        sortBy,
+        sortDir,
+      });
+
+      const totalPages = Math.max(Math.ceil(total / sizeNum), 1);
+      res.status(200).json({
+        data,
+        page: pageNum,
+        pageSize: sizeNum,
+        total,
+        totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1,
+        sortBy,
+        sortDir: String(sortDir).toLowerCase() === "asc" ? "asc" : "desc",
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -301,14 +322,39 @@ module.exports = {
 
   getAllPagados: async (req, res) => {
     try {
-      const { id_trabajador } = req.query;
-      const avances = await AvanceModel.getAllPagados(id_trabajador);
-      if (avances.length === 0) {
-        return res
-          .status(404)
-          .json({ error: "No se encontraron avances pagados." });
-      }
-      res.status(200).json(avances);
+      const {
+        id_trabajador = null,
+        buscar = "",
+        page = 1,
+        pageSize = 10,
+        sortBy = "fecha",
+        sortDir = "desc",
+      } = req.query;
+
+      const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+      const sizeNum = Math.min(Math.max(parseInt(pageSize, 10) || 10, 1), 200);
+
+      const { data, total } = await AvanceModel.getAllPagadosPaginated({
+        id_trabajador,
+        buscar,
+        page: pageNum,
+        pageSize: sizeNum,
+        sortBy,
+        sortDir,
+      });
+
+      const totalPages = Math.max(Math.ceil(total / sizeNum), 1);
+      res.status(200).json({
+        data,
+        page: pageNum,
+        pageSize: sizeNum,
+        total,
+        totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1,
+        sortBy,
+        sortDir: String(sortDir).toLowerCase() === "asc" ? "asc" : "desc",
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

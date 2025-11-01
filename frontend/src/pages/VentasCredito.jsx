@@ -4,6 +4,7 @@ import api from "../services/api"; // Usa tu instancia de API
 import { FiEye, FiArrowLeft, FiPlusCircle, FiSearch } from "react-icons/fi";
 import toast from "react-hot-toast";
 import AbonoDrawer from "../components/AbonoDrawer";
+import CrearCreditoManualModal from "../components/CrearCreditoManualModal";
 import CreditoHistorialDrawer from "../components/CreditoHistorialDrawer";
 
 const VentasCredito = () => {
@@ -21,6 +22,7 @@ const VentasCredito = () => {
     const [referencia, setReferencia] = useState("");
     const [obsAbono, setObsAbono] = useState("");
     const [guardandoAbono, setGuardandoAbono] = useState(false);
+    const [openCrearManual, setOpenCrearManual] = useState(false);
 
     const API_ENDPOINT = "/creditos"; 
 
@@ -101,7 +103,8 @@ const VentasCredito = () => {
     const filteredCreditos = creditos.filter((credito) => {
         const term = searchTerm.toLowerCase();
         const cliente = credito.cliente_nombre?.toLowerCase() || "";
-        const idVenta = String(credito.id_orden_venta) || "";
+        const idVenta = String(credito.id_orden_venta || "");
+        const idCredito = String(credito.id_venta_credito || "");
 
         const montoTotal = Number(credito.monto_total || 0);
         const saldo = Number(credito.saldo_pendiente || 0);
@@ -115,6 +118,7 @@ const VentasCredito = () => {
         return (
             cliente.includes(term) ||
             idVenta.includes(term) ||
+            idCredito.includes(term) ||
             estadoDerivado.includes(term) ||
             (credito.estado || '').toLowerCase().includes(term)
         );
@@ -164,6 +168,13 @@ const VentasCredito = () => {
                     </div>
 
                     <button
+                        onClick={() => setOpenCrearManual(true)}
+                        className="h-[42px] flex items-center bg-emerald-600 hover:bg-emerald-700 gap-2 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+                    >
+                        <FiPlusCircle /> Registrar factura pendiente
+                    </button>
+
+                    <button
                         onClick={() => navigate(-1)}
                         className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
                     >
@@ -178,7 +189,7 @@ const VentasCredito = () => {
                 <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
                     <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
                         <tr>
-                            <th className="px-4 py-3">ID Venta</th>
+                            <th className="px-4 py-3">Documento</th>
                             <th className="px-4 py-3">Cliente</th>
                             <th className="px-4 py-3">Fecha Crédito</th>
                           
@@ -213,8 +224,12 @@ const VentasCredito = () => {
                                         }`}
                                     >
                                      
-                                        <td className="px-4 py-3 font-mono text-gray-700">
-                                            #{credito.id_orden_venta}
+                                        <td className="px-4 py-3">
+                                            {credito.id_orden_venta ? (
+                                                <span className="font-mono text-gray-700">OV #{credito.id_orden_venta}</span>
+                                            ) : (
+                                                <span className="font-mono text-slate-700">CR #{credito.id_venta_credito}</span>
+                                            )}
                                         </td>
 
                                   
@@ -318,6 +333,24 @@ const VentasCredito = () => {
             {historialCreditoId && (
                 <CreditoHistorialDrawer creditoId={historialCreditoId} onClose={() => setHistorialCreditoId(null)} />
             )}
+                        {openCrearManual && (
+                                <CrearCreditoManualModal
+                                    open={openCrearManual}
+                                    onClose={() => setOpenCrearManual(false)}
+                                    onCreated={async () => {
+                                        setLoading(true);
+                                        try {
+                                            const res = await api.get(API_ENDPOINT);
+                                            setCreditos(res.data);
+                                            toast.success('Lista actualizada');
+                                        } catch (e) {
+                                            console.error('Error refrescando creditos', e);
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                />
+                        )}
         </div>
     );
 };

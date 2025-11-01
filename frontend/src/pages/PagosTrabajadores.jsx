@@ -9,24 +9,55 @@ const PagosTrabajadores = () => {
   const [trabajadores, setTrabajadores] = useState([]);
   const [trabajadorFiltro, setTrabajadorFiltro] = useState('');
   const [expandedPago, setExpandedPago] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInit = async () => {
       try {
-        const [resPagos, resTrabajadores] = await Promise.all([
-          api.get('/pagos'),
-          api.get('/trabajadores'),
-        ]);
-        setPagos(resPagos.data);
-        setTrabajadores(resTrabajadores.data);
+        const resTrabajadores = await api.get('/trabajadores');
+        setTrabajadores(resTrabajadores.data || []);
       } catch (error) {
-        console.error('Error al cargar los datos:', error);
+        console.error('Error cargando trabajadores:', error);
       }
     };
-
-    fetchData();
+    fetchInit();
   }, []);
+
+  // Cargar pagos paginados cuando cambian filtros/paginación
+  useEffect(() => {
+    const fetchPagos = async () => {
+      setLoading(true);
+      try {
+        const resPagos = await api.get('/pagos', {
+          params: {
+            page,
+            pageSize,
+            sortBy: 'fecha_pago',
+            sortDir: 'desc',
+            trabajadorId: trabajadorFiltro || undefined,
+          },
+        });
+        const payload = resPagos.data || {};
+        setPagos(Array.isArray(payload.data) ? payload.data : []);
+        setTotalPages(Number(payload.totalPages) || 1);
+        setTotal(Number(payload.total) || 0);
+        setHasNext(Boolean(payload.hasNext));
+        setHasPrev(Boolean(payload.hasPrev));
+      } catch (error) {
+        console.error('Error cargando pagos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPagos();
+  }, [page, pageSize, trabajadorFiltro]);
 
   const toggleExpand = async (id_pago) => {
     if (expandedPago === id_pago) {
@@ -51,9 +82,11 @@ const PagosTrabajadores = () => {
     setExpandedPago(id_pago);
   };
 
-  const pagosFiltrados = trabajadorFiltro
-    ? pagos.filter((p) => p.id_trabajador === parseInt(trabajadorFiltro))
-    : pagos;
+  // Al cambiar el filtro de trabajador, volver a página 1
+  const onTrabajadorChange = (e) => {
+    setTrabajadorFiltro(e.target.value);
+    setPage(1);
+  };
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
@@ -68,7 +101,7 @@ const PagosTrabajadores = () => {
         <select
           className="border border-gray-300 rounded-md px-4 py-2"
           value={trabajadorFiltro}
-          onChange={(e) => setTrabajadorFiltro(e.target.value)}
+          onChange={onTrabajadorChange}
         >
           <option value="">Todos</option>
           {trabajadores.map((t) => (
@@ -123,7 +156,17 @@ const PagosTrabajadores = () => {
             </tr>
           </thead>
           <tbody>
-            {pagosFiltrados.map((pago) => (
+            {loading && (
+              <tr>
+                <td colSpan="4" className="text-center py-6 text-gray-500">Cargando...</td>
+              </tr>
+            )}
+            {!loading && pagos.length === 0 && (
+              <tr>
+                <td colSpan="4" className="text-center py-6 text-gray-500">No se encontraron pagos.</td>
+              </tr>
+            )}
+            {!loading && pagos.length > 0 && pagos.map((pago) => (
               <React.Fragment key={pago.id_pago}>
                 <tr
                   onClick={() => toggleExpand(pago.id_pago)}
@@ -207,6 +250,40 @@ const PagosTrabajadores = () => {
             ))}
           </tbody>
         </table>
+        {/* Paginación */}
+        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">Página {page} de {totalPages} {total ? `(total: ${total})` : ''}</div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700">Filas por página</label>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value, 10));
+                setPage(1);
+              }}
+              className="border border-gray-300 rounded-md px-2 py-1 h-[36px]"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <button
+              onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev || loading}
+              className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => hasNext && setPage((p) => p + 1)}
+              disabled={!hasNext || loading}
+              className={`px-3 py-2 rounded-md border ${hasNext && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'}`}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ const reportesController = {
       res.status(500).json({ error: "Error al generar el reporte" });
     }
   },
+  // (controladores adicionales eliminados)
 
   // ...
   getAvanceFabricacion: async (req, res) => {
@@ -145,16 +146,24 @@ const reportesController = {
 
   async getUtilidadPorOrden(req, res) {
     try {
-      let { desde, hasta, orden } = req.query;
+      let { desde, hasta, orden, solo_mano_obra } = req.query;
 
       if (hasta) {
         hasta = `${hasta} 23:59:59`;
       }
 
+      const soloManoObraBool =
+        solo_mano_obra == null
+          ? true
+          : ["1", "true", "si", "sí", "yes"].includes(
+              String(solo_mano_obra).toLowerCase()
+            );
+
       const data = await reportesModel.getUtilidadPorOrden({
         desde,
         hasta,
         orden,
+        solo_mano_obra: soloManoObraBool,
       });
 
       res.json({ success: true, data });

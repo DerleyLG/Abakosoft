@@ -2,7 +2,6 @@ const dashboardModel = require("../models/dashboardModel");
 
 const getDashboardData = async (req, res) => {
   try {
-   
     const [
       totalArticulos,
       ordenesPendientes,
@@ -21,6 +20,8 @@ const getDashboardData = async (req, res) => {
       pagosTrabajadoresSemanaAnterior,
       topVendidosMes,
       topFabricadosMes,
+      ventasSemana,
+      comprasSemana,
     ] = await Promise.all([
       dashboardModel.getTotalArticulos(),
       dashboardModel.getOrdenesPendientes(),
@@ -39,6 +40,8 @@ const getDashboardData = async (req, res) => {
       dashboardModel.getPagosTrabajadoresSemanaAnterior(),
       dashboardModel.getTopVendidosMes(),
       dashboardModel.getTopFabricadosMes(),
+      dashboardModel.getVentasSemana(),
+      dashboardModel.getComprasSemana(),
     ]);
 
     // Cálculo del margen de utilidad
@@ -73,6 +76,8 @@ const getDashboardData = async (req, res) => {
       TotalClientes,
       ingresosMes: Number(ingresosMes),
       egresosMes: Number(egresosMes),
+      ventasSemana: Number(ventasSemana),
+      comprasSemana: Number(comprasSemana),
       tendenciaIngresos: Number(tendenciaIngresos.toFixed(2)),
       tendenciaEgresos: Number(tendenciaEgresos.toFixed(2)),
       tendenciaPagosSem: Number(tendenciaPagosSem.toFixed(2)),

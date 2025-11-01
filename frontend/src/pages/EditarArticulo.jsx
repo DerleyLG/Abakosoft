@@ -28,7 +28,7 @@ const EditarArticulo = () => {
                 setPrecioVenta(articulo.precio_venta);
                 setPrecioCosto(articulo.precio_costo);
                 setIdCategoria(articulo.id_categoria);
-                setEsCompuesto(articulo.es_compuesto);
+                setEsCompuesto(Boolean(articulo.es_compuesto));
 
                 if (articulo.es_compuesto) {
                     const resComponentes = await api.get(`/articulos/componentes/${id}`);
@@ -51,10 +51,11 @@ const EditarArticulo = () => {
             try {
                 const [resCategorias, resArticulos] = await Promise.all([
                     api.get('/categorias'),
-                    api.get('/articulos'),
+                    api.get('/articulos', { params: { page: 1, pageSize: 500, sortBy: 'descripcion', sortDir: 'asc' } }),
                 ]);
-                setCategorias(resCategorias.data);
-                const simples = resArticulos.data.filter(art => !art.es_compuesto);
+                setCategorias(resCategorias.data || []);
+                const lista = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : Array.isArray(resArticulos.data) ? resArticulos.data : [];
+                const simples = lista.filter(art => !art.es_compuesto);
                 setArticulosSimples(simples);
                 fetchArticulo();
             } catch (error) {
@@ -207,7 +208,7 @@ const EditarArticulo = () => {
                         <input
                             type="checkbox"
                             id="esCompuesto"
-                            checked={esCompuesto}
+                            checked={!!esCompuesto}
                             onChange={(e) => setEsCompuesto(e.target.checked)}
                             className="w-4 h-4 text-slate-600 bg-gray-100 border-gray-300 rounded focus:ring-slate-500"
                         />
@@ -215,7 +216,7 @@ const EditarArticulo = () => {
                             ¿Es un artículo compuesto?
                         </label>
                     </div>
-                    {esCompuesto && (
+                    {!!esCompuesto && (
                         <div className="md:col-span-2 bg-gray-50 p-6 rounded-md border border-gray-200 mt-4">
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Componentes del Artículo</h3>
                             {componentes.map((comp, index) => (

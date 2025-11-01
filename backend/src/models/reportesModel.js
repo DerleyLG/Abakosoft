@@ -288,7 +288,7 @@ module.exports = {
     }
   },
 
-  async getUtilidadPorOrden({ desde, hasta, orden }) {
+  async getUtilidadPorOrden({ desde, hasta, orden, solo_mano_obra = true }) {
     let conditions = [];
     let params = [];
 
@@ -312,23 +312,52 @@ module.exports = {
     }
 
     const sql = `
-   SELECT
+      SELECT
         ofab.id_orden_fabricacion,
         ofab.fecha_inicio,
-        
-        COALESCE(SUM(df.cantidad * a_material.precio_costo), 0) AS costo_articulos,
-       
-        COALESCE(SUM(aep.cantidad * aep.costo_fabricacion), 0) AS costo_mano_obra,
-       
-        COALESCE(SUM(aep.cantidad * a_venta.precio_venta), 0) AS total_ingresos
+        c.nombre AS cliente,
+        COALESCE(mo.costo_mano_obra, 0) AS costo_mano_obra,
+        COALESCE(v.total_ingresos, 0) AS total_ingresos,
+        COALESCE(v.total_ingresos, 0) - COALESCE(mo.costo_mano_obra, 0) AS utilidad
       FROM ordenes_fabricacion ofab
-      LEFT JOIN detalle_orden_fabricacion df ON ofab.id_orden_fabricacion = df.id_orden_fabricacion
-      LEFT JOIN articulos a_material ON df.id_articulo = a_material.id_articulo
-      LEFT JOIN avance_etapas_produccion aep ON ofab.id_orden_fabricacion = aep.id_orden_fabricacion
-     
-      LEFT JOIN articulos a_venta ON aep.id_articulo = a_venta.id_articulo
+      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      /* Mano de obra (avance etapas: cantidad x costo_fabricacion) */
+      LEFT JOIN (
+        SELECT 
+          aep.id_orden_fabricacion,
+          SUM(aep.cantidad * aep.costo_fabricacion) AS costo_mano_obra
+        FROM avance_etapas_produccion aep
+        GROUP BY aep.id_orden_fabricacion
+      ) mo ON mo.id_orden_fabricacion = ofab.id_orden_fabricacion
+      /* Ingresos por ventas solo vía pedido (OF -> pedido -> OV),
+         distribuidos proporcionalmente por artículo entre las OF del mismo pedido */
+      LEFT JOIN (
+        SELECT 
+          poa.id_orden_fabricacion,
+          SUM(ing.ingresos_art * (poa.cant_of / NULLIF(tpa.total_producido, 0))) AS total_ingresos
+        FROM (
+          SELECT of2.id_orden_fabricacion, of2.id_pedido, df.id_articulo, SUM(df.cantidad) AS cant_of
+          FROM ordenes_fabricacion of2
+          JOIN detalle_orden_fabricacion df ON df.id_orden_fabricacion = of2.id_orden_fabricacion
+          GROUP BY of2.id_orden_fabricacion, of2.id_pedido, df.id_articulo
+        ) poa
+        JOIN (
+          SELECT ov.id_pedido, dov.id_articulo, SUM(dov.cantidad * dov.precio_unitario) AS ingresos_art
+          FROM ordenes_venta ov
+          JOIN detalle_orden_venta dov ON dov.id_orden_venta = ov.id_orden_venta
+          WHERE ov.estado = 'completada'
+          GROUP BY ov.id_pedido, dov.id_articulo
+        ) ing ON ing.id_pedido = poa.id_pedido AND ing.id_articulo = poa.id_articulo
+        JOIN (
+          SELECT of3.id_pedido, df2.id_articulo, SUM(df2.cantidad) AS total_producido
+          FROM ordenes_fabricacion of3
+          JOIN detalle_orden_fabricacion df2 ON df2.id_orden_fabricacion = of3.id_orden_fabricacion
+          GROUP BY of3.id_pedido, df2.id_articulo
+        ) tpa ON tpa.id_pedido = poa.id_pedido AND tpa.id_articulo = poa.id_articulo
+        GROUP BY poa.id_orden_fabricacion
+      ) v ON v.id_orden_fabricacion = ofab.id_orden_fabricacion
       ${where}
-      GROUP BY ofab.id_orden_fabricacion
       ORDER BY ofab.fecha_inicio DESC;
     `;
     try {
@@ -382,8 +411,37 @@ module.exports = {
     const filtros = ["1=1"];
     const params = [];
 
+    if (Array.isArray(desde)) {
+      desde = desde[desde.length - 1];
+    }
+    if (Array.isArray(hasta)) {
+      hasta = hasta[hasta.length - 1];
+    }
+    if (typeof desde === "string" && desde.includes(",")) {
+      const parts = desde
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length > 0) desde = parts[parts.length - 1];
+    }
+    if (typeof hasta === "string" && hasta.includes(",")) {
+      const parts = hasta
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length > 0) hasta = parts[parts.length - 1];
+    }
+
     const esFechaSimple = (s) =>
       typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    const extraeFecha = (s) => {
+      if (typeof s !== "string") return null;
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : null;
+    };
+    const dDesde = extraeFecha(desde);
+    const dHasta = extraeFecha(hasta);
+    const mismoDia = dDesde && dHasta && dDesde === dHasta;
     const desdeNorm = esFechaSimple(desde) ? `${desde} 00:00:00` : desde;
     const hastaNorm = esFechaSimple(hasta) ? `${hasta} 23:59:59` : hasta;
 
@@ -391,17 +449,28 @@ module.exports = {
       filtros.push("pt.id_trabajador = ?");
       params.push(id_trabajador);
     }
-    if (desdeNorm) {
-      filtros.push("pt.fecha_pago >= ?");
-      params.push(desdeNorm);
-    }
-    if (hastaNorm) {
-      filtros.push("pt.fecha_pago <= ?");
-      params.push(hastaNorm);
-    }
     if (id_orden_fabricacion) {
       filtros.push("a.id_orden_fabricacion = ?");
       params.push(id_orden_fabricacion);
+    }
+
+    if (dDesde && dHasta) {
+      if (mismoDia) {
+        filtros.push("DATE(pt.fecha_pago) = ?");
+        params.push(dDesde);
+      } else {
+        filtros.push("DATE(pt.fecha_pago) BETWEEN ? AND ?");
+        params.push(dDesde, dHasta);
+      }
+    } else {
+      if (desdeNorm) {
+        filtros.push("pt.fecha_pago >= ?");
+        params.push(desdeNorm);
+      }
+      if (hastaNorm) {
+        filtros.push("pt.fecha_pago <= ?");
+        params.push(hastaNorm);
+      }
     }
 
     const where = `WHERE ${filtros.join(" AND ")}`;
@@ -469,7 +538,6 @@ module.exports = {
 
     const where = `WHERE ${filtros.join(" AND ")}`;
 
-    // SELECT y GROUP BY dinámicos según el tipo de agrupación
     let select, groupBySql, orderBy;
 
     if (groupBy === "dia") {
@@ -485,7 +553,6 @@ module.exports = {
       groupBySql = `GROUP BY DATE(ov.fecha)`;
       orderBy = `ORDER BY fecha DESC`;
     } else if (groupBy === "mes") {
-      // YYYY-MM para visualización; se agrupa por YEAR y MONTH para ordenar correctamente.
       select = `
       SELECT
         DATE_FORMAT(ov.fecha, '%Y-%m') AS periodo,
@@ -498,7 +565,6 @@ module.exports = {
       groupBySql = `GROUP BY YEAR(ov.fecha), MONTH(ov.fecha)`;
       orderBy = `ORDER BY YEAR(ov.fecha) DESC, MONTH(ov.fecha) DESC`;
     } else {
-      // Por orden (detalle por cada OV con su total)
       select = `
       SELECT
         ov.id_orden_venta,

@@ -7,16 +7,18 @@ import toast from 'react-hot-toast';
 const NuevoInventario = () => {
   const [articulos, setArticulos] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
-  const [cantidad, setCantidad] = useState(0); // Esto será el stock inicial para stock_disponible y stock_fabricado
+  const [cantidad, setCantidad] = useState(0); 
   const [stockMinimo, setStockMinimo] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchArticulos = async () => {
       try {
-        const res = await api.get('/articulos');
-        // Mapear artículos para react-select {value, label}
-        const opciones = res.data.map((art) => ({
+        const res = await api.get('/articulos', {
+          params: { page: 1, pageSize: 500, sortBy: 'descripcion', sortDir: 'asc' }
+        });
+        const lista = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+        const opciones = lista.map((art) => ({
           value: art.id_articulo,
           label: art.descripcion,
         }));

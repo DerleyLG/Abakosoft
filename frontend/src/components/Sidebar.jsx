@@ -13,11 +13,15 @@ import {
 } from 'lucide-react';
 import { FiDollarSign, FiCreditCard } from 'react-icons/fi';
 import { NavLink, useNavigate } from 'react-router-dom';
-// user / logout moved to Header
+import { useAuth } from '../context/AuthContext';
+import { can, ACTIONS } from '../utils/permissions';
+
+
 
 const Sidebar = ({ isOpen }) => {
-  const [ordenesOpen, setOrdenesOpen] = useState(false);
-  const navigate = useNavigate();
+    const [ordenesOpen, setOrdenesOpen] = useState(false);
+    const { user } = useAuth();
+ 
   
 
   return (
@@ -88,27 +92,32 @@ const Sidebar = ({ isOpen }) => {
             <Users size={20} /> Clientes
           </NavLink>
           
-          <NavLink
-            to="/trabajadores"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
-              }`
-            }
-          >
-            <Settings size={20} /> Trabajadores
-          </NavLink>
+                    {can(user?.rol, ACTIONS.WORKERS_VIEW) && (
+                        <NavLink
+                            to="/trabajadores"
+                            end
+                            className={({ isActive }) =>
+                                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+                                    isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                                }`
+                            }
+                        >
+                            <Settings size={20} /> Trabajadores
+                        </NavLink>
+                    )}
           
-          <NavLink
-            to="/trabajadores/pagos"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
-              }`
-            }
-          >
-            <FiCreditCard size={20} /> Pagos
-          </NavLink>
+          {can(user?.rol, ACTIONS.PAYMENTS_VIEW) && (
+            <NavLink
+              to="/trabajadores/pagos"
+              className={({ isActive }) =>
+                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+                  isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                }`
+              }
+            >
+              <FiCreditCard size={20} /> Pagos
+            </NavLink>
+          )}
 
           <NavLink
             to="/inventario"
@@ -202,29 +211,31 @@ const Sidebar = ({ isOpen }) => {
         >
          	<FiDollarSign size={20} /> Tesorería
          </NavLink>
-          <NavLink
-            to="/reportes"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
-              }`
-            }
-          >
-            <FileText size={20} /> Reportes
-          </NavLink>
+          {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
+            <NavLink
+              to="/reportes"
+              className={({ isActive }) =>
+                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+                  isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                }`
+              }
+            >
+              <FileText size={20} /> Reportes
+            </NavLink>
+          )}
           
-         
-
-          <NavLink
-            to="/gestionUsuarios"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
-              }`
-            }
-          >
-            <Users size={20} /> Gestión de Usuarios
-          </NavLink>
+                                {user?.rol === 'admin' && (
+                        <NavLink
+                            to="/gestionUsuarios"
+                            className={({ isActive }) =>
+                                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+                                    isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                                }`
+                            }
+                        >
+                            <Users size={20} /> Gestión de Usuarios
+                        </NavLink>
+                    )}
         </nav>
       </div>
 

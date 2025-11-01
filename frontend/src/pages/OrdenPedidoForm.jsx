@@ -49,16 +49,21 @@ const OrdenPedidoForm = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            setLoading(true); 
+            setLoading(true);
             try {
                 const [resClientes, resArticulos, resCategorias] = await Promise.all([
                     api.get("/clientes"),
-                    api.get("/articulos"),
+                    // Solicitar artículos con paginación estandarizada y ordenar por descripción
+                    api.get("/articulos", { params: { page: 1, pageSize: 500, sortBy: "descripcion", sortDir: "asc" } }),
                     api.get("/categorias"),
                 ]);
                 setClientes(resClientes.data || []);
-                setArticulos(resArticulos.data || []);
-                setCategorias(resCategorias.data || []); 
+                // Adaptar al contrato paginado: { data, total, ... }
+                const articulosData = Array.isArray(resArticulos.data)
+                    ? resArticulos.data
+                    : (resArticulos.data?.data || []);
+                setArticulos(articulosData);
+                setCategorias(resCategorias.data || []);
             } catch (error) {
                 console.error("Error al cargar datos iniciales:", error);
                 toast.error("Error al cargar datos iniciales (clientes, artículos, categorías)");

@@ -22,15 +22,40 @@ const ESTADOS_VALIDOS = ["pendiente", "completada", "anulada"];
 module.exports = {
   getAll: async (req, res) => {
     try {
-      const estado = req.query.estado;
-      let estados;
-      if (estado === "anulada") {
-        estados = ["anulada"];
-      } else {
-        estados = ["pendiente", "completada"];
-      }
-      const data = await ordenModel.getAll(estados);
-      res.json(data);
+      const {
+        estado,
+        buscar = "",
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+      } = req.query;
+      const estados =
+        estado === "anulada" ? ["anulada"] : ["pendiente", "completada"];
+      const p = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+
+      const { data, total } = await ordenModel.getAllPaginated({
+        estados,
+        buscar,
+        page: p,
+        pageSize: ps,
+        sortBy,
+        sortDir,
+      });
+      const totalPages = Math.ceil(total / ps) || 1;
+      res.json({
+        data,
+        page: p,
+        pageSize: ps,
+        total,
+        totalPages,
+        hasNext: p < totalPages,
+        hasPrev: p > 1,
+        sortBy: sortBy || "fecha",
+        sortDir: String(sortDir).toLowerCase() === "asc" ? "asc" : "desc",
+        estado: estado || "activas",
+      });
     } catch (err) {
       console.error("Error al obtener órdenes de venta:", err);
       res.status(500).json({ error: "Error al obtener órdenes de venta." });

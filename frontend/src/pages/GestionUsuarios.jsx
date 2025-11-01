@@ -12,16 +12,20 @@ const ListaUsuarios = () => {
  const { isAuthenticated } = useContext(AuthContext);
  const [usuarios, setUsuarios] = useState([]);
  const [searchTerm, setSearchTerm] = useState('');
+ const [loading, setLoading] = useState(false);
  const navigate = useNavigate();
 
  const fetchUsuarios = async () => {
-  try {
-   const res = await api.get('/usuarios');
-   setUsuarios(res.data);
-  } catch (error) {
-   console.error('Error cargando usuarios', error);
-   toast.error('Error al cargar la lista de usuarios.');
-  }
+    try {
+     setLoading(true);
+     const res = await api.get('/usuarios');
+     setUsuarios(res.data);
+    } catch (error) {
+     console.error('Error cargando usuarios', error);
+     toast.error('Error al cargar la lista de usuarios.');
+    } finally {
+     setLoading(false);
+    }
  };
 
  // Este es el único useEffect que necesitas.
@@ -77,76 +81,111 @@ const ListaUsuarios = () => {
  });
 
  return (
-  <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-   <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-    <h2 className="text-4xl font-bold text-gray-800 w-full md:w-auto">Gestión de Usuarios</h2>
-    <div className="flex w-full md:w-200 items-center gap-4">
-     <div className="relative flex-grow">
-      <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-      <input
-       type="text"
-       placeholder="Buscar por nombre, email o rol..."
-       value={searchTerm}
-       onChange={(e) => setSearchTerm(e.target.value)}
-       className="flex-grow border border-gray-500 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
-      />
+    <div className="w-full px-4 md:px-8 lg:px-12 py-8">
+     {/* Encabezado y acciones */}
+     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+         <div>
+             <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Gestión de usuarios</h1>
+            
+         </div>
+         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+             <div className="relative flex-1 sm:flex-initial sm:w-80">
+                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                 <input
+                     type="text"
+                     placeholder="Buscar por rol"
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="w-full border border-slate-300 rounded-lg pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 focus:border-transparent"
+                 />
+             </div>
+             <button
+                 onClick={handleCrearClick}
+                 className="cursor-pointer inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition"
+             >
+                 <FiPlus size={18} /> Nuevo usuario
+             </button>
+         </div>
      </div>
-     <button
-      onClick={handleCrearClick}
-      className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-      title="Crear nuevo usuario"
-     >
-      <FiPlus size={20} />
-      Crear usuario
-     </button>
-    </div>
-   </div>
 
-   <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-    <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-     <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-      <tr>
-       <th className="px-4 py-3">Nombre</th>
-       <th className="px-4 py-3">Rol</th>
-       <th className="px-4 py-3 text-center">Acciones</th>
-      </tr>
-     </thead>
-     <tbody>
-      {filteredUsuarios.length > 0 ? (
-       filteredUsuarios.map((user) => (
-        <tr
-         key={user.id_usuario}
-         onDoubleClick={() => handleRowDoubleClick(user.id_usuario)}
-         className="hover:bg-slate-300 cursor-pointer transition select-none"
-        >
-         <td className="px-4 py-3">{user.nombre_usuario}</td>
-         
-         <td className="px-4 py-3">{user.nombre_rol}</td>
-         <td className="px-4 py-3 text-center">
-          <button
-           onClick={(e) => {
-            e.stopPropagation();
-            handleDelete(user.id_usuario, user.nombre_usuario);
-           }}
-           className="text-red-600 hover:text-red-400 transition cursor-pointer"
-           title="Eliminar usuario"
-          >
-           <FiTrash2 size={18} />
-          </button>
-         </td>
-        </tr>
-       ))
-      ) : (
-       <tr>
-        <td colSpan="4" className="text-center py-6 text-gray-500">
-         No se encontraron usuarios.
-        </td>
-       </tr>
-      )}
-     </tbody>
-    </table>
-   </div>
-  </div>
+     {/* Contenedor tabla */}
+     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+         <div className="overflow-x-auto">
+             <table className="min-w-full text-sm text-slate-700">
+                 <thead className="bg-slate-200 text-slate-600 uppercase text-xs tracking-wide">
+                     <tr>
+                         <th className="px-5 py-3 text-left">Usuario</th>
+                         <th className="px-5 py-3 text-left">Rol</th>
+                         <th className="px-5 py-3 text-center w-32">Acciones</th>
+                     </tr>
+                 </thead>
+                 <tbody>
+                     {loading ? (
+                         <tr>
+                             <td colSpan="3" className="px-5 py-6 text-center text-slate-500">Cargando usuarios…</td>
+                         </tr>
+                     ) : filteredUsuarios.length > 0 ? (
+                         filteredUsuarios.map((user) => (
+                             <tr
+                                 key={user.id_usuario}
+                                 onDoubleClick={() => handleRowDoubleClick(user.id_usuario)}
+                                 className="hover:bg-slate-100 cursor-pointer transition-colors"
+                             >
+                                 <td className="px-5 py-3 font-medium text-slate-900">{user.nombre_usuario}</td>
+                                 <td className="px-5 py-3">
+                                     <span
+                                         className={
+                                             `inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold border ` +
+                                             (user.nombre_rol === 'admin'
+                                                 ? 'bg-slate-100 text-slate-800 border-slate-300'
+                                                 : user.nombre_rol === 'supervisor'
+                                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                 : 'bg-amber-50 text-amber-700 border-amber-200')
+                                         }
+                                     >
+                                         {user.nombre_rol}
+                                     </span>
+                                 </td>
+                                 <td className="px-5 py-3">
+                                     <div className="flex items-center justify-center gap-3">
+                                         <button
+                                             onClick={(e) => { e.stopPropagation(); navigate(`/usuarios/editar/${user.id_usuario}`); }}
+                                             className="text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                                             title="Editar"
+                                         >
+                                             <FiEdit size={18} />
+                                         </button>
+                                         <button
+                                             onClick={(e) => { e.stopPropagation(); handleDelete(user.id_usuario, user.nombre_usuario); }}
+                                             className="text-red-600 hover:text-red-700 transition cursor-pointer"
+                                             title="Eliminar"
+                                         >
+                                             <FiTrash2 size={18} />
+                                         </button>
+                                     </div>
+                                 </td>
+                             </tr>
+                         ))
+                     ) : (
+                         <tr>
+                             <td colSpan="3" className="px-5 py-10">
+                                 <div className="flex flex-col items-center justify-center text-center">
+                                     <div className="text-slate-400 mb-2">No se encontraron usuarios</div>
+                                     <button
+                                         onClick={handleCrearClick}
+                                         className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition"
+                                     >
+                                         <FiPlus size={18} /> Crear el primero
+                                     </button>
+                                 </div>
+                             </td>
+                         </tr>
+                     )}
+                 </tbody>
+             </table>
+         </div>
+     </div>
+    </div>
  );
 };
 

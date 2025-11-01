@@ -20,21 +20,42 @@ const debounce = (func, delay) => {
   };
 };
 
-const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange }) => {
+const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange, exportSummary = [], showSummary = true, containerClassName = "p-6", summaryVariant = 'default' }) => {
   const [datos, setDatos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [filtrosActivos, setFiltrosActivos] = useState({});
   const [filtrosParaAPI, setFiltrosParaAPI] = useState({});
+  const [internalSummary, setInternalSummary] = useState([]);
   const navigate = useNavigate();
 
   const timezone = 'America/Bogota'; 
 
-  const obtenerDatos = useCallback(async () => {
+ 
+  const formatDateCell = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') {
+      const ymd = value.slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+        const [y, m, d] = ymd.split('-');
+        return `${d}/${m}/${y}`;
+      }
+    }
+    try {
+      return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+    } catch {
+      return String(value);
+    }
+  };
+
+  const obtenerDatos = useCallback(async () => {
     try {
       setCargando(true);
   const res = await api.get(endpoint, { params: filtrosParaAPI });
     
-      let datosProcesados = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      // Soportar forma { data, summary }
+      let datosProcesados = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const summaryFromRes = Array.isArray(res.data?.summary) ? res.data.summary : [];
+      setInternalSummary(summaryFromRes);
       setDatos(datosProcesados);
       try { onDataChange && onDataChange(datosProcesados); } catch {}
       toast.success("Datos cargados exitosamente.");
@@ -64,7 +85,7 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
     debouncedSetFiltrosParaAPI(newFiltros);
   };
 
-  const generarPDF = () => {
+  const generarPDF = () => {
    try {
     if (!datos || datos.length === 0) return toast.error('No hay datos para exportar');
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -79,7 +100,7 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
         }
     
         const isDateColumn = ["fecha_registro", "ultima_actualizacion", "fecha", "fecha_pago", "fecha_inicio"].includes(col.accessor);
-        if (isDateColumn && value) return new Date(value).toLocaleDateString();
+        if (isDateColumn && value) return formatDateCell(value);
         if (col.isCurrency) return formatCurrencyCOP(value);
         return value == null ? '' : String(value);
       });
@@ -90,9 +111,25 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
     doc.setFontSize(10);
     const dateStr = new Date().toLocaleString();
     doc.text(`Generado: ${dateStr}`, 40, 56);
+    
+    
+    let startY = 80;
+  const summaryToUse = (exportSummary && exportSummary.length > 0) ? exportSummary : internalSummary;
+  if (Array.isArray(summaryToUse) && summaryToUse.length > 0) {
+      let y = 76;
+      doc.setFontSize(11);
+  summaryToUse.forEach((item) => {
+        const label = item?.label ? String(item.label) : '';
+        const valueNum = typeof item?.value === 'string' ? parseFloat(item.value) : Number(item?.value);
+        const valueStr = item?.isCurrency ? formatCurrencyCOP(valueNum) : (item?.value ?? '');
+        doc.text(`${label}: ${valueStr}`, 40, y);
+        y += 16;
+      });
+      startY = y + 8;
+    }
 
     autoTable(doc, {
-      startY: 80,
+      startY,
       head: [headers],
       body: body,
       theme: 'striped',
@@ -109,11 +146,11 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
   }
   };
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = () => {
     try {
       if (!datos || datos.length === 0) return toast.error('No hay datos para exportar');
 
-      // preparar cabeceras y filas alineadas
+      
       const headers = columnas.map((c) => c.header || (typeof c.accessor === 'string' ? c.accessor : 'col'));
       const rows = datos.map((row) => {
         return columnas.map((col) => {
@@ -122,7 +159,7 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
           else value = row[col.accessor];
 
           const isDateColumn = ["fecha_registro", "ultima_actualizacion", "fecha", "fecha_pago", "fecha_inicio"].includes(col.accessor);
-          if (isDateColumn && value) return new Date(value).toLocaleDateString();
+          if (isDateColumn && value) return formatDateCell(value);
 
           if (col.isCurrency) {
             const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : Number(value);
@@ -133,36 +170,64 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
         });
       });
 
-      const aoa = [headers, ...rows];
+     
+      const aoa = [];
+      if (Array.isArray(summaryToUse) && summaryToUse.length > 0) {
+        summaryToUse.forEach((item) => {
+          const label = item?.label ? String(item.label) : '';
+          const valueNum = typeof item?.value === 'string' ? parseFloat(item.value.replace(/[^0-9.-]+/g, '')) : Number(item?.value);
+          const valueCell = item?.isCurrency ? (isNaN(valueNum) ? '' : valueNum) : (item?.value ?? '');
+          aoa.push([label, valueCell]);
+        });
+        aoa.push([]); 
+      }
+      aoa.push(headers);
+      rows.forEach(r => aoa.push(r));
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-      // calcular anchos de columna basados en contenido
-      const colWidths = headers.map((h, colIndex) => {
-        let max = String(h).length;
-        for (let r = 0; r < rows.length; r++) {
-          const cell = rows[r][colIndex];
+      
+      const numCols = Math.max(...aoa.map(row => row.length));
+      const colWidths = Array.from({ length: numCols }).map((_, colIndex) => {
+        let max = 0;
+        aoa.forEach((row) => {
+          const cell = row[colIndex];
           const len = cell == null ? 0 : String(cell).length;
           if (len > max) max = len;
-        }
+        });
         return { wch: Math.min(Math.max(max + 2, 10), 50) };
       });
       ws['!cols'] = colWidths;
 
-      // asegurar formatos numéricos para columnas currency
+    
       columnas.forEach((col, colIndex) => {
         if (col.isCurrency) {
-          // establecer tipo numérico en cada celda de esa columna (filas 2..)
-          for (let r = 2; r <= rows.length + 1; r++) {
+        
+          const headerRowIndex = aoa.findIndex(r => r === headers); 
+          for (let r = headerRowIndex + 1; r <= aoa.length; r++) {
             const cellAddress = XLSX.utils.encode_cell({ c: colIndex, r: r - 1 });
             const cell = ws[cellAddress];
             if (cell && (typeof cell.v === 'number')) {
               cell.t = 'n';
-              // opcional: aplicar formato numérico (sin símbolo)
+             
               cell.z = '#,##0';
             }
           }
         }
       });
+
+      
+      if (Array.isArray(summaryToUse) && summaryToUse.length > 0) {
+        summaryToUse.forEach((item, idx) => {
+          if (item?.isCurrency) {
+            const cellAddress = XLSX.utils.encode_cell({ c: 1, r: idx });
+            const cell = ws[cellAddress];
+            if (cell && typeof cell.v === 'number') {
+              cell.t = 'n';
+              cell.z = '#,##0';
+            }
+          }
+        });
+      }
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
@@ -192,8 +257,10 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
     }).format(numValue);
   }
 
-  return (
-    <div className="p-6">
+  const effectiveSummary = (exportSummary && exportSummary.length > 0) ? exportSummary : internalSummary;
+
+  return (
+    <div className={containerClassName}>
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold text-slate-700">{titulo}</h1>
         <div className="flex gap-2">
@@ -276,6 +343,56 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
         </div>
       )}
 
+      {showSummary && Array.isArray(effectiveSummary) && effectiveSummary.length > 0 && (
+        summaryVariant === 'prominent-all'
+          ? (
+            <div className="mb-4">
+              <div className="rounded-xl p-5 bg-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+                <div className="flex flex-wrap gap-6">
+                  {effectiveSummary.map((item, idx) => (
+                    <div key={idx} className="min-w-[220px]">
+                      <div className="text-sm text-slate-600">{item?.label ?? ''}</div>
+                      <div className="font-bold text-emerald-600">
+                        {item?.isCurrency ? formatCurrencyCOP(item?.value) : (item?.value ?? '')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+          : (
+            (() => {
+              const primary = effectiveSummary.find(i => i && i.isCurrency) || effectiveSummary[0];
+              const others = effectiveSummary.filter(i => i && i !== primary);
+              return (
+                <div className="mb-4">
+                  <div className="rounded-xl p-5 bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-baseline flex-wrap gap-x-3 gap-y-1">
+                      <span>{primary?.label ?? 'Total'}</span>
+                      <span className="pl-5 text-green-600 font-extrabold">
+                        {primary?.isCurrency ? formatCurrencyCOP(primary?.value) : (primary?.value ?? '')}
+                      </span>
+                    </div>
+                    {others.length > 0 && (
+                      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                        {others.map((item, idx) => (
+                          <div key={idx}>
+                            <span className="font-medium text-slate-600">{item?.label ?? ''}:</span>{' '}
+                            <span className="font-semibold text-slate-900">
+                              {item?.isCurrency ? formatCurrencyCOP(item?.value) : (item?.value ?? '')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          )
+      )}
+
       <div className="overflow-x-auto bg-white rounded-lg shadow border border-slate-200">
         {cargando ? (
           <div className="text-center p-8 text-slate-500 flex justify-center items-center gap-2">
@@ -323,9 +440,9 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange })
             "fecha_inicio"
           ].includes(col.accessor);
 
-          if (isDateColumn && value) {
-            return new Date(value).toLocaleDateString();
-          }
+          if (isDateColumn && value) {
+            return formatDateCell(value);
+          }
 
           if (col.isCurrency) {
             return formatCurrencyCOP(value);

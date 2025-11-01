@@ -11,15 +11,13 @@ const ReporteUtilidadPorOrden = () => {
 
   const columnas = [
     { header: "ID Orden", accessor: "id_orden_fabricacion" },
+    { header: "Cliente", accessor: "cliente" },
     { header: "Fecha", accessor: "fecha_inicio" },
-    { header: "Costo de Artículos", accessor: "costo_articulos", isCurrency: true },
     { header: "Costo de Mano de Obra", accessor: "costo_mano_obra", isCurrency: true },
     { header: "Total Ingresos", accessor: "total_ingresos", isCurrency: true },
     {
       header: "Utilidad",
-      accessor: (row) =>
-        (parseFloat(row.total_ingresos) || 0) -
-        ((parseFloat(row.costo_articulos) || 0) + (parseFloat(row.costo_mano_obra) || 0)),
+      accessor: "utilidad",
       isCurrency: true
     },
   ];

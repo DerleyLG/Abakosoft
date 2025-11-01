@@ -41,7 +41,7 @@ const CreditoHistorialDrawer = ({ creditoId, onClose }) => {
       <div className={`absolute right-0 top-0 bottom-0 w-full md:w-96 bg-white shadow-xl p-4 overflow-auto transform transition-transform duration-300 ease-out ${entered ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Historial de Abonos</h3>
-          <button onClick={onClose} className="p-2 rounded hover:bg-slate-100">
+          <button onClick={onClose} className="p-2 rounded hover:bg-slate-100 cursor-pointer">
             <FiX />
           </button>
         </div>

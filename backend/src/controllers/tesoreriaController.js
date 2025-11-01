@@ -7,10 +7,33 @@ const tesoreriaController = {
       res.json(metodos);
     } catch (error) {
       console.error("Error al obtener métodos de pago:", error);
+      res.status(500).json({
+        error: "Error interno del servidor al obtener métodos de pago.",
+      });
+    }
+  },
+  async getVentasCobrosReport(req, res) {
+    try {
+      let { desde, hasta, id_cliente, estado_pago } = req.query;
+      // Normalizar fechas: si vienen como YYYY-MM-DD en 'hasta', agregar fin de día
+      if (hasta && /^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+        hasta = `${hasta} 23:59:59`;
+      }
+
+      const data = await TesoreriaModel.getVentasCobrosReport({
+        desde,
+        hasta,
+        id_cliente,
+        estado_pago,
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error("Error en reporte de tesorería (ventas y cobros):", error);
       res
         .status(500)
         .json({
-          error: "Error interno del servidor al obtener métodos de pago.",
+          success: false,
+          message: "Error al generar el reporte de tesorería.",
         });
     }
   },
@@ -21,12 +44,10 @@ const tesoreriaController = {
       res.json(movimientos);
     } catch (error) {
       console.error("Error al obtener movimientos de tesorería:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            "Error interno del servidor al obtener movimientos de tesorería.",
-        });
+      res.status(500).json({
+        error:
+          "Error interno del servidor al obtener movimientos de tesorería.",
+      });
     }
   },
   getIngresosSummary: async (req, res) => {
@@ -35,12 +56,9 @@ const tesoreriaController = {
       res.json(summary);
     } catch (error) {
       console.error("Error al obtener el resumen de ingresos:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            "Error interno del servidor al obtener el resumen de ingresos.",
-        });
+      res.status(500).json({
+        error: "Error interno del servidor al obtener el resumen de ingresos.",
+      });
     }
   },
 
@@ -129,12 +147,9 @@ const tesoreriaController = {
         "Error al obtener movimiento de tesorería por documento:",
         error
       );
-      res
-        .status(500)
-        .json({
-          error:
-            "Error interno del servidor al obtener movimiento de tesorería.",
-        });
+      res.status(500).json({
+        error: "Error interno del servidor al obtener movimiento de tesorería.",
+      });
     }
   },
   createMovimiento: async (req, res) => {

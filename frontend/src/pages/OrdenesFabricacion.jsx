@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
@@ -12,10 +12,13 @@ import {
   FiArrowUp,
   FiArrowRight,
   FiEdit,
+  FiX,
 } from "react-icons/fi";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
 
 const ListaOrdenesFabricacion = () => {
-  // Utilidades de formato COP
+ 
   const formatCOP = (number) => {
     const n = Number(number) || 0;
     return new Intl.NumberFormat('es-CO', {
@@ -46,19 +49,47 @@ const ListaOrdenesFabricacion = () => {
   const [etapasDisponibles, setEtapasDisponibles] = useState({});
   const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState({});
 const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas'); 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const role = user?.rol;
+  const canCreate = can(role, ACTIONS.FABRICATION_CREATE);
+  const canDelete = can(role, ACTIONS.FABRICATION_DELETE);
   const yaConsultadoCosto = useRef({});
   const historialCostos = useRef({});
   const costoManualEditado = useRef({});
-  const [editandoCosto, setEditandoCosto] = useState({}); // edición de costo con formato
-  const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({}); // { [id_avance_etapa]: string COP }
+  const [editandoCosto, setEditandoCosto] = useState({});
+  const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({}); 
 
-  // Carga los datos estáticos al montar el componente
+ 
+  const [articulosCatalogo, setArticulosCatalogo] = useState([]); 
+  const [articuloQuery, setArticuloQuery] = useState("");
+  const [articuloSeleccion, setArticuloSeleccion] = useState(null); 
+  const [showSugArticulos, setShowSugArticulos] = useState(false);
+  const articuloFilterRef = useRef(null);
+  const sugerenciasArticulos = useMemo(() => {
+    const q = (articuloQuery || '').trim().toLowerCase();
+    if (!q) return articulosCatalogo.slice(0, 8);
+    return articulosCatalogo.filter(a => (a.label || '').toLowerCase().includes(q)).slice(0, 8);
+  }, [articuloQuery, articulosCatalogo]);
+
+  
+  const esOrdenCompletada = (estado) =>
+    typeof estado === 'string' && estado.toLowerCase().trim() === 'completada';
+
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [resTrabajadores, resEtapas] = await Promise.all([
+        const [resTrabajadores, resEtapas, resArticulos] = await Promise.all([
           api.get("/trabajadores"),
           api.get("/etapas-produccion"),
+          api.get("/articulos", { params: { page: 1, pageSize: 200, sortBy: 'descripcion', sortDir: 'asc' } }),
         ]);
         setTrabajadores(
           resTrabajadores.data.map((trab) => ({
@@ -75,6 +106,13 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
             cargo: etp.cargo,
           }))
         );
+        const articulosArr = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
+        setArticulosCatalogo(
+          articulosArr.map((a) => ({
+            value: a.id_articulo,
+            label: a.descripcion ? `${a.referencia || ''} - ${a.descripcion}`.trim() : (a.referencia || `ID ${a.id_articulo}`),
+          }))
+        );
       } catch (error) {
         console.error("Error al cargar datos iniciales", error);
         toast.error("Error al cargar datos iniciales");
@@ -83,24 +121,52 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
     fetchInitialData();
   }, []);
 
+  // Cerrar sugerencias cuando se haga clic fuera del filtro de artículos
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (articuloFilterRef.current && !articuloFilterRef.current.contains(e.target)) {
+        setShowSugArticulos(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  
+  useEffect(() => {
+    if (mostrarFormularioAvance) {
+      const ord = ordenes.find(
+        (o) => o.id_orden_fabricacion === mostrarFormularioAvance
+      );
+      if (ord && esOrdenCompletada(ord.estado)) {
+        setMostrarFormularioAvance(null);
+      }
+    }
+  }, [ordenes, mostrarFormularioAvance]);
+
   
 
   useEffect(() => {
     const fetchOrdenes = async () => {
       try { 
-   let endpoint="/ordenes-fabricacion";
-
-   if (mostrarCanceladas) {
-    endpoint = "/ordenes-fabricacion?estados=cancelada";
-   } else if (filtroEstadoActivas !== 'todas') {
-  
-    endpoint = `/ordenes-fabricacion?estados=${filtroEstadoActivas}`;
-   } 
-const res = await api.get(endpoint);
-setOrdenes(res.data);
-        //  Calcula y establece los artículos pendientes para la carga inicial
+        setLoading(true);
+        const params = { page, pageSize, sortBy: 'id', sortDir: 'desc' };
+        if (mostrarCanceladas) {
+          params.estados = 'cancelada';
+        } else if (filtroEstadoActivas !== 'todas') {
+          params.estados = filtroEstadoActivas;
+        }
+        const res = await api.get('/ordenes-fabricacion', { params });
+        const payload = res.data || {};
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        setOrdenes(rows);
+        setTotal(payload.total || 0);
+        setTotalPages(payload.totalPages || 1);
+        setHasNext(!!payload.hasNext);
+        setHasPrev(!!payload.hasPrev);
+     
         const nuevosArticulosPendientes = {};
-        res.data.forEach((orden) => {
+  rows.forEach((orden) => {
           // Parsea los arrays JSON de forma segura
           const detallesEnOrden = Array.isArray(orden.detalles)
             ? orden.detalles
@@ -132,10 +198,12 @@ setOrdenes(res.data);
       } catch (error) {
         console.error("Error al cargar órdenes:", error);
         toast.error("Error al cargar órdenes");
+      } finally {
+        setLoading(false);
       }
     };
     fetchOrdenes();
-  }, [mostrarCanceladas, filtroEstadoActivas]);
+  }, [mostrarCanceladas, filtroEstadoActivas, page, pageSize]);
 
   // Carga el costo de fabricación anterior cuando cambian los formularios
   useEffect(() => {
@@ -354,12 +422,14 @@ setOrdenes(res.data);
   }
   setMostrarCanceladas((prev) => !prev);
   setExpandedOrden(null);
+  setPage(1);
  };
  
  const handleFiltroEstadoChange = (e) => {
   setMostrarCanceladas(false); 
   setFiltroEstadoActivas(e.target.value);
   setExpandedOrden(null);
+  setPage(1);
  };
 
   const expandirOrden = (id) => {
@@ -388,7 +458,18 @@ setOrdenes(res.data);
       ? true
       : estado === filtroEstadoActivas.toLowerCase();
 
-  return coincideBusqueda && coincideEstado;
+  const coincideArticulo = articuloSeleccion
+    ? (() => {
+        let detalles = o.detalles;
+        if (typeof detalles === 'string') {
+          try { detalles = JSON.parse(detalles); } catch { detalles = []; }
+        }
+        detalles = Array.isArray(detalles) ? detalles : [];
+        return detalles.some(d => Number(d.id_articulo) === Number(articuloSeleccion.value));
+      })()
+    : true;
+
+  return coincideBusqueda && coincideEstado && coincideArticulo;
 });
 
   const renderDetalles = (orden) => {
@@ -431,6 +512,8 @@ setOrdenes(res.data);
     if (!orden.avances || orden.avances.length === 0) {
       return <div className="mt-4">No hay avances registrados.</div>;
     }
+
+    const ordenCompletada = esOrdenCompletada(orden.estado);
 
     const avancesPorArticulo = {};
     orden.avances.forEach((avance) => {
@@ -506,7 +589,18 @@ setOrdenes(res.data);
                         {avance.cantidad}
                       </td>
                       <td className="px-2 py-2 border-b border-gray-300">
-                        {editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
+                        {ordenCompletada ? (
+                          <div className="flex items-center gap-2">
+                            <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                            <button
+                              className="text-slate-300 cursor-not-allowed"
+                              title="La orden está completada. No se puede editar el costo."
+                              disabled
+                            >
+                              <FiEdit />
+                            </button>
+                          </div>
+                        ) : editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
@@ -720,76 +814,119 @@ setOrdenes(res.data);
   };
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <h2 className="text-4xl font-bold text-gray-800 p-4">
-        Órdenes de fabricación
-      </h2>
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-6 m-5">
-
-  <div className="w-full md:w-auto">
-    <label className="text-gray-700 font-semibold mr-2">
-          Filtrar por estado:
-        </label>
-    <select
-      value={filtroEstadoActivas}
-      onChange={handleFiltroEstadoChange}
-      disabled={mostrarCanceladas}
-      className={`h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-        mostrarCanceladas
-          ? "bg-gray-200 cursor-not-allowed text-gray-600"
-          : "bg-gray-100 text-gray-800"
-      }`}
-    >
-      <option value="todas">Todas</option>
-      <option value="pendiente">Pendientes</option>
-      <option value="en proceso">En proceso</option>
-      <option value="completada">Completadas</option>
-    </select>
-  </div>
-
-
-  <div className="flex flex-wrap gap-4 items-center justify-end">
-    <button
-      onClick={() => navigate("/ordenes_fabricacion/nuevo")}
-      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-    >
-      <FiPlus size={20} /> Crear orden
-    </button>
-    <button
-      onClick={() => navigate("/etapas_produccion")}
-      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-    >
-      <FiPlus size={20} /> Nueva etapa
-    </button>
-    <button
-      onClick={() => navigate("/lotes_fabricados")}
-      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-    >
-      <FiArrowRight /> Lotes fabricados
-    </button>
-    <button
-      onClick={() => navigate("/avances_fabricacion")}
-      className="bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-    >
-      <FiArrowRight /> Avances de fabricación
-    </button>
-    <button
-      onClick={toggleMostrarCanceladas}
-      className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-        mostrarCanceladas
-          ? "bg-red-600 hover:bg-red-500 text-white"
-          : "bg-gray-300 hover:bg-gray-400 text-gray-800"
-      }`}
-    >
-      {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
-    </button>
-    <button
-      onClick={() => navigate(-1)}
-      className="bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
-    >
-      <FiArrowLeft /> Volver
-    </button>
-  </div>
-</div>
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <h2 className="text-4xl font-bold text-gray-800">Órdenes de fabricación</h2>
+          <div className="w-full md:flex-1 md:ml-100px md:justify-end flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+            {/* Filtro por artículo */}
+            <div className="w-full md:w-[28rem] lg:w-[32rem] relative" ref={articuloFilterRef}>
+              <label className="block text-gray-700 font-semibold mb-1">Artículo en la orden</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Escribe y selecciona…"
+                  className="flex-grow border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                  value={articuloQuery}
+                  onChange={(e) => { setArticuloQuery(e.target.value); setArticuloSeleccion(null); setShowSugArticulos(true); }}
+                  onFocus={() => setShowSugArticulos(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowSugArticulos(false); e.currentTarget.blur(); }
+                    if (e.key === 'Enter') {
+                      const s = sugerenciasArticulos;
+                      if (s.length > 0) { const opt = s[0]; setArticuloSeleccion(opt); setArticuloQuery(opt.label); setShowSugArticulos(false); e.preventDefault(); }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="h-[42px] px-3 border border-slate-300 rounded-md cursor-pointer text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                  title="Limpiar"
+                  aria-label="Limpiar"
+                  onClick={() => { setArticuloQuery(''); setArticuloSeleccion(null); setShowSugArticulos(false); }}
+                >
+                  <FiX size={18} />
+                </button>
+              </div>
+              {showSugArticulos && sugerenciasArticulos.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full border border-slate-200 rounded-md bg-white max-h-56 overflow-auto">
+                  <ul className="divide-y divide-slate-100">
+                    {sugerenciasArticulos.map((opt) => (
+                      <li
+                        key={opt.value}
+                        className="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
+                        onMouseDown={() => { setArticuloSeleccion(opt); setArticuloQuery(opt.label); setShowSugArticulos(false); }}
+                      >
+                        {opt.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+             
+            </div>
+            {/* Filtro por estado */}
+            <div className="w-full md:w-64">
+              <label className="block text-gray-700 font-semibold mb-1">Filtrar por estado:</label>
+              <select
+                value={filtroEstadoActivas}
+                onChange={handleFiltroEstadoChange}
+                disabled={mostrarCanceladas}
+                className={`w-full h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
+                  mostrarCanceladas ? "bg-gray-200 cursor-not-allowed text-gray-600" : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                <option value="todas">Todas</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="en proceso">En proceso</option>
+                <option value="completada">Completadas</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        {/* fila inferior: botones alineados a la izquierda y responsivos */}
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          {canCreate && (
+            <button
+              onClick={() => navigate("/ordenes_fabricacion/nuevo")}
+              className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <FiPlus size={20} /> Crear orden
+            </button>
+          )}
+          <button
+            onClick={() => navigate("/etapas_produccion")}
+            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FiPlus size={20} /> Nueva etapa
+          </button>
+          <button
+            onClick={() => navigate("/lotes_fabricados")}
+            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FiArrowRight /> Lotes fabricados
+          </button>
+          <button
+            onClick={() => navigate("/avances_fabricacion")}
+            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FiArrowRight /> Avances de fabricación
+          </button>
+          <button
+            onClick={toggleMostrarCanceladas}
+            className={`w-full h-[42px] flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
+              mostrarCanceladas ? "bg-red-600 hover:bg-red-500 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+            }`}
+          >
+            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="w-full bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FiArrowLeft /> Volver
+          </button>
+        </div>
+      </div>
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
@@ -803,7 +940,11 @@ setOrdenes(res.data);
             </tr>
           </thead>
           <tbody>
-            {ordenesFiltradas.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="text-center py-4 text-gray-500">Cargando…</td>
+              </tr>
+            ) : ordenesFiltradas.length > 0 ? (
               ordenesFiltradas.map((orden) => (
                 <React.Fragment key={orden.id_orden_fabricacion}>
                   <tr
@@ -835,16 +976,33 @@ setOrdenes(res.data);
                         : "No asociada"}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          eliminarOrden(orden.id_orden_fabricacion);
-                        }}
-                        className="text-red-600 hover:text-red-400 transition cursor-pointer"
-                        title="Eliminar orden"
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
+                      <div className="flex items-center gap-4 justify-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/costos_indirectos/nuevo', { state: { id_orden_fabricacion: orden.id_orden_fabricacion } });
+                          }}
+                          className="text-emerald-700 hover:text-emerald-500 transition cursor-pointer"
+                          title="Registrar costo indirecto para esta OF"
+                        >
+                          <FiPlus size={18} />
+                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              eliminarOrden(orden.id_orden_fabricacion);
+                            }}
+                            className="text-red-600 hover:text-red-400 transition cursor-pointer"
+                            title="Eliminar orden"
+                          >
+                            <FiTrash2 size={18} />
+                          </button>
+                        )}
+                        {!canDelete && (
+                          <span className="text-gray-400 italic select-none">Sin permisos</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   {expandedOrden === orden.id_orden_fabricacion && (
@@ -858,24 +1016,56 @@ setOrdenes(res.data);
                         </div>
                         {renderDetalles(orden)}
                         {renderAvancesPorArticulo(orden)}
-                        <button
-                          onClick={() =>
-                            setMostrarFormularioAvance((prev) =>
-                              prev === orden.id_orden_fabricacion
-                                ? null
-                                : orden.id_orden_fabricacion
-                            )
+                        {(() => {
+                          const completada = esOrdenCompletada(orden.estado);
+                          if (completada) {
+                            return (
+                              <button
+                                type="button"
+                                disabled
+                                title="La orden está completada. No se pueden registrar más avances."
+                                className="mt-4 text-slate-400 flex items-center gap-2 cursor-not-allowed"
+                              >
+                                <FiPlus /> Registrar nuevo avance
+                              </button>
+                            );
                           }
-                          className="mt-4 text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
-                        >
-                          <FiPlus /> Registrar nuevo avance
-                        </button>
+                          return (
+                            <div className="mt-4 flex items-center gap-6">
+                              <button
+                                onClick={() =>
+                                  setMostrarFormularioAvance((prev) =>
+                                    prev === orden.id_orden_fabricacion
+                                      ? null
+                                      : orden.id_orden_fabricacion
+                                  )
+                                }
+                                className="text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
+                              >
+                                <FiPlus /> Registrar nuevo avance
+                              </button>
+                              <button
+                                onClick={() => navigate('/costos_indirectos/nuevo', { state: { id_orden_fabricacion: orden.id_orden_fabricacion } })}
+                                className="text-emerald-700 flex items-center gap-2 hover:underline cursor-pointer"
+                                title="Registrar un costo indirecto y asignarlo a esta OF"
+                              >
+                                <FiPlus /> Registrar costo indirecto
+                              </button>
+                            </div>
+                          );
+                        })()}
                         {mostrarFormularioAvance ===
-                          orden.id_orden_fabricacion && (
+                          orden.id_orden_fabricacion &&
+                          !esOrdenCompletada(orden.estado) && (
                           <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault();
+                                 if (esOrdenCompletada(orden.estado)) {
+                                   toast.error("La orden está completada. No se pueden registrar más avances.");
+                                   setMostrarFormularioAvance(null);
+                                   return;
+                                 }
                                 const form = formularios[orden.id_orden_fabricacion] || {};
                                 const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
                                 const valorEnEdicion = editandoCosto[claveCosto];
@@ -1075,6 +1265,32 @@ setOrdenes(res.data);
             )}
           </tbody>
         </table>
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-600">
+            Página {page} de {totalPages} — {total} órdenes
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev}
+            >Anterior</button>
+            <button
+              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasNext}
+            >Siguiente</button>
+            <select
+              className="ml-2 border border-gray-400 rounded-md px-2 py-2"
+              value={pageSize}
+              onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   );
