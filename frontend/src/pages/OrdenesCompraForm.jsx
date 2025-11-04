@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api'; 
 import toast from 'react-hot-toast';
-import Select from 'react-select'; 
+import AsyncSelect from 'react-select/async'; 
 import { X } from 'lucide-react';
 import { confirmAlert } from 'react-confirm-alert'; 
 import 'react-confirm-alert/src/react-confirm-alert.css'; 
@@ -26,7 +26,6 @@ const cleanCOPFormat = (formattedValue) => {
 
 const CrearOrdenCompra = () => {
     const [proveedores, setProveedores] = useState([]);
-    const [articulos, setArticulos] = useState([]); 
     const [idProveedor, setIdProveedor] = useState('');
     const [categoriaCosto, setCategoriaCosto] = useState('');
     const [articulosSeleccionados, setArticulosSeleccionados] = useState([]); 
@@ -44,29 +43,69 @@ const CrearOrdenCompra = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [resProveedores, resArticulos, resMetodosPago] = await Promise.all([
+                const [resProveedores, resMetodosPago] = await Promise.all([
                     api.get('/proveedores'),
-                    api.get('/articulos', { params: { page: 1, pageSize: 100, sortBy: 'descripcion', sortDir: 'asc' } }),
                     api.get('/tesoreria/metodos-pago'),
                 ]);
                 setProveedores(resProveedores.data || []);
                 setMetodosPago(resMetodosPago.data || []);
-                const lista = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
-                const opcionesArticulos = lista.map((art) => ({
-                    value: art.id_articulo,
-                    label: art.descripcion,
-                    ...art, 
-                }));
-                setArticulos(opcionesArticulos || []);
             } catch (error) {
                 console.error('Error al cargar datos iniciales:', error);
                 const msg = error.response?.data?.mensaje || error.response?.data?.message || error.message;
-                toast.error(`Error al cargar datos iniciales (proveedores, artículos): ${msg}`);
+                toast.error(`Error al cargar datos iniciales (proveedores, métodos de pago): ${msg}`);
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
+    }, []);
+
+    // Caché para almacenar resultados de búsqueda
+    const cacheRef = useRef({});
+    const timerRef = useRef(null);
+
+    // Función para cargar artículos dinámicamente con debounce y caché
+    const loadArticulosOptions = useCallback((inputValue, callback) => {
+        // Limpiar el timer anterior
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // Si ya está en caché, retornar inmediatamente
+        const cacheKey = inputValue?.toLowerCase() || '';
+        if (cacheRef.current[cacheKey]) {
+            callback(cacheRef.current[cacheKey]);
+            return;
+        }
+
+        // Debounce: esperar 500ms después de que el usuario deje de escribir
+        timerRef.current = setTimeout(async () => {
+            try {
+                const response = await api.get('/articulos', { 
+                    params: { 
+                        buscar: inputValue, 
+                        page: 1, 
+                        pageSize: 50, 
+                        sortBy: 'descripcion', 
+                        sortDir: 'asc' 
+                    } 
+                });
+                const lista = Array.isArray(response.data?.data) ? response.data.data : [];
+                const opciones = lista.map((art) => ({
+                    value: art.id_articulo,
+                    label: `${art.descripcion} (Ref: ${art.referencia})`,
+                    ...art,
+                }));
+                
+                // Guardar en caché
+                cacheRef.current[cacheKey] = opciones;
+                callback(opciones);
+            } catch (error) {
+                console.error('Error al buscar artículos:', error);
+                toast.error('Error al buscar artículos');
+                callback([]);
+            }
+        }, 300); // 300ms de delay
     }, []);
 
   
@@ -370,8 +409,10 @@ const CrearOrdenCompra = () => {
                             Agregar artículo
                         </label>
                         <div className="flex items-center gap-2">
-                            <Select
-                                options={articulos}
+                            <AsyncSelect
+                                cacheOptions
+                                loadOptions={loadArticulosOptions}
+                                defaultOptions
                                 value={articuloSeleccionado}
                                 onChange={(option) => {
                                     setArticuloSeleccionado(option); 
@@ -379,7 +420,7 @@ const CrearOrdenCompra = () => {
                                         agregarArticulo(option); 
                                     }
                                 }}
-                                placeholder="Selecciona un artículo"
+                                placeholder="Escribe para buscar un artículo..."
                                 isClearable
                                 className="text-sm w-full"
                                 styles={{
@@ -392,6 +433,8 @@ const CrearOrdenCompra = () => {
                                     }),
                                 }}
                                 isDisabled={loading}
+                                noOptionsMessage={() => "No se encontraron artículos"}
+                                loadingMessage={() => "Buscando..."}
                             />
                           
                         </div>

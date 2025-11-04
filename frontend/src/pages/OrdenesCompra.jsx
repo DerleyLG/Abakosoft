@@ -289,6 +289,7 @@ const OrdenesCompra = () => {
               <th className="px-4 py-3">Proveedor</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Total</th>
+              <th className="px-4 py-3">Método de Pago</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Acciones</th>
             </tr>
@@ -296,7 +297,7 @@ const OrdenesCompra = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="text-center py-6 text-gray-500">Cargando…</td>
+                <td colSpan="7" className="text-center py-6 text-gray-500">Cargando…</td>
               </tr>
             ) : filteredOrdenes.length > 0 ? (
               filteredOrdenes.map((orden) => (
@@ -312,6 +313,19 @@ const OrdenesCompra = () => {
                     </td>
                     <td className="px-4 py-3">
                       ${Number(orden.monto_total || 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      {orden.metodo_pago ? (
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          orden.tipo_pago === 'contado' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {orden.metodo_pago}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">No registrado</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">{orden.estado}</td>
                     <td className="pl-3 py-3 text-center flex gap-4">
@@ -365,21 +379,21 @@ const OrdenesCompra = () => {
 
                   {expandedId === orden.id_orden_compra && (
                     <tr>
-                      <td colSpan="5" className="bg-gray-100 px-6 py-4 border-b">
-                        <div className="mt-3">
+                      <td colSpan="7" className="bg-gray-100 p-0 border-b">
+                        <div className="px-4 py-4 max-h-96 overflow-y-auto">
                           <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-gray-200 text-gray-700">
-                                <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
-                                <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
-                                <th className="px-2 py-2 border-b border-gray-300">Precio Unitario</th>
-                                <th className="px-2 py-2 border-b border-gray-300">Subtotal</th>
+                            <thead className="sticky top-0 bg-gray-200">
+                              <tr className="text-gray-700">
+                                <th className="px-2 py-2 border-b border-gray-300 text-left">Artículo</th>
+                                <th className="px-2 py-2 border-b border-gray-300 text-left">Cantidad</th>
+                                <th className="px-2 py-2 border-b border-gray-300 text-left">Precio Unitario</th>
+                                <th className="px-2 py-2 border-b border-gray-300 text-left">Subtotal</th>
                               </tr>
                             </thead>
-                            <tbody className="hover:bg-gray-100">
+                            <tbody className="bg-white">
                               {orden.detalles && orden.detalles.length > 0 ? (
                                 orden.detalles.map((d, i) => (
-                                  <tr key={i}>
+                                  <tr key={i} className="hover:bg-gray-50">
                                     <td className="px-2 py-2 border-b border-gray-300">{d.descripcion_articulo}</td>
                                     <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
                                     <td className="px-2 py-2 border-b border-gray-300">
@@ -407,7 +421,7 @@ const OrdenesCompra = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="text-center py-6 text-gray-500">
+                <td colSpan="7" className="text-center py-6 text-gray-500">
                   No se encontraron órdenes que coincidan con la búsqueda.
                 </td>
               </tr>
