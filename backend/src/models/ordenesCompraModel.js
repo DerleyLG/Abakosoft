@@ -61,7 +61,7 @@ module.exports = {
       FROM ordenes_compra oc
       JOIN proveedores p ON oc.id_proveedor = p.id_proveedor
       LEFT JOIN detalle_orden_compra doc ON oc.id_orden_compra = doc.id_orden_compra
-      LEFT JOIN movimientos_tesoreria mt ON oc.id_orden_compra = mt.id_documento AND mt.tipo_documento = 'compra'
+      LEFT JOIN movimientos_tesoreria mt ON oc.id_orden_compra = mt.id_documento AND mt.tipo_documento = 'orden_compra'
       LEFT JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
       ${whereSQL}
       GROUP BY oc.id_orden_compra
