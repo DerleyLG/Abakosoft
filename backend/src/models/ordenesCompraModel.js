@@ -72,8 +72,8 @@ module.exports = {
          oc.id_orden_compra, oc.fecha, oc.id_proveedor, p.nombre AS proveedor_nombre,
          oc.categoria_costo, oc.id_orden_fabricacion, oc.estado,
          SUM(doc.cantidad * doc.precio_unitario) AS monto_total,
-         mp.nombre AS metodo_pago,
-         mp.tipo AS tipo_pago
+         MAX(mp.nombre) AS metodo_pago,
+         MAX(mp.tipo) AS tipo_pago
        ${base}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
