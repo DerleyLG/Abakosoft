@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Listbox } from "@headlessui/react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import api from "../services/api"; 
-import Select from "react-select"; 
+import AsyncSelect from "react-select/async"; 
 import { PlusCircle } from "lucide-react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -29,7 +29,6 @@ const cleanCOPFormat = (formattedValue) => {
 const OrdenPedidoForm = () => {
     const navigate = useNavigate();
     const [clientes, setClientes] = useState([]);
-    const [articulos, setArticulos] = useState([]);
     const [categorias, setCategorias] = useState([]); 
     const [cliente, setCliente] = useState(null);
     const [estado, setEstado] = useState("pendiente");
@@ -51,27 +50,70 @@ const OrdenPedidoForm = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [resClientes, resArticulos, resCategorias] = await Promise.all([
+                const [resClientes, resCategorias] = await Promise.all([
                     api.get("/clientes"),
-                    // Solicitar artículos con paginación estandarizada y ordenar por descripción
-                    api.get("/articulos", { params: { page: 1, pageSize: 500, sortBy: "descripcion", sortDir: "asc" } }),
                     api.get("/categorias"),
                 ]);
                 setClientes(resClientes.data || []);
-                // Adaptar al contrato paginado: { data, total, ... }
-                const articulosData = Array.isArray(resArticulos.data)
-                    ? resArticulos.data
-                    : (resArticulos.data?.data || []);
-                setArticulos(articulosData);
                 setCategorias(resCategorias.data || []);
             } catch (error) {
                 console.error("Error al cargar datos iniciales:", error);
-                toast.error("Error al cargar datos iniciales (clientes, artículos, categorías)");
+                toast.error("Error al cargar datos iniciales (clientes, categorías)");
             } finally {
                 setLoading(false); // Desactivar carga al finalizar
             }
         };
         fetchData();
+    }, []);
+
+    // Caché para almacenar resultados de búsqueda
+    const cacheRef = useRef({});
+    const timerRef = useRef(null);
+
+    // Función para cargar artículos dinámicamente con debounce y caché
+    const loadArticulosOptions = useCallback((inputValue, callback) => {
+        // Limpiar el timer anterior
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // Si ya está en caché, retornar inmediatamente
+        const cacheKey = inputValue?.toLowerCase() || '';
+        if (cacheRef.current[cacheKey]) {
+            callback(cacheRef.current[cacheKey]);
+            return;
+        }
+
+        // Debounce: esperar 300ms después de que el usuario deje de escribir
+        timerRef.current = setTimeout(async () => {
+            try {
+                const response = await api.get("/articulos", { 
+                    params: { 
+                        buscar: inputValue, 
+                        page: 1, 
+                        pageSize: 50, 
+                        sortBy: "descripcion", 
+                        sortDir: "asc" 
+                    } 
+                });
+                const articulosData = Array.isArray(response.data)
+                    ? response.data
+                    : (response.data?.data || []);
+                const opciones = articulosData.map((art) => ({
+                    value: art.id_articulo,
+                    label: `${art.descripcion} (Ref: ${art.referencia})`,
+                    ...art,
+                }));
+                
+                // Guardar en caché
+                cacheRef.current[cacheKey] = opciones;
+                callback(opciones);
+            } catch (error) {
+                console.error("Error al buscar artículos:", error);
+                toast.error("Error al buscar artículos");
+                callback([]);
+            }
+        }, 300); // 300ms de delay
     }, []);
 
     const agregarArticulo = async (articulo) => {
@@ -380,27 +422,18 @@ const OrdenPedidoForm = () => {
                             Agregar artículo
                         </label>
                         <div className="flex items-center gap-2">
-                            <Select
-                                options={articulos.map((a) => ({
-                                    value: a.id_articulo,
-                                    label: a.descripcion,
-                                    ...a,
-                                }))}
-                                value={
-                                    articuloSeleccionado
-                                        ? {
-                                            value: articuloSeleccionado.id_articulo,
-                                            label: articuloSeleccionado.descripcion,
-                                        }
-                                        : null
-                                }
+                            <AsyncSelect
+                                cacheOptions
+                                loadOptions={loadArticulosOptions}
+                                defaultOptions
+                                value={articuloSeleccionado}
                                 onChange={(option) => {
                                     setArticuloSeleccionado(option); // Actualiza el estado del Select
                                     if (option) {
                                         agregarArticulo(option); // Llama a agregarArticulo si se selecciona una opción
                                     }
                                 }}
-                                placeholder="Selecciona un artículo"
+                                placeholder="Escribe para buscar un artículo..."
                                 isClearable
                                 className="text-sm w-full"
                                 styles={{
@@ -413,6 +446,8 @@ const OrdenPedidoForm = () => {
                                     }),
                                 }}
                                 isDisabled={loading}
+                                noOptionsMessage={() => "No se encontraron artículos"}
+                                loadingMessage={() => "Buscando..."}
                             />
                             <button
                                 type="button"

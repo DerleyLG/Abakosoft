@@ -61,6 +61,8 @@ module.exports = {
       FROM ordenes_compra oc
       JOIN proveedores p ON oc.id_proveedor = p.id_proveedor
       LEFT JOIN detalle_orden_compra doc ON oc.id_orden_compra = doc.id_orden_compra
+      LEFT JOIN movimientos_tesoreria mt ON oc.id_orden_compra = mt.id_documento AND mt.tipo_documento = 'compra'
+      LEFT JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
       ${whereSQL}
       GROUP BY oc.id_orden_compra
     `;
@@ -69,7 +71,9 @@ module.exports = {
       `SELECT 
          oc.id_orden_compra, oc.fecha, oc.id_proveedor, p.nombre AS proveedor_nombre,
          oc.categoria_costo, oc.id_orden_fabricacion, oc.estado,
-         SUM(doc.cantidad * doc.precio_unitario) AS monto_total
+         SUM(doc.cantidad * doc.precio_unitario) AS monto_total,
+         mp.nombre AS metodo_pago,
+         mp.tipo AS tipo_pago
        ${base}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
