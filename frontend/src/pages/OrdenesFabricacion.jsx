@@ -89,8 +89,14 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
         const [resTrabajadores, resEtapas, resArticulos] = await Promise.all([
           api.get("/trabajadores"),
           api.get("/etapas-produccion"),
-          api.get("/articulos", { params: { page: 1, pageSize: 200, sortBy: 'descripcion', sortDir: 'asc' } }),
+          api.get("/articulos", { params: { page: 1, pageSize: 10000, sortBy: 'descripcion', sortDir: 'asc' } }),
         ]);
+        
+        console.log('Órdenes Fabricación - Artículos raw:', resArticulos.data);
+        const articulosArr = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
+        console.log('Órdenes Fabricación - Artículos procesados:', articulosArr.length, 'artículos');
+        console.log('Órdenes Fabricación - Primeros 5 artículos:', articulosArr.slice(0, 5));
+        
         setTrabajadores(
           resTrabajadores.data.map((trab) => ({
             value: trab.id_trabajador,
@@ -106,7 +112,7 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
             cargo: etp.cargo,
           }))
         );
-        const articulosArr = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
+        
         setArticulosCatalogo(
           articulosArr.map((a) => ({
             value: a.id_articulo,
@@ -159,21 +165,38 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
         const res = await api.get('/ordenes-fabricacion', { params });
         const payload = res.data || {};
         const rows = Array.isArray(payload.data) ? payload.data : [];
-        setOrdenes(rows);
+        
+        // Parsear detalles y avances de cada orden
+        const ordenesProcesadas = rows.map(orden => ({
+          ...orden,
+          detalles: Array.isArray(orden.detalles)
+            ? orden.detalles
+            : typeof orden.detalles === 'string'
+            ? (() => {
+                try { return JSON.parse(orden.detalles); } 
+                catch { return []; }
+              })()
+            : [],
+          avances: Array.isArray(orden.avances)
+            ? orden.avances
+            : typeof orden.avances === 'string'
+            ? (() => {
+                try { return JSON.parse(orden.avances); }
+                catch { return []; }
+              })()
+            : []
+        }));
+        
+        setOrdenes(ordenesProcesadas);
         setTotal(payload.total || 0);
         setTotalPages(payload.totalPages || 1);
         setHasNext(!!payload.hasNext);
         setHasPrev(!!payload.hasPrev);
      
         const nuevosArticulosPendientes = {};
-  rows.forEach((orden) => {
-          // Parsea los arrays JSON de forma segura
-          const detallesEnOrden = Array.isArray(orden.detalles)
-            ? orden.detalles
-            : JSON.parse(orden.detalles || "[]");
-          const avancesDeLaOrden = Array.isArray(orden.avances)
-            ? orden.avances
-            : JSON.parse(orden.avances || "[]");
+        ordenesProcesadas.forEach((orden) => {
+          const detallesEnOrden = orden.detalles;
+          const avancesDeLaOrden = orden.avances;
 
           const articulosFiltrados = detallesEnOrden.filter((articulo) => {
             const cantidadAvanzadaEnEtapaFinal = avancesDeLaOrden
@@ -459,14 +482,7 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
       : estado === filtroEstadoActivas.toLowerCase();
 
   const coincideArticulo = articuloSeleccion
-    ? (() => {
-        let detalles = o.detalles;
-        if (typeof detalles === 'string') {
-          try { detalles = JSON.parse(detalles); } catch { detalles = []; }
-        }
-        detalles = Array.isArray(detalles) ? detalles : [];
-        return detalles.some(d => Number(d.id_articulo) === Number(articuloSeleccion.value));
-      })()
+    ? o.detalles.some(d => Number(d.id_articulo) === Number(articuloSeleccion.value))
     : true;
 
   return coincideBusqueda && coincideEstado && coincideArticulo;

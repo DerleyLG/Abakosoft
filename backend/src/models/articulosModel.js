@@ -99,7 +99,7 @@ const Articulo = {
     const dir = String(sortDir).toLowerCase() === "desc" ? "DESC" : "ASC";
 
     const p = Math.max(1, parseInt(page) || 1);
-    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+    const ps = Math.min(10000, Math.max(1, parseInt(pageSize) || 25));
     const offset = (p - 1) * ps;
 
     const like = `%${buscar}%`;

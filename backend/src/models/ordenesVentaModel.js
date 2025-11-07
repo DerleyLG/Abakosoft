@@ -176,12 +176,19 @@ module.exports = {
     return result.insertId;
   },
 
-  update: async (id, { id_cliente, estado, id_pedido }, connection = db) => {
+  update: async (
+    id,
+    { id_cliente, estado, id_pedido, total },
+    connection = db
+  ) => {
     const [result] = await (connection || db).query(
       `UPDATE ordenes_venta
-       SET id_cliente = COALESCE(?, id_cliente), estado = COALESCE(?, estado), id_pedido = COALESCE(?, id_pedido)
-       WHERE id_orden_venta = ? AND estado = 'pendiente'`,
-      [id_cliente, estado, id_pedido, id]
+       SET id_cliente = COALESCE(?, id_cliente), 
+           estado = COALESCE(?, estado), 
+           id_pedido = COALESCE(?, id_pedido),
+           total = COALESCE(?, total)
+       WHERE id_orden_venta = ?`,
+      [id_cliente, estado, id_pedido, total, id]
     );
     return result.affectedRows;
   },

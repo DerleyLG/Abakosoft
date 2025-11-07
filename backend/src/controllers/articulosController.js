@@ -15,7 +15,7 @@ const getArticulos = async (req, res) => {
     const { buscar = "", page, pageSize, sortBy, sortDir } = req.query;
 
     const p = Math.max(1, parseInt(page) || 1);
-    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+    const ps = Math.min(10000, Math.max(1, parseInt(pageSize) || 25));
 
     const { data, total } = await Articulo.buscarArticulosPaginado({
       buscar,
@@ -88,11 +88,9 @@ const createArticulo = async (req, res) => {
 
     if (es_compuesto) {
       if (!Array.isArray(componentes) || componentes.length === 0) {
-        return res
-          .status(400)
-          .json({
-            error: "Un artículo compuesto debe tener al menos un componente.",
-          });
+        return res.status(400).json({
+          error: "Un artículo compuesto debe tener al menos un componente.",
+        });
       }
 
       // Validar la estructura y existencia de cada componente
@@ -102,13 +100,11 @@ const createArticulo = async (req, res) => {
           typeof comp.cantidad !== "number" ||
           comp.cantidad <= 0
         ) {
-          return res
-            .status(400)
-            .json({
-              error: `Formato de componente inválido: ${JSON.stringify(
-                comp
-              )}. Se requieren 'id' y 'cantidad' (número positivo).`,
-            });
+          return res.status(400).json({
+            error: `Formato de componente inválido: ${JSON.stringify(
+              comp
+            )}. Se requieren 'id' y 'cantidad' (número positivo).`,
+          });
         }
 
         // Verificar que el ID del componente exista como un artículo válido
@@ -118,11 +114,9 @@ const createArticulo = async (req, res) => {
           [comp.id]
         );
         if (componenteArticuloRows.length === 0) {
-          return res
-            .status(400)
-            .json({
-              error: `El componente con ID ${comp.id} no es un artículo válido.`,
-            });
+          return res.status(400).json({
+            error: `El componente con ID ${comp.id} no es un artículo válido.`,
+          });
         }
       }
     }
@@ -150,11 +144,9 @@ const createArticulo = async (req, res) => {
       for (const comp of componentes) {
         if (comp.id === articuloId) {
           await connection.rollback();
-          return res
-            .status(400)
-            .json({
-              error: `Un artículo compuesto no puede contenerse a sí mismo como componente.`,
-            });
+          return res.status(400).json({
+            error: `Un artículo compuesto no puede contenerse a sí mismo como componente.`,
+          });
         }
       }
 
@@ -169,12 +161,10 @@ const createArticulo = async (req, res) => {
 
     const articuloCreado = await Articulo.getById(articuloId);
 
-    res
-      .status(201)
-      .json({
-        message: "Artículo creado correctamente",
-        articulo: articuloCreado,
-      });
+    res.status(201).json({
+      message: "Artículo creado correctamente",
+      articulo: articuloCreado,
+    });
   } catch (err) {
     if (connection) {
       await connection.rollback();
@@ -220,11 +210,9 @@ const getComponentesParaOrdenFabricacion = async (req, res) => {
       "Error al obtener componentes para orden de fabricación:",
       error
     );
-    res
-      .status(500)
-      .json({
-        error: "Error interno del servidor al obtener los componentes.",
-      });
+    res.status(500).json({
+      error: "Error interno del servidor al obtener los componentes.",
+    });
   }
 };
 
@@ -270,12 +258,10 @@ const deleteArticulo = async (req, res) => {
     );
 
     if (movimientos.length > 0) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "No puedes eliminar este artículo porque tiene movimientos registrados.",
-        });
+      return res.status(400).json({
+        error:
+          "No puedes eliminar este artículo porque tiene movimientos registrados.",
+      });
     }
 
     const result = await Articulo.delete(id);

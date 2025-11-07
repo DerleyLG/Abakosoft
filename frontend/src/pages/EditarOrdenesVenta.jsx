@@ -237,12 +237,14 @@ const OrdenVentaEdit = () => {
                      detalles = detallesRes.data;
                 }
 
-                const articulosDeLaOrden = detalles.map((item) => ({
-                    id_articulo: item.id_articulo,
-                    descripcion: item.descripcion || articulosAPI.find(a => a.id_articulo === item.id_articulo)?.descripcion || `Artículo ${item.id_articulo}`,
-                    cantidad: item.cantidad,
-                    precio_unitario: Number(item.precio_unitario) || 0,
-                }));
+                const articulosDeLaOrden = Array.isArray(detalles) 
+                    ? detalles.map((item) => ({
+                        id_articulo: item.id_articulo,
+                        descripcion: item.descripcion || articulosAPI.find(a => a.id_articulo === item.id_articulo)?.descripcion || `Artículo ${item.id_articulo}`,
+                        cantidad: item.cantidad,
+                        precio_unitario: Number(item.precio_unitario) || 0,
+                    }))
+                    : [];
                 setArticulosSeleccionados(articulosDeLaOrden);
                 
                 
