@@ -1,9 +1,11 @@
-const db = require('../database/db');
+const db = require("../database/db");
 
 module.exports = {
   // MODIFICADO: Acepta 'connection' opcional
   getAll: async (connection = db) => {
-    const [rows] = await (connection || db).query('SELECT * FROM detalle_orden_venta');
+    const [rows] = await (connection || db).query(
+      "SELECT * FROM detalle_orden_venta"
+    );
     return rows;
   },
 
@@ -20,7 +22,16 @@ module.exports = {
   },
 
   // MODIFICADO: Acepta 'observaciones' y 'connection' opcional
-  create: async ({ id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones = null }, connection = db) => {
+  create: async (
+    {
+      id_orden_venta,
+      id_articulo,
+      cantidad,
+      precio_unitario,
+      observaciones = null,
+    },
+    connection = db
+  ) => {
     const [result] = await (connection || db).query(
       `INSERT INTO detalle_orden_venta
        (id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones)
@@ -31,19 +42,48 @@ module.exports = {
   },
 
   // MODIFICADO: Acepta 'connection' opcional
-  update: async (id, { id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones = null }, connection = db) => {
+  update: async (
+    id,
+    {
+      id_orden_venta,
+      id_articulo,
+      cantidad,
+      precio_unitario,
+      observaciones = null,
+    },
+    connection = db
+  ) => {
     const [result] = await (connection || db).query(
       `UPDATE detalle_orden_venta
        SET id_orden_venta = ?, id_articulo = ?, cantidad = ?, precio_unitario = ?, observaciones = ?
        WHERE id_detalle_venta = ?`,
-      [id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones, id]
+      [
+        id_orden_venta,
+        id_articulo,
+        cantidad,
+        precio_unitario,
+        observaciones,
+        id,
+      ]
     );
     return result.affectedRows;
   },
 
   // MODIFICADO: Acepta 'connection' opcional
   delete: async (id, connection = db) => {
-    const [result] = await (connection || db).query('DELETE FROM detalle_orden_venta WHERE id_detalle_venta = ?', [id]);
+    const [result] = await (connection || db).query(
+      "DELETE FROM detalle_orden_venta WHERE id_detalle_venta = ?",
+      [id]
+    );
     return result.affectedRows;
-  }
+  },
+
+  // Eliminar todos los detalles de una orden de venta
+  deleteByVenta: async (id_orden_venta, connection = db) => {
+    const [result] = await (connection || db).query(
+      "DELETE FROM detalle_orden_venta WHERE id_orden_venta = ?",
+      [id_orden_venta]
+    );
+    return result.affectedRows;
+  },
 };

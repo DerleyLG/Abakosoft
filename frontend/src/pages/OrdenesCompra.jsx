@@ -10,6 +10,16 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
 
+// Función para formatear fecha sin problemas de zona horaria
+const formatDateLocal = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${day}/${month}/${year}`;
+};
+
 
 const OrdenesCompra = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -195,11 +205,7 @@ const OrdenesCompra = () => {
   const filteredOrdenes = ordenes.filter((orden) => {
     const term = searchTerm.toLowerCase();
     const proveedor = orden.proveedor_nombre?.toLowerCase() || "";
-    const fechaStr = new Date(orden.fecha).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    const fechaStr = formatDateLocal(orden.fecha);
 
     // el backend ya filtra por proveedor (buscar), complementamos por fecha
     const textMatch = proveedor.includes(term) || fechaStr.includes(term);
@@ -309,7 +315,7 @@ const OrdenesCompra = () => {
                     <td className="px-4 py-3">{orden.id_orden_compra}</td>
                     <td className="px-4 py-3">{orden.proveedor_nombre}</td>
                     <td className="px-4 py-3">
-                      {new Date(orden.fecha).toLocaleDateString("es-ES")}
+                      {formatDateLocal(orden.fecha)}
                     </td>
                     <td className="px-4 py-3">
                       ${Number(orden.monto_total || 0).toLocaleString()}

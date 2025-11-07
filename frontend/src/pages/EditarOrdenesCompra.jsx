@@ -87,13 +87,19 @@ const EditarOrdenCompra = () => {
         try {
             const [resProveedores, resArticulos, resMetodos] = await Promise.all([
                 api.get('/proveedores'),
-                api.get('/articulos'),
+                api.get('/articulos', { params: { page: 1, pageSize: 10000, sortBy: 'descripcion', sortDir: 'asc' } }),
              
                 api.get('/metodos-pago'), 
             ]);
-            setAllProveedores(resProveedores.data);
-            setAllArticulos(resArticulos.data); 
-            setAllMetodosPago(resMetodos.data);
+            
+            console.log('Artículos cargados (raw):', resArticulos.data);
+            
+            const articulosArray = Array.isArray(resArticulos.data) ? resArticulos.data : (resArticulos.data?.data || []);
+            console.log('Artículos array:', articulosArray);
+            
+            setAllProveedores(Array.isArray(resProveedores.data) ? resProveedores.data : []);
+            setAllArticulos(articulosArray); 
+            setAllMetodosPago(Array.isArray(resMetodos.data) ? resMetodos.data : []);
         } catch (error) {
             toast.error('Error al cargar dependencias (Proveedores/Artículos/Pagos).');
             console.error('Error cargando dependencias:', error);
@@ -106,12 +112,21 @@ const EditarOrdenCompra = () => {
             const resOrden = await api.get(`/ordenes-compra/${id}`); 
             const orden = resOrden.data;
 
+            console.log('Orden cargada:', orden);
+            console.log('Detalles de la orden:', orden.detalles);
             
             const editable = orden.estado.toLowerCase() === 'pendiente';
             setIsEditable(editable);
             
-            
-            const formattedDate = orden.fecha ? format(new Date(orden.fecha), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+            // Formatear fecha sin problemas de zona horaria
+            let formattedDate = format(new Date(), 'yyyy-MM-dd');
+            if (orden.fecha) {
+                const date = new Date(orden.fecha);
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                formattedDate = `${year}-${month}-${day}`;
+            }
 
             
             setOrdenData({
@@ -123,12 +138,16 @@ const EditarOrdenCompra = () => {
             });
 
             
-            setDetalles(orden.detalles.map(d => ({
-                id_articulo: d.id_articulo,
-                cantidad: d.cantidad,
-               
-                precio_unitario: Number(d.precio_unitario) || 0, 
-            })));
+            const detallesFormateados = Array.isArray(orden.detalles) 
+                ? orden.detalles.map(d => ({
+                    id_articulo: d.id_articulo,
+                    cantidad: d.cantidad,
+                    precio_unitario: Number(d.precio_unitario) || 0, 
+                }))
+                : [];
+            
+            console.log('Detalles formateados:', detallesFormateados);
+            setDetalles(detallesFormateados);
             
         
             await fetchMovimientoPago(id); 
@@ -259,7 +278,7 @@ const EditarOrdenCompra = () => {
          
             await api.put(`/ordenes-compra/${id}`, dataToSend); 
 
-            toast.success('Orden de compra, detalles y movimiento de pago actualizados correctamente. ✅');
+            toast.success('Orden de compra, detalles y movimiento de pago actualizados correctamente');
             navigate('/ordenes_compra');
         } catch (error) {
             const errorMessage = error.response?.data?.message || 'Error al actualizar la orden de compra.';
@@ -291,7 +310,7 @@ const EditarOrdenCompra = () => {
                 </h2>
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-slate-800 px-4 py-2 rounded-lg font-semibold transition"
+                    className="cursor-pointer flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-slate-800 px-4 py-2 rounded-lg font-semibold transition"
                 >
                     <FiArrowLeft />
                     Volver

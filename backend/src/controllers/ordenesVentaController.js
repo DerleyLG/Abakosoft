@@ -8,6 +8,7 @@ const pedidoModel = require("../models/ordenPedidosModel");
 const db = require("../database/db");
 const ventasCreditoModel = require("../models/ventasCredito");
 const metodosDePagoModel = require("../models/metodosDePagoModel");
+const cierresCajaModel = require("../models/cierresCajaModel");
 
 // Utilidad para obtener la fecha local YYYY-MM-DD en una zona horaria dada
 function getTodayYMDForTZ(timeZone) {
@@ -106,6 +107,16 @@ module.exports = {
         observaciones_pago,
         id_pedido,
       } = req.body;
+
+      // Validar que la fecha actual no esté en un período cerrado
+      const fechaHoy = new Date().toISOString().split("T")[0];
+      const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fechaHoy);
+      if (fechaCerrada) {
+        return res.status(400).json({
+          error:
+            "No se pueden crear órdenes de venta en períodos cerrados. La fecha actual está en un período cerrado de caja.",
+        });
+      }
 
       connection = await db.getConnection();
       await connection.beginTransaction();
@@ -282,7 +293,14 @@ module.exports = {
     let connection;
     try {
       const id = +req.params.id;
-      const { id_cliente, estado } = req.body;
+      const {
+        id_cliente,
+        estado,
+        detalles,
+        id_metodo_pago,
+        referencia,
+        observaciones_pago,
+      } = req.body;
 
       connection = await db.getConnection();
       await connection.beginTransaction();
@@ -290,6 +308,17 @@ module.exports = {
       const ordenActual = await ordenModel.getById(id, connection);
       if (!ordenActual) {
         throw new Error("Orden de venta no encontrada.");
+      }
+
+      // Validar que la fecha de la orden no esté en un período cerrado
+      const fechaCerrada = await cierresCajaModel.validarFechaCerrada(
+        ordenActual.fecha
+      );
+      if (fechaCerrada) {
+        return res.status(400).json({
+          error:
+            "No se pueden modificar órdenes de venta de períodos cerrados. La fecha de esta orden está en un período cerrado de caja.",
+        });
       }
 
       if (!id_cliente || !estado) {
@@ -326,11 +355,63 @@ module.exports = {
         }
       }
 
+      // Actualizar detalles si se proporcionan
+      if (detalles && Array.isArray(detalles) && detalles.length > 0) {
+        // Eliminar detalles antiguos
+        await detalleOrdenModel.deleteByVenta(id, connection);
+
+        // Insertar nuevos detalles
+        for (const detalle of detalles) {
+          await detalleOrdenModel.create(
+            {
+              id_orden_venta: id,
+              id_articulo: detalle.id_articulo,
+              cantidad: detalle.cantidad,
+              precio_unitario: detalle.precio_unitario,
+            },
+            connection
+          );
+        }
+      }
+
+      // Calcular nuevo total
+      const nuevoTotal = detalles
+        ? detalles.reduce((sum, d) => sum + d.cantidad * d.precio_unitario, 0)
+        : ordenActual.total;
+
+      console.log("Actualizando orden de venta:", {
+        id,
+        id_cliente,
+        estado,
+        total: nuevoTotal,
+        ordenActual: { estado: ordenActual.estado, total: ordenActual.total },
+      });
+
       const updatedRows = await ordenModel.update(
         id,
-        { id_cliente, estado },
+        {
+          id_cliente,
+          estado,
+          total: nuevoTotal,
+        },
         connection
       );
+
+      console.log("Filas actualizadas:", updatedRows);
+
+      // Actualizar movimiento de tesorería si se proporcionan datos de pago
+      if (id_metodo_pago && ordenActual.id_movimiento_tesoreria) {
+        await tesoreriaModel.actualizarMovimiento(
+          ordenActual.id_movimiento_tesoreria,
+          {
+            monto: nuevoTotal,
+            id_metodo_pago,
+            referencia: referencia || null,
+            observaciones: observaciones_pago || null,
+          },
+          connection
+        );
+      }
 
       if (updatedRows === 0) {
         throw new Error("No se pudo actualizar la orden de venta.");

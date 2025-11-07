@@ -5,6 +5,7 @@ const proveedorModel = require("../models/proveedoresModel");
 const articuloModel = require("../models/articulosModel");
 const inventarioModel = require("../models/inventarioModel");
 const tesoreriaModel = require("../models/tesoreriaModel");
+const cierresCajaModel = require("../models/cierresCajaModel");
 
 const proveedorExiste = async (id_proveedor, connection = db) => {
   const proveedor = await proveedorModel.getById(id_proveedor, connection);
@@ -81,7 +82,11 @@ const getOrdenCompraById = async (req, res) => {
       return res.status(404).json({ error: "Orden de compra no encontrada" });
     }
     const detalles = await detalleOrdenCompra.getByOrdenCompra(id);
-    res.json({ ...orden, detalles });
+    console.log("getOrdenCompraById - Orden:", orden);
+    console.log("getOrdenCompraById - Detalles:", detalles);
+    const response = { ...orden, detalles };
+    console.log("getOrdenCompraById - Response:", response);
+    res.json(response);
   } catch (error) {
     console.error("Error al obtener la orden de compra:", error);
     res.status(500).json({ error: "Error al obtener la orden de compra" });
@@ -100,6 +105,16 @@ async function createOrdenCompra(req, res) {
       referencia,
       observaciones_pago,
     } = req.body;
+
+    // Validar que la fecha actual no esté en un período cerrado
+    const fechaHoy = new Date().toISOString().split("T")[0];
+    const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fechaHoy);
+    if (fechaCerrada) {
+      return res.status(400).json({
+        error:
+          "No se pueden crear órdenes de compra en períodos cerrados. La fecha actual está en un período cerrado de caja.",
+      });
+    }
 
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -216,12 +231,10 @@ async function createOrdenCompra(req, res) {
     await connection.commit();
     connection.release();
 
-    return res
-      .status(201)
-      .json({
-        message: "Orden de compra creada correctamente.",
-        id_orden_compra: ordenId,
-      });
+    return res.status(201).json({
+      message: "Orden de compra creada correctamente.",
+      id_orden_compra: ordenId,
+    });
   } catch (error) {
     if (connection) {
       console.log(
@@ -236,11 +249,9 @@ async function createOrdenCompra(req, res) {
     console.error("Error creando orden de compra:", error);
 
     if (!res.headersSent) {
-      res
-        .status(500)
-        .json({
-          message: error.message || "Error al crear la orden de compra",
-        });
+      res.status(500).json({
+        message: error.message || "Error al crear la orden de compra",
+      });
     }
   }
 }
@@ -291,24 +302,19 @@ async function confirmarRecepcion(req, res) {
 
     await connection.commit();
     connection.release();
-    res
-      .status(200)
-      .json({
-        message:
-          "Recepción de mercancía confirmada y stock actualizado correctamente.",
-      });
+    res.status(200).json({
+      message:
+        "Recepción de mercancía confirmada y stock actualizado correctamente.",
+    });
   } catch (error) {
     if (connection) {
       await connection.rollback();
       connection.release();
     }
     console.error("Error al confirmar recepción de mercancía:", error);
-    res
-      .status(500)
-      .json({
-        message:
-          error.message || "Error al confirmar la recepción de mercancía.",
-      });
+    res.status(500).json({
+      message: error.message || "Error al confirmar la recepción de mercancía.",
+    });
   }
 }
 
@@ -336,6 +342,30 @@ async function updateOrdenCompra(req, res) {
     const ordenActual = await ordenCompras.getById(id_orden_compra, connection);
     if (!ordenActual) {
       throw new Error("Orden de compra no encontrada.");
+    }
+
+    // Validar que la fecha actual de la orden no esté en un período cerrado
+    const fechaActualCerrada = await cierresCajaModel.validarFechaCerrada(
+      ordenActual.fecha
+    );
+    if (fechaActualCerrada) {
+      return res.status(400).json({
+        error:
+          "No se pueden modificar órdenes de compra de períodos cerrados. La fecha actual de esta orden está en un período cerrado de caja.",
+      });
+    }
+
+    // Si se está cambiando la fecha, validar que la nueva fecha tampoco esté cerrada
+    if (fecha && fecha !== ordenActual.fecha) {
+      const nuevaFechaCerrada = await cierresCajaModel.validarFechaCerrada(
+        fecha
+      );
+      if (nuevaFechaCerrada) {
+        return res.status(400).json({
+          error:
+            "No se puede cambiar la fecha a un período cerrado. La nueva fecha está en un período cerrado de caja.",
+        });
+      }
     }
 
     if (ordenActual.estado !== "pendiente") {
@@ -462,11 +492,9 @@ async function updateOrdenCompra(req, res) {
     }
     console.error("Error actualizando orden de compra:", error);
     if (!res.headersSent) {
-      res
-        .status(500)
-        .json({
-          message: error.message || "Error al actualizar la orden de compra",
-        });
+      res.status(500).json({
+        message: error.message || "Error al actualizar la orden de compra",
+      });
     }
   }
 }
@@ -536,12 +564,10 @@ const deleteOrdenCompra = async (req, res) => {
     }
     console.error("Error al eliminar/cancelar la orden de compra:", error);
     if (!res.headersSent) {
-      res
-        .status(500)
-        .json({
-          message:
-            error.message || "Error al eliminar/cancelar la orden de compra",
-        });
+      res.status(500).json({
+        message:
+          error.message || "Error al eliminar/cancelar la orden de compra",
+      });
     }
   }
 };
