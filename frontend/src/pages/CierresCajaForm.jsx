@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cierresCajaService from '../services/cierresCajaService';
+import api from '../services/api';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiSave, FiAlertCircle } from 'react-icons/fi';
 
@@ -31,12 +32,8 @@ const CierresCajaForm = () => {
       }
 
       // Obtener métodos de pago (desde tu servicio existente)
-      const response = await fetch('http://localhost:3000/api/metodos-pago', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const metodos = await response.json();
+      const response = await api.get('/metodos-pago');
+      const metodos = response.data;
       setMetodosPago(metodos);
 
       // Inicializar saldos en 0
