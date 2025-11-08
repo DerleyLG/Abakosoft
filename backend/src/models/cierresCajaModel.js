@@ -261,6 +261,10 @@ const cierresCajaModel = {
 
     const { fecha_inicio, fecha_fin } = cierre[0];
 
+    console.log("[getMovimientosPeriodo] id_cierre:", id_cierre);
+    console.log("[getMovimientosPeriodo] fecha_inicio:", fecha_inicio);
+    console.log("[getMovimientosPeriodo] fecha_fin:", fecha_fin);
+
     const query = `
       SELECT 
         mt.id_movimiento,
@@ -285,8 +289,14 @@ const cierresCajaModel = {
     const [movimientos] = await db.query(query, [
       fecha_inicio,
       fecha_fin,
-      fecha_fin
+      fecha_fin,
     ]);
+
+    console.log(
+      "[getMovimientosPeriodo] movimientos encontrados:",
+      movimientos.length
+    );
+
     return movimientos;
   },
 

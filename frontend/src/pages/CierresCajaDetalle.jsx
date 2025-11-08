@@ -27,6 +27,8 @@ const CierresCajaDetalle = () => {
         cierresCajaService.getMovimientos(id)
       ]);
       
+      console.log('[CierresCajaDetalle] Movimientos recibidos:', movimientosPeriodo.length, movimientosPeriodo);
+      
       setCierre(detalleCierre);
       setMovimientos(movimientosPeriodo);
     } catch (error) {
