@@ -277,13 +277,15 @@ const cierresCajaModel = {
         mp.nombre AS metodo_pago
       FROM movimientos_tesoreria mt
       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-      WHERE DATE(mt.fecha_movimiento) BETWEEN ? AND ?
+      WHERE DATE(mt.fecha_movimiento) >= ?
+        AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
       ORDER BY mt.fecha_movimiento DESC, tipo_movimiento
     `;
 
     const [movimientos] = await db.query(query, [
       fecha_inicio,
-      fecha_fin || fecha_inicio,
+      fecha_fin,
+      fecha_fin
     ]);
     return movimientos;
   },
