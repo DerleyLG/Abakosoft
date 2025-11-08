@@ -132,13 +132,15 @@ const cierresCajaModel = {
           SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
           SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
         FROM movimientos_tesoreria mt
-        WHERE DATE(mt.fecha_movimiento) BETWEEN ? AND ?
+        WHERE DATE(mt.fecha_movimiento) >= ?
+          AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
         GROUP BY mt.id_metodo_pago
       `;
 
       const [totalesReales] = await db.query(queryTotales, [
         fecha_inicio,
-        fecha_fin || fecha_inicio,
+        fecha_fin,
+        fecha_fin,
       ]);
 
       // Crear un mapa de totales por método de pago
