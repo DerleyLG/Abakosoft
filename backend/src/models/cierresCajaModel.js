@@ -36,12 +36,14 @@ const cierresCajaModel = {
             SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
             SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
           FROM movimientos_tesoreria mt
-          WHERE DATE(mt.fecha_movimiento) BETWEEN ? AND ?
+          WHERE DATE(mt.fecha_movimiento) >= ?
+            AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
         `;
 
         const [totales] = await db.query(queryTotales, [
           cierre.fecha_inicio,
-          cierre.fecha_fin || cierre.fecha_inicio,
+          cierre.fecha_fin,
+          cierre.fecha_fin,
         ]);
 
         if (totales && totales.length > 0) {
