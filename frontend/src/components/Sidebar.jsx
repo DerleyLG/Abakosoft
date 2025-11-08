@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
     Boxes,
     ClipboardList,
@@ -11,7 +11,7 @@ import {
     ChevronDown,
     ChevronRight,
 } from 'lucide-react';
-import { FiDollarSign, FiCreditCard } from 'react-icons/fi';
+import { FiDollarSign, FiCreditCard, FiCalendar } from 'react-icons/fi';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { can, ACTIONS } from '../utils/permissions';
@@ -178,6 +178,17 @@ const Sidebar = ({ isOpen }) => {
                   Órdenes de Fabricación
                 </NavLink>
 
+                <NavLink
+                  to="/kanban"
+                  className={({ isActive }) =>
+                    `block p-2 rounded text-sm transition-colors duration-200 ${
+                      isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                    }`
+                  }
+                >
+                   Tablero de Producción
+                </NavLink>
+
                 <NavLink
                   to="/ordenes_compra"
                   className={({ isActive }) =>
@@ -210,6 +221,16 @@ const Sidebar = ({ isOpen }) => {
          	}
         >
          	<FiDollarSign size={20} /> Tesorería
+         </NavLink>
+         <NavLink
+         	to="/cierres-caja"
+         	className={({ isActive }) =>
+         		`flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
+         	  isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+         	 }`
+         	}
+        >
+         	<FiCalendar size={20} /> Cierres de Caja
          </NavLink>
           {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
             <NavLink

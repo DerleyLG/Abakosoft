@@ -39,6 +39,8 @@ const compraMateriaPrimaRoutes = require("./src/routes/compraMateriaPrimaRoutes.
 const tesoreria = require("./src/routes/tesoreriaRoutes.js");
 const metodosPago = require("./src/routes/metodosDePagoRoutes.js");
 const ventascreditos = require("./src/routes/ventasCreditoRoutes.js");
+const kanbanRoutes = require("./src/routes/kanbanRoutes.js");
+const cierresCajaRoutes = require("./src/routes/cierresCaja.js");
 
 const app = express();
 app.use(
@@ -142,6 +144,8 @@ app.use("/api/metodos-pago", metodosPago);
 
 app.use("/api/creditos", ventascreditos);
 app.use("/api/roles", rolesRoutes);
+app.use("/api/kanban", kanbanRoutes);
+app.use("/api/cierres-caja", cierresCajaRoutes);
 
 const PORT = process.env.PORT;
 app.listen(PORT, "0.0.0.0", () => {
