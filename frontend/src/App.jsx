@@ -29,6 +29,7 @@ import OrdenesFabricacion from "./pages/OrdenesFabricacion";
 import OrdenFabricacionForm from "./pages/OrdenFabricacionForm";
 import OrdenesVenta from "./pages/OrdenesVenta";
 import OrdenVentaForm from "./pages/OrdenVentaForm"
+import KanbanBoard from "./pages/KanbanBoard";
 import OrdenesPedido from "./pages/OrdenesPedido";
 import OrdenPedidoForm from './pages/OrdenPedidoForm'
 import CrearEtapa from "./pages/EtapasProduccionForm";
@@ -61,6 +62,10 @@ import OrdenesVentaEdit from "./pages/EditarOrdenesVenta";
 import VentasCredito from "./pages/VentasCredito";
 import RequirePermission from "./components/RequirePermission";
 import { ACTIONS } from "./utils/permissions";
+import CierresCajaList from "./pages/CierresCajaList";
+import CierresCajaDetalle from "./pages/CierresCajaDetalle";
+import CierresCajaForm from "./pages/CierresCajaForm";
+import CierresCajaCerrar from "./pages/CierresCajaCerrar";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -106,6 +111,7 @@ const AppLogic = () => {
                 <Route path="ordenes_compra/nuevo" element={<RequirePermission action={ACTIONS.PURCHASES_CREATE}><OrdenesCompraForm /></RequirePermission>} />
                 <Route path="ordenes_fabricacion" element={<OrdenesFabricacion/>} />
                 <Route path="ordenes_fabricacion/nuevo" element={<RequirePermission action={ACTIONS.FABRICATION_CREATE}><OrdenFabricacionForm/></RequirePermission>} />
+                <Route path="kanban" element={<KanbanBoard/>} />
                 <Route path="ordenes_venta" element={<OrdenesVenta/>} />
                 <Route path="ordenes_venta/nuevo" element={<RequirePermission action={ACTIONS.SALES_CREATE}><OrdenVentaForm/></RequirePermission>} />
                 <Route path="ordenes_pedido" element={<OrdenesPedido/>} />
@@ -137,6 +143,12 @@ const AppLogic = () => {
                 <Route path="ordenes_compra/editar/:id" element={<RequirePermission action={ACTIONS.PURCHASES_EDIT}><EditarOrdenCompra /></RequirePermission>} />
                 <Route path="ordenes_venta/editar/:id" element={<RequirePermission action={ACTIONS.SALES_EDIT}><OrdenesVentaEdit/></RequirePermission>} />
                 <Route path="ventas_credito" element={<VentasCredito/>} />
+                
+                {/* Cierres de Caja */}
+                <Route path="cierres-caja" element={<CierresCajaList/>} />
+                <Route path="cierres-caja/crear" element={<CierresCajaForm/>} />
+                <Route path="cierres-caja/:id" element={<CierresCajaDetalle/>} />
+                <Route path="cierres-caja/:id/cerrar" element={<CierresCajaCerrar/>} />
             </Route>
         </Routes>
     );
