@@ -1,4 +1,5 @@
 const cierresCajaModel = require("../models/cierresCajaModel");
+const migracionService = require("../services/migracionCierresService");
 
 const cierresCajaController = {
   /**
@@ -146,6 +147,27 @@ const cierresCajaController = {
         return res.status(400).json({ error: "La fecha de fin es requerida" });
       }
 
+      // Validar que la fecha_fin sea >= fecha_inicio
+      if (new Date(fecha_fin) < new Date(cierre.fecha_inicio)) {
+        return res.status(400).json({
+          error: "La fecha de fin no puede ser anterior a la fecha de inicio",
+        });
+      }
+
+      // Ejecutar validaciones del período
+      const validaciones = await cierresCajaModel.validarCierrePeriodo(
+        id,
+        fecha_fin
+      );
+
+      // Si hay validaciones críticas (errores), no permitir cerrar
+      if (validaciones.errores && validaciones.errores.length > 0) {
+        return res.status(400).json({
+          error: "No se puede cerrar el período debido a errores de validación",
+          validaciones,
+        });
+      }
+
       // Calcular totales del período
       const totales = await cierresCajaModel.calcularTotalesPeriodo(id);
 
@@ -158,10 +180,17 @@ const cierresCajaController = {
         totales
       );
 
-      res.json({
+      // Incluir warnings en la respuesta (si los hay)
+      const response = {
         message: "Período cerrado exitosamente",
         ...result,
-      });
+      };
+
+      if (validaciones.warnings && validaciones.warnings.length > 0) {
+        response.warnings = validaciones.warnings;
+      }
+
+      res.json(response);
     } catch (error) {
       console.error("Error cerrando período:", error);
       res.status(500).json({ error: "Error al cerrar el período" });
@@ -191,6 +220,124 @@ const cierresCajaController = {
     } catch (error) {
       console.error("Error validando fecha:", error);
       res.status(500).json({ error: "Error al validar la fecha" });
+    }
+  },
+
+  /**
+   * POST /api/cierres-caja/:id/validar
+   * Validar un período antes de cerrarlo
+   */
+  validarPeriodo: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fecha_fin } = req.body;
+
+      if (!fecha_fin) {
+        return res.status(400).json({ error: "La fecha de fin es requerida" });
+      }
+
+      const cierre = await cierresCajaModel.getById(id);
+      if (!cierre) {
+        return res.status(404).json({ error: "Cierre no encontrado" });
+      }
+
+      if (cierre.estado === "cerrado") {
+        return res.status(400).json({ error: "Este período ya está cerrado" });
+      }
+
+      const validaciones = await cierresCajaModel.validarCierrePeriodo(
+        id,
+        fecha_fin
+      );
+
+      res.json({
+        valido: validaciones.errores.length === 0,
+        ...validaciones,
+      });
+    } catch (error) {
+      console.error("Error validando período:", error);
+      res.status(500).json({ error: "Error al validar el período" });
+    }
+  },
+
+  /**
+   * PUT /api/cierres-caja/:id/saldos-iniciales
+   * Actualizar saldos iniciales de un período abierto
+   */
+  actualizarSaldosIniciales: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { saldos_iniciales } = req.body;
+
+      // Validar que el cierre exista y esté abierto
+      const cierre = await cierresCajaModel.getById(id);
+      if (!cierre) {
+        return res.status(404).json({ error: "Cierre no encontrado" });
+      }
+
+      if (cierre.estado === "cerrado") {
+        return res.status(400).json({
+          error:
+            "No se pueden modificar los saldos iniciales de un período cerrado",
+        });
+      }
+
+      if (!saldos_iniciales || !Array.isArray(saldos_iniciales)) {
+        return res.status(400).json({
+          error: "Los saldos iniciales deben ser un array",
+        });
+      }
+
+      // Actualizar saldos iniciales
+      await cierresCajaModel.actualizarSaldosIniciales(id, saldos_iniciales);
+
+      res.json({
+        message: "Saldos iniciales actualizados exitosamente",
+      });
+    } catch (error) {
+      console.error("Error actualizando saldos iniciales:", error);
+      res
+        .status(500)
+        .json({ error: "Error al actualizar los saldos iniciales" });
+    }
+  },
+
+  /**
+   * GET /api/cierres-caja/estado-sistema
+   * Verificar si el sistema necesita migración de períodos históricos
+   */
+  verificarEstadoSistema: async (req, res) => {
+    try {
+      console.log("[verificarEstadoSistema] Petición recibida");
+      const estado = await migracionService.necesitaMigracion();
+      console.log("[verificarEstadoSistema] Estado:", estado);
+      res.json(estado);
+    } catch (error) {
+      console.error("[verificarEstadoSistema] Error:", error);
+      res.status(500).json({ error: "Error al verificar estado del sistema" });
+    }
+  },
+
+  /**
+   * POST /api/cierres-caja/migrar-historicos
+   * Crear períodos históricos basados en movimientos existentes
+   */
+  migrarPeriodosHistoricos: async (req, res) => {
+    try {
+      // Verificar permisos (solo admin)
+      if (req.user && req.user.rol !== "admin") {
+        return res.status(403).json({
+          error: "Solo administradores pueden ejecutar migraciones",
+        });
+      }
+
+      const resultado = await migracionService.migrarPeriodosHistoricos();
+      res.json(resultado);
+    } catch (error) {
+      console.error("Error en migración:", error);
+      res.status(500).json({
+        error: error.message || "Error durante la migración de períodos",
+      });
     }
   },
 };

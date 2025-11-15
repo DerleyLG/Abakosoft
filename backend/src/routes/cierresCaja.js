@@ -18,6 +18,12 @@ router.use(verifyToken);
 router.get("/", cierresCajaController.getAll);
 
 /**
+ * GET /api/cierres-caja/estado-sistema
+ * Verificar si el sistema necesita migración
+ */
+router.get("/estado-sistema", cierresCajaController.verificarEstadoSistema);
+
+/**
  * GET /api/cierres-caja/abierto
  * Obtener cierre actual (abierto)
  */
@@ -66,5 +72,33 @@ router.post(
  * Validar si una fecha está en un período cerrado
  */
 router.post("/validar-fecha", cierresCajaController.validarFecha);
+
+/**
+ * POST /api/cierres-caja/:id/validar
+ * Validar un período antes de cerrarlo
+ */
+router.post("/:id/validar", cierresCajaController.validarPeriodo);
+
+/**
+ * PUT /api/cierres-caja/:id/saldos-iniciales
+ * Actualizar saldos iniciales de un período abierto
+ * Requiere: admin o supervisor
+ */
+router.put(
+  "/:id/saldos-iniciales",
+  requirePermission(["admin", "supervisor"]),
+  cierresCajaController.actualizarSaldosIniciales
+);
+
+/**
+ * POST /api/cierres-caja/migrar-historicos
+ * Crear períodos históricos automáticamente
+ * Requiere: solo admin
+ */
+router.post(
+  "/migrar-historicos",
+  requirePermission(["admin"]),
+  cierresCajaController.migrarPeriodosHistoricos
+);
 
 module.exports = router;

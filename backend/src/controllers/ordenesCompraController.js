@@ -7,6 +7,22 @@ const inventarioModel = require("../models/inventarioModel");
 const tesoreriaModel = require("../models/tesoreriaModel");
 const cierresCajaModel = require("../models/cierresCajaModel");
 
+// Utilidad para obtener la fecha local YYYY-MM-DD en una zona horaria dada
+function getTodayYMDForTZ(timeZone) {
+  const tz =
+    timeZone || process.env.APP_TZ || process.env.TZ || "America/Bogota";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value || "1970";
+  const m = parts.find((p) => p.type === "month")?.value || "01";
+  const d = parts.find((p) => p.type === "day")?.value || "01";
+  return `${y}-${m}-${d}`;
+}
+
 const proveedorExiste = async (id_proveedor, connection = db) => {
   const proveedor = await proveedorModel.getById(id_proveedor, connection);
   return !!proveedor;
@@ -107,7 +123,8 @@ async function createOrdenCompra(req, res) {
     } = req.body;
 
     // Validar que la fecha actual no esté en un período cerrado
-    const fechaHoy = new Date().toISOString().split("T")[0];
+    // Usar la misma zona horaria que se usa para crear la orden
+    const fechaHoy = getTodayYMDForTZ();
     const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fechaHoy);
     if (fechaCerrada) {
       return res.status(400).json({
