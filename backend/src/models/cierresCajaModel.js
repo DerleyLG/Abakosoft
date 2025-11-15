@@ -14,11 +14,11 @@ const cierresCajaModel = {
         c.fecha_cierre,
         c.observaciones,
         u.nombre_usuario AS usuario_cierre,
-        -- Totales generales (suma de todos los métodos)
-        SUM(d.saldo_inicial) AS saldo_inicial_total,
-        SUM(d.total_ingresos) AS total_ingresos_total,
-        SUM(d.total_egresos) AS total_egresos_total,
-        SUM(d.saldo_final) AS saldo_final_total
+        -- Totales generales (suma de todos los métodos) - Forzar conversión a DECIMAL
+        CAST(SUM(COALESCE(d.saldo_inicial, 0)) AS DECIMAL(15,2)) AS saldo_inicial_total,
+        CAST(SUM(COALESCE(d.total_ingresos, 0)) AS DECIMAL(15,2)) AS total_ingresos_total,
+        CAST(SUM(COALESCE(d.total_egresos, 0)) AS DECIMAL(15,2)) AS total_egresos_total,
+        CAST(SUM(COALESCE(d.saldo_inicial, 0) + COALESCE(d.total_ingresos, 0) - COALESCE(d.total_egresos, 0)) AS DECIMAL(15,2)) AS saldo_final_total
       FROM cierres_caja c
       LEFT JOIN usuarios u ON c.id_usuario_cierre = u.id_usuario
       LEFT JOIN detalle_cierre_caja d ON c.id_cierre = d.id_cierre
@@ -49,11 +49,12 @@ const cierresCajaModel = {
         if (totales && totales.length > 0) {
           const ingresosTotal = parseFloat(totales[0].total_ingresos) || 0;
           const egresosTotal = parseFloat(totales[0].total_egresos) || 0;
+          const saldoInicialTotal = parseFloat(cierre.saldo_inicial_total) || 0;
 
           cierre.total_ingresos_total = ingresosTotal;
           cierre.total_egresos_total = egresosTotal;
           cierre.saldo_final_total =
-            (cierre.saldo_inicial_total || 0) + ingresosTotal - egresosTotal;
+            saldoInicialTotal + ingresosTotal - egresosTotal;
         }
       }
     }
@@ -112,10 +113,10 @@ const cierresCajaModel = {
         d.id_detalle,
         d.id_metodo_pago,
         mp.nombre AS metodo_nombre,
-        d.saldo_inicial,
-        d.total_ingresos,
-        d.total_egresos,
-        d.saldo_final
+        COALESCE(d.saldo_inicial, 0) as saldo_inicial,
+        COALESCE(d.total_ingresos, 0) as total_ingresos,
+        COALESCE(d.total_egresos, 0) as total_egresos,
+        (COALESCE(d.saldo_inicial, 0) + COALESCE(d.total_ingresos, 0) - COALESCE(d.total_egresos, 0)) as saldo_final
       FROM detalle_cierre_caja d
       JOIN metodos_pago mp ON d.id_metodo_pago = mp.id_metodo_pago
       WHERE d.id_cierre = ?
@@ -347,9 +348,14 @@ const cierresCajaModel = {
       );
 
       // 3. Crear siguiente período automáticamente
-      // Obtener saldos finales del cierre actual
+      // Calcular saldos finales correctamente (saldo_inicial + ingresos - egresos)
       const [saldosFinales] = await connection.query(
-        `SELECT id_metodo_pago, saldo_final 
+        `SELECT 
+          id_metodo_pago, 
+          saldo_inicial,
+          COALESCE(total_ingresos, 0) as total_ingresos,
+          COALESCE(total_egresos, 0) as total_egresos,
+          (saldo_inicial + COALESCE(total_ingresos, 0) - COALESCE(total_egresos, 0)) as saldo_final
          FROM detalle_cierre_caja 
          WHERE id_cierre = ?`,
         [id_cierre]
@@ -369,7 +375,7 @@ const cierresCajaModel = {
 
       const id_nuevo_cierre = resultNuevo.insertId;
 
-      // Insertar saldos iniciales del nuevo período
+      // Insertar saldos iniciales del nuevo período usando el saldo final calculado
       for (const saldo of saldosFinales) {
         await connection.query(
           `INSERT INTO detalle_cierre_caja 
@@ -403,6 +409,190 @@ const cierresCajaModel = {
 
     const [rows] = await db.query(query, [fecha]);
     return rows.length > 0;
+  },
+
+  /**
+   * Actualizar saldos iniciales de un período de caja
+   */
+  actualizarSaldosIniciales: async (id_cierre, saldos_iniciales) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Actualizar cada saldo inicial en detalle_cierre_caja
+      for (const saldo of saldos_iniciales) {
+        const { id_metodo_pago, saldo_inicial } = saldo;
+
+        const query = `
+          UPDATE detalle_cierre_caja 
+          SET saldo_inicial = ? 
+          WHERE id_cierre = ? AND id_metodo_pago = ?
+        `;
+
+        await connection.query(query, [
+          saldo_inicial,
+          id_cierre,
+          id_metodo_pago,
+        ]);
+      }
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Validar un período antes de cerrarlo
+   * Retorna objetos con errores críticos y warnings
+   */
+  validarCierrePeriodo: async (id_cierre, fecha_fin) => {
+    const errores = [];
+    const warnings = [];
+
+    try {
+      // Obtener datos del cierre
+      const cierre = await cierresCajaModel.getById(id_cierre);
+      if (!cierre) {
+        errores.push({ campo: "cierre", mensaje: "Cierre no encontrado" });
+        return { errores, warnings };
+      }
+
+      const fecha_inicio = cierre.fecha_inicio;
+
+      // 1. Validar que existan movimientos en el período
+      const queryMovimientos = `
+        SELECT COUNT(*) as total
+        FROM movimientos_tesoreria
+        WHERE DATE(fecha_movimiento) >= ? 
+          AND DATE(fecha_movimiento) <= ?
+      `;
+      const [rowsMovimientos] = await db.query(queryMovimientos, [
+        fecha_inicio,
+        fecha_fin,
+      ]);
+      const totalMovimientos = rowsMovimientos[0].total;
+
+      if (totalMovimientos === 0) {
+        warnings.push({
+          tipo: "sin_movimientos",
+          mensaje: "No se encontraron movimientos en este período",
+        });
+      }
+
+      // 2. Validar que fecha_fin >= última fecha de movimiento
+      const queryUltimoMovimiento = `
+        SELECT MAX(DATE(fecha_movimiento)) as ultima_fecha
+        FROM movimientos_tesoreria
+        WHERE DATE(fecha_movimiento) >= ?
+      `;
+      const [rowsUltimo] = await db.query(queryUltimoMovimiento, [
+        fecha_inicio,
+      ]);
+      const ultimaFecha = rowsUltimo[0].ultima_fecha;
+
+      if (ultimaFecha && new Date(fecha_fin) < new Date(ultimaFecha)) {
+        errores.push({
+          campo: "fecha_fin",
+          mensaje: `La fecha de fin (${fecha_fin}) es anterior a la última fecha de movimiento (${ultimaFecha})`,
+          fecha_sugerida: ultimaFecha,
+        });
+      }
+
+      // 3. Validar coherencia de saldos calculados
+      // Para cada método de pago, verificar: saldo_final = saldo_inicial + ingresos - egresos
+      const queryValidarSaldos = `
+        SELECT 
+          dcc.id_metodo_pago,
+          mp.nombre as nombre_metodo,
+          CAST(dcc.saldo_inicial AS DECIMAL(15,2)) as saldo_inicial,
+          CAST(COALESCE(SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END), 0) AS DECIMAL(15,2)) as total_ingresos,
+          CAST(COALESCE(SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END), 0) AS DECIMAL(15,2)) as total_egresos,
+          CAST((dcc.saldo_inicial + 
+           COALESCE(SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END), 0) -
+           COALESCE(SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END), 0)) AS DECIMAL(15,2)) as saldo_calculado
+        FROM detalle_cierre_caja dcc
+        LEFT JOIN movimientos_tesoreria mt 
+          ON dcc.id_metodo_pago = mt.id_metodo_pago
+          AND DATE(mt.fecha_movimiento) >= ?
+          AND DATE(mt.fecha_movimiento) <= ?
+        JOIN metodos_pago mp ON dcc.id_metodo_pago = mp.id_metodo_pago
+        WHERE dcc.id_cierre = ?
+        GROUP BY dcc.id_metodo_pago, dcc.saldo_inicial, mp.nombre
+      `;
+
+      const [rowsSaldos] = await db.query(queryValidarSaldos, [
+        fecha_inicio,
+        fecha_fin,
+        id_cierre,
+      ]);
+
+      console.log(
+        "[validarCierrePeriodo] Saldos calculados:",
+        JSON.stringify(rowsSaldos, null, 2)
+      );
+
+      // Verificar cada método de pago
+      for (const metodo of rowsSaldos) {
+        // El saldo_calculado YA tiene la fórmula aplicada en la query
+        // Solo verificamos si hay valores inconsistentes entre los campos
+        const saldoEsperado =
+          parseFloat(metodo.saldo_inicial) +
+          parseFloat(metodo.total_ingresos) -
+          parseFloat(metodo.total_egresos);
+        const diferencia = Math.abs(
+          parseFloat(metodo.saldo_calculado) - saldoEsperado
+        );
+
+        console.log(`[validarCierrePeriodo] ${metodo.nombre_metodo}:`, {
+          saldo_inicial: metodo.saldo_inicial,
+          total_ingresos: metodo.total_ingresos,
+          total_egresos: metodo.total_egresos,
+          saldo_calculado: metodo.saldo_calculado,
+          saldoEsperado,
+          diferencia,
+        });
+
+        // Tolerancia de 1 peso por errores de redondeo
+        if (diferencia > 1) {
+          warnings.push({
+            tipo: "saldo_inconsistente",
+            metodo_pago: metodo.nombre_metodo,
+            mensaje: `El saldo calculado para ${metodo.nombre_metodo} presenta inconsistencias`,
+            saldo_inicial: metodo.saldo_inicial,
+            ingresos: metodo.total_ingresos,
+            egresos: metodo.total_egresos,
+            saldo_esperado:
+              metodo.saldo_inicial +
+              metodo.total_ingresos -
+              metodo.total_egresos,
+            saldo_calculado: metodo.saldo_calculado,
+            diferencia: diferencia,
+          });
+        }
+      }
+
+      // 4. Validar que no haya saldos negativos
+      for (const metodo of rowsSaldos) {
+        if (metodo.saldo_calculado < 0) {
+          warnings.push({
+            tipo: "saldo_negativo",
+            metodo_pago: metodo.nombre_metodo,
+            mensaje: `El saldo final de ${metodo.nombre_metodo} es negativo: ${metodo.saldo_calculado}`,
+            saldo_final: metodo.saldo_calculado,
+          });
+        }
+      }
+
+      return { errores, warnings };
+    } catch (error) {
+      console.error("Error validando período:", error);
+      throw error;
+    }
   },
 };
 

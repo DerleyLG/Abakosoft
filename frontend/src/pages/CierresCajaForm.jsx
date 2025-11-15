@@ -126,9 +126,9 @@ const CierresCajaForm = () => {
         </div>
         <button
           onClick={() => navigate('/cierres-caja')}
-          className="cursor-pointer flex items-center gap-2 text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+          className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
         >
-          <FiArrowLeft />
+          <FiArrowLeft size={18} />
           Volver
         </button>
       </div>

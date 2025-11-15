@@ -109,7 +109,8 @@ module.exports = {
       } = req.body;
 
       // Validar que la fecha actual no esté en un período cerrado
-      const fechaHoy = new Date().toISOString().split("T")[0];
+      // Usar la misma zona horaria que se usa para crear la orden
+      const fechaHoy = getTodayYMDForTZ();
       const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fechaHoy);
       if (fechaCerrada) {
         return res.status(400).json({
