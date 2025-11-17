@@ -2,15 +2,11 @@
 import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
-import { useState } from "react";
 import { Toaster } from 'react-hot-toast';
+import { useSidebar } from '../context/SidebarContext';
 
 const Layout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  const toggleSidebar = () => {
-    setSidebarOpen((prev) => !prev);
-  };
+  const { sidebarOpen, toggleSidebar } = useSidebar();
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">

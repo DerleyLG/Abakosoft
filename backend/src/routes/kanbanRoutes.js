@@ -9,6 +9,9 @@ router.use(verifyToken);
 // Obtener datos del tablero Kanban
 router.get("/ordenes-fabricacion", kanbanController.getOrdenesKanban);
 
+// Obtener órdenes entregadas
+router.get("/ordenes-entregadas", kanbanController.getOrdenesEntregadas);
+
 // Marcar orden como entregada
 router.post("/marcar-entregada/:id", kanbanController.marcarComoEntregada);
 

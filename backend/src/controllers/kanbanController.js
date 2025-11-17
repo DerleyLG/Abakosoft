@@ -49,15 +49,42 @@ const kanbanController = {
     try {
       const { id } = req.params;
 
-      await kanbanModel.marcarComoEntregada(id);
+      const orden = await kanbanModel.marcarComoEntregada(id);
 
       res.json({
         message: "Orden marcada como entregada exitosamente",
         id_orden_fabricacion: id,
+        fecha_entrega: orden.fecha_entrega,
+        fecha_fin_estimada: orden.fecha_fin_estimada,
       });
     } catch (error) {
       console.error("Error marcando orden como entregada:", error);
       res.status(500).json({ error: "Error al marcar orden como entregada" });
+    }
+  },
+
+  /**
+   * GET /api/kanban/ordenes-entregadas
+   * Obtiene órdenes entregadas filtradas por mes/año
+   */
+  getOrdenesEntregadas: async (req, res) => {
+    try {
+      const { mes, anio } = req.query;
+
+      const ordenes = await kanbanModel.getOrdenesEntregadas(
+        mes ? parseInt(mes) : null,
+        anio ? parseInt(anio) : null
+      );
+
+      res.json({
+        ordenes,
+        total: ordenes.length,
+        mes: mes || new Date().getMonth() + 1,
+        anio: anio || new Date().getFullYear(),
+      });
+    } catch (error) {
+      console.error("Error obteniendo órdenes entregadas:", error);
+      res.status(500).json({ error: "Error al cargar órdenes entregadas" });
     }
   },
 };

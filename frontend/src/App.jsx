@@ -51,6 +51,7 @@ import ReporteUtilidadPorOrden from "./pages/ReporteUtilidadPorOrden";
 import ReporteTesoreriaVentas from "./pages/ReporteTesoreriaVentas";
 import Login from "./pages/Login";
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SidebarProvider } from './context/SidebarContext';
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 import Tesoreria from "./pages/Tesoreria";
 import GestionUsuarios from "./pages/GestionUsuarios";
@@ -157,8 +158,10 @@ const AppLogic = () => {
 export default function App() {
     return(
         <AuthProvider>
-            <Toaster position="top-right" reverseOrder={false} /> 
-            <AppLogic />
+            <SidebarProvider>
+                <Toaster position="top-right" reverseOrder={false} /> 
+                <AppLogic />
+            </SidebarProvider>
         </AuthProvider>
     );
 }
