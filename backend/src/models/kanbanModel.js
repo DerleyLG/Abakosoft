@@ -82,10 +82,6 @@ const kanbanModel = {
 
     const [rows] = await db.query(query);
 
-    // Fecha límite: 15 días atrás desde hoy
-    const fechaLimiteFinalizadas = new Date();
-    fechaLimiteFinalizadas.setDate(fechaLimiteFinalizadas.getDate() - 15);
-
     // Calcular la columna (etapa/estado) donde debe aparecer cada OF
     const ordenes = rows.map((orden) => {
       let columna = "sin_iniciar"; // Por defecto
@@ -176,40 +172,71 @@ const kanbanModel = {
       };
     });
 
-    // Filtrar las órdenes finalizadas que tengan más de 15 días
-    const ordenesFiltradas = ordenes.filter((orden) => {
-      // Si la orden está en columna 'finalizada', verificar fecha
-      if (
-        orden.columna === "finalizada" &&
-        orden.fecha_ultima_etapa_completada
-      ) {
-        const fechaCompletado = new Date(orden.fecha_ultima_etapa_completada);
-        // Solo mostrar si se completó hace 15 días o menos
-        return fechaCompletado >= fechaLimiteFinalizadas;
-      }
-      // Todas las demás órdenes se muestran normalmente
-      return true;
-    });
+    return ordenes;
+  },
 
-    return ordenesFiltradas;
+  /**
+   * Obtiene órdenes entregadas filtradas por mes/año
+   */
+  getOrdenesEntregadas: async (mes = null, anio = null) => {
+    // Si no se especifica mes/año, usar el mes actual
+    const fechaActual = new Date();
+    const mesConsulta = mes || fechaActual.getMonth() + 1;
+    const anioConsulta = anio || fechaActual.getFullYear();
+
+    const query = `
+      SELECT 
+        ofa.id_orden_fabricacion,
+        ofa.fecha_inicio,
+        ofa.fecha_fin_estimada,
+        ofa.fecha_entrega,
+        ofa.estado,
+        ofa.id_pedido,
+        c.nombre as nombre_cliente,
+        c.telefono as telefono_cliente,
+        GROUP_CONCAT(DISTINCT CONCAT(a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos
+      FROM ordenes_fabricacion ofa
+      LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      LEFT JOIN detalle_orden_fabricacion dof ON ofa.id_orden_fabricacion = dof.id_orden_fabricacion
+      LEFT JOIN articulos a ON dof.id_articulo = a.id_articulo
+      WHERE ofa.estado = 'entregada'
+        AND MONTH(ofa.fecha_entrega) = ?
+        AND YEAR(ofa.fecha_entrega) = ?
+      GROUP BY ofa.id_orden_fabricacion, ofa.fecha_inicio, ofa.fecha_fin_estimada, 
+               ofa.fecha_entrega, ofa.estado, ofa.id_pedido, c.nombre, c.telefono
+      ORDER BY ofa.fecha_entrega DESC
+    `;
+
+    const [rows] = await db.query(query, [mesConsulta, anioConsulta]);
+    return rows;
   },
 
   /**
    * Marca una orden como entregada
    */
   marcarComoEntregada: async (id_orden_fabricacion) => {
-    const [result] = await db.query(
+    // Actualizar el estado y establecer la fecha de entrega
+    await db.query(
       `UPDATE ordenes_fabricacion 
-       SET estado = 'entregada' 
+       SET estado = 'entregada', fecha_entrega = NOW() 
        WHERE id_orden_fabricacion = ?`,
       [id_orden_fabricacion]
     );
-    return result;
-  },
 
+    // Retornar la orden actualizada con su fecha
+    const [rows] = await db.query(
+      `SELECT id_orden_fabricacion, fecha_fin_estimada, fecha_entrega
+       FROM ordenes_fabricacion 
+       WHERE id_orden_fabricacion = ?`,
+      [id_orden_fabricacion]
+    );
+
+    return rows[0];
+  }
   /**
    * Obtiene las etapas de producción ordenadas
-   */
+   */,
   getEtapasProduccion: async () => {
     const [rows] = await db.query(
       `SELECT id_etapa, nombre, orden, cargo 

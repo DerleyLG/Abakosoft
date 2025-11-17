@@ -144,23 +144,69 @@ const getPagosTrabajadoresSemana = async () => {
 // Ventas y compras de la semana (para dashboard semanal)
 const getVentasSemana = async () => {
   const [rows] = await db.query(`
-      SELECT IFNULL(SUM(dov.precio_unitario * dov.cantidad), 0) AS total_ventas
-      FROM ordenes_venta ov
-      JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
-      WHERE YEARWEEK(ov.fecha, 1) = YEARWEEK(CURDATE(), 1)
-        AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
+      SELECT IFNULL(SUM(mt.monto), 0) AS total_ventas
+      FROM movimientos_tesoreria mt
+      LEFT JOIN ordenes_venta ov 
+        ON mt.id_documento = ov.id_orden_venta
+      WHERE YEARWEEK(mt.fecha_movimiento, 1) = YEARWEEK(CURDATE(), 1)
+        AND (
+          (TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%' AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada'))
+          OR TRIM(LOWER(mt.tipo_documento)) = 'abono_credito'
+        )
     `);
   return rows[0].total_ventas;
 };
 
 const getComprasSemana = async () => {
-  const [rows] = await db.query(`
+  // Sumar todos los egresos de la semana (pagos reales)
+  const [[{ total_pagos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
+      FROM pagos_trabajadores
+      WHERE YEARWEEK(fecha_pago, 1) = YEARWEEK(CURDATE(), 1)
+    `
+  );
+
+  const [[{ total_costos_indirectos }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
+      FROM costos_indirectos
+      WHERE YEARWEEK(fecha, 1) = YEARWEEK(CURDATE(), 1)
+    `
+  );
+
+  const [[{ total_servicios }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(costo), 0) AS total_servicios
+      FROM servicios_tercerizados
+      WHERE YEARWEEK(fecha_inicio, 1) = YEARWEEK(CURDATE(), 1)
+    `
+  );
+
+  const [[{ total_compras }]] = await db.query(
+    `
       SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
       FROM detalle_orden_compra doc
       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
       WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
-    `);
-  return rows[0].total_compras;
+    `
+  );
+
+  const [[{ total_materia_prima }]] = await db.query(
+    `
+      SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
+      FROM compras_materia_prima
+      WHERE YEARWEEK(fecha_compra, 1) = YEARWEEK(CURDATE(), 1)
+    `
+  );
+
+  const compras =
+    parseFloat(total_pagos) +
+    parseFloat(total_costos_indirectos) +
+    parseFloat(total_servicios) +
+    parseFloat(total_compras) +
+    parseFloat(total_materia_prima);
+  return compras;
 };
 
 const getAnticiposSemana = async () => {

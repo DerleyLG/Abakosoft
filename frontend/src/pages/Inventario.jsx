@@ -269,71 +269,78 @@ const Inventario = () => {
             </button>
           )}
         </div>
-        <div className="w-full bg-white p-4 rounded-xl shadow grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="w-full md:col-span-4">
-            <label className="block text-gray-700 font-semibold mb-1">Buscar</label>
-            <input
-              type="text"
-              placeholder="Buscar artículo..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-              className="w-full border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
-            />
+        <div className="w-full bg-white p-4 rounded-xl shadow">
+          {/* Primera fila: Búsqueda y Categoría */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="sm:col-span-2 lg:col-span-2">
+              <label className="block text-gray-700 font-semibold mb-1">Buscar</label>
+              <input
+                type="text"
+                placeholder="Buscar artículo..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                className="w-full border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-semibold mb-1">Categoría</label>
+              <select
+                value={categoriaSeleccionada}
+                onChange={(e) => { setCategoriaSeleccionada(e.target.value); setPage(1); }}
+                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                title="Filtrar por categoría"
+              >
+                <option value="">Todas</option>
+                {categorias.map((cat) => (
+                  <option key={cat.id_categoria} value={cat.id_categoria}>
+                    {cat.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="w-full md:col-span-2">
-            <label className="block text-gray-700 font-semibold mb-1">Categoría</label>
-            <select
-              value={categoriaSeleccionada}
-              onChange={(e) => { setCategoriaSeleccionada(e.target.value); setPage(1); }}
-              className="w-full md:min-w-[160px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-              title="Filtrar por categoría"
-            >
-              <option value="">Todas las categorías</option>
-              {categorias.map((cat) => (
-                <option key={cat.id_categoria} value={cat.id_categoria}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="w-full md:col-span-2">
-            <label className="block text-gray-700 font-semibold mb-1">Stock fabricado</label>
-            <select
-              value={stockFabricadoFilter}
-              onChange={(e) => { setStockFabricadoFilter(e.target.value); setPage(1); }}
-              className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-              title="Filtrar stock fabricado"
-            >
-              <option value="">Todos</option>
-              <option value="gt0">Con stock </option>
-              <option value="eq0">Sin stock </option>
-            </select>
-          </div>
-          <div className="w-full md:col-span-2">
-            <label className="block text-gray-700 font-semibold mb-1">Stock en proceso</label>
-            <select
-              value={stockProcesoFilter}
-              onChange={(e) => { setStockProcesoFilter(e.target.value); setPage(1); }}
-              className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-              title="Filtrar stock en proceso"
-            >
-              <option value="">Todos</option>
-              <option value="gt0">Con stock</option>
-              <option value="eq0">Sin stock </option>
-            </select>
-          </div>
-          <div className="w-full md:col-span-2">
-            <label className="block text-gray-700 font-semibold mb-1">Stock disponible</label>
-            <select
-              value={stockDisponibleFilter}
-              onChange={(e) => { setStockDisponibleFilter(e.target.value); setPage(1); }}
-              className="w-full md:min-w-[180px] border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-              title="Filtrar stock disponible"
-            >
-              <option value="">Todos</option>
-              <option value="gt0">Con stock </option>
-              <option value="eq0">Sin stock </option>
-            </select>
+          
+          {/* Segunda fila: Filtros de stock */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-gray-700 font-semibold mb-1">Stock fabricado</label>
+              <select
+                value={stockFabricadoFilter}
+                onChange={(e) => { setStockFabricadoFilter(e.target.value); setPage(1); }}
+                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                title="Filtrar stock fabricado"
+              >
+                <option value="">Todos</option>
+                <option value="gt0">Con stock</option>
+                <option value="eq0">Sin stock</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-semibold mb-1">Stock en proceso</label>
+              <select
+                value={stockProcesoFilter}
+                onChange={(e) => { setStockProcesoFilter(e.target.value); setPage(1); }}
+                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                title="Filtrar stock en proceso"
+              >
+                <option value="">Todos</option>
+                <option value="gt0">Con stock</option>
+                <option value="eq0">Sin stock</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 font-semibold mb-1">Stock disponible</label>
+              <select
+                value={stockDisponibleFilter}
+                onChange={(e) => { setStockDisponibleFilter(e.target.value); setPage(1); }}
+                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                title="Filtrar stock disponible"
+              >
+                <option value="">Todos</option>
+                <option value="gt0">Con stock</option>
+                <option value="eq0">Sin stock</option>
+              </select>
+            </div>
           </div>
         </div>
         {categoriaSeleccionada && filteredItems.length === 0 && allItems.length > 0 && (
