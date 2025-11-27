@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Listbox } from "@headlessui/react";
 import { format } from "date-fns";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import AsyncSelect from "react-select/async";
 import api from "../services/api";
 import { useLocation } from "react-router-dom";
 
@@ -17,10 +18,51 @@ const CrearOrdenFabricacion = () => {
   const [fechaFinEstimada, setFechaFinEstimada] = useState("");
   const [estado, setEstado] = useState("pendiente");
   const [articulos, setArticulos] = useState([]);
+  const [articulosOptions, setArticulosOptions] = useState([]);
   const [etapasProduccion, setEtapasProduccion] = useState([]);
   const [idEtapaDefault, setIdEtapaDefault] = useState(null);
 const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
   const [detalles, setDetalles] = useState([]);
+
+  // Para AsyncSelect
+  const cacheRef = useRef({});
+  const timerRef = useRef(null);
+
+  // Función para cargar artículos con búsqueda
+  const loadArticulosOptions = useCallback((inputValue, callback) => {
+    const cacheKey = inputValue?.toLowerCase() || '';
+
+    // Si no hay búsqueda, retornar todos los artículos
+    if (!inputValue || inputValue.trim() === '') {
+      callback(articulosOptions);
+      return;
+    }
+
+    // Si ya está en caché, retornar inmediatamente
+    if (cacheRef.current[cacheKey]) {
+      callback(cacheRef.current[cacheKey]);
+      return;
+    }
+
+    // Limpiar el timer anterior
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Debounce: esperar 300ms
+    timerRef.current = setTimeout(() => {
+      // Filtrar localmente
+      const filtered = articulosOptions.filter(art => 
+        art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+        art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
+        art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
+      );
+      
+      // Guardar en caché
+      cacheRef.current[cacheKey] = filtered;
+      callback(filtered);
+    }, 300);
+  }, [articulosOptions]);
 
   useEffect(() => {
     if (etapasProduccion.length > 0) {
@@ -69,7 +111,32 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
         const res = await api.get("/articulos", { params: { page: 1, pageSize: 200, sortBy: 'descripcion', sortDir: 'asc' } });
         const payload = res.data || {};
         const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
-        setArticulos(rows);
+        
+        // Obtener categorías para filtrar solo artículos fabricables
+        const resCategorias = await api.get("/categorias");
+        const categorias = Array.isArray(resCategorias.data) ? resCategorias.data : [];
+        const categoriasMap = {};
+        categorias.forEach(cat => {
+          categoriasMap[cat.id_categoria] = cat.tipo;
+        });
+        
+        // Filtrar solo artículos fabricables
+        const articulosFabricables = rows.filter(art => 
+          categoriasMap[art.id_categoria] === 'articulo_fabricable'
+        );
+        
+        setArticulos(articulosFabricables);
+        
+        // Crear opciones para AsyncSelect
+        const opciones = articulosFabricables.map((art) => ({
+          value: art.id_articulo,
+          label: `${art.descripcion} (Ref: ${art.referencia || 'N/A'})`,
+          referencia: art.referencia,
+          descripcion: art.descripcion,
+          ...art,
+        }));
+        setArticulosOptions(opciones);
+        cacheRef.current[''] = opciones;
       } catch (error) {
         toast.error("Error al cargar artículos");
       }
@@ -344,35 +411,34 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Artículo <span className="text-red-500">*</span>
                   </label>
-                  <Listbox
-                    value={detalle.articulo}
-                    onChange={(value) =>
-                      handleDetalleChange(index, "articulo", value)
-                    }
-                  >
-                    <div className="relative">
-                      <Listbox.Button className="w-full border border-gray-300 rounded-md px-4 py-2 text-left focus:outline-none focus:ring-2 focus:ring-slate-600">
-                        {detalle.articulo
-                          ? detalle.articulo.descripcion
-                          : "Selecciona un artículo"}
-                      </Listbox.Button>
-                      <Listbox.Options className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-52 overflow-auto">
-                        {articulos.map((art) => (
-                          <Listbox.Option
-                            key={art.id_articulo}
-                            value={art}
-                            className={({ active }) =>
-                              `cursor-pointer select-none px-4 py-2 ${
-                                active ? "bg-slate-100" : ""
-                              }`
-                            }
-                          >
-                            {art.descripcion}
-                          </Listbox.Option>
-                        ))}
-                      </Listbox.Options>
-                    </div>
-                  </Listbox>
+                  <AsyncSelect
+                    cacheOptions
+                    loadOptions={loadArticulosOptions}
+                    defaultOptions={articulosOptions}
+                    value={articulosOptions.find(opt => opt.value === detalle.articulo?.id_articulo) || null}
+                    onChange={(option) => {
+                      const articuloSeleccionado = option ? articulos.find(a => a.id_articulo === option.value) : null;
+                      handleDetalleChange(index, "articulo", articuloSeleccionado);
+                    }}
+                    placeholder="Busca o selecciona un artículo..."
+                    isClearable
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderColor: "#d1d5db",
+                        boxShadow: "none",
+                        "&:hover": { borderColor: "#64748b" },
+                        borderRadius: "0.375rem",
+                        minHeight: "42px",
+                      }),
+                      menuList: (base) => ({
+                        ...base,
+                        maxHeight: "250px",
+                      }),
+                    }}
+                    noOptionsMessage={() => "No se encontraron artículos"}
+                    loadingMessage={() => "Cargando artículos..."}
+                  />
                 </div>
 
                 <div>
@@ -448,20 +514,20 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
           
            
           {/* Botón submit */}
-          <div className="pt-4 border-t flex justify-end">
+          <div className="pt-4 border-t flex justify-end gap-4">
             <button
-              disabled={hayArticuloCompuesto}
-              type="submit"
-              className={`${hayArticuloCompuesto ? 'opacity-50 cursor-not-allowed': 'bg-slate-700 hover:bg-slate-900 text-white font-semibold px-8 py-3 rounded-md transition cursor-pointer'}`}
-            >
-              Crear orden de fabricación
-            </button>
-
-            <button
+              type="button"
               onClick={() => navigate("/ordenes_fabricacion")}
-              className=" bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-7 py-2 rounded-md font-semibold transition cursor-pointer ml-6"
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
             >
               Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={hayArticuloCompuesto}
+              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Crear orden de fabricación
             </button>
           </div>
         </form>

@@ -24,8 +24,10 @@ const TesoreriaModel = {
   },
 
   getMovimientosTesoreria: async () => {
+    // Ordenar por fecha completa (datetime) y por id_movimiento para asegurar
+    // que los movimientos insertados al mismo tiempo queden en orden descendente
     const [rows] = await db.query(
-      "SELECT id_movimiento, id_documento, tipo_documento, DATE(fecha_movimiento) AS fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria ORDER BY DATE(fecha_movimiento) DESC"
+      `SELECT id_movimiento, id_documento, tipo_documento, fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria ORDER BY fecha_movimiento DESC, id_movimiento DESC`
     );
     return rows;
   },

@@ -117,7 +117,6 @@ const OrdenVentaEdit = () => {
                 setObservaciones('');
             }
         } catch (error) {
-            console.warn('Advertencia: No se encontró movimiento de tesorería o hubo un error al buscarlo.', error);
             setMetodoPago(null);
             setReferencia('');
             setObservaciones('');
@@ -200,12 +199,12 @@ const OrdenVentaEdit = () => {
                     ]);
 
                 const clientesAPI = clientesRes.data;
-                const articulosAPI = articulosRes.data;
+                const articulosAPI = articulosRes.data; // Ya viene filtrado desde el backend
                 const metodosPagoAPI = metodosPagoRes.data;
                 const ordenData = ordenRes.data; 
 
                 setClientes(clientesAPI);
-                setArticulos(articulosAPI);
+                setArticulos(articulosAPI); // Ya viene filtrado
                 setMetodosPago(metodosPagoAPI);
 
                 // Verificar si la orden viene de un pedido

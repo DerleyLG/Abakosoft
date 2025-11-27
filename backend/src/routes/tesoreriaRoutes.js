@@ -14,6 +14,12 @@ router.get(
 // Ruta para crear un movimiento de tesorería (POST)
 router.post("/movimientos", TesoreriaController.createMovimiento);
 
+// Ruta para transferencias entre métodos de pago
+router.post(
+  "/transferencia-metodos",
+  TesoreriaController.transferirEntreMetodos
+);
+
 router.get("/ingresos-summary", TesoreriaController.getIngresosSummary);
 router.get("/egresos-summary", TesoreriaController.getEgresosSummary);
 router.get(

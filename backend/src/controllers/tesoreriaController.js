@@ -29,12 +29,10 @@ const tesoreriaController = {
       res.json({ success: true, data });
     } catch (error) {
       console.error("Error en reporte de tesorería (ventas y cobros):", error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Error al generar el reporte de tesorería.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "Error al generar el reporte de tesorería.",
+      });
     }
   },
 
@@ -185,6 +183,121 @@ const tesoreriaController = {
       res
         .status(500)
         .json({ error: "Error interno al crear movimiento de tesorería" });
+    }
+  },
+
+  transferirEntreMetodos: async (req, res) => {
+    const db = require("../database/db");
+    let connection;
+
+    try {
+      const {
+        id_metodo_origen,
+        id_metodo_destino,
+        monto,
+        observaciones,
+        referencia,
+      } = req.body;
+
+      // Validaciones
+      if (!id_metodo_origen || !id_metodo_destino) {
+        return res
+          .status(400)
+          .json({ error: "Debe especificar método origen y destino" });
+      }
+
+      if (id_metodo_origen === id_metodo_destino) {
+        return res
+          .status(400)
+          .json({ error: "No se puede transferir al mismo método" });
+      }
+
+      if (!monto || monto <= 0) {
+        return res.status(400).json({ error: "El monto debe ser mayor a 0" });
+      }
+
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      const metodosModel = require("../models/tesoreriaModel");
+
+      // Obtener nombres de métodos para observaciones
+      const metodos = await metodosModel.getMetodosPago();
+      const metodoOrigen = metodos.find(
+        (m) => m.id_metodo_pago === parseInt(id_metodo_origen)
+      );
+      const metodoDestino = metodos.find(
+        (m) => m.id_metodo_pago === parseInt(id_metodo_destino)
+      );
+
+      const observacionFinal =
+        observaciones ||
+        `Transferencia de ${metodoOrigen?.nombre || "N/A"} a ${
+          metodoDestino?.nombre || "N/A"
+        }`;
+
+      // Referencias claras y cortas
+      let referenciaOrigen = referencia;
+      let referenciaDestino = referencia;
+      // Solo generar referencias automáticas si no se recibió el campo `referencia`
+      // Es decir: respetar '' (cadena vacía) si el frontend la envía explícitamente.
+      if (referencia === undefined || referencia === null) {
+        referenciaOrigen = metodoDestino?.nombre
+          ?.toLowerCase()
+          .includes("efectivo")
+          ? "Transferencia a efectivo"
+          : `Transferencia a ${metodoDestino?.nombre || "N/A"}`;
+        referenciaDestino = metodoDestino?.nombre
+          ?.toLowerCase()
+          .includes("efectivo")
+          ? "Ingreso por transferencia"
+          : `Ingreso por transferencia desde ${metodoOrigen?.nombre || "N/A"}`;
+      }
+
+      // Registrar salida del método origen (negativo)
+      await metodosModel.insertarMovimiento(
+        {
+          id_documento: null,
+          tipo_documento: "transferencia_fondos",
+          monto: -Math.abs(monto),
+          id_metodo_pago: id_metodo_origen,
+          referencia: referenciaOrigen,
+          observaciones: observacionFinal,
+          fecha_movimiento: new Date(),
+        },
+        connection
+      );
+
+      // Registrar entrada al método destino (positivo)
+      await metodosModel.insertarMovimiento(
+        {
+          id_documento: null,
+          tipo_documento: "transferencia_fondos",
+          monto: Math.abs(monto),
+          id_metodo_pago: id_metodo_destino,
+          referencia: referenciaDestino,
+          observaciones: observacionFinal,
+          fecha_movimiento: new Date(),
+        },
+        connection
+      );
+
+      await connection.commit();
+      connection.release();
+
+      res.status(201).json({
+        message: "Transferencia registrada exitosamente",
+        monto,
+        origen: metodoOrigen?.nombre,
+        destino: metodoDestino?.nombre,
+      });
+    } catch (error) {
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
+      console.error("Error en transferencia entre métodos:", error);
+      res.status(500).json({ error: "Error al procesar la transferencia" });
     }
   },
 };

@@ -84,7 +84,7 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-full md:w-1/2 lg:w-2/5 xl:w-1/3 bg-white shadow-2xl z-50 flex flex-col animate-slide-in-right">
+    <div className="fixed right-0 top-0 h-full w-full md:w-1/2 lg:w-2/5 xl:w-1/3 bg-black/40 shadow-2xl z-50 flex flex-col animate-slide-in-right">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 flex items-center justify-between">
         <div className="flex items-center gap-3">

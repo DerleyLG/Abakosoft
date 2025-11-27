@@ -38,9 +38,27 @@ const EditarPedido = () => {
       setClientes(resClientes.data);
 
     
-      const resArticulos = await api.get('/articulos');
-      setAllArticulos(resArticulos.data);
-      setArticulos(resArticulos.data); 
+      const [resArticulos, resCategorias] = await Promise.all([
+        api.get('/articulos'),
+        api.get('/categorias'),
+      ]);
+      
+      const articulosAPI = resArticulos.data;
+      const categoriasAPI = Array.isArray(resCategorias.data) ? resCategorias.data : [];
+      
+      // Crear mapa de categorías por tipo
+      const categoriasMap = {};
+      categoriasAPI.forEach(cat => {
+        categoriasMap[cat.id_categoria] = cat.tipo;
+      });
+      
+      // Filtrar solo artículos fabricables
+      const articulosFabricables = articulosAPI.filter(art => 
+        categoriasMap[art.id_categoria] === 'articulo_fabricable'
+      );
+      
+      setAllArticulos(articulosFabricables);
+      setArticulos(articulosFabricables); 
 
     } catch (error) {
       toast.error('Error al cargar dependencias (Clientes/Artículos).');

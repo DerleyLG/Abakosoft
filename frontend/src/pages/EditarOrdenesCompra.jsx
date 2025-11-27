@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api'; 
 import toast from 'react-hot-toast';
-import { FiSave, FiArrowLeft, FiPlus, FiTrash2, FiDollarSign } from 'react-icons/fi'; 
+import AsyncSelect from 'react-select/async';
+import { FiSave, FiArrowLeft, FiPlus, FiTrash2, FiDollarSign, FiFileText, FiX, FiUpload } from 'react-icons/fi'; 
 import { format } from 'date-fns';
 
 
@@ -42,6 +43,13 @@ const EditarOrdenCompra = () => {
         fecha: format(new Date(), 'yyyy-MM-dd'), 
     });
 
+    // Estados para comprobante
+    const [comprobanteActual, setComprobanteActual] = useState(null); // {path, nombre_original, fecha_subida}
+    const [adjuntarComprobante, setAdjuntarComprobante] = useState(false);
+    const [archivoComprobante, setArchivoComprobante] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [eliminarComprobanteActual, setEliminarComprobanteActual] = useState(false);
+
   
     const [pagoData, setPagoData] = useState({
         id_metodo_pago: '',
@@ -55,7 +63,47 @@ const EditarOrdenCompra = () => {
     const [loading, setLoading] = useState(true);
     const [allProveedores, setAllProveedores] = useState([]);
     const [allArticulos, setAllArticulos] = useState([]);
+    const [articulosOptions, setArticulosOptions] = useState([]);
     const [isEditable, setIsEditable] = useState(true); 
+
+    // Para AsyncSelect
+    const cacheRef = useRef({});
+    const timerRef = useRef(null);
+
+    // Función para cargar artículos con búsqueda
+    const loadArticulosOptions = useCallback((inputValue, callback) => {
+        const cacheKey = inputValue?.toLowerCase() || '';
+
+        // Si no hay búsqueda, retornar todos los artículos
+        if (!inputValue || inputValue.trim() === '') {
+            callback(articulosOptions);
+            return;
+        }
+
+        // Si ya está en caché, retornar inmediatamente
+        if (cacheRef.current[cacheKey]) {
+            callback(cacheRef.current[cacheKey]);
+            return;
+        }
+
+        // Limpiar el timer anterior
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // Debounce: esperar 300ms
+        timerRef.current = setTimeout(() => {
+            // Filtrar localmente
+            const filtered = articulosOptions.filter(art => 
+                art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+                art.referencia?.toLowerCase().includes(inputValue.toLowerCase())
+            );
+            
+            // Guardar en caché
+            cacheRef.current[cacheKey] = filtered;
+            callback(filtered);
+        }, 300);
+    }, [articulosOptions]); 
 
  
     const fetchMovimientoPago = async (ordenId) => {
@@ -76,7 +124,6 @@ const EditarOrdenCompra = () => {
                  setPagoData({ id_metodo_pago: '', referencia: '', observaciones_pago: '' });
             }
         } catch (error) {
-            console.warn('Advertencia: No se encontró movimiento de tesorería para esta OC o hubo un error al buscarlo.', error);
             
              setPagoData({ id_metodo_pago: '', referencia: '', observaciones_pago: '' });
         }
@@ -92,13 +139,24 @@ const EditarOrdenCompra = () => {
                 api.get('/metodos-pago'), 
             ]);
             
-            console.log('Artículos cargados (raw):', resArticulos.data);
+            
             
             const articulosArray = Array.isArray(resArticulos.data) ? resArticulos.data : (resArticulos.data?.data || []);
-            console.log('Artículos array:', articulosArray);
+      
             
             setAllProveedores(Array.isArray(resProveedores.data) ? resProveedores.data : []);
-            setAllArticulos(articulosArray); 
+            setAllArticulos(articulosArray);
+            
+            // Crear opciones para AsyncSelect
+            const opciones = articulosArray.map((art) => ({
+                value: art.id_articulo,
+                label: `${art.descripcion} (Ref: ${art.referencia || 'N/A'})`,
+                referencia: art.referencia,
+                descripcion: art.descripcion,
+                ...art,
+            }));
+            setArticulosOptions(opciones);
+            cacheRef.current[''] = opciones; 
             setAllMetodosPago(Array.isArray(resMetodos.data) ? resMetodos.data : []);
         } catch (error) {
             toast.error('Error al cargar dependencias (Proveedores/Artículos/Pagos).');
@@ -112,8 +170,7 @@ const EditarOrdenCompra = () => {
             const resOrden = await api.get(`/ordenes-compra/${id}`); 
             const orden = resOrden.data;
 
-            console.log('Orden cargada:', orden);
-            console.log('Detalles de la orden:', orden.detalles);
+          
             
             const editable = orden.estado.toLowerCase() === 'pendiente';
             setIsEditable(editable);
@@ -137,6 +194,15 @@ const EditarOrdenCompra = () => {
                 fecha: formattedDate,
             });
 
+            // Cargar comprobante si existe
+            if (orden.comprobante_path) {
+                setComprobanteActual({
+                    path: orden.comprobante_path,
+                    nombre_original: orden.comprobante_nombre_original,
+                    fecha_subida: orden.comprobante_fecha_subida,
+                });
+            }
+
             
             const detallesFormateados = Array.isArray(orden.detalles) 
                 ? orden.detalles.map(d => ({
@@ -146,7 +212,7 @@ const EditarOrdenCompra = () => {
                 }))
                 : [];
             
-            console.log('Detalles formateados:', detallesFormateados);
+        
             setDetalles(detallesFormateados);
             
         
@@ -178,6 +244,63 @@ const EditarOrdenCompra = () => {
     const handlePagoChange = (e) => {
         const { name, value } = e.target;
         setPagoData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // Manejar checkbox para adjuntar comprobante
+    const handleCheckAdjuntar = (e) => {
+        setAdjuntarComprobante(e.target.checked);
+        if (!e.target.checked) {
+            setArchivoComprobante(null);
+            setPreviewUrl(null);
+        }
+    };
+
+    // Manejar selección de archivo
+    const handleArchivoChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validar tipo de archivo
+        const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+        if (!tiposPermitidos.includes(file.type)) {
+            toast.error('Solo se permiten archivos JPG, PNG o PDF.');
+            e.target.value = '';
+            return;
+        }
+
+        // Validar tamaño (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('El archivo no debe superar 5MB.');
+            e.target.value = '';
+            return;
+        }
+
+        setArchivoComprobante(file);
+
+        // Preview solo para imágenes
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setPreviewUrl(null);
+        }
+    };
+
+    // Eliminar archivo seleccionado (nuevo)
+    const eliminarArchivo = () => {
+        setArchivoComprobante(null);
+        setPreviewUrl(null);
+        setAdjuntarComprobante(false);
+    };
+
+    // Eliminar comprobante actual
+    const handleEliminarComprobanteActual = () => {
+        setEliminarComprobanteActual(true);
+        setComprobanteActual(null);
+        toast.success('El comprobante será eliminado al guardar.');
     };
     
     
@@ -267,20 +390,63 @@ const EditarOrdenCompra = () => {
             return;
         }
 
+        // Mostrar indicador de carga
+        const loadingToast = toast.loading('Actualizando orden de compra...');
+        
         try {
-            
-            const dataToSend = {
-                ...ordenData,
-                ...pagoData, 
-                detalles: detalles 
-            };
+            // Si se va a adjuntar un archivo nuevo o eliminar el actual, usar FormData
+            if (adjuntarComprobante && archivoComprobante) {
+                const formData = new FormData();
+                
+                // Agregar datos básicos de la orden
+                formData.append('id_proveedor', ordenData.id_proveedor);
+                formData.append('estado', ordenData.estado);
+                formData.append('observaciones', ordenData.observaciones || '');
+                formData.append('categoria_costo', ordenData.categoria_costo || '');
+                formData.append('fecha', ordenData.fecha);
+                
+                // Agregar detalles como JSON string
+                formData.append('detalles', JSON.stringify(detalles));
+                
+                // Agregar datos de pago
+                if (pagoData.id_metodo_pago) formData.append('id_metodo_pago', pagoData.id_metodo_pago);
+                if (pagoData.referencia) formData.append('referencia', pagoData.referencia);
+                if (pagoData.observaciones_pago) formData.append('observaciones_pago', pagoData.observaciones_pago);
+                
+                // Agregar archivo
+                formData.append('comprobante', archivoComprobante);
+                
+                await api.put(`/ordenes-compra/${id}`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+            } else if (eliminarComprobanteActual) {
+                // Enviar con flag para eliminar comprobante
+                const dataToSend = {
+                    ...ordenData,
+                    ...pagoData,
+                    detalles: detalles,
+                    eliminar_comprobante: true,
+                };
+                
+                await api.put(`/ordenes-compra/${id}`, dataToSend);
+            } else {
+                // Envío normal sin cambios en comprobante
+                const dataToSend = {
+                    ...ordenData,
+                    ...pagoData, 
+                    detalles: detalles 
+                };
+                
+                await api.put(`/ordenes-compra/${id}`, dataToSend); 
+            }
 
-         
-            await api.put(`/ordenes-compra/${id}`, dataToSend); 
-
-            toast.success('Orden de compra, detalles y movimiento de pago actualizados correctamente');
+            toast.dismiss(loadingToast);
+            toast.success('Orden de compra actualizada correctamente');
             navigate('/ordenes_compra');
         } catch (error) {
+            toast.dismiss(loadingToast);
             const errorMessage = error.response?.data?.message || 'Error al actualizar la orden de compra.';
             
           
@@ -437,6 +603,110 @@ const EditarOrdenCompra = () => {
                         className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
                     />
                 </div>
+
+                {/* SECCIÓN DE COMPROBANTE */}
+                <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700">Comprobante / Factura</h3>
+                
+                {/* Mostrar comprobante actual si existe */}
+                {comprobanteActual && !eliminarComprobanteActual && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <FiFileText size={24} className="text-blue-600" />
+                                <div>
+                                    <p className="font-semibold text-slate-700">Comprobante adjunto</p>
+                                    <p className="text-sm text-gray-600">{comprobanteActual.nombre_original}</p>
+                                    {comprobanteActual.fecha_subida && (
+                                        <p className="text-xs text-gray-500">
+                                            Subido: {new Date(comprobanteActual.fecha_subida).toLocaleDateString('es-CO')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <a
+                                    href={`http://localhost:3002/uploads/${comprobanteActual.path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition cursor-pointer"
+                                >
+                                    Ver archivo
+                                </a>
+                                {isEditable && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEliminarComprobanteActual}
+                                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition cursor-pointer"
+                                    >
+                                        Eliminar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Opción para adjuntar nuevo comprobante */}
+                {isEditable && (!comprobanteActual || eliminarComprobanteActual) && (
+                    <div className="mb-6">
+                        <label className="flex items-center gap-2 cursor-pointer mb-3">
+                            <input
+                                type="checkbox"
+                                checked={adjuntarComprobante}
+                                onChange={handleCheckAdjuntar}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="font-medium text-slate-700">
+                                {eliminarComprobanteActual ? 'Adjuntar nuevo comprobante' : 'Adjuntar comprobante / factura'}
+                            </span>
+                        </label>
+
+                        {adjuntarComprobante && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition cursor-pointer">
+                                        <FiUpload size={18} />
+                                        Seleccionar archivo
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg,image/jpg,image/png,application/pdf"
+                                            onChange={handleArchivoChange}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    {archivoComprobante && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-700">{archivoComprobante.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={eliminarArchivo}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                <FiX size={20} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Preview para imágenes */}
+                                {previewUrl && (
+                                    <div className="mt-4">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Vista previa:</p>
+                                        <img
+                                            src={previewUrl}
+                                            alt="Preview comprobante"
+                                            className="max-w-xs border border-gray-300 rounded-lg shadow-sm"
+                                        />
+                                    </div>
+                                )}
+
+                                <p className="text-sm text-gray-500">
+                                    Formatos permitidos: JPG, PNG, PDF. Tamaño máximo: 5MB.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
                 
             
 
@@ -448,21 +718,39 @@ const EditarOrdenCompra = () => {
                             {/* Artículo */}
                             <div className="col-span-1 md:col-span-5 flex flex-col">
                                 <label className="mb-1 font-medium text-sm text-slate-700">Artículo</label>
-                                <select
-                                    name="id_articulo"
-                                    value={detalle.id_articulo}
-                                    onChange={(e) => handleDetalleChange(index, e)}
-                                    required
-                                    disabled={!isEditable}
-                                    className="border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500"
-                                >
-                                    <option value="">Seleccione artículo</option>
-                                    {allArticulos.map(a => (
-                                        <option key={a.id_articulo} value={a.id_articulo}>
-                                            {a.descripcion}
-                                        </option>
-                                    ))}
-                                </select>
+                                <AsyncSelect
+                                    cacheOptions
+                                    loadOptions={loadArticulosOptions}
+                                    defaultOptions={articulosOptions}
+                                    value={articulosOptions.find(opt => opt.value === detalle.id_articulo) || null}
+                                    onChange={(option) => {
+                                        const syntheticEvent = {
+                                            target: {
+                                                name: 'id_articulo',
+                                                value: option ? option.value : ''
+                                            }
+                                        };
+                                        handleDetalleChange(index, syntheticEvent);
+                                    }}
+                                    placeholder="Busca o selecciona un artículo..."
+                                    isClearable
+                                    isDisabled={!isEditable}
+                                    styles={{
+                                        control: (base) => ({
+                                            ...base,
+                                            borderColor: "#d1d5db",
+                                            boxShadow: "none",
+                                            "&:hover": { borderColor: "#64748b" },
+                                            borderRadius: "0.5rem",
+                                        }),
+                                        menuList: (base) => ({
+                                            ...base,
+                                            maxHeight: "250px",
+                                        }),
+                                    }}
+                                    noOptionsMessage={() => "No se encontraron artículos"}
+                                    loadingMessage={() => "Cargando artículos..."}
+                                />
                             </div>
 
                         

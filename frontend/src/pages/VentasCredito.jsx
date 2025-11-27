@@ -70,8 +70,7 @@ const VentasCredito = () => {
                 const r = await api.get('/metodos-pago');
                 setMetodosPago(r.data || []);
             } catch (e) {
-              
-                console.debug('No se pudieron cargar metodos de pago', e);
+                // Silenciar error
             }
         })();
     }, []);
@@ -323,7 +322,7 @@ const VentasCredito = () => {
                             setCreditos(res.data);
                             toast.success('Lista actualizada');
                         } catch (e) {
-                            console.error('Error refrescando creditos', e);
+                            // Silenciar
                         } finally {
                             setLoading(false);
                         }
@@ -344,7 +343,7 @@ const VentasCredito = () => {
                                             setCreditos(res.data);
                                             toast.success('Lista actualizada');
                                         } catch (e) {
-                                            console.error('Error refrescando creditos', e);
+                                            // Silenciar
                                         } finally {
                                             setLoading(false);
                                         }

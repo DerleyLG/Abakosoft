@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReporteBase from '../components/ReporteBase';
 
 const ReporteUtilidadPorOrden = () => {
+  const [summary, setSummary] = useState([]);
 
   const titulo = "Reporte de Utilidad por Orden";
 
@@ -41,12 +42,32 @@ const ReporteUtilidadPorOrden = () => {
     },
   ];
 
+  const handleDataChange = (rows) => {
+    try {
+      const arr = Array.isArray(rows) ? rows : [];
+      const totalCostoManoObra = arr.reduce((acc, r) => acc + (Number(r?.costo_mano_obra) || 0), 0);
+      const totalIngresos = arr.reduce((acc, r) => acc + (Number(r?.total_ingresos) || 0), 0);
+      const totalUtilidad = arr.reduce((acc, r) => acc + (Number(r?.utilidad) || 0), 0);
+      
+      setSummary([
+        { label: 'Total Costo de Mano de Obra', value: totalCostoManoObra, isCurrency: true },
+        { label: 'Total Ingresos', value: totalIngresos, isCurrency: true },
+        { label: 'Utilidad Total', value: totalUtilidad, isCurrency: true },
+      ]);
+    } catch {
+      setSummary([]);
+    }
+  };
+
   return (
     <ReporteBase
       titulo={titulo}
       endpoint={endpoint}
       filtros={filtros}
       columnas={columnas}
+      onDataChange={handleDataChange}
+      exportSummary={summary}
+      summaryVariant="prominent-all"
     />
   );
 };

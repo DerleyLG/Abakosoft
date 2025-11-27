@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { FiPackage, FiBox, FiTool } from 'react-icons/fi';
 
 const EditarCategoria = () => {
   const [nombre, setNombre] = useState('');
+  const [tipo, setTipo] = useState('articulo_fabricable');
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -13,6 +15,7 @@ const EditarCategoria = () => {
       try {
         const res = await api.get(`/categorias/${id}`);
         setNombre(res.data.nombre);
+        setTipo(res.data.tipo || 'articulo_fabricable');
       } catch (error) {
         console.error('Error al obtener la categoría', error);
         alert('No se pudo cargar la categoría.');
@@ -28,6 +31,7 @@ const EditarCategoria = () => {
     try {
       const formData = {
         nombre: nombre.trim(),
+        tipo: tipo,
       };
 
       await api.put(`/categorias/${id}`, formData);
@@ -84,6 +88,79 @@ const EditarCategoria = () => {
               className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
               placeholder="Ej: Muebles de sala"
             />
+          </div>
+
+          <div>
+            <label htmlFor="tipo" className="block text-2sm font-semibold text-gray-700 mb-2">
+              Tipo de categoría <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition ${
+                tipo === 'articulo_fabricable' 
+                  ? 'border-blue-600 bg-blue-50' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}>
+                <input
+                  type="radio"
+                  name="tipo"
+                  value="articulo_fabricable"
+                  checked={tipo === 'articulo_fabricable'}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="sr-only"
+                />
+                <FiPackage size={24} className={tipo === 'articulo_fabricable' ? 'text-blue-600' : 'text-gray-500'} />
+                <div>
+                  <div className={`font-semibold ${tipo === 'articulo_fabricable' ? 'text-blue-600' : 'text-gray-700'}`}>
+                    Artículo Fabricable
+                  </div>
+                  <div className="text-xs text-gray-500">Productos terminados</div>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition ${
+                tipo === 'materia_prima' 
+                  ? 'border-green-600 bg-green-50' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}>
+                <input
+                  type="radio"
+                  name="tipo"
+                  value="materia_prima"
+                  checked={tipo === 'materia_prima'}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="sr-only"
+                />
+                <FiBox size={24} className={tipo === 'materia_prima' ? 'text-green-600' : 'text-gray-500'} />
+                <div>
+                  <div className={`font-semibold ${tipo === 'materia_prima' ? 'text-green-600' : 'text-gray-700'}`}>
+                    Materia Prima
+                  </div>
+                  <div className="text-xs text-gray-500">Insumos y materiales</div>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition ${
+                tipo === 'costo_produccion' 
+                  ? 'border-orange-600 bg-orange-50' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}>
+                <input
+                  type="radio"
+                  name="tipo"
+                  value="costo_produccion"
+                  checked={tipo === 'costo_produccion'}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="sr-only"
+                />
+                <FiTool size={24} className={tipo === 'costo_produccion' ? 'text-orange-600' : 'text-gray-500'} />
+                <div>
+                  <div className={`font-semibold ${tipo === 'costo_produccion' ? 'text-orange-600' : 'text-gray-700'}`}>
+                    Costo de Producción
+                  </div>
+                  <div className="text-xs text-gray-500">Servicios y gastos</div>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div className="flex justify-end gap-4 pt-4 h-[60px]">

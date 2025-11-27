@@ -25,6 +25,35 @@ module.exports = {
     return rows;
   },
 
+  getByCostoIndirecto: async (idCosto) => {
+    const [rows] = await db.query(
+      `SELECT 
+        cia.*, 
+        ofa.fecha_inicio,
+        ofa.fecha_fin_estimada,
+        ofa.fecha_entrega,
+        ofa.estado,
+        dof.cantidad,
+        dof.id_articulo,
+        a.referencia as referencia_articulo,
+        a.descripcion as descripcion_articulo,
+        COALESCE(c1.nombre, c2.nombre) as nombre_cliente,
+        COALESCE(ov.id_cliente, p.id_cliente) as id_cliente
+       FROM costos_indirectos_asignados cia
+       LEFT JOIN ordenes_fabricacion ofa ON cia.id_orden_fabricacion = ofa.id_orden_fabricacion
+       LEFT JOIN detalle_orden_fabricacion dof ON ofa.id_orden_fabricacion = dof.id_orden_fabricacion
+       LEFT JOIN articulos a ON dof.id_articulo = a.id_articulo
+       LEFT JOIN ordenes_venta ov ON ofa.id_orden_venta = ov.id_orden_venta
+       LEFT JOIN clientes c1 ON ov.id_cliente = c1.id_cliente
+       LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
+       LEFT JOIN clientes c2 ON p.id_cliente = c2.id_cliente
+       WHERE cia.id_costo_indirecto = ?
+       ORDER BY cia.id_orden_fabricacion`,
+      [idCosto]
+    );
+    return rows;
+  },
+
   create: async ({
     id_costo_indirecto,
     id_orden_fabricacion,

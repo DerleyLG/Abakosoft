@@ -179,7 +179,6 @@ module.exports = {
             id_orden_fabricacion
           );
 
-        console.log(`El artículo ${id_articulo} ¿es compuesto?`, esCompuesto);
 
         if (esCompuesto) {
           console.log(

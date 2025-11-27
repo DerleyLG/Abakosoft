@@ -116,7 +116,7 @@ const cargarTrabajadores = async () => {
             {filteredTrabajadores.length > 0 ? (
                 
               filteredTrabajadores.map((trab) => (
-              console.log('Activo:', trab.activo, typeof trab.activo),
+          
                 <tr
                   key={trab.id_trabajador}
                   onDoubleClick={() => handleRowDoubleClick(trab.id_trabajador)}

@@ -317,8 +317,8 @@ module.exports = {
         ofab.fecha_inicio,
         c.nombre AS cliente,
         COALESCE(mo.costo_mano_obra, 0) AS costo_mano_obra,
-        COALESCE(v.total_ingresos, 0) AS total_ingresos,
-        COALESCE(v.total_ingresos, 0) - COALESCE(mo.costo_mano_obra, 0) AS utilidad
+        COALESCE(v.total_ingresos, precio_catalogo.total_precio_catalogo, 0) AS total_ingresos,
+        COALESCE(v.total_ingresos, precio_catalogo.total_precio_catalogo, 0) - COALESCE(mo.costo_mano_obra, 0) AS utilidad
       FROM ordenes_fabricacion ofab
       LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
       LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
@@ -357,6 +357,15 @@ module.exports = {
         ) tpa ON tpa.id_pedido = poa.id_pedido AND tpa.id_articulo = poa.id_articulo
         GROUP BY poa.id_orden_fabricacion
       ) v ON v.id_orden_fabricacion = ofab.id_orden_fabricacion
+      /* Precio de catálogo (precio_venta de la tabla artículos cuando no hay venta vinculada) */
+      LEFT JOIN (
+        SELECT 
+          dof.id_orden_fabricacion,
+          SUM(dof.cantidad * COALESCE(a.precio_venta, 0)) AS total_precio_catalogo
+        FROM detalle_orden_fabricacion dof
+        JOIN articulos a ON dof.id_articulo = a.id_articulo
+        GROUP BY dof.id_orden_fabricacion
+      ) precio_catalogo ON precio_catalogo.id_orden_fabricacion = ofab.id_orden_fabricacion
       ${where}
       ORDER BY ofab.fecha_inicio DESC;
     `;

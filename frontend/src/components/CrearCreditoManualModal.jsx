@@ -2,12 +2,26 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
+const formatCOP = (value) => {
+  if (!value || value === '') return '';
+  const number = Number(String(value).replace(/[^0-9]/g, ''));
+  if (!isFinite(number) || number === 0) return '';
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(number);
+};
+
 const CrearCreditoManualModal = ({ open, onClose, onCreated }) => {
   const [clientes, setClientes] = useState([]);
   const [idCliente, setIdCliente] = useState('');
   const [monto, setMonto] = useState('');
+  const [montoDisplay, setMontoDisplay] = useState('');
   const [obs, setObs] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -25,6 +39,7 @@ const CrearCreditoManualModal = ({ open, onClose, onCreated }) => {
   const reset = () => {
     setIdCliente('');
     setMonto('');
+    setMontoDisplay('');
     setObs('');
   };
 
@@ -36,6 +51,21 @@ const CrearCreditoManualModal = ({ open, onClose, onCreated }) => {
   const parseMonto = (val) => {
     const n = Number(String(val).replace(/[^0-9]/g, ''));
     return isFinite(n) ? n : 0;
+  };
+
+  const handleMontoChange = (e) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^0-9]/g, '');
+    setMonto(numericValue);
+    setMontoDisplay(numericValue);
+  };
+
+  const handleMontoFocus = () => {
+    setIsFocused(true);
+  };
+
+  const handleMontoBlur = () => {
+    setIsFocused(false);
   };
 
   const handleSubmit = async () => {
@@ -87,9 +117,11 @@ const CrearCreditoManualModal = ({ open, onClose, onCreated }) => {
             <input
               type="text"
               className="w-full border rounded px-3 py-2"
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              placeholder="0"
+              value={isFocused ? montoDisplay : formatCOP(monto)}
+              onChange={handleMontoChange}
+              onFocus={handleMontoFocus}
+              onBlur={handleMontoBlur}
+              placeholder="$ 0"
             />
           </div>
           <div>

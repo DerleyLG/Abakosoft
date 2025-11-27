@@ -92,10 +92,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
           api.get("/articulos", { params: { page: 1, pageSize: 10000, sortBy: 'descripcion', sortDir: 'asc' } }),
         ]);
         
-        console.log('Órdenes Fabricación - Artículos raw:', resArticulos.data);
+      
         const articulosArr = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
-        console.log('Órdenes Fabricación - Artículos procesados:', articulosArr.length, 'artículos');
-        console.log('Órdenes Fabricación - Primeros 5 artículos:', articulosArr.slice(0, 5));
+    
         
         setTrabajadores(
           resTrabajadores.data.map((trab) => ({
@@ -1281,30 +1280,36 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
             )}
           </tbody>
         </table>
-        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            Página {page} de {totalPages} — {total} órdenes
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={!hasPrev}
-            >Anterior</button>
-            <button
-              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!hasNext}
-            >Siguiente</button>
-            <select
-              className="ml-2 border border-gray-400 rounded-md px-2 py-2"
-              value={pageSize}
-              onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> — <span className="font-semibold text-gray-800">{total}</span> órdenes
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!hasPrev}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNext}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value={10}>10 / página</option>
+                <option value={25}>25 / página</option>
+                <option value={50}>50 / página</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

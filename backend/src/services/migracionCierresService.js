@@ -145,7 +145,7 @@ async function migrarPeriodosHistoricos() {
   try {
     await connection.beginTransaction();
 
-    console.log("🔄 Iniciando migración de períodos históricos...");
+
 
     // 1. Verificar si ya hay cierres
     const [cierresExistentes] = await connection.query(
@@ -169,8 +169,8 @@ async function migrarPeriodosHistoricos() {
     const fechaInicio = primerMovimiento[0].primera_fecha;
     const primerLunes = calcularLunesAnterior(fechaInicio);
 
-    console.log(`📅 Primer movimiento: ${fechaInicio}`);
-    console.log(`📅 Primer período iniciará: ${primerLunes}`);
+    console.log(` Primer movimiento: ${fechaInicio}`);
+    console.log(` Primer período iniciará: ${primerLunes}`);
 
     // 3. Obtener métodos de pago
     const [metodosPago] = await connection.query(
@@ -211,7 +211,7 @@ async function migrarPeriodosHistoricos() {
       const numero_semana = calcularNumeroSemana(fecha_inicio);
       const anio_semana = fechaActual.getFullYear();
 
-      console.log(`\n📦 Creando período ${numeroPeriodo}:`);
+      console.log(` Creando período ${numeroPeriodo}:`);
       console.log(`   ${fecha_inicio} al ${fecha_fin || "Actual"} (${estado})`);
 
       // Crear período
@@ -311,8 +311,8 @@ async function migrarPeriodosHistoricos() {
 
     await connection.commit();
 
-    console.log("\n✅ Migración completada exitosamente");
-    console.log(`📊 Períodos creados: ${periodosCreados.length}`);
+    console.log(" Migración completada exitosamente");
+    console.log(` Períodos creados: ${periodosCreados.length}`);
 
     return {
       success: true,

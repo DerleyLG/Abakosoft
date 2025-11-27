@@ -77,7 +77,7 @@ const Pedidos = () => {
               toast.success("Pedido eliminado");
               setPedidos((prev) => prev.filter((p) => p.id_pedido !== id));
             } catch (error) {
-              console.log("Error al eliminar", error.response?.data || error.message);
+             
               toast.error(
                 error.response?.data?.error || error.response?.data?.message || error.message
               );

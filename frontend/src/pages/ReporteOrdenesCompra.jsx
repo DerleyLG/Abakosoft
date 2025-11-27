@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import ReporteBase from '../components/ReporteBase'; // Asegúrate de que la ruta sea correcta
+import ReporteBase from '../components/ReporteBase'; 
 
 const ReporteOrdenesCompra = () => {
   const [summary, setSummary] = useState([]);
@@ -38,7 +38,7 @@ const ReporteOrdenesCompra = () => {
       const count = Array.isArray(rows) ? rows.length : 0;
       setSummary([
         { label: 'Registros', value: count },
-        { label: 'Subtotal Compras', value: total, isCurrency: true },
+        { label: 'Total Compras', value: total, isCurrency: true },
       ]);
     } catch {
       setSummary([]);

@@ -35,6 +35,9 @@ const CrearOrdenCompra = () => {
     const [referenciaPago, setReferenciaPago] = useState('');
     const [observacionesPago, setObservacionesPago] = useState('');
     const [metodosPago, setMetodosPago] = useState([]);
+    const [adjuntarComprobante, setAdjuntarComprobante] = useState(false);
+    const [archivoComprobante, setArchivoComprobante] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
 
     const navigate = useNavigate();
 
@@ -63,29 +66,16 @@ const CrearOrdenCompra = () => {
     // Caché para almacenar resultados de búsqueda
     const cacheRef = useRef({});
     const timerRef = useRef(null);
+    const [todosLosArticulos, setTodosLosArticulos] = useState([]);
 
-    // Función para cargar artículos dinámicamente con debounce y caché
-    const loadArticulosOptions = useCallback((inputValue, callback) => {
-        // Limpiar el timer anterior
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        // Si ya está en caché, retornar inmediatamente
-        const cacheKey = inputValue?.toLowerCase() || '';
-        if (cacheRef.current[cacheKey]) {
-            callback(cacheRef.current[cacheKey]);
-            return;
-        }
-
-        // Debounce: esperar 500ms después de que el usuario deje de escribir
-        timerRef.current = setTimeout(async () => {
+    // Cargar todos los artículos al inicio
+    useEffect(() => {
+        const cargarTodosArticulos = async () => {
             try {
                 const response = await api.get('/articulos', { 
                     params: { 
-                        buscar: inputValue, 
                         page: 1, 
-                        pageSize: 50, 
+                        pageSize: 1000, // Cargar muchos artículos
                         sortBy: 'descripcion', 
                         sortDir: 'asc' 
                     } 
@@ -96,17 +86,52 @@ const CrearOrdenCompra = () => {
                     label: `${art.descripcion} (Ref: ${art.referencia})`,
                     ...art,
                 }));
-                
-                // Guardar en caché
-                cacheRef.current[cacheKey] = opciones;
-                callback(opciones);
+                setTodosLosArticulos(opciones);
+                // Guardar en caché como opciones por defecto
+                cacheRef.current[''] = opciones;
             } catch (error) {
-                console.error('Error al buscar artículos:', error);
-                toast.error('Error al buscar artículos');
-                callback([]);
+                console.error('Error al cargar artículos:', error);
+                toast.error('Error al cargar lista de artículos');
             }
-        }, 300); // 300ms de delay
+        };
+        cargarTodosArticulos();
     }, []);
+
+    // Función para cargar artículos dinámicamente con debounce y caché
+    const loadArticulosOptions = useCallback((inputValue, callback) => {
+        const cacheKey = inputValue?.toLowerCase() || '';
+
+        // Si no hay búsqueda, retornar todos los artículos
+        if (!inputValue || inputValue.trim() === '') {
+            callback(todosLosArticulos);
+            return;
+        }
+
+        // Si ya está en caché, retornar inmediatamente
+        if (cacheRef.current[cacheKey]) {
+            callback(cacheRef.current[cacheKey]);
+            return;
+        }
+
+        // Limpiar el timer anterior
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // Debounce: esperar 300ms después de que el usuario deje de escribir
+        timerRef.current = setTimeout(() => {
+            // Filtrar localmente en todos los artículos cargados
+            const filtered = todosLosArticulos.filter(art => 
+                art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+                art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
+            );
+            
+            // Guardar en caché
+            cacheRef.current[cacheKey] = filtered;
+            callback(filtered);
+        }, 300); // 300ms de delay
+    }, [todosLosArticulos]);
 
   
     const verificarYAgregarAlInventario = async (idArticulo, descripcionArticulo) => {
@@ -245,12 +270,51 @@ const CrearOrdenCompra = () => {
     };
 
    
+    const handleArchivoChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validar tipo de archivo
+        const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+        if (!tiposPermitidos.includes(file.type)) {
+            toast.error('Solo se permiten archivos JPG, PNG o PDF');
+            e.target.value = '';
+            return;
+        }
+
+        // Validar tamaño (5MB máximo)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('El archivo no puede superar los 5MB');
+            e.target.value = '';
+            return;
+        }
+
+        setArchivoComprobante(file);
+
+        // Crear preview para imágenes
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setPreviewUrl(null);
+        }
+    };
+
+    const eliminarArchivo = () => {
+        setArchivoComprobante(null);
+        setPreviewUrl(null);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validarFormulario()) return;
 
         setLoading(true);
-        const payload = {
+        
+        const datos = {
             id_proveedor: parseInt(idProveedor),
             categoria_costo: categoriaCosto.trim() || null,
             id_orden_fabricacion: null, 
@@ -266,7 +330,31 @@ const CrearOrdenCompra = () => {
         };
 
         try {
-            await api.post("/ordenes-compra", payload);
+            // Si hay archivo, usar FormData
+            if (adjuntarComprobante && archivoComprobante) {
+                const formData = new FormData();
+                
+                // Agregar campos como strings
+                formData.append('id_proveedor', datos.id_proveedor);
+                if (datos.categoria_costo) formData.append('categoria_costo', datos.categoria_costo);
+                formData.append('items', JSON.stringify(datos.items));
+                formData.append('id_metodo_pago', datos.id_metodo_pago);
+                if (datos.referencia) formData.append('referencia', datos.referencia);
+                if (datos.observaciones_pago) formData.append('observaciones_pago', datos.observaciones_pago);
+                
+                // Agregar archivo
+                formData.append('comprobante', archivoComprobante);
+
+                await api.post("/ordenes-compra", formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+            } else {
+                // Sin archivo, enviar JSON normal
+                await api.post("/ordenes-compra", datos);
+            }
+            
             toast.success("Orden de compra creada correctamente", {
                 duration: 4000,
                 style: {
@@ -401,6 +489,78 @@ const CrearOrdenCompra = () => {
                             disabled={loading}
                         />
                     </div>
+
+                    {/* Checkbox para habilitar carga de comprobante */}
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="adjuntarComprobante"
+                            checked={adjuntarComprobante}
+                            onChange={(e) => {
+                                setAdjuntarComprobante(e.target.checked);
+                                if (!e.target.checked) {
+                                    setArchivoComprobante(null);
+                                    setPreviewUrl(null);
+                                }
+                            }}
+                            className="w-4 h-4 text-slate-600 cursor-pointer"
+                            disabled={loading}
+                        />
+                        <label htmlFor="adjuntarComprobante" className="text-sm font-medium text-gray-700 cursor-pointer">
+                            Adjuntar comprobante/factura (opcional)
+                        </label>
+                    </div>
+
+                    {/* Campo de archivo (solo si está habilitado) */}
+                    {adjuntarComprobante && (
+                        <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Cargar archivo
+                            </label>
+                            <input
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.pdf"
+                                onChange={handleArchivoChange}
+                                className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer"
+                                disabled={loading}
+                            />
+                            <p className="mt-2 text-xs text-gray-500">
+                                Formatos permitidos: JPG, PNG, PDF. Tamaño máximo: 5MB
+                            </p>
+
+                            {/* Preview de imagen */}
+                            {previewUrl && (
+                                <div className="mt-4 relative">
+                                    <img 
+                                        src={previewUrl} 
+                                        alt="Preview" 
+                                        className="max-w-full h-auto max-h-48 rounded-md border border-gray-300"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={eliminarArchivo}
+                                        className="cursor-pointer absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Nombre de archivo PDF */}
+                            {archivoComprobante && !previewUrl && (
+                                <div className="mt-4 flex items-center justify-between bg-white border border-gray-300 rounded-md p-3">
+                                    <span className="text-sm text-gray-700">{archivoComprobante.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={eliminarArchivo}
+                                        className="cursor-pointer text-red-600 hover:text-red-700"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     
                     <hr className="my-6 border-gray-300" />
                 
@@ -412,7 +572,7 @@ const CrearOrdenCompra = () => {
                             <AsyncSelect
                                 cacheOptions
                                 loadOptions={loadArticulosOptions}
-                                defaultOptions
+                                defaultOptions={todosLosArticulos}
                                 value={articuloSeleccionado}
                                 onChange={(option) => {
                                     setArticuloSeleccionado(option); 
@@ -420,7 +580,7 @@ const CrearOrdenCompra = () => {
                                         agregarArticulo(option); 
                                     }
                                 }}
-                                placeholder="Escribe para buscar un artículo..."
+                                placeholder="Escribe para buscar un artículo o selecciona de la lista..."
                                 isClearable
                                 className="text-sm w-full"
                                 styles={{
@@ -431,10 +591,14 @@ const CrearOrdenCompra = () => {
                                         "&:hover": { borderColor: "#64748b" },
                                         borderRadius: "0.375rem",
                                     }),
+                                    menuList: (base) => ({
+                                        ...base,
+                                        maxHeight: "300px",
+                                    }),
                                 }}
                                 isDisabled={loading}
                                 noOptionsMessage={() => "No se encontraron artículos"}
-                                loadingMessage={() => "Buscando..."}
+                                loadingMessage={() => "Cargando artículos..."}
                             />
                           
                         </div>
@@ -508,14 +672,14 @@ const CrearOrdenCompra = () => {
                         <button
                             type="button"
                             onClick={handleCancelar}
-                            className="px-6 py-3 border border-gray-400 rounded-xl hover:bg-gray-300 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={loading}
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            className="bg-slate-700 text-white px-6 py-3 rounded-xl hover:bg-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed "
+                            className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={loading}
                         >
                             Guardar Orden

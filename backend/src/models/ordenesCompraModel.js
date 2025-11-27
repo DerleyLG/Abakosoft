@@ -71,6 +71,7 @@ module.exports = {
       `SELECT 
          oc.id_orden_compra, oc.fecha, oc.id_proveedor, p.nombre AS proveedor_nombre,
          oc.categoria_costo, oc.id_orden_fabricacion, oc.estado,
+         oc.comprobante_path, oc.comprobante_nombre_original, oc.comprobante_fecha_subida,
          SUM(doc.cantidad * doc.precio_unitario) AS monto_total,
          MAX(mp.nombre) AS metodo_pago,
          MAX(mp.tipo) AS tipo_pago
@@ -104,30 +105,87 @@ module.exports = {
     categoria_costo,
     id_orden_fabricacion,
     estado,
+    comprobante = null,
     connection = db
   ) => {
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [id_proveedor, categoria_costo, id_orden_fabricacion, estado]
+      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre_original, comprobante_fecha_subida)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)`,
+      [
+        id_proveedor,
+        categoria_costo,
+        id_orden_fabricacion,
+        estado,
+        comprobante?.path || null,
+        comprobante?.nombre_original || null,
+        comprobante?.fecha_subida || null,
+      ]
     );
     return result.insertId;
   },
 
   update: async (
     id,
-    { id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha },
+    {
+      id_proveedor,
+      categoria_costo,
+      id_orden_fabricacion,
+      estado,
+      fecha,
+      comprobante_path,
+      comprobante_nombre_original,
+      comprobante_fecha_subida,
+    },
     connection = db
   ) => {
+    // Construir dinámicamente el UPDATE solo para campos definidos
+    const updates = [];
+    const values = [];
+
+    if (id_proveedor !== undefined) {
+      updates.push("id_proveedor = ?");
+      values.push(id_proveedor);
+    }
+    if (categoria_costo !== undefined) {
+      updates.push("categoria_costo = ?");
+      values.push(categoria_costo);
+    }
+    if (id_orden_fabricacion !== undefined) {
+      updates.push("id_orden_fabricacion = ?");
+      values.push(id_orden_fabricacion);
+    }
+    if (estado !== undefined) {
+      updates.push("estado = ?");
+      values.push(estado);
+    }
+    if (fecha !== undefined) {
+      updates.push("fecha = ?");
+      values.push(fecha);
+    }
+    if (comprobante_path !== undefined) {
+      updates.push("comprobante_path = ?");
+      values.push(comprobante_path);
+    }
+    if (comprobante_nombre_original !== undefined) {
+      updates.push("comprobante_nombre_original = ?");
+      values.push(comprobante_nombre_original);
+    }
+    if (comprobante_fecha_subida !== undefined) {
+      updates.push("comprobante_fecha_subida = ?");
+      values.push(comprobante_fecha_subida);
+    }
+
+    if (updates.length === 0) {
+      return 0; // No hay nada que actualizar
+    }
+
+    values.push(id); // Agregar el ID al final para el WHERE
+
     const [result] = await (connection || db).query(
-      `UPDATE ordenes_compra
-   SET id_proveedor = COALESCE(?, id_proveedor),
-     categoria_costo = COALESCE(?, categoria_costo),
-     id_orden_fabricacion = COALESCE(?, id_orden_fabricacion),
-     estado = COALESCE(?, estado),
-     fecha = COALESCE(?, fecha) 
-   WHERE id_orden_compra = ?`,
-      [id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, id]
+      `UPDATE ordenes_compra SET ${updates.join(
+        ", "
+      )} WHERE id_orden_compra = ?`,
+      values
     );
     return result.affectedRows;
   },

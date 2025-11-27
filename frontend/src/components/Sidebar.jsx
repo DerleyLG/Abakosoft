@@ -222,6 +222,7 @@ const Sidebar = ({ isOpen }) => {
         >
          	<FiDollarSign size={20} /> Tesorería
          </NavLink>
+          {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
          <NavLink
          	to="/cierres-caja"
          	className={({ isActive }) =>
@@ -232,6 +233,7 @@ const Sidebar = ({ isOpen }) => {
         >
          	<FiCalendar size={20} /> Cierres de Caja
          </NavLink>
+         )}
           {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
             <NavLink
               to="/reportes"

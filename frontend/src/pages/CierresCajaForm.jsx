@@ -205,18 +205,18 @@ const CierresCajaForm = () => {
         </div>
 
         {/* Botones */}
-        <div className="flex gap-3 mt-8">
+        <div className="flex gap-4 mt-8">
           <button
             type="button"
             onClick={() => navigate('/cierres-caja')}
-            className="cursor-pointer flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="cursor-pointer flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>Guardando...</>

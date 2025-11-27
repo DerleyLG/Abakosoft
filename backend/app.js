@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 require("dotenv").config();
 
@@ -40,7 +41,7 @@ const tesoreria = require("./src/routes/tesoreriaRoutes.js");
 const metodosPago = require("./src/routes/metodosDePagoRoutes.js");
 const ventascreditos = require("./src/routes/ventasCreditoRoutes.js");
 const kanbanRoutes = require("./src/routes/kanbanRoutes.js");
-const cierresCajaRoutes = require("./src/routes/cierresCaja.js");
+const cierresCajaRoutes = require("./src/routes/cierresCajaRoutes.js");
 
 const app = express();
 app.use(
@@ -49,6 +50,9 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Servir archivos estáticos desde la carpeta uploads
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Montaje del módulo Clientes
 app.use("/api/clientes", clientesRoutes);

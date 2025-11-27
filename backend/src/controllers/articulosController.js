@@ -12,13 +12,23 @@ const categoriaExiste = async (id_categoria) => {
 
 const getArticulos = async (req, res) => {
   try {
-    const { buscar = "", page, pageSize, sortBy, sortDir } = req.query;
+    const {
+      buscar = "",
+      tipo_categoria = "",
+      id_categoria = "",
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+    } = req.query;
 
     const p = Math.max(1, parseInt(page) || 1);
     const ps = Math.min(10000, Math.max(1, parseInt(pageSize) || 25));
 
     const { data, total } = await Articulo.buscarArticulosPaginado({
       buscar,
+      tipo_categoria,
+      id_categoria,
       page: p,
       pageSize: ps,
       sortBy,
