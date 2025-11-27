@@ -236,7 +236,19 @@ const ListaAvances = () => {
                           toast.error('Para seleccionar todos, filtra por un trabajador primero.');
                           return;
                         }
-                        // Si ya hay selección previa de otro trabajador, validarlo
+                        // Si ya filtraste por trabajador, permite seleccionar todos sin validar el trabajador
+                        if (idTrabajadorSeleccionado) {
+                          setSeleccionados(
+                            Array.from(
+                              new Set([
+                                ...seleccionados,
+                                ...avances.map(a => a.id_avance_etapa),
+                              ])
+                            )
+                          );
+                          return;
+                        }
+                        // Si no hay filtro, validar que todos los avances sean del mismo trabajador
                         if (seleccionados.length > 0) {
                           const primeraSel = avances.find(a => a.id_avance_etapa === seleccionados[0]);
                           const trabajadorSel = primeraSel?.id_trabajador;
