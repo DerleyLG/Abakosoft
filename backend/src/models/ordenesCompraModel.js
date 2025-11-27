@@ -71,7 +71,7 @@ module.exports = {
       `SELECT 
          oc.id_orden_compra, oc.fecha, oc.id_proveedor, p.nombre AS proveedor_nombre,
          oc.categoria_costo, oc.id_orden_fabricacion, oc.estado,
-         oc.comprobante_path, oc.comprobante_nombre_original, oc.comprobante_fecha_subida,
+         oc.comprobante_path, oc.comprobante_nombre, oc.comprobante_fecha_subida,
          SUM(doc.cantidad * doc.precio_unitario) AS monto_total,
          MAX(mp.nombre) AS metodo_pago,
          MAX(mp.tipo) AS tipo_pago
@@ -109,7 +109,7 @@ module.exports = {
     connection = db
   ) => {
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre_original, comprobante_fecha_subida)
+      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre, comprobante_fecha_subida)
        VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)`,
       [
         id_proveedor,
@@ -117,7 +117,7 @@ module.exports = {
         id_orden_fabricacion,
         estado,
         comprobante?.path || null,
-        comprobante?.nombre_original || null,
+        comprobante?.nombre || null,
         comprobante?.fecha_subida || null,
       ]
     );
@@ -133,7 +133,7 @@ module.exports = {
       estado,
       fecha,
       comprobante_path,
-      comprobante_nombre_original,
+      comprobante_nombre,
       comprobante_fecha_subida,
     },
     connection = db
@@ -166,9 +166,9 @@ module.exports = {
       updates.push("comprobante_path = ?");
       values.push(comprobante_path);
     }
-    if (comprobante_nombre_original !== undefined) {
-      updates.push("comprobante_nombre_original = ?");
-      values.push(comprobante_nombre_original);
+    if (comprobante_nombre !== undefined) {
+      updates.push("comprobante_nombre = ?");
+      values.push(comprobante_nombre);
     }
     if (comprobante_fecha_subida !== undefined) {
       updates.push("comprobante_fecha_subida = ?");
