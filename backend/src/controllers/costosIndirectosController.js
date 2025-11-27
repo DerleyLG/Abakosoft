@@ -4,8 +4,44 @@ const db = require("../database/db");
 
 exports.getAll = async (req, res) => {
   try {
-    const [rows] = await CostosIndirectos.getAll();
-    res.json(rows);
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const sortBy = req.query.sortBy || "fecha";
+    const sortDir = req.query.sortDir || "desc";
+    const offset = (page - 1) * pageSize;
+
+    // Validar sortBy para evitar SQL injection
+    const allowedSortFields = [
+      "fecha",
+      "tipo_costo",
+      "valor",
+      "fecha_inicio",
+      "fecha_fin",
+    ];
+    const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : "fecha";
+    const validSortDir = sortDir.toLowerCase() === "asc" ? "ASC" : "DESC";
+
+    // Obtener total de registros
+    const [countResult] = await db.query(
+      "SELECT COUNT(*) as total FROM costos_indirectos"
+    );
+    const total = countResult[0].total;
+
+    // Obtener registros paginados
+    const [rows] = await db.query(
+      `SELECT * FROM costos_indirectos 
+       ORDER BY ${validSortBy} ${validSortDir} 
+       LIMIT ? OFFSET ?`,
+      [pageSize, offset]
+    );
+
+    res.json({
+      data: rows,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -28,6 +64,8 @@ exports.createCostoIndirecto = async (req, res) => {
     fecha,
     valor,
     observaciones,
+    fecha_inicio,
+    fecha_fin,
     id_orden_fabricacion,
     asignaciones,
   } = req.body;
@@ -63,6 +101,8 @@ exports.createCostoIndirecto = async (req, res) => {
       fecha,
       valor,
       observaciones: observaciones || null,
+      fecha_inicio: fecha_inicio || null,
+      fecha_fin: fecha_fin || null,
     });
 
     const created = {
@@ -100,11 +140,9 @@ exports.createCostoIndirecto = async (req, res) => {
           !Number.isFinite(val) ||
           val <= 0
         ) {
-          return res
-            .status(400)
-            .json({
-              error: "Asignación inválida: verifique OF y valores positivos.",
-            });
+          return res.status(400).json({
+            error: "Asignación inválida: verifique OF y valores positivos.",
+          });
         }
       }
       // Verificar estados de OF y crear asignaciones
@@ -125,11 +163,9 @@ exports.createCostoIndirecto = async (req, res) => {
             .json({ error: `La OF #${a.id_orden_fabricacion} no existe.` });
         }
         if (["cancelada", "completada"].includes(String(estado))) {
-          return res
-            .status(400)
-            .json({
-              error: `No se puede asignar a la OF #${a.id_orden_fabricacion} con estado '${estado}'.`,
-            });
+          return res.status(400).json({
+            error: `No se puede asignar a la OF #${a.id_orden_fabricacion} con estado '${estado}'.`,
+          });
         }
       }
       // Crear asignaciones válidas
@@ -159,11 +195,9 @@ exports.createCostoIndirecto = async (req, res) => {
             .json({ error: `La OF #${id_orden_fabricacion} no existe.` });
         }
         if (["cancelada", "completada"].includes(String(rows[0].estado))) {
-          return res
-            .status(400)
-            .json({
-              error: `No se puede asignar a la OF #${id_orden_fabricacion} con estado '${rows[0].estado}'.`,
-            });
+          return res.status(400).json({
+            error: `No se puede asignar a la OF #${id_orden_fabricacion} con estado '${rows[0].estado}'.`,
+          });
         }
         await CostosIndirectosAsignados.create({
           id_costo_indirecto: created.id,
@@ -193,7 +227,8 @@ exports.createCostoIndirecto = async (req, res) => {
 
 exports.update = async (req, res) => {
   const { id } = req.params;
-  const { tipo_costo, fecha, valor, observaciones } = req.body;
+  const { tipo_costo, fecha, valor, observaciones, fecha_inicio, fecha_fin } =
+    req.body;
 
   if (!id) {
     return res.status(400).json({ error: "El ID es obligatorio" });
@@ -230,6 +265,8 @@ exports.update = async (req, res) => {
       fecha,
       valor,
       observaciones: observaciones || null,
+      fecha_inicio: fecha_inicio || null,
+      fecha_fin: fecha_fin || null,
     });
 
     if (result.affectedRows === 0) {

@@ -113,7 +113,7 @@ const OrdenVentaForm = () => {
                 const metodosPagoAPI = metodosPagoRes.data;
 
                 setClientes(clientesAPI);
-                setArticulos(articulosAPI);
+                setArticulos(articulosAPI); // Ya viene filtrado desde el backend
                 setMetodosPago(metodosPagoAPI);
 
                 // Precarga desde Pedido
@@ -264,9 +264,6 @@ const OrdenVentaForm = () => {
         const ordenRes = await api.post("/ordenes-venta", payload);
         // Algunos entornos pueden devolver diferentes nombres de campo; robustecemos la lectura
         const id_orden_venta = ordenRes?.data?.id_orden_venta ?? ordenRes?.data?.id ?? ordenRes?.data?.insertId ?? null;
-        if (!id_orden_venta) {
-            console.warn('La respuesta de creación de orden no contiene id_orden_venta:', ordenRes?.data);
-        }
 
         // Nota: el backend ya crea el movimiento en tesorería cuando el método
         // de pago no es 'credito' (ver lógica en ordenesVentaController).
@@ -588,7 +585,7 @@ const OrdenVentaForm = () => {
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition shadow-lg cursor-pointer"
+                            className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
                         >
                             Guardar Orden
                         </button>

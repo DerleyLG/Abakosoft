@@ -14,14 +14,6 @@ api.interceptors.request.use((config) => {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
-    // Agrega el registro de depuración aquí
-    console.debug(
-      "[api] request:",
-      (config.method || "").toUpperCase(),
-      config.url,
-      "hasToken=",
-      !!token
-    );
   } catch (e) {}
   return config;
 });
@@ -32,7 +24,6 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     if (status === 401) {
-      console.warn("[api] 401 Unauthorized received from", error.config?.url);
       try {
         localStorage.removeItem("token");
       } catch (e) {}

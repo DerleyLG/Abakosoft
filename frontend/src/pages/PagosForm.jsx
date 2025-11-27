@@ -414,16 +414,9 @@ const FormularioPagoAvances = () => {
           disabled={
             guardando ||
             (esAnticipo && (!ordenSeleccionada || !trabajadorSeleccionado || montoAnticipo <= 0)) ||
-            // --- Esta es la condición que valida el anticipo para pagos normales ---
             (!esAnticipo && mostrarAlertaAnticipo)
           }
-          className={`px-6 py-2 rounded-md font-semibold transition ${
-            guardando ||
-            (esAnticipo && (!ordenSeleccionada || !trabajadorSeleccionado || montoAnticipo <= 0)) ||
-            (!esAnticipo && mostrarAlertaAnticipo)
-              ? "bg-slate-300 cursor-not-allowed text-slate-500"
-              : "bg-slate-700 hover:bg-slate-600 text-white cursor-pointer"
-          }`}
+          className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {guardando ? "Guardando..." : "Registrar Pago"}
         </button>

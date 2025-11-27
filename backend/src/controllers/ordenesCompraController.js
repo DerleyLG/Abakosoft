@@ -112,15 +112,39 @@ const getOrdenCompraById = async (req, res) => {
 async function createOrdenCompra(req, res) {
   let connection;
   try {
+    // Si viene de FormData con archivo, items es un string JSON que necesita parsearse
+    let itemsParsed;
+    if (typeof req.body.items === "string") {
+      try {
+        itemsParsed = JSON.parse(req.body.items);
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ error: "El formato de items es inválido." });
+      }
+    } else {
+      itemsParsed = req.body.items;
+    }
+
     const {
       id_proveedor,
       categoria_costo,
       id_orden_fabricacion,
-      items,
       id_metodo_pago,
       referencia,
       observaciones_pago,
     } = req.body;
+
+    const items = itemsParsed;
+
+    // Obtener información del archivo si existe
+    const comprobante = req.file
+      ? {
+          path: `comprobantes/${req.file.filename}`,
+          nombre_original: req.file.originalname,
+          fecha_subida: new Date(),
+        }
+      : null;
 
     // Validar que la fecha actual no esté en un período cerrado
     // Usar la misma zona horaria que se usa para crear la orden
@@ -214,6 +238,7 @@ async function createOrdenCompra(req, res) {
       categoria_costo || null,
       id_orden_fabricacion || null,
       estadoFinal,
+      comprobante,
       connection
     );
     if (!ordenId) {
@@ -340,18 +365,43 @@ async function updateOrdenCompra(req, res) {
   try {
     const id_orden_compra = req.params.id;
 
+    // Parsear detalles si vienen como string (FormData)
+    let detallesParsed;
+    if (typeof req.body.detalles === "string") {
+      try {
+        detallesParsed = JSON.parse(req.body.detalles);
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ error: "El formato de detalles es inválido." });
+      }
+    } else {
+      detallesParsed = req.body.detalles;
+    }
+
     const {
       id_proveedor,
       categoria_costo,
       id_orden_fabricacion,
       estado,
       fecha,
-      detalles,
+      eliminar_comprobante,
 
       id_metodo_pago,
       referencia,
       observaciones_pago,
     } = req.body;
+
+    const detalles = detallesParsed;
+
+    // Manejar comprobante
+    const comprobante = req.file
+      ? {
+          path: `comprobantes/${req.file.filename}`,
+          nombre_original: req.file.originalname,
+          fecha_subida: new Date(),
+        }
+      : null;
 
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -462,6 +512,21 @@ async function updateOrdenCompra(req, res) {
       estado: ordenActual.estado,
       fecha,
     };
+
+    // Agregar datos de comprobante si hay un archivo nuevo
+    if (comprobante) {
+      ordenData.comprobante_path = comprobante.path;
+      ordenData.comprobante_nombre_original = comprobante.nombre_original;
+      ordenData.comprobante_fecha_subida = comprobante.fecha_subida;
+    }
+
+    // Si se solicita eliminar el comprobante
+    if (eliminar_comprobante === "true" || eliminar_comprobante === true) {
+      ordenData.comprobante_path = null;
+      ordenData.comprobante_nombre_original = null;
+      ordenData.comprobante_fecha_subida = null;
+    }
+
     await ordenCompras.update(id_orden_compra, ordenData, connection);
 
     await detalleOrdenCompra.deleteByOrdenCompraId(id_orden_compra, connection);

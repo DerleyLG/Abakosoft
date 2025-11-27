@@ -235,20 +235,20 @@ const UsuarioForm = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60"
-            >
-              <FiUserPlus /> {loading ? 'Guardando…' : 'Crear usuario'}
-            </button>
+          <div className="flex flex-col sm:flex-row gap-4 pt-2">
             <button
               type="button"
               onClick={() => navigate('/gestionUsuarios')}
-              className=" cursor-pointer px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
             >
               Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FiUserPlus /> {loading ? 'Guardando…' : 'Crear usuario'}
             </button>
           </div>
         </form>

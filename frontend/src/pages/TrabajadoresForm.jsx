@@ -27,7 +27,7 @@ const CrearTrabajador = () => {
         activo: activo ? 1 : 0,
       };
 
-      console.log("Enviando datos:", formData);
+   
 
       await api.post('/trabajadores', formData);
 
@@ -125,19 +125,19 @@ const CrearTrabajador = () => {
             </label>
           </div>
 
-          <div className="md:col-span-2 flex justify-end gap-4 pt-4 h-[60px]">
-            <button
-              type="submit"
-              className="text-2xs flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-            >
-              Guardar
-            </button>
+          <div className="md:col-span-2 flex justify-end gap-4 pt-4">
             <button
               type="button"
               onClick={handleCancelar}
-              className="text-2xs bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-md text-sm font-medium transition cursor-pointer"
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
             >
               Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
+            >
+              Guardar
             </button>
           </div>
         </form>

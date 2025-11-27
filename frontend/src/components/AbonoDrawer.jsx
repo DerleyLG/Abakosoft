@@ -21,7 +21,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
         const filtered = (res.data || []).filter(m => (m.nombre || '').toLowerCase() !== 'credito');
         setMetodos(filtered);
       } catch (e) {
-        console.debug('No se pudieron cargar metodos de pago', e);
+        // Silenciar error
       }
     };
 
@@ -41,7 +41,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
         const resumenRes = await api.get(`/creditos/${credito.id_venta_credito}/resumen`).catch(() => null);
         setResumen({ abonos: r.data, resumen: resumenRes?.data || null });
       } catch (e) {
-        console.debug('No se pudo cargar historial de abonos', e);
+        // Silenciar error
       }
     };
   if (credito && credito.id_venta_credito) fetchResumen();
@@ -74,7 +74,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
         setMonto(resumenRes.data.saldo_pendiente);
       }
     } catch (e) {
-      console.debug('No se pudo cargar historial de abonos', e);
+      // Silenciar error
     }
   };
 

@@ -114,6 +114,19 @@ module.exports = {
     }
   },
 
+  getByCostoIndirecto: async (req, res) => {
+    try {
+      const idCosto = parseInt(req.params.id, 10);
+      if (!idCosto || idCosto <= 0) {
+        return res.status(400).json({ error: "ID de costo inválido" });
+      }
+      const rows = await Model.getByCostoIndirecto(idCosto);
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
   create: async (req, res) => {
     const {
       id_costo_indirecto,

@@ -43,7 +43,7 @@ const Register = () => {
             });
 
             toast.success('¡Registro exitoso! Ya puedes iniciar sesión.');
-            console.log('Usuario registrado:', response.data);
+         
             navigate('/login'); // Redirige al usuario a la página de inicio de sesión
 
         } catch (error) {

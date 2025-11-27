@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api"; // ajusta según tu estructura
-import { FiEdit, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle,FiArrowRight} from "react-icons/fi"; 
+import { FiEdit, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle, FiArrowRight, FiFileText, FiDownload, FiExternalLink } from "react-icons/fi"; 
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -297,13 +297,14 @@ const OrdenesCompra = () => {
               <th className="px-4 py-3">Total</th>
               <th className="px-4 py-3">Método de Pago</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3 text-center">Comprobante</th>
               <th className="px-4 py-3">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-gray-500">Cargando…</td>
+                <td colSpan="8" className="text-center py-6 text-gray-500">Cargando…</td>
               </tr>
             ) : filteredOrdenes.length > 0 ? (
               filteredOrdenes.map((orden) => (
@@ -334,6 +335,22 @@ const OrdenesCompra = () => {
                       )}
                     </td>
                     <td className="px-4 py-3">{orden.estado}</td>
+                    <td className="px-4 py-3 text-center">
+                      {orden.comprobante_path ? (
+                        <a
+                          href={`http://localhost:3002/uploads/${orden.comprobante_path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                          title={`Ver ${orden.comprobante_nombre_original || 'comprobante'}`}
+                        >
+                          <FiFileText size={18} />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 text-xs italic">—</span>
+                      )}
+                    </td>
                     <td className="pl-3 py-3 text-center flex gap-4">
                    
 {canEdit && orden.estado === 'pendiente' && !mostrarCanceladas && (
@@ -385,17 +402,40 @@ const OrdenesCompra = () => {
 
                   {expandedId === orden.id_orden_compra && (
                     <tr>
-                      <td colSpan="7" className="bg-gray-100 p-0 border-b">
-                        <div className="px-4 py-4 max-h-96 overflow-y-auto">
-                          <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-gray-200">
-                              <tr className="text-gray-700">
-                                <th className="px-2 py-2 border-b border-gray-300 text-left">Artículo</th>
-                                <th className="px-2 py-2 border-b border-gray-300 text-left">Cantidad</th>
-                                <th className="px-2 py-2 border-b border-gray-300 text-left">Precio Unitario</th>
-                                <th className="px-2 py-2 border-b border-gray-300 text-left">Subtotal</th>
-                              </tr>
-                            </thead>
+                      <td colSpan="8" className="bg-gray-100 p-0 border-b">
+                        <div className="px-4 py-4">
+                          {orden.comprobante_path && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <FiFileText className="text-blue-600" size={20} />
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-700">Comprobante adjunto</p>
+                                    <p className="text-xs text-gray-500">{orden.comprobante_nombre_original}</p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={`http://localhost:3002/uploads/${orden.comprobante_path}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                                >
+                                  <FiExternalLink size={14} />
+                                  Ver archivo
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                          <div className="max-h-96 overflow-y-auto">
+                            <table className="w-full text-sm">
+                              <thead className="sticky top-0 bg-gray-200">
+                                <tr className="text-gray-700">
+                                  <th className="px-2 py-2 border-b border-gray-300 text-left">Artículo</th>
+                                  <th className="px-2 py-2 border-b border-gray-300 text-left">Cantidad</th>
+                                  <th className="px-2 py-2 border-b border-gray-300 text-left">Precio Unitario</th>
+                                  <th className="px-2 py-2 border-b border-gray-300 text-left">Subtotal</th>
+                                </tr>
+                              </thead>
                             <tbody className="bg-white">
                               {orden.detalles && orden.detalles.length > 0 ? (
                                 orden.detalles.map((d, i) => (
@@ -417,8 +457,9 @@ const OrdenesCompra = () => {
                                   </td>
                                 </tr>
                               )}
-                            </tbody>
-                          </table>
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -427,37 +468,43 @@ const OrdenesCompra = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-gray-500">
+                <td colSpan="8" className="text-center py-6 text-gray-500">
                   No se encontraron órdenes que coincidan con la búsqueda.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            Página {page} de {totalPages} — {total} órdenes de compra
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={!hasPrev}
-            >Anterior</button>
-            <button
-              className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!hasNext}
-            >Siguiente</button>
-            <select
-              className="ml-2 border border-gray-400 rounded-md px-2 py-2"
-              value={pageSize}
-              onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> — <span className="font-semibold text-gray-800">{total}</span> órdenes
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!hasPrev}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNext}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value={10}>10 / página</option>
+                <option value={25}>25 / página</option>
+                <option value={50}>50 / página</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

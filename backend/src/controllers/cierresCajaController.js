@@ -308,9 +308,9 @@ const cierresCajaController = {
    */
   verificarEstadoSistema: async (req, res) => {
     try {
-      console.log("[verificarEstadoSistema] Petición recibida");
+     
       const estado = await migracionService.necesitaMigracion();
-      console.log("[verificarEstadoSistema] Estado:", estado);
+      
       res.json(estado);
     } catch (error) {
       console.error("[verificarEstadoSistema] Error:", error);

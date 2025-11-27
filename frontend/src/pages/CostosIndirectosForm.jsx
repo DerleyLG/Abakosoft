@@ -2,29 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 
 const CostosIndirectosNuevo = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Inicializa esMateriaPrima, pero el useEffect lo ajustará si hay estado de navegación
-  const [esMateriaPrima, setEsMateriaPrima] = useState(false);
+  const [usarPeriodo, setUsarPeriodo] = useState(false);
 
   const [tipoCosto, setTipoCosto] = useState('');
   const [fecha, setFecha] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
   const [valor, setValor] = useState(''); // texto formateado COP
   const [observaciones, setObservaciones] = useState('');
-
-  // ESTADOS para el formulario de materia prima
-  const [descripcionGastoMateriaPrima, setDescripcionGastoMateriaPrima] = useState('');
-  const [cantidadMateriaPrima, setCantidadMateriaPrima] = useState('');
-  const [precioUnitarioMateriaPrima, setPrecioUnitarioMateriaPrima] = useState('');
-  const [idProveedorMateriaPrima, setIdProveedorMateriaPrima] = useState(null);
-  const [observacionesMateriaPrima, setObservacionesMateriaPrima] = useState('');
-
-  const [proveedores, setProveedores] = useState([]);
   const [ofSeleccionada, setOfSeleccionada] = useState(null);
   const [asignarAOF, setAsignarAOF] = useState(false);
   const [asignacionMultiple, setAsignacionMultiple] = useState(false);
@@ -34,43 +25,6 @@ const CostosIndirectosNuevo = () => {
   // Sugerencias (vista previa) para auto-distribución por driver
   const [sugerencias, setSugerencias] = useState([]); // [{ id_orden_fabricacion, driver_valor, peso, valor_asignado? }]
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
-
-  // useEffect para cargar proveedores
-  useEffect(() => {
-    const fetchProveedores = async () => {
-      try {
-        const res = await api.get('/proveedores');
-        const opcionesProveedores = res.data.map(prov => ({
-          value: prov.id_proveedor,
-          label: prov.nombre
-        }));
-        setProveedores(opcionesProveedores);
-      } catch (error) {
-        console.error('Error cargando proveedores:', error);
-        toast.error('Error al cargar opciones de proveedores.');
-      }
-    };
-    fetchProveedores();
-  }, []);
-
-  // NUEVO useEffect para manejar el estado de navegación y la casilla
-  useEffect(() => {
-    if (location.state?.esMateriaPrima) {
-      setEsMateriaPrima(true);
-      // Opcional: limpiar los campos de costo indirecto si se llega aquí con la intención de registrar MP
-      setTipoCosto('');
-      setValor('');
-      setObservaciones('');
-    } else {
-      setEsMateriaPrima(false);
-      // Opcional: limpiar los campos de materia prima si se llega aquí sin la intención de registrar MP
-      setDescripcionGastoMateriaPrima('');
-      setCantidadMateriaPrima('');
-      setPrecioUnitarioMateriaPrima('');
-      setIdProveedorMateriaPrima(null);
-      setObservacionesMateriaPrima('');
-    }
-  }, [location.state]); // Dependencia: reacciona cuando cambia el estado de la ubicación
 
   // Prefill de OF si navegamos desde Órdenes de Fabricación
   useEffect(() => {
@@ -109,9 +63,6 @@ const CostosIndirectosNuevo = () => {
     }
   };
 
-  // Calcular el valor total para materia prima (solo para mostrar en UI)
-  const valorTotalMateriaPrima = (Number(cantidadMateriaPrima) * Number(precioUnitarioMateriaPrima)).toFixed(2);
-
   // Helpers COP
   const formatCOP = (number) => {
     const n = Number(number) || 0;
@@ -133,95 +84,79 @@ const CostosIndirectosNuevo = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!fecha) {
-      toast.error('Por favor, selecciona una fecha.');
-      return;
-    }
-
-    if (esMateriaPrima) {
-      // Validaciones para el formulario de materia prima
-      if (!descripcionGastoMateriaPrima.trim() || !cantidadMateriaPrima || !precioUnitarioMateriaPrima) {
-        toast.error('Por favor, completa todos los campos obligatorios para el costo de materia prima.');
+    // Validar fechas según el modo
+    if (usarPeriodo) {
+      if (!fechaInicio || !fechaFin) {
+        toast.error('Por favor, selecciona fecha de inicio y fecha de fin.');
         return;
       }
-      if (Number(cantidadMateriaPrima) <= 0) {
-        toast.error('La cantidad de materia prima debe ser un número positivo.');
+      if (new Date(fechaInicio) > new Date(fechaFin)) {
+        toast.error('La fecha de inicio no puede ser posterior a la fecha de fin.');
         return;
       }
-      if (Number(precioUnitarioMateriaPrima) < 0) {
-        toast.error('El precio unitario de materia prima no puede ser negativo.');
+      if (fechaInicio === fechaFin) {
+        toast.error('La fecha de fin debe ser diferente a la fecha de inicio.');
         return;
-      }
-
-      const payload = {
-        descripcion_gasto: descripcionGastoMateriaPrima.trim(),
-        cantidad: Number(cantidadMateriaPrima),
-        precio_unitario: Number(precioUnitarioMateriaPrima),
-        fecha_compra: fecha,
-        id_proveedor: idProveedorMateriaPrima,
-        observaciones: observacionesMateriaPrima || null,
-      };
-
-      try {
-        await api.post('/compras_materia_prima', payload);
-        toast.success('Costo de materia prima registrado correctamente.');
-        navigate('/costos_materia_prima');
-      } catch (error) {
-        console.error('Error al registrar costo de materia prima:', error.response?.data || error.message);
-        toast.error(error.response?.data?.message || 'Error al registrar el costo de materia prima.');
       }
     } else {
-      // Validaciones para el formulario de costo indirecto tradicional
-      if (!tipoCosto || !valorNumerico) {
-        toast.error('Por favor, completa todos los campos obligatorios para el costo indirecto.');
+      if (!fecha) {
+        toast.error('Por favor, selecciona una fecha.');
         return;
       }
+    }
+
+    // Validaciones para el formulario de costo indirecto
+    if (!tipoCosto || !valorNumerico) {
+      toast.error('Por favor, completa todos los campos obligatorios.');
+      return;
+    }
       if (Number(valorNumerico) <= 0) {
         toast.error('El valor del costo indirecto debe ser mayor a cero.');
         return;
       }
 
-      // Preparar payload con opciones de asignación
-      const payload = {
-        tipo_costo: tipoCosto,
-        fecha,
-        valor: Number(valorNumerico),
-        observaciones: observaciones || null,
-        ...(asignarAOF && !asignacionMultiple && ofSeleccionada?.value
-          ? { id_orden_fabricacion: ofSeleccionada.value }
-          : {}),
-        ...(asignarAOF && asignacionMultiple
-          ? {
-              asignaciones: ofsSeleccionadas
-                .map((opt) => ({
-                  id_orden_fabricacion: opt.value,
-                  valor_asignado: Number(montosAsignados[opt.value] || 0),
-                }))
-                .filter((a) => a.valor_asignado > 0),
-            }
-          : {}),
-      };
+    // Preparar payload con opciones de asignación
+    const payload = {
+      tipo_costo: tipoCosto,
+      fecha: usarPeriodo ? fechaInicio : fecha,
+      fecha_inicio: usarPeriodo ? fechaInicio : null,
+      fecha_fin: usarPeriodo ? fechaFin : null,
+      valor: Number(valorNumerico),
+      observaciones: observaciones || null,
+      ...(asignarAOF && !asignacionMultiple && ofSeleccionada?.value
+        ? { id_orden_fabricacion: ofSeleccionada.value }
+        : {}),
+      ...(asignarAOF && asignacionMultiple
+        ? {
+            asignaciones: ofsSeleccionadas
+              .map((opt) => ({
+                id_orden_fabricacion: opt.value,
+                valor_asignado: Number(montosAsignados[opt.value] || 0),
+              }))
+              .filter((a) => a.valor_asignado > 0),
+          }
+        : {}),
+    };
 
-      if (asignarAOF && asignacionMultiple) {
-        const suma = (payload.asignaciones || []).reduce((acc, a) => acc + Number(a.valor_asignado || 0), 0);
-        if (suma !== valorNumerico) {
-          toast.error('La suma de los valores asignados debe ser exactamente igual al valor del costo.');
-          return;
-        }
-        if (!payload.asignaciones || payload.asignaciones.length === 0) {
-          toast.error('Selecciona al menos una OF y define sus valores.');
-          return;
-        }
+    if (asignarAOF && asignacionMultiple) {
+      const suma = (payload.asignaciones || []).reduce((acc, a) => acc + Number(a.valor_asignado || 0), 0);
+      if (suma !== valorNumerico) {
+        toast.error('La suma de los valores asignados debe ser exactamente igual al valor del costo.');
+        return;
       }
+      if (!payload.asignaciones || payload.asignaciones.length === 0) {
+        toast.error('Selecciona al menos una OF y define sus valores.');
+        return;
+      }
+    }
 
-      try {
-        await api.post('/costos-indirectos', payload);
-        toast.success('Costo indirecto registrado correctamente');
-        navigate('/costos_indirectos');
-      } catch (error) {
-        console.error('Error al registrar el costo indirecto:', error.response?.data || error.message);
-        toast.error(error.response?.data?.message || 'Error al registrar el costo indirecto.');
-      }
+    try {
+      await api.post('/costos-indirectos', payload);
+      toast.success('Costo indirecto registrado correctamente');
+      navigate('/costos_indirectos');
+    } catch (error) {
+      console.error('Error al registrar el costo indirecto:', error.response?.data || error.message);
+      toast.error(error.response?.data?.message || 'Error al registrar el costo indirecto.');
     }
   };
 
@@ -235,47 +170,77 @@ const CostosIndirectosNuevo = () => {
         <div className="mb-6 flex items-center">
           <input
             type="checkbox"
-            id="esMateriaPrima"
-            checked={esMateriaPrima}
+            id="usarPeriodo"
+            checked={usarPeriodo}
             onChange={(e) => {
-              setEsMateriaPrima(e.target.checked);
-              // Limpiar estados al cambiar de tipo de costo
-              setTipoCosto('');
-              setValor('');
-              setObservaciones('');
-              setDescripcionGastoMateriaPrima('');
-              setCantidadMateriaPrima('');
-              setPrecioUnitarioMateriaPrima('');
-              setIdProveedorMateriaPrima(null);
-              setObservacionesMateriaPrima('');
+              const checked = e.target.checked;
+              setUsarPeriodo(checked);
+              // Limpiar fechas al cambiar
+              if (checked) {
+                setFecha('');
+              } else {
+                setFechaInicio('');
+                setFechaFin('');
+              }
             }}
             className="h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
           />
-          <label htmlFor="esMateriaPrima" className="ml-2 block text-lg font-medium text-gray-700">
-            Registrar Costo de Materia Prima
+          <label htmlFor="usarPeriodo" className="cursor-pointer ml-2 block text-lg font-medium text-gray-700">
+            Registrar con fecha de inicio y fecha de fin
           </label>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Campo de Fecha (siempre visible) */}
-          <div>
-            <label className="block font-medium mb-1">
-              Fecha <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-            />
-          </div>
+          {/* Campos de fecha según modo */}
+          {!usarPeriodo ? (
+            <div>
+              <label className="block font-medium mb-1">
+                Fecha <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                required
+                className="cursor-pointer w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block font-medium mb-1">
+                  Fecha Inicio <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  required
+                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                />
+              </div>
 
-          {!esMateriaPrima ? (
+              <div>
+                <label className="block font-medium mb-1">
+                  Fecha Fin <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  required
+                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Formulario de Costo Indirecto */}
+          {
             <>
               {/* Formulario de Costo Indirecto Tradicional */}
               <div className="md:col-span-2">
-                <label className="inline-flex items-center gap-2">
+                <label className=" inline-flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={asignarAOF}
@@ -290,9 +255,9 @@ const CostosIndirectosNuevo = () => {
                         setMontosAsignados({});
                       }
                     }}
-                    className="h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
+                    className="cursor-pointer h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
                   />
-                  <span className="block font-medium">Asignar a una Orden de Fabricación ahora</span>
+                  <span className=" cursor-pointer block font-medium">Asignar a una Orden de Fabricación ahora</span>
                 </label>
               </div>
               {asignarAOF && (
@@ -334,7 +299,7 @@ const CostosIndirectosNuevo = () => {
                   type="text"
                   value={tipoCosto}
                   onChange={(e) => setTipoCosto(e.target.value)}
-                  required={!esMateriaPrima}
+                  required
                   className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                 />
               </div>
@@ -352,7 +317,7 @@ const CostosIndirectosNuevo = () => {
                   }}
                   placeholder="$ 0"
                   inputMode="numeric"
-                  required={!esMateriaPrima}
+                  required
                   className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                 />
               </div>
@@ -584,119 +549,21 @@ const CostosIndirectosNuevo = () => {
                 />
               </div>
             </>
-          ) : (
-            <>
-              {/* Formulario de Costo de Materia Prima */}
-              <div className="md:col-span-2">
-                <h3 className="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">
-                  Detalles de Materia Prima
-                </h3>
-              </div>
-              <div>
-                <label className="block font-medium mb-1">
-                  Descripción del Gasto <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={descripcionGastoMateriaPrima}
-                  onChange={(e) => setDescripcionGastoMateriaPrima(e.target.value)}
-                  required={esMateriaPrima}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                  placeholder="Ej: Tornillería, Pintura acrílica, Madera de pino"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium mb-1">
-                  Cantidad <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={cantidadMateriaPrima}
-                  onChange={(e) => setCantidadMateriaPrima(e.target.value)}
-                  min="1"
-                  required={esMateriaPrima}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium mb-1">
-                  Precio Unitario <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={precioUnitarioMateriaPrima}
-                  onChange={(e) => setPrecioUnitarioMateriaPrima(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  required={esMateriaPrima}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium mb-1">
-                  Proveedor (Opcional)
-                </label>
-                <Select
-                  options={proveedores}
-                  value={proveedores.find(opt => opt.value === idProveedorMateriaPrima)}
-                  onChange={(selectedOption) => setIdProveedorMateriaPrima(selectedOption ? selectedOption.value : null)}
-                  placeholder="Selecciona un proveedor"
-                  isClearable
-                  className="w-full"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderColor: '#d1d5db',
-                      boxShadow: 'none',
-                      '&:hover': { borderColor: '#64748b' },
-                      borderRadius: '0.375rem',
-                    }),
-                  }}
-                />
-              </div>
-
-              {/* Campo Valor Total (solo lectura para MP) */}
-              <div>
-                <label className="block font-medium mb-1">
-                  Valor Total Estimado
-                </label>
-                <input
-                  type="text"
-                  value={Number(valorTotalMateriaPrima).toLocaleString()}
-                  readOnly
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 bg-gray-100 text-gray-700"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block font-medium mb-1">Observaciones</label>
-                <textarea
-                  value={observacionesMateriaPrima}
-                  onChange={(e) => setObservacionesMateriaPrima(e.target.value)}
-                  rows="3"
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                  placeholder="Opcional"
-                />
-              </div>
-            </>
-          )}
+          }
 
           <div className="md:col-span-2 flex justify-end gap-4 pt-4">
             <button
-              type="submit"
-              className="bg-slate-800 hover:bg-slate-600 text-white px-6 py-2 rounded-md font-semibold cursor-pointer"
-            >
-              Registrar Costo
-            </button>
-            <button
               type="button"
               onClick={() => navigate(-1)}
-              className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-md font-medium cursor-pointer"
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
             >
               Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
+            >
+              Registrar Costo
             </button>
           </div>
         </form>

@@ -82,49 +82,42 @@ const ListaAvances = () => {
     fetchTrabajadores();
   }, []);
 
-  useEffect(() => {
-    const fetchAvances = async () => {
-      setLoading(true);
-      try {
-        const params = {
-          page,
-          pageSize,
-          sortBy: 'fecha',
-          sortDir: 'desc',
-        };
-        if (idTrabajadorSeleccionado) params.id_trabajador = idTrabajadorSeleccionado;
-        if (buscar && buscar.trim()) params.buscar = buscar.trim();
+  useEffect(() => {
+    const fetchAvances = async () => {
+      setLoading(true);
+      try {
+        const params = {
+          page,
+          pageSize,
+          sortBy: 'fecha',
+          sortDir: 'desc',
+        };
+        if (idTrabajadorSeleccionado) params.id_trabajador = idTrabajadorSeleccionado;
+        if (buscar && buscar.trim()) params.buscar = buscar.trim();
 
-        const endpoint = mostrarPagados ? '/avances-etapa/pagados' : '/avances-etapa';
-        const res = await api.get(endpoint, { params });
-        const payload = res.data || {};
-        setAvances(payload.data || []);
-        setTotal(payload.total || 0);
-        setTotalPages(payload.totalPages || 1);
-        setHasNext(!!payload.hasNext);
-        setHasPrev(!!payload.hasPrev);
-        setSeleccionados([]);
-      } catch (error) {
-        console.error('Error al obtener avances:', error);
-        setAvances([]);
-        setTotal(0);
-        setTotalPages(1);
-        setHasNext(false);
-        setHasPrev(false);
-        toast.error('Error al cargar avances.'); 
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAvances();
-  }, [idTrabajadorSeleccionado, mostrarPagados, page, pageSize, buscar]);
-
-  // Resetear página cuando cambian filtros principales
-  useEffect(() => {
-    setPage(1);
-  }, [idTrabajadorSeleccionado, mostrarPagados]);
-
-  const confirmarPago = (avance) => {
+        const endpoint = mostrarPagados ? '/avances-etapa/pagados' : '/avances-etapa';
+        const res = await api.get(endpoint, { params });
+        const payload = res.data || {};
+        setAvances(payload.data || []);
+        setTotal(payload.total || 0);
+        setTotalPages(payload.totalPages || 1);
+        setHasNext(!!payload.hasNext);
+        setHasPrev(!!payload.hasPrev);
+        setSeleccionados([]);
+      } catch (error) {
+        console.error('Error al obtener avances:', error);
+        setAvances([]);
+        setTotal(0);
+        setTotalPages(1);
+        setHasNext(false);
+        setHasPrev(false);
+        toast.error('Error al cargar avances.'); 
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAvances();
+  }, [idTrabajadorSeleccionado, mostrarPagados, page, pageSize, buscar]);  const confirmarPago = (avance) => {
     confirmAlert({
       title: '¿Registrar pago?',
       message: `¿Deseas registrar un pago para el avance de '${avance.nombre_etapa}' del artículo '${avance.descripcion}' realizado por el trabajador '${avance.nombre_trabajador}'?`,
@@ -156,19 +149,22 @@ const ListaAvances = () => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-4xl font-bold text-gray-800">Avances de Producción</h2>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setMostrarPagados(!mostrarPagados)}
-            className={`px-4 py-2 rounded-md font-semibold transition ${
-              mostrarPagados
-                ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'
-                : 'bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer'
-            }`}
-          >
-            {mostrarPagados ? 'Ver no pagados' : 'Ver pagados'}
-          </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setMostrarPagados(!mostrarPagados);
+              setPage(1);
+            }}
+            className={`px-4 py-2 rounded-md font-semibold transition ${
+              mostrarPagados
+                ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer'
+                : 'bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer'
+            }`}
+          >
+            {mostrarPagados ? 'Ver no pagados' : 'Ver pagados'}
+          </button>
 
-          <button
+          <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
           >
@@ -178,28 +174,29 @@ const ListaAvances = () => {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3">
-     
-        <label htmlFor="trabajador" className="block text-sm font-medium text-gray-700 mb-1">
-          Selecciona un trabajador:
-        </label>
-        <select
-          id="trabajador"
-          value={idTrabajadorSeleccionado}
-          onChange={(e) => setIdTrabajadorSeleccionado(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md w-full max-w-xs"
-        >
-       
-          <option value="">-- Todos --</option>
-          {trabajadores.map((t) => (
-            <option key={t.id_trabajador} value={t.id_trabajador}>
-              {t.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      
+      <div className="mb-4 flex flex-col gap-3">
+     
+        <label htmlFor="trabajador" className="block text-sm font-medium text-gray-700 mb-1">
+          Selecciona un trabajador:
+        </label>
+        <select
+          id="trabajador"
+          value={idTrabajadorSeleccionado}
+          onChange={(e) => {
+            setIdTrabajadorSeleccionado(e.target.value);
+            setPage(1);
+          }}
+          className="px-3 py-2 border border-gray-300 rounded-md w-full max-w-xs"
+        >
+       
+          <option value="">-- Todos --</option>
+          {trabajadores.map((t) => (
+            <option key={t.id_trabajador} value={t.id_trabajador}>
+              {t.nombre}
+            </option>
+          ))}
+        </select>
+      </div>      
       <div className="overflow-x-auto shadow rounded-lg mt-4">
         <table className="min-w-full table-auto border border-slate-300 bg-white">
           <thead className="bg-slate-200 text-slate-700">

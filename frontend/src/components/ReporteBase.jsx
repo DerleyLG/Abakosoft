@@ -370,7 +370,7 @@ const ReporteBase = ({ endpoint, columnas, titulo, filtros = [], onDataChange, e
                   <div className="rounded-xl p-5 bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-baseline flex-wrap gap-x-3 gap-y-1">
                       <span>{primary?.label ?? 'Total'}</span>
-                      <span className="pl-5 text-green-600 font-extrabold">
+                      <span className="pl-5 text-green-600 font-bold">
                         {primary?.isCurrency ? formatCurrencyCOP(primary?.value) : (primary?.value ?? '')}
                       </span>
                     </div>

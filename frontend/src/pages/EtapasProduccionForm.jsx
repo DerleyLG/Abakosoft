@@ -154,10 +154,10 @@ const CrearEtapa = () => {
           </div>
         </div>
 
-        <div className="col-span-2 flex justify-end mt-4 gap-4">
+        <div className="col-span-2 flex justify-end mt-4">
           <button
             type="submit"
-            className="bg-slate-700 text-white px-6 py-2 rounded-md hover:bg-slate-800 transition font-semibold cursor-pointer"
+            className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
           >
             Registrar Etapa
           </button>

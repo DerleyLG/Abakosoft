@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { FiDollarSign, FiCreditCard, FiArrowLeft, FiArrowRight } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import { FiDollarSign, FiCreditCard, FiArrowLeft, FiArrowRight, FiRepeat } from 'react-icons/fi';
+import TransferenciaDrawer from '../components/TransferenciaDrawer';
 
 const TesoreriaDashboard = () => {
   const [movimientos, setMovimientos] = useState([]);
@@ -10,10 +12,18 @@ const TesoreriaDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Estados de paginación
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
-  const [filtroTipo, setFiltroTipo] = useState('abono_credito');
+  // Estados de filtros
+  const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroMetodo, setFiltroMetodo] = useState('');
   const [cacheCreditos, setCacheCreditos] = useState({});
+
+  // Estados para drawer de transferencias
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [procesandoTransferencia, setProcesandoTransferencia] = useState(false);
  
 
   const [resumenFinanciero, setResumenFinanciero] = useState({
@@ -78,7 +88,26 @@ const TesoreriaDashboard = () => {
       if (fecha.getMonth() !== currentMonth || fecha.getFullYear() !== currentYear) return;
 
       const tipo = getTipoMovimiento(mov);
-      const montoAbsoluto = Math.abs(mov.monto);
+      const monto = Number(mov.monto) || 0;
+      const montoAbsoluto = Math.abs(monto);
+
+      // Manejar transferencias entre métodos
+      if (tipo === 'transferencia_fondos') {
+        if (mov.id_metodo_pago === efectivoId) {
+          if (monto > 0) {
+            resumen.ventasEfectivo += monto; // Ingreso a efectivo
+          } else {
+            resumen.comprasEfectivo += montoAbsoluto; // Salida de efectivo
+          }
+        } else if (mov.id_metodo_pago === transferenciaId) {
+          if (monto > 0) {
+            resumen.ventasTransferencia += monto; // Ingreso a transferencia
+          } else {
+            resumen.comprasTransferencia += montoAbsoluto; // Salida de transferencia
+          }
+        }
+        return; // No continuar procesando este movimiento
+      }
 
       if (tipo === 'venta') {
         resumen.totalVentas += montoAbsoluto;
@@ -180,25 +209,28 @@ const TesoreriaDashboard = () => {
   };
 
 
+  // Calcular movimientos filtrados y paginados
   const movimientosFiltrados = movimientos.filter(mov => {
     const tipo = getTipoMovimiento(mov);
 
-
-
-   
     if (filtroTipo && filtroTipo !== 'todos' && tipo !== filtroTipo) {
       return false;
     }
 
-   
     if (filtroMetodo && mov.id_metodo_pago.toString() !== filtroMetodo) {
       return false;
     }
 
-   
-
     return true;
   });
+
+  const totalFiltrados = movimientosFiltrados.length;
+  const totalPages = Math.ceil(totalFiltrados / pageSize);
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const movimientosPaginados = movimientosFiltrados.slice(startIndex, endIndex);
+  const hasNext = page < totalPages;
+  const hasPrev = page > 1;
 
   
   useEffect(() => {
@@ -235,6 +267,32 @@ const TesoreriaDashboard = () => {
     return () => { mounted = false; };
   }, [movimientosFiltrados]);
 
+  // Función para manejar transferencias entre métodos
+  const handleTransferenciaExitosa = async (datos) => {
+    setProcesandoTransferencia(true);
+    const loadingToast = toast.loading('Procesando transferencia...');
+
+    try {
+      await api.post('/tesoreria/transferencia-metodos', datos);
+
+      toast.dismiss(loadingToast);
+      toast.success('Transferencia registrada exitosamente');
+      
+      // Recargar datos
+      const movimientosRes = await api.get('/tesoreria/movimientos-tesoreria');
+      setMovimientos(movimientosRes.data);
+      const resumenCalculado = calcularResumenFinanciero(movimientosRes.data, metodosPago);
+      setResumenFinanciero(resumenCalculado);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Error en transferencia:', error);
+      toast.error(error.response?.data?.error || 'Error al procesar transferencia');
+      throw error; // Re-lanzar para que el drawer lo maneje
+    } finally {
+      setProcesandoTransferencia(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-10 text-gray-500">Cargando datos de tesorería...</div>;
   }
@@ -250,9 +308,26 @@ const TesoreriaDashboard = () => {
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
+      {/* Componente Drawer de Transferencias */}
+      <TransferenciaDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        metodosPago={metodosPago}
+        balanceEfectivo={balanceEfectivo}
+        balanceTransferencia={balanceTransferencia}
+        onTransferenciaExitosa={handleTransferenciaExitosa}
+      />
+
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-4xl font-bold text-gray-800">Panel de Tesorería</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer shadow-lg"
+          >
+            <FiRepeat />
+            Transferir Fondos
+          </button>
           <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 cursor-pointer">
             <FiArrowLeft />
             Volver
@@ -297,14 +372,17 @@ const TesoreriaDashboard = () => {
               <select
                 id="filtroTipo"
                 value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
+                onChange={(e) => {
+                  setFiltroTipo(e.target.value);
+                  setPage(1);
+                }}
                 className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
               >
                 <option value="todos">Todos</option>
               <option value="venta">Venta</option>
               <option value="compra">Compra</option>
-              <option value="pago_trabajadores">Pagos</option>
               <option value="abono_credito">Abonos Crédito</option>
+              <option value="transferencia_fondos">Transferencia fondos</option>
             </select>
           </div>
           <div className="flex-1 max-w-[200px]">
@@ -312,7 +390,10 @@ const TesoreriaDashboard = () => {
             <select
               id="filtroMetodo"
               value={filtroMetodo}
-              onChange={(e) => setFiltroMetodo(e.target.value)}
+              onChange={(e) => {
+                setFiltroMetodo(e.target.value);
+                setPage(1);
+              }}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
             >
               <option value="">Todos</option>
@@ -340,16 +421,18 @@ const TesoreriaDashboard = () => {
             </tr>
           </thead>
           <tbody>
-            {movimientosFiltrados.length > 0 ? (
-              movimientosFiltrados.map((mov) => {
+            {movimientosPaginados.length > 0 ? (
+              movimientosPaginados.map((mov) => {
                 const tipo = getTipoMovimiento(mov);
                 const idRef = getIdReferencia(mov);
-                const montoColor = tipo === 'compra' ? 'text-red-700' : 'text-green-700';
+                // Color según símbolo '-' en el valor: si comienza con '-' -> rojo, si no -> verde
+                const montoStr = String(mov.monto ?? '').trim();
+                const montoColor = montoStr.startsWith('-') ? 'text-red-700' : 'text-green-700';
                 const creditoInfo = mov.id_documento ? cacheCreditos[mov.id_documento] : null;
                 const clienteNombre = creditoInfo ? creditoInfo.cliente_nombre : null;
                 return (
                   <tr key={mov.id_movimiento} className="hover:bg-slate-100 transition">
-                    <td className="px-4 py-3 font-medium">{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</td>
+                    <td className="px-4 py-3 font-medium">{tipo.charAt(0).toUpperCase() + tipo.slice(1).replace('_', ' ')}</td>
                     <td className="px-4 py-3">#{idRef}{clienteNombre ? ` · ${clienteNombre}` : ''}</td>
                     <td className="px-4 py-3">{formatDate(mov.fecha_movimiento)}</td>
                     <td className={`px-4 py-3 font-semibold ${montoColor}`}>
@@ -374,13 +457,52 @@ const TesoreriaDashboard = () => {
               })
             ) : (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-gray-500">
+                <td colSpan="8" className="text-center py-6 text-gray-500">
                   No se encontraron movimientos de tesorería que coincidan con los filtros.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        {/* Paginación */}
+        <div className="mt-4 bg-white rounded-lg p-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span> de{' '}
+              <span className="font-semibold text-gray-800">{totalPages || 1}</span> — {totalFiltrados} movimientos
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={!hasPrev}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={!hasNext}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value));
+                  setPage(1);
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-slate-600 cursor-pointer"
+              >
+                <option value={10}>10 / página</option>
+                <option value={25}>25 / página</option>
+                <option value={50}>50 / página</option>
+                <option value={100}>100 / página</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

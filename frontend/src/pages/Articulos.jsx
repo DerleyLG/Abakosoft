@@ -4,15 +4,15 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { confirmAlert } from 'react-confirm-alert';
 import 'react-confirm-alert/src/react-confirm-alert.css'; // 
-import { FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiPackage, FiBox, FiTool } from 'react-icons/fi';
 import '../styles/confirmAlert.css'; 
-
 
 const ListaArticulos = () => {
   const [articulos, setArticulos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [categorias, setCategorias] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
+  const [activeTab, setActiveTab] = useState('articulo_fabricable'); // 'articulo_fabricable' | 'materia_prima' | 'costo_produccion'
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
@@ -44,15 +44,11 @@ const ListaArticulos = () => {
     const fetchArticulos = async () => {
       setLoading(true);
       try {
-        // Si hay categoría seleccionada, usamos su nombre dentro de la búsqueda para que el backend filtre por c.nombre LIKE
-        const catName = categoriaSeleccionada
-          ? (categorias.find(c => Number(c.id_categoria) === Number(categoriaSeleccionada))?.nombre || '')
-          : '';
-        const buscar = [searchTerm, catName].filter(Boolean).join(' ').trim();
-
         const res = await api.get('/articulos', {
           params: {
-            buscar,
+            buscar: searchTerm,
+            tipo_categoria: categoriaSeleccionada ? '' : activeTab, // Solo tipo si no hay categoría específica
+            id_categoria: categoriaSeleccionada, // Categoría específica si está seleccionada
             page,
             pageSize,
             sortBy,
@@ -74,8 +70,12 @@ const ListaArticulos = () => {
         setLoading(false);
       }
     };
-    fetchArticulos();
-  }, [searchTerm, categoriaSeleccionada, page, pageSize, sortBy, sortDir, categorias]);
+    
+    // Solo ejecutar si ya tenemos categorías cargadas
+    if (categorias.length > 0) {
+      fetchArticulos();
+    }
+  }, [searchTerm, categoriaSeleccionada, activeTab, page, pageSize, sortBy, sortDir, categorias]);
 
 
 const handleDelete = (id) => {
@@ -128,6 +128,37 @@ const handleDelete = (id) => {
     setCategoriaSeleccionada(e.target.value);
     setPage(1);
   };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCategoriaSeleccionada(''); // Resetear categoría al cambiar tab
+    setPage(1);
+  };
+
+  // Obtener categorías filtradas según el tab activo
+  const getCategoriasFiltradas = () => {
+    return categorias.filter(cat => cat.tipo === activeTab);
+  };
+
+  // Configuración de tabs dinámicos
+  const tabsConfig = {
+    'articulo_fabricable': {
+      label: 'Artículos Fabricables',
+      icon: FiPackage,
+      color: 'blue'
+    },
+    'materia_prima': {
+      label: 'Materia Prima',
+      icon: FiBox,
+      color: 'green'
+    },
+    'costo_produccion': {
+      label: 'Costos de Producción',
+      icon: FiTool,
+      color: 'orange'
+    }
+  };
+
   return (
  <div className="w-full px-4 md:px-12 lg:px-20 py-10">
     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -147,7 +178,7 @@ const handleDelete = (id) => {
           title="Filtrar por categoría"
         >
           <option value="">Todas las categorías</option>
-          {categorias.map((cat) => (
+          {getCategoriasFiltradas().map((cat) => (
             <option key={cat.id_categoria} value={cat.id_categoria}>
               {cat.nombre}
             </option>
@@ -163,6 +194,31 @@ const handleDelete = (id) => {
         </button>
       </div>
     </div>
+
+    {/* Sistema de Tabs */}
+    <div className="mb-6 border-b border-gray-200">
+      <div className="flex gap-1">
+        {Object.entries(tabsConfig).map(([key, config]) => {
+          const Icon = config.icon;
+          const isActive = activeTab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => handleTabChange(key)}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all cursor-pointer ${
+                isActive
+                  ? `text-${config.color}-600 border-b-2 border-${config.color}-600 bg-${config.color}-50`
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              <Icon size={18} />
+              {config.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
@@ -216,39 +272,40 @@ const handleDelete = (id) => {
           </tbody>
         </table>
         {/* Controles de paginación */}
-        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            Página {page} de {totalPages} {total ? `(total: ${total})` : ''}
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-700">Filas por página</label>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(parseInt(e.target.value, 10));
-                setPage(1);
-              }}
-              className="border border-gray-500 rounded-md px-2 py-1 h-[36px] cursor-pointer"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <button
-              onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
-              disabled={!hasPrev || loading}
-              className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'} `}
-            >
-              Anterior
-            </button>
-            <button
-              onClick={() => hasNext && setPage((p) => p + 1)}
-              disabled={!hasNext || loading}
-              className={`px-3 py-2 rounded-md border ${hasNext && !loading ? 'bg-white hover:bg-slate-100 cursor-pointer' : 'bg-gray-100 cursor-not-allowed'} `}
-            >
-              Siguiente
-            </button>
+        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> {total ? `— ` : ''}<span className="font-semibold text-gray-800">{total || ''}</span>{total ? ` artículos` : ''}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
+                disabled={!hasPrev || loading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => hasNext && setPage((p) => p + 1)}
+                disabled={!hasNext || loading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value, 10));
+                  setPage(1);
+                }}
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value={10}>10 / página</option>
+                <option value={25}>25 / página</option>
+                <option value={50}>50 / página</option>
+                <option value={100}>100 / página</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

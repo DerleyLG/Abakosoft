@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export const exportarCierrePDF = (cierre, movimientos) => {
   const doc = new jsPDF();
@@ -45,13 +45,13 @@ export const exportarCierrePDF = (cierre, movimientos) => {
   doc.setFontSize(12);
   doc.text("RESUMEN EJECUTIVO", 14, 47);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 50,
     head: [["Concepto", "Monto"]],
     body: [
       ["Saldo Inicial", formatMonto(totalInicial)],
       ["Total Ingresos", formatMonto(totalIngresos)],
-      ["Total Egresos", formatMonto(totalEgresos)],
+      ["Total Egresos", formatMontoConSigno(-totalEgresos)],
       ["Saldo Final", formatMonto(totalFinal)],
     ],
     theme: "grid",
@@ -62,9 +62,10 @@ export const exportarCierrePDF = (cierre, movimientos) => {
     },
     styles: { fontSize: 10 },
     columnStyles: {
-      0: { cellWidth: 100 },
-      1: { cellWidth: 70, halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 80 },
+      1: { cellWidth: 60, halign: "right", fontStyle: "bold" },
     },
+    tableWidth: 140,
   });
 
   // Tabla de Saldos por Método de Pago
@@ -77,11 +78,11 @@ export const exportarCierrePDF = (cierre, movimientos) => {
     d.metodo_nombre,
     formatMonto(d.saldo_inicial),
     formatMonto(d.total_ingresos),
-    formatMonto(d.total_egresos),
+    formatMontoConSigno(-d.total_egresos),
     formatMonto(d.saldo_final),
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: finalY + 3,
     head: [["Método", "Saldo Inicial", "Ingresos", "Egresos", "Saldo Final"]],
     body: metodosData,
@@ -93,12 +94,13 @@ export const exportarCierrePDF = (cierre, movimientos) => {
     },
     styles: { fontSize: 9 },
     columnStyles: {
-      0: { cellWidth: 50 },
-      1: { cellWidth: 30, halign: "right" },
-      2: { cellWidth: 30, halign: "right" },
-      3: { cellWidth: 30, halign: "right" },
-      4: { cellWidth: 30, halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 38 },
+      1: { cellWidth: 27, halign: "right" },
+      2: { cellWidth: 27, halign: "right" },
+      3: { cellWidth: 27, halign: "right" },
+      4: { cellWidth: 27, halign: "right", fontStyle: "bold" },
     },
+    tableWidth: 146,
   });
 
   // Movimientos detallados (si hay)
@@ -121,10 +123,12 @@ export const exportarCierrePDF = (cierre, movimientos) => {
         m.tipo_movimiento === "ingreso" ? "Ingreso" : "Egreso",
         `${m.tipo_documento} #${m.id_documento}`,
         m.metodo_pago,
-        formatMonto(Math.abs(m.monto)),
+        m.tipo_movimiento === "egreso"
+          ? formatMontoConSigno(-Math.abs(m.monto))
+          : formatMonto(Math.abs(m.monto)),
       ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: finalY + 3,
       head: [["Fecha", "Tipo", "Documento", "Método", "Monto"]],
       body: movimientosData,
@@ -136,12 +140,13 @@ export const exportarCierrePDF = (cierre, movimientos) => {
       },
       styles: { fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 50 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 30, halign: "right" },
+        0: { cellWidth: 22 },
+        1: { cellWidth: 16 },
+        2: { cellWidth: 48 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 26, halign: "right" },
       },
+      tableWidth: 142,
     });
 
     if (movimientos.length > 50) {
@@ -181,6 +186,17 @@ const formatMonto = (monto) => {
     currency: "COP",
     minimumFractionDigits: 0,
   }).format(monto || 0);
+};
+
+const formatMontoConSigno = (monto) => {
+  const valor = monto || 0;
+  const signo = valor < 0 ? "-" : "";
+  const montoFormateado = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+  }).format(Math.abs(valor));
+  return signo + montoFormateado;
 };
 
 const formatFecha = (fecha) => {

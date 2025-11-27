@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FiPlus, FiEdit3 } from 'react-icons/fi';
+import { FiPlus, FiEdit3, FiPackage, FiBox, FiTool } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { confirmAlert } from 'react-confirm-alert';
 import 'react-confirm-alert/src/react-confirm-alert.css';
@@ -23,6 +23,7 @@ const Inventario = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categorias, setCategorias] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
+  const [activeTab, setActiveTab] = useState('articulo_fabricable');
   // Eliminado índice cruzado; el backend ya entrega categoría por ítem
   const [stockFabricadoFilter, setStockFabricadoFilter] = useState('');
   const [stockProcesoFilter, setStockProcesoFilter] = useState('');
@@ -50,10 +51,7 @@ const Inventario = () => {
         
         // Si los items del inventario no tienen id_categoria, cruzarlos con artículos
         const articulos = Array.isArray(resArticulos.data) ? resArticulos.data : [];
-        console.log('[Inventario] Artículos recibidos:', {
-          total: articulos.length,
-          muestra: articulos.slice(0, 3).map(a => ({ id: a.id_articulo, desc: a.descripcion, cat: a.id_categoria }))
-        });
+      
         
         const articulosMap = {};
         articulos.forEach(art => {
@@ -65,11 +63,7 @@ const Inventario = () => {
           id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
         }));
         
-        console.debug('[Inventario] Cargado total de items:', items.length);
-        console.log('[Inventario] Payload completo recibido del backend:', {
-          esArray: Array.isArray(payload),
-          primerItem: items[0]
-        });
+
         setAllItems(items);
       } catch (error) {
         console.error('Error cargando inventario o categorías', error);
@@ -91,26 +85,22 @@ const Inventario = () => {
       return true;
     };
 
-    // Log detallado ANTES de filtrar
-    if (categoriaSeleccionada) {
-      console.log('[Inventario] DEBUG filtro categoría:', {
-        categoriaSeleccionada,
-        tipo: typeof categoriaSeleccionada,
-        totalItems: allItems.length,
-        muestraItems: allItems.slice(0, 5).map(it => ({
-          desc: it.descripcion,
-          id_cat: it.id_categoria,
-          tipo_id_cat: typeof it.id_categoria,
-          coincide: String(it.id_categoria) === String(categoriaSeleccionada)
-        }))
-      });
-    }
+  
 
     const filtered = (allItems || [])
       .filter((it) => {
         const bySearch = term
           ? ((it.descripcion || '').toLowerCase().includes(term) || (it.referencia || '').toLowerCase().includes(term))
           : true;
+        
+        // Obtener tipo de categoría del item
+        const catDelItem = categorias.find(c => String(c.id_categoria) === String(it.id_categoria));
+        const tipoDelItem = catDelItem?.tipo;
+        
+        // Filtro por tab activo
+        const byTab = tipoDelItem === activeTab;
+        
+        // Filtro por categoría específica (si está seleccionada)
         const byCat = categoriaSeleccionada
           ? String(it.id_categoria) === String(categoriaSeleccionada)
           : true;
@@ -119,20 +109,9 @@ const Inventario = () => {
         const okProc = (typeof it.stock_en_proceso !== 'undefined')
           ? rule(it.stock_en_proceso, stockProcesoFilter)
           : true;
-        return bySearch && byCat && okDisp && okFab && okProc;
+        return bySearch && byTab && byCat && okDisp && okFab && okProc;
       })
       .sort((a, b) => String(a.descripcion || '').localeCompare(String(b.descripcion || '')));
-
-    console.debug('[Inventario] Filtro aplicado:', {
-      categoriaSeleccionada,
-      searchTerm,
-      stockDisponibleFilter,
-      stockFabricadoFilter,
-      stockProcesoFilter,
-      totalAntes: allItems.length,
-      totalDespues: filtered.length,
-      ejemploCategorias: filtered.slice(0, 3).map(x => ({id_cat: x.id_categoria, desc: x.descripcion})),
-    });
 
     const total = filtered.length;
     const tp = Math.max(1, Math.ceil(total / pageSize));
@@ -140,7 +119,7 @@ const Inventario = () => {
     const paged = filtered.slice(start, start + pageSize);
     setInventario(paged);
     setTotalPages(tp);
-  }, [allItems, page, pageSize, searchTerm, categoriaSeleccionada, stockDisponibleFilter, stockFabricadoFilter, stockProcesoFilter]);
+  }, [allItems, page, pageSize, searchTerm, categoriaSeleccionada, activeTab, stockDisponibleFilter, stockFabricadoFilter, stockProcesoFilter, categorias]);
 
   const cargarInventario = async () => {
     try {
@@ -164,7 +143,6 @@ const Inventario = () => {
         id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
       }));
       
-      console.debug('[Inventario] Refetch total:', items.length);
       setAllItems(items);
     } catch (error) {
       console.error('Error al cargar inventario', error);
@@ -251,6 +229,33 @@ const Inventario = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCategoriaSeleccionada('');
+    setPage(1);
+  };
+
+  const getCategoriasFiltradas = () => {
+    return categorias.filter(cat => cat.tipo === activeTab);
+  };
+
+  const tabsConfig = {
+    'articulo_fabricable': {
+      label: 'Artículos Fabricables',
+      icon: FiPackage,
+      color: 'blue'
+    },
+    'materia_prima': {
+      label: 'Materia Prima',
+      icon: FiBox,
+      color: 'green'
+    },
+    'costo_produccion': {
+      label: 'Costos de Producción',
+      icon: FiTool,
+      color: 'orange'
+    }
+  };
   
   const filteredItems = inventario;
 
@@ -269,7 +274,32 @@ const Inventario = () => {
             </button>
           )}
         </div>
-        <div className="w-full bg-white p-4 rounded-xl shadow">
+
+        {/* Sistema de Tabs */}
+        <div className="border-b border-gray-200 bg-white rounded-t-xl px-4 pt-4">
+          <div className="flex gap-1">
+            {Object.entries(tabsConfig).map(([key, config]) => {
+              const Icon = config.icon;
+              const isActive = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleTabChange(key)}
+                  className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all cursor-pointer ${
+                    isActive
+                      ? `text-${config.color}-600 border-b-2 border-${config.color}-600 bg-${config.color}-50`
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon size={18} />
+                  {config.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="w-full bg-white p-4 rounded-b-xl shadow">
           {/* Primera fila: Búsqueda y Categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div className="sm:col-span-2 lg:col-span-2">
@@ -290,8 +320,8 @@ const Inventario = () => {
                 className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar por categoría"
               >
-                <option value="">Todas</option>
-                {categorias.map((cat) => (
+                <option value="">Todas las categorías</option>
+                {getCategoriasFiltradas().map((cat) => (
                   <option key={cat.id_categoria} value={cat.id_categoria}>
                     {cat.nombre}
                   </option>
@@ -357,11 +387,27 @@ const Inventario = () => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm text-gray-600">Página {page} de {totalPages}</div>
-          <div className="flex items-center gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className={`px-3 py-1 rounded border ${page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer'}`}>Anterior</button>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className={`px-3 py-1 rounded border ${page >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer'}`}>Siguiente</button>
+        <div className="mb-3 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+            </div>
           </div>
         </div>
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">

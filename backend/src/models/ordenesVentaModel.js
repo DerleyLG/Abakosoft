@@ -147,10 +147,13 @@ module.exports = {
          a.id_articulo,
          a.descripcion,
          a.precio_venta,
-         i.stock
+         a.id_categoria,
+         i.stock,
+         c.tipo as categoria_tipo
        FROM articulos AS a
        JOIN inventario AS i ON a.id_articulo = i.id_articulo
-       WHERE i.stock > 0
+       LEFT JOIN categorias AS c ON a.id_categoria = c.id_categoria
+       WHERE i.stock > 0 AND c.tipo = 'articulo_fabricable'
        ORDER BY a.descripcion ASC`
     );
     return rows;

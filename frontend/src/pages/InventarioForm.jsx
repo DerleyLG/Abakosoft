@@ -119,17 +119,17 @@ const NuevoInventario = () => {
 
         <div className="flex justify-end gap-4 pt-4">
           <button
-            type="submit"
-            className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-600 transition cursor-pointer"
-          >
-            Guardar
-          </button>
-          <button
             type="button"
             onClick={() => navigate('/inventario')}
-            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400 transition cursor-pointer"
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
           >
             Cancelar
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
+          >
+            Guardar
           </button>
         </div>
       </form>

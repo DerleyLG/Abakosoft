@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiPackage, FiBox, FiTool } from 'react-icons/fi';
 import 'react-confirm-alert/src/react-confirm-alert.css'; 
 import '../styles/confirmAlert.css';
 import { confirmAlert } from 'react-confirm-alert';
@@ -67,6 +67,36 @@ const ListaCategorias = () => {
     c.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  const getTipoBadge = (tipo) => {
+    const config = {
+      'articulo_fabricable': {
+        label: 'Artículo Fabricable',
+        icon: FiPackage,
+        color: 'bg-blue-100 text-blue-700 border-blue-300'
+      },
+      'materia_prima': {
+        label: 'Materia Prima',
+        icon: FiBox,
+        color: 'bg-green-100 text-green-700 border-green-300'
+      },
+      'costo_produccion': {
+        label: 'Costo de Producción',
+        icon: FiTool,
+        color: 'bg-orange-100 text-orange-700 border-orange-300'
+      }
+    };
+
+    const tipConfig = config[tipo] || config['articulo_fabricable'];
+    const Icon = tipConfig.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${tipConfig.color}`}>
+        <Icon size={14} />
+        {tipConfig.label}
+      </span>
+    );
+  };
+
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -94,6 +124,7 @@ const ListaCategorias = () => {
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
             <tr>
               <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3 text-center">Acciones</th>
             </tr>
           </thead>
@@ -105,6 +136,7 @@ const ListaCategorias = () => {
                 className="hover:bg-slate-300 cursor-pointer transition select-none"
               >
                 <td className="px-4 py-3">{cat.nombre}</td>
+                <td className="px-4 py-3">{getTipoBadge(cat.tipo)}</td>
                 <td className="px-4 py-3 text-center">
                   <button
                     onClick={(e) => {
@@ -120,7 +152,7 @@ const ListaCategorias = () => {
             ))}
             {categoriasFiltradas.length === 0 && (
               <tr>
-                <td colSpan="2" className="text-center py-6 text-gray-500">
+                <td colSpan="3" className="text-center py-6 text-gray-500">
                   No hay categorías registradas.
                 </td>
               </tr>

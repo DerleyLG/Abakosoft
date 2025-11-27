@@ -30,7 +30,7 @@ const CierresCajaDetalle = () => {
         cierresCajaService.getMovimientos(id)
       ]);
       
-      console.log('[CierresCajaDetalle] Movimientos recibidos:', movimientosPeriodo.length, movimientosPeriodo);
+   
       
       setCierre(detalleCierre);
       setMovimientos(movimientosPeriodo);
@@ -77,8 +77,7 @@ const CierresCajaDetalle = () => {
 
   const handleExportar = () => {
     try {
-      console.log('[handleExportar] Cierre:', cierre);
-      console.log('[handleExportar] Movimientos:', movimientos);
+    
       
       if (!cierre || !cierre.detalle_metodos) {
         toast.error('No hay datos suficientes para generar el PDF');

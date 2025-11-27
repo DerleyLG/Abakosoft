@@ -82,6 +82,8 @@ const Articulo = {
 
   async buscarArticulosPaginado({
     buscar = "",
+    tipo_categoria = "",
+    id_categoria = "",
     page = 1,
     pageSize = 25,
     sortBy = "descripcion",
@@ -104,15 +106,31 @@ const Articulo = {
 
     const like = `%${buscar}%`;
 
+    // Construir condición de filtro
+    let whereCondition =
+      "(a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?)";
+    let params = [like, like, like];
+
+    // Agregar filtro por categoría específica (tiene prioridad)
+    if (id_categoria) {
+      whereCondition += " AND a.id_categoria = ?";
+      params.push(id_categoria);
+    }
+    // Si no hay categoría específica, filtrar por tipo de categoría
+    else if (tipo_categoria) {
+      whereCondition += " AND c.tipo = ?";
+      params.push(tipo_categoria);
+    }
+
     // Consulta de datos paginados
     const [rows] = await db.query(
       `SELECT a.*, c.nombre AS nombre_categoria
        FROM articulos a
        LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
-       WHERE a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?
+       WHERE ${whereCondition}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
-      [like, like, like, ps, offset]
+      [...params, ps, offset]
     );
 
     // Conteo total con el mismo filtro
@@ -120,8 +138,8 @@ const Articulo = {
       `SELECT COUNT(*) as total
        FROM articulos a
        LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
-       WHERE a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?`,
-      [like, like, like]
+       WHERE ${whereCondition}`,
+      params
     );
     const total = countRows[0]?.total || 0;
 

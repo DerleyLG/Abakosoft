@@ -154,7 +154,7 @@ const CierresCajaList = () => {
       // Verificar estado del sistema primero (no bloquear si falla)
       try {
         const estado = await cierresCajaService.verificarEstadoSistema();
-        console.log('[CierresCajaList] Estado sistema:', estado);
+        
         setEstadoSistema(estado);
       } catch (errorEstado) {
         console.error('Error verificando estado sistema:', errorEstado);
@@ -166,8 +166,7 @@ const CierresCajaList = () => {
         cierresCajaService.getCierreAbierto().catch(() => null)
       ]);
       
-      console.log('[CierresCajaList] Datos recibidos:', historico);
-      console.log('[CierresCajaList] Primer cierre:', historico[0]);
+
       
       setCierres(historico);
       setCierreAbierto(abierto);
@@ -200,7 +199,7 @@ const CierresCajaList = () => {
       }
       
       const metodos = await response.json();
-      console.log(' Métodos de pago obtenidos:', metodos);
+   
 
       // Crear saldos iniciales en 0
       const saldos_iniciales = metodos.map(metodo => ({
@@ -225,7 +224,7 @@ const CierresCajaList = () => {
       
       const resultado = await cierresCajaService.create(payload);
       
-      console.log(' Período creado:', resultado);
+    
       
       toast.success('Sistema inicializado. Los movimientos de tesorería se contarán desde hoy.', { 
         id: 'init-cierre',

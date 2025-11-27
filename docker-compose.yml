@@ -25,6 +25,8 @@ services:
       DB_PORT: 3306
       PORT: 3000
       JWT_SECRET: Masterkey
+    volumes:
+      - uploads_data:/app/uploads
 
   db:
     image: mysql:8.0
@@ -42,3 +44,4 @@ services:
       
 volumes:
   db_data:
+  uploads_data:
