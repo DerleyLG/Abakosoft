@@ -50,9 +50,22 @@ const ListaAvances = () => {
   };
 
 
+  // Para el subtotal, necesitamos todos los avances seleccionados, no solo los de la página actual
+  const [avancesGlobal, setAvancesGlobal] = useState([]);
+
+  useEffect(() => {
+    // Acumula todos los avances seleccionados globalmente
+    setAvancesGlobal(prev => {
+      // Si la página trae avances nuevos, los fusionamos sin duplicados
+      const nuevos = avances.filter(a => !prev.some(p => p.id_avance_etapa === a.id_avance_etapa));
+      return [...prev, ...nuevos];
+    });
+  }, [avances]);
+
   const avancesSeleccionados = useMemo(() => {
-    return avances.filter(av => seleccionados.includes(av.id_avance_etapa));
-  }, [avances, seleccionados]);
+    // Buscar los ids seleccionados en el array global
+    return avancesGlobal.filter(av => seleccionados.includes(av.id_avance_etapa));
+  }, [avancesGlobal, seleccionados]);
 
   // Subtotal de costo de fabricación (costo unitario x cantidad) de los seleccionados
   const subtotalSeleccionados = useMemo(() => {
@@ -103,7 +116,6 @@ const ListaAvances = () => {
         setTotalPages(payload.totalPages || 1);
         setHasNext(!!payload.hasNext);
         setHasPrev(!!payload.hasPrev);
-        setSeleccionados([]);
       } catch (error) {
         console.error('Error al obtener avances:', error);
         setAvances([]);
@@ -154,6 +166,7 @@ const ListaAvances = () => {
             onClick={() => {
               setMostrarPagados(!mostrarPagados);
               setPage(1);
+              setSeleccionados([]); // limpiar selección al cambiar vista pagados/no pagados
             }}
             className={`px-4 py-2 rounded-md font-semibold transition ${
               mostrarPagados
@@ -185,6 +198,7 @@ const ListaAvances = () => {
           onChange={(e) => {
             setIdTrabajadorSeleccionado(e.target.value);
             setPage(1);
+            setSeleccionados([]); // limpiar selección al cambiar de trabajador
           }}
           className="px-3 py-2 border border-gray-300 rounded-md w-full max-w-xs"
         >
