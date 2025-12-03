@@ -65,6 +65,7 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
   const costoManualEditado = useRef({});
   const [editandoCosto, setEditandoCosto] = useState({});
   const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({}); 
+    const [editandoAvanceResponsable, setEditandoAvanceResponsable] = useState({});
 
  
   const [articulosCatalogo, setArticulosCatalogo] = useState([]); 
@@ -537,10 +538,10 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
         (det) => det.id_articulo === avance.id_articulo
       );
       const nombreEtapa = etapas.find(
-        (etp) => etp.value === avance.id_etapa_produccion
+        (etp) => String(etp.value) === String(avance.id_etapa_produccion)
       )?.label;
       const nombreTrabajador = trabajadores.find(
-        (trab) => trab.value === avance.id_trabajador
+        (trab) => String(trab.value) === String(avance.id_trabajador)
       )?.label;
 
       if (!avancesPorArticulo[avance.id_articulo]) {
@@ -592,122 +593,235 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                   </tr>
                 </thead>
                 <tbody>
-                  {data.avances.map((avance, idx2) => (
-                    <tr key={idx2} className="hover:bg-gray-50">
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {avance.nombre_etapa || "N/A"}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {avance.nombre_trabajador || "N/A"}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {avance.cantidad}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {ordenCompletada ? (
-                          <div className="flex items-center gap-2">
-                            <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
-                            <button
-                              className="text-slate-300 cursor-not-allowed"
-                              title="La orden está completada. No se puede editar el costo."
-                              disabled
-                            >
-                              <FiEdit />
-                            </button>
-                          </div>
-                        ) : editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editandoAvanceCosto[avance.id_avance_etapa]}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                if (!raw || raw.trim() === "") {
-                                  setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: "" }));
-                                  return;
+                  {data.avances.map((avance, idx2) => {
+                    const nombreCargoEtapa = etapas.find(et => String(et.value) === String(avance.id_etapa_produccion))?.cargo;
+                    const trabajadoresFiltrados = nombreCargoEtapa
+                      ? trabajadores.filter(t => t.cargo && String(t.cargo).toLowerCase().trim() === String(nombreCargoEtapa).toLowerCase().trim())
+                      : trabajadores;
+
+                    return (
+                      <tr key={idx2} className="hover:bg-gray-50">
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.nombre_etapa || "N/A"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {ordenCompletada ? (
+                            <div className="flex items-center gap-2">
+                              <span>{avance.nombre_trabajador || "N/A"}</span>
+                              <button
+                                className="text-slate-300 cursor-not-allowed"
+                                title="La orden está completada. No se puede editar el responsable."
+                                disabled
+                              >
+                                <FiEdit />
+                              </button>
+                            </div>
+                          ) : editandoAvanceResponsable?.[avance.id_avance_etapa] !== undefined ? (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={editandoAvanceResponsable[avance.id_avance_etapa]}
+                                onChange={e => {
+                                  setEditandoAvanceResponsable(prev => ({ ...prev, [avance.id_avance_etapa]: e.target.value }));
+                                }}
+                                className="border rounded px-2 py-1 border-slate-300"
+                              >
+                                <option value="">Selecciona responsable</option>
+                                {trabajadoresFiltrados.map(trab => (
+                                  <option key={trab.value} value={String(trab.value)}>{trab.label}</option>
+                                ))}
+                              </select>
+                              <button
+                                className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
+                                onClick={async () => {
+                                  const nuevoTrabajadorRaw = editandoAvanceResponsable[avance.id_avance_etapa];
+                                  if (nuevoTrabajadorRaw === undefined || nuevoTrabajadorRaw === "") {
+                                    toast.error("Selecciona un responsable válido");
+                                    return;
+                                  }
+                                  const idTrabajadorNum = Number(nuevoTrabajadorRaw);
+                                  if (!Number.isFinite(idTrabajadorNum) || idTrabajadorNum <= 0) {
+                                    toast.error("Selecciona un responsable válido");
+                                    return;
+                                  }
+                                  try {
+                                    await api.put(`/avances-etapa/${avance.id_avance_etapa}/responsable`, { id_trabajador: idTrabajadorNum });
+                                    setOrdenes(prev => prev.map(o => {
+                                      if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
+                                      const avancesActualizados = (o.avances || []).map(av =>
+                                        av.id_avance_etapa === avance.id_avance_etapa
+                                          ? {
+                                              ...av,
+                                              id_trabajador: idTrabajadorNum,
+                                              nombre_trabajador: (trabajadores.find(t => String(t.value) === String(nuevoTrabajadorRaw)) || {}).label || av.nombre_trabajador || "N/A",
+                                            }
+                                          : av
+                                      );
+                                      return { ...o, avances: avancesActualizados };
+                                    }));
+                                    setEditandoAvanceResponsable(prev => {
+                                      const n = { ...prev };
+                                      delete n[avance.id_avance_etapa];
+                                      return n;
+                                    });
+                                    toast.success("Trabajador actualizado");
+                                  } catch (error) {
+                                    const msg = error?.response?.data?.error || "No se pudo actualizar el responsable";
+                                    toast.error(msg);
+                                  }
+                                }}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+                                onClick={() =>
+                                  setEditandoAvanceResponsable(prev => {
+                                    const n = { ...prev };
+                                    delete n[avance.id_avance_etapa];
+                                    return n;
+                                  })
                                 }
-                                const num = cleanCOPFormat(raw);
-                                setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: formatCOP(num) }));
-                              }}
-                              className="border rounded px-2 py-1 border-slate-300"
-                            />
-                            <button
-                              className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
-                              onClick={async () => {
-                                const formVal = editandoAvanceCosto[avance.id_avance_etapa];
-                                const num = cleanCOPFormat(formVal);
-                                if (!num || num <= 0) {
-                                  toast.error("Ingresa un costo válido");
-                                  return;
-                                }
-                                try {
-                                  await api.put(`/avances-etapa/${avance.id_avance_etapa}/costo`, { costo_fabricacion: num });
-                                  // actualizar en memoria
-                                  setOrdenes((prev) => prev.map((o) => {
-                                    if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
-                                    const avancesActualizados = (o.avances || []).map((av) =>
-                                      av.id_avance_etapa === avance.id_avance_etapa
-                                        ? { ...av, costo_fabricacion: num }
-                                        : av
-                                    );
-                                    return { ...o, avances: avancesActualizados };
-                                  }));
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span>{avance.nombre_trabajador || "N/A"}</span>
+                              {trabajadoresFiltrados.length === 0 ? (
+                                <button
+                                  className="text-gray-400 cursor-not-allowed"
+                                  title="No hay trabajadores con el cargo requerido"
+                                  disabled
+                                >
+                                  <FiEdit />
+                                </button>
+                              ) : (
+                                <button
+                                  className="text-slate-700 hover:text-slate-900 cursor-pointer"
+                                  title="Editar responsable"
+                                  onClick={() =>
+                                    setEditandoAvanceResponsable(prev => ({
+                                      ...prev,
+                                      [avance.id_avance_etapa]: String(avance.id_trabajador || "")
+                                    }))
+                                  }
+                                >
+                                  <FiEdit />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.cantidad}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {ordenCompletada ? (
+                            <div className="flex items-center gap-2">
+                              <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                              <button
+                                className="text-slate-300 cursor-not-allowed"
+                                title="La orden está completada. No se puede editar el costo."
+                                disabled
+                              >
+                                <FiEdit />
+                              </button>
+                            </div>
+                          ) : editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editandoAvanceCosto[avance.id_avance_etapa]}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (!raw || raw.trim() === "") {
+                                    setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: "" }));
+                                    return;
+                                  }
+                                  const num = cleanCOPFormat(raw);
+                                  setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: formatCOP(num) }));
+                                }}
+                                className="border rounded px-2 py-1 border-slate-300"
+                              />
+                              <button
+                                className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
+                                onClick={async () => {
+                                  const formVal = editandoAvanceCosto[avance.id_avance_etapa];
+                                  const num = cleanCOPFormat(formVal);
+                                  if (!num || num <= 0) {
+                                    toast.error("Ingresa un costo válido");
+                                    return;
+                                  }
+                                  try {
+                                    await api.put(`/avances-etapa/${avance.id_avance_etapa}/costo`, { costo_fabricacion: num });
+                                    // actualizar en memoria
+                                    setOrdenes((prev) => prev.map((o) => {
+                                      if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
+                                      const avancesActualizados = (o.avances || []).map((av) =>
+                                        av.id_avance_etapa === avance.id_avance_etapa
+                                          ? { ...av, costo_fabricacion: num }
+                                          : av
+                                      );
+                                      return { ...o, avances: avancesActualizados };
+                                    }));
+                                    setEditandoAvanceCosto((prev) => {
+                                      const n = { ...prev };
+                                      delete n[avance.id_avance_etapa];
+                                      return n;
+                                    });
+                                    toast.success("Costo actualizado");
+                                  } catch (error) {
+                                    const msg = error?.response?.data?.error || "No se pudo actualizar el costo";
+                                    toast.error(msg);
+                                  }
+                                }}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+                                onClick={() =>
                                   setEditandoAvanceCosto((prev) => {
                                     const n = { ...prev };
                                     delete n[avance.id_avance_etapa];
                                     return n;
-                                  });
-                                  toast.success("Costo actualizado");
-                                } catch (error) {
-                                  const msg = error?.response?.data?.error || "No se pudo actualizar el costo";
-                                  toast.error(msg);
+                                  })
                                 }
-                              }}
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
-                              onClick={() =>
-                                setEditandoAvanceCosto((prev) => {
-                                  const n = { ...prev };
-                                  delete n[avance.id_avance_etapa];
-                                  return n;
-                                })
-                              }
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
-                            <button
-                              className="text-slate-700 hover:text-slate-900 cursor-pointer"
-                              title="Editar costo"
-                              onClick={() =>
-                                setEditandoAvanceCosto((prev) => ({
-                                  ...prev,
-                                  [avance.id_avance_etapa]: formatCOP(Number(avance.costo_fabricacion) || 0),
-                                }))
-                              }
-                            >
-                              <FiEdit />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {avance.estado || "-"}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {avance.observaciones || "-"}
-                      </td>
-                      <td className="px-2 py-2 border-b border-gray-300">
-                        {new Date(avance.fecha_registro).toLocaleDateString()}
-                      </td>
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                              <button
+                                className="text-slate-700 hover:text-slate-900 cursor-pointer"
+                                title="Editar costo"
+                                onClick={() =>
+                                  setEditandoAvanceCosto((prev) => ({
+                                    ...prev,
+                                    [avance.id_avance_etapa]: formatCOP(Number(avance.costo_fabricacion) || 0),
+                                  }))
+                                }
+                              >
+                                <FiEdit />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.estado || "-"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {avance.observaciones || "-"}
+                        </td>
+                        <td className="px-2 py-2 border-b border-gray-300">
+                          {new Date(avance.fecha_registro).toLocaleDateString()}
+                        </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>

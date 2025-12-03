@@ -1,6 +1,6 @@
-// models/TesoreriaModel.js
-
 const db = require("../database/db");
+
+// models/TesoreriaModel.js
 
 function getTodayYMDForTZ(timeZone) {
   const tz =
@@ -18,17 +18,33 @@ function getTodayYMDForTZ(timeZone) {
 }
 
 const TesoreriaModel = {
+  deleteByDocumentoAndTipo: async (
+    id_documento,
+    tipo_documento,
+    connection = db
+  ) => {
+    const conn = connection || db;
+    const [result] = await conn.query(
+      "DELETE FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
+      [id_documento, tipo_documento]
+    );
+    return result.affectedRows;
+  },
+
   getMetodosPago: async () => {
     const [rows] = await db.query("SELECT * FROM metodos_pago");
     return rows;
   },
 
-  getMovimientosTesoreria: async () => {
-    // Ordenar por fecha completa (datetime) y por id_movimiento para asegurar
-    // que los movimientos insertados al mismo tiempo queden en orden descendente
-    const [rows] = await db.query(
-      `SELECT id_movimiento, id_documento, tipo_documento, fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria ORDER BY fecha_movimiento DESC, id_movimiento DESC`
-    );
+  getMovimientosTesoreria: async (tipo_documento = null) => {
+    let query = `SELECT id_movimiento, id_documento, tipo_documento, fecha_movimiento, monto, id_metodo_pago, referencia, observaciones FROM movimientos_tesoreria`;
+    let params = [];
+    if (tipo_documento) {
+      query += ` WHERE tipo_documento = ?`;
+      params.push(tipo_documento);
+    }
+    query += ` ORDER BY fecha_movimiento DESC, id_movimiento DESC`;
+    const [rows] = await db.query(query, params);
     return rows;
   },
 

@@ -88,12 +88,16 @@ const FormularioPagoAvances = () => {
   useEffect(() => {
     if (state?.avances?.length > 0) {
       setAvances(state.avances);
+      // Si el usuario activa modo anticipo, rellenar orden y trabajador automáticamente
+      const primerAvance = state.avances[0];
+      if (primerAvance?.id_orden_fabricacion) setOrdenSeleccionada(primerAvance.id_orden_fabricacion);
+      if (primerAvance?.id_trabajador) setTrabajadorSeleccionado(primerAvance.id_trabajador);
     }
   }, [state]);
 
   useEffect(() => {
-    // Cargar trabajadores solo si estamos en modo "pago normal"
-    if (!esAnticipo && state?.avances?.length > 0) {
+    // Cargar trabajadores siempre que haya avances o modo anticipo
+    if (state?.avances?.length > 0 || esAnticipo) {
       api.get("/trabajadores")
         .then((res) => setTrabajadores(res.data))
         .catch(() => toast.error("Error al cargar trabajadores"));
@@ -306,7 +310,6 @@ const FormularioPagoAvances = () => {
                 </>
               )}
             </select>
-
           </div>
 
           <div>
@@ -328,11 +331,16 @@ const FormularioPagoAvances = () => {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Monto del anticipo</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               min="0"
-              value={montoAnticipo}
-              onChange={(e) => setMontoAnticipo(parseFloat(e.target.value))}
+              value={montoAnticipo === 0 ? '' : montoAnticipo.toLocaleString()}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, '');
+                setMontoAnticipo(raw ? parseFloat(raw) : 0);
+              }}
               className="w-full border border-slate-300 rounded-xl px-4 py-2"
+              placeholder="0"
             />
           </div>
         </div>

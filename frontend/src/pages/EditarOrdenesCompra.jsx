@@ -32,45 +32,17 @@ const parseCurrency = (value) => {
 
 
 const EditarOrdenCompra = () => {
-    const { id } = useParams(); 
-    const navigate = useNavigate();
-
-    const [ordenData, setOrdenData] = useState({
-        id_proveedor: '',
-        estado: '',
-        observaciones: '',
-        categoria_costo: '', 
-        fecha: format(new Date(), 'yyyy-MM-dd'), 
-    });
-
-    // Estados para comprobante
-    const [comprobanteActual, setComprobanteActual] = useState(null); // {path, nombre_original, fecha_subida}
-    const [adjuntarComprobante, setAdjuntarComprobante] = useState(false);
-    const [archivoComprobante, setArchivoComprobante] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(null);
-    const [eliminarComprobanteActual, setEliminarComprobanteActual] = useState(false);
-
-  
-    const [pagoData, setPagoData] = useState({
-        id_metodo_pago: '',
-        referencia: '',
-        observaciones_pago: '',
-    });
-    
-    const [allMetodosPago, setAllMetodosPago] = useState([]);
-    const [detalles, setDetalles] = useState([]);
-
-    const [loading, setLoading] = useState(true);
+    const cacheRef = useRef({});
+    const timerRef = useRef(null);
     const [allProveedores, setAllProveedores] = useState([]);
     const [allArticulos, setAllArticulos] = useState([]);
     const [articulosOptions, setArticulosOptions] = useState([]);
-    const [isEditable, setIsEditable] = useState(true); 
+    const [allMetodosPago, setAllMetodosPago] = useState([]);
+    const [isEditable, setIsEditable] = useState(true);
+    const [detalles, setDetalles] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Para AsyncSelect
-    const cacheRef = useRef({});
-    const timerRef = useRef(null);
-
-    // Función para cargar artículos con búsqueda
+    // Función para cargar artículos con búsqueda (usada en AsyncSelect)
     const loadArticulosOptions = useCallback((inputValue, callback) => {
         const cacheKey = inputValue?.toLowerCase() || '';
 
@@ -98,12 +70,35 @@ const EditarOrdenCompra = () => {
                 art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
                 art.referencia?.toLowerCase().includes(inputValue.toLowerCase())
             );
-            
             // Guardar en caché
             cacheRef.current[cacheKey] = filtered;
             callback(filtered);
         }, 300);
-    }, [articulosOptions]); 
+    }, [articulosOptions]);
+    const { id } = useParams(); 
+    const navigate = useNavigate();
+
+    const [ordenData, setOrdenData] = useState({
+        id_proveedor: '',
+        estado: '',
+        observaciones: '',
+        categoria_costo: '', 
+        fecha: format(new Date(), 'yyyy-MM-dd'), 
+    });
+
+    // Estados para comprobante
+    const [comprobanteActual, setComprobanteActual] = useState(null); // {path, nombre_original, fecha_subida}
+    const [adjuntarComprobante, setAdjuntarComprobante] = useState(false);
+    const [archivoComprobante, setArchivoComprobante] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [eliminarComprobanteActual, setEliminarComprobanteActual] = useState(false);
+
+  
+    const [pagoData, setPagoData] = useState({
+        id_metodo_pago: '',
+        referencia: '',
+        observaciones_pago: '',
+    });
 
  
     const fetchMovimientoPago = async (ordenId) => {
@@ -167,15 +162,10 @@ const EditarOrdenCompra = () => {
     
     const fetchOrdenData = async () => {
         try {
-            const resOrden = await api.get(`/ordenes-compra/${id}`); 
+            const resOrden = await api.get(`/ordenes-compra/${id}`);
             const orden = resOrden.data;
-
-          
-            
             const editable = orden.estado.toLowerCase() === 'pendiente';
             setIsEditable(editable);
-            
-            // Formatear fecha sin problemas de zona horaria
             let formattedDate = format(new Date(), 'yyyy-MM-dd');
             if (orden.fecha) {
                 const date = new Date(orden.fecha);
@@ -184,17 +174,13 @@ const EditarOrdenCompra = () => {
                 const day = String(date.getUTCDate()).padStart(2, '0');
                 formattedDate = `${year}-${month}-${day}`;
             }
-
-            
             setOrdenData({
                 id_proveedor: orden.id_proveedor || '',
                 estado: orden.estado || 'pendiente',
                 observaciones: orden.observaciones || '',
-                categoria_costo: orden.categoria_costo || '', 
+                categoria_costo: orden.categoria_costo || '',
                 fecha: formattedDate,
             });
-
-            // Cargar comprobante si existe
             if (orden.comprobante_path) {
                 setComprobanteActual({
                     path: orden.comprobante_path,
@@ -202,26 +188,29 @@ const EditarOrdenCompra = () => {
                     fecha_subida: orden.comprobante_fecha_subida,
                 });
             }
-
-            
-            const detallesFormateados = Array.isArray(orden.detalles) 
+            const detallesFormateados = Array.isArray(orden.detalles)
                 ? orden.detalles.map(d => ({
                     id_articulo: d.id_articulo,
                     cantidad: d.cantidad,
-                    precio_unitario: Number(d.precio_unitario) || 0, 
+                    precio_unitario: Number(d.precio_unitario) || 0,
                 }))
                 : [];
-            
-        
             setDetalles(detallesFormateados);
-            
-        
-            await fetchMovimientoPago(id); 
-
+            // Usar directamente el método de pago y movimiento de tesorería
+            if (orden.movimiento_tesoreria) {
+                setPagoData({
+                    id_metodo_pago: orden.movimiento_tesoreria.id_metodo_pago ? String(orden.movimiento_tesoreria.id_metodo_pago) : '',
+                    referencia: orden.movimiento_tesoreria.referencia || '',
+                    observaciones_pago: orden.movimiento_tesoreria.observaciones || '',
+                });
+            } else {
+                setPagoData({ id_metodo_pago: '', referencia: '', observaciones_pago: '' });
+            }
         } catch (error) {
-            toast.error('Error al cargar datos de la orden de compra. Volviendo...');
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al cargar datos de la orden de compra.';
+            toast.error(errorMessage);
             console.error('Error cargando orden:', error);
-            navigate('/ordenes_compra'); 
+            navigate('/ordenes_compra');
         } finally {
             setLoading(false);
         }
@@ -232,6 +221,14 @@ const EditarOrdenCompra = () => {
         fetchDependencies();
         fetchOrdenData();
     }, [id]);
+
+    // Refrescar datos tras cambio de estado a pendiente antes de permitir edición
+    useEffect(() => {
+        if (ordenData.estado === 'pendiente' && !loading) {
+            fetchOrdenData();
+        }
+        // eslint-disable-next-line
+    }, [ordenData.estado]);
 
 
   
@@ -392,31 +389,26 @@ const EditarOrdenCompra = () => {
 
         // Mostrar indicador de carga
         const loadingToast = toast.loading('Actualizando orden de compra...');
-        
+
+        // Forzar el estado a 'pendiente' en el payload
+        const estadoPendiente = 'pendiente';
+
         try {
             // Si se va a adjuntar un archivo nuevo o eliminar el actual, usar FormData
+            let response;
             if (adjuntarComprobante && archivoComprobante) {
                 const formData = new FormData();
-                
-                // Agregar datos básicos de la orden
                 formData.append('id_proveedor', ordenData.id_proveedor);
-                formData.append('estado', ordenData.estado);
+                formData.append('estado', estadoPendiente);
                 formData.append('observaciones', ordenData.observaciones || '');
                 formData.append('categoria_costo', ordenData.categoria_costo || '');
                 formData.append('fecha', ordenData.fecha);
-                
-                // Agregar detalles como JSON string
                 formData.append('detalles', JSON.stringify(detalles));
-                
-                // Agregar datos de pago
                 if (pagoData.id_metodo_pago) formData.append('id_metodo_pago', pagoData.id_metodo_pago);
                 if (pagoData.referencia) formData.append('referencia', pagoData.referencia);
                 if (pagoData.observaciones_pago) formData.append('observaciones_pago', pagoData.observaciones_pago);
-                
-                // Agregar archivo
                 formData.append('comprobante', archivoComprobante);
-                
-                await api.put(`/ordenes-compra/${id}`, formData, {
+                response = await api.put(`/ordenes-compra/${id}`, formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
@@ -428,36 +420,38 @@ const EditarOrdenCompra = () => {
                     ...pagoData,
                     detalles: detalles,
                     eliminar_comprobante: true,
+                    estado: estadoPendiente,
                 };
-                
-                await api.put(`/ordenes-compra/${id}`, dataToSend);
+                response = await api.put(`/ordenes-compra/${id}`, dataToSend);
             } else {
                 // Envío normal sin cambios en comprobante
                 const dataToSend = {
                     ...ordenData,
-                    ...pagoData, 
-                    detalles: detalles 
+                    ...pagoData,
+                    detalles: detalles,
+                    estado: estadoPendiente,
                 };
-                
-                await api.put(`/ordenes-compra/${id}`, dataToSend); 
+                response = await api.put(`/ordenes-compra/${id}`, dataToSend);
             }
-
+            // Sincronizar datos tras la acción
+            await fetchOrdenData();
             toast.dismiss(loadingToast);
             toast.success('Orden de compra actualizada correctamente');
             navigate('/ordenes_compra');
         } catch (error) {
             toast.dismiss(loadingToast);
-            const errorMessage = error.response?.data?.message || 'Error al actualizar la orden de compra.';
-            
-          
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al actualizar la orden de compra.';
             if (error.response?.status === 409 && error.response.data?.needsInitialization) {
-                 const articulo = error.response.data.articulo;
-                 toast.error(`${error.response.data.message} Por favor, inicializa el artículo: ${articulo.descripcion}.`);
-                 return;
+                const articulo = error.response.data.articulo;
+                toast.error(`${error.response.data.message} Por favor, inicializa el artículo: ${articulo.descripcion}.`);
+                return;
             }
-            
+            if (errorMessage.includes('Stock insuficiente')) {
+                toast.error(errorMessage + ' Revisa los movimientos de inventario antes de continuar.');
+            } else {
+                toast.error(errorMessage);
+            }
             console.error('Error de actualización:', error);
-            toast.error(errorMessage);
         }
     };
     
@@ -713,7 +707,7 @@ const EditarOrdenCompra = () => {
                 <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700 mt-10">Detalles (Artículos a Comprar)</h3>
                 <div className="space-y-6 mb-8">
                     {detalles.map((detalle, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-5 border border-gray-200 rounded-lg bg-gray-50 shadow-sm">
+                        <div key={index} className="w-full grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-end p-5 border border-gray-200 rounded-lg bg-gray-50 shadow-sm">
                             
                             {/* Artículo */}
                             <div className="col-span-1 md:col-span-5 flex flex-col">
@@ -755,7 +749,7 @@ const EditarOrdenCompra = () => {
 
                         
                             {/* Cantidad */}
-                            <div className="col-span-1 md:col-span-2 flex flex-col">
+                            <div className="col-span-1 md:col-span-1 flex flex-col">
                                 <label className="mb-1 font-medium text-sm text-slate-700">Cantidad</label>
                                 <input
                                     type="number"
@@ -765,44 +759,43 @@ const EditarOrdenCompra = () => {
                                     min="1"
                                     required
                                     disabled={!isEditable}
-                                    className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right"
+                                    className="border border-gray-300 rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-[70px]"
                                 />
                             </div>
 
-                        
-                         
-                            <div className="col-span-1 md:col-span-3 flex flex-col">
-                                <label className="mb-1 font-medium text-sm text-slate-700">Precio Unitario (COP)</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        name="precio_unitario"
-                                        value={formatCurrency(detalle.precio_unitario)}
-                                        onChange={(e) => handleDetalleChange(index, e)}
-                                        required
-                                        disabled={!isEditable}
-                                        
-                                        className="border border-gray-300 rounded-lg pl-10 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full"
-                                    />
-                                     <FiDollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                            {/* Precio Unitario y Subtotal en fila con espacio */}
+                            <div className="col-span-2 md:col-span-4 flex flex-row gap-6 items-end">
+                                <div className="flex flex-col flex-1 justify-end">
+                                    <label className="mb-1 font-medium text-sm text-slate-700">Precio Unitario (COP)</label>
+                                    <div className="relative flex items-center">
+                                        <span className="absolute left-3 text-gray-400 flex items-center h-full"><FiDollarSign size={18} /></span>
+                                        <input
+                                            type="text"
+                                            name="precio_unitario"
+                                            value={formatCurrency(detalle.precio_unitario)}
+                                            onChange={(e) => handleDetalleChange(index, e)}
+                                            required
+                                            disabled={!isEditable}
+                                            style={{ paddingLeft: 36 }}
+                                            className="border border-gray-300 rounded-lg pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full h-[44px] min-w-[250px]"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            
-                    
-                             <div className="col-span-1 md:col-span-1 flex flex-col justify-end">
-                                <label className="mb-1 font-medium text-sm text-slate-700">Subtotal</label>
-                                <p className="py-2.5 px-3 bg-white text-slate-800 font-semibold border border-gray-300 rounded-lg text-right">
-                                    {formatCurrency(calcularSubtotal(detalle.cantidad, detalle.precio_unitario))}
-                                </p>
+                                <div className="flex flex-col flex-1 justify-end">
+                                    <label className="mb-1 font-medium text-sm text-slate-700">Subtotal</label>
+                                    <p className="border border-gray-300 rounded-lg pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right h-[44px] overflow-x-auto overflow-y-hidden whitespace-nowrap select-none min-w-[300px] max-w-[450px]">
+                                        {formatCurrency(calcularSubtotal(detalle.cantidad, detalle.precio_unitario))}
+                                    </p>
+                                </div>
                             </div>
 
                        
-                            <div className="col-span-1 md:col-span-1 flex items-center justify-center">
+                            <div className="col-span-1 md:col-span-2 flex items-stretch justify-end ">
                                 <button
                                     type="button"
                                     onClick={() => handleRemoveDetalle(index)}
                                     disabled={detalles.length === 1 || !isEditable}
-                                    className="bg-red-500 text-white p-2.5 rounded-lg hover:bg-red-600 disabled:bg-red-300 transition shadow-md"
+                                    className="cursor-pointer bg-red-500 text-white w-[44px] h-[44px] rounded-lg hover:bg-red-600 disabled:bg-red-300 transition shadow-md flex items-center justify-center ml-auto"
                                     title="Eliminar artículo"
                                 >
                                     <FiTrash2 size={20} />

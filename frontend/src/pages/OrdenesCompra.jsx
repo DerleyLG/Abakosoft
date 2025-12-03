@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api"; // ajusta según tu estructura
-import { FiEdit, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle, FiArrowRight, FiFileText, FiDownload, FiExternalLink } from "react-icons/fi"; 
+import { FiEdit, FiArrowLeft, FiTrash2, FiPlus, FiCheckCircle, FiArrowRight, FiFileText, FiDownload, FiExternalLink, FiRefreshCw } from "react-icons/fi"; 
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -352,22 +352,56 @@ const OrdenesCompra = () => {
                       )}
                     </td>
                     <td className="pl-3 py-3 text-center flex gap-4">
-                   
-{canEdit && orden.estado === 'pendiente' && !mostrarCanceladas && (
+                      {/* Botón editar solo si puede editar y está pendiente */}
+                      {canEdit && orden.estado === 'pendiente' && !mostrarCanceladas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/ordenes_compra/editar/${orden.id_orden_compra}`);
+                          }}
+                          className="text-blue-600 hover:text-blue-400 cursor-pointer"
+                          title="Editar Orden"
+                        >
+                          <FiEdit size={18} />
+                        </button>
+                      )}
 
-    <button
-        onClick={(e) => {
-            e.stopPropagation();
-            
-            navigate(`/ordenes_compra/editar/${orden.id_orden_compra}`); 
-        }}
-        className="text-blue-600 hover:text-blue-400 cursor-pointer"
-        title="Editar Orden"
-    >
-        <FiEdit size={18} /> 
-    </button>
-)}
-                
+                      {/* Botón especial para admin para cambiar estado SOLO si está completada */}
+                      {role === 'admin' && orden.estado === 'completada' && !mostrarCanceladas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmAlert({
+                              title: '¿Actualizar estado de la orden?',
+                              message: `¿Seguro que quieres cambiar el estado de la orden #${orden.id_orden_compra} de COMPLETADA a PENDIENTE?`,
+                              buttons: [
+                                {
+                                  label: 'Sí, actualizar',
+                                  onClick: async () => {
+                                    try {
+                                      await api.put(`/ordenes-compra/${orden.id_orden_compra}/estado`, { estado: 'pendiente' });
+                                      toast.success('Estado actualizado a pendiente');
+                                      setOrdenes(prev => prev.map(o => o.id_orden_compra === orden.id_orden_compra ? { ...o, estado: 'pendiente' } : o));
+                                    } catch (err) {
+                                      toast.error('No se pudo actualizar el estado');
+                                    }
+                                  }
+                                },
+                                {
+                                  label: 'Cancelar',
+                                  onClick: () => {}
+                                }
+                              ]
+                            });
+                          }}
+                          className="text-orange-600 hover:text-orange-400 cursor-pointer"
+                          title="Actualizar estado de la orden"
+                        >
+                          <FiRefreshCw size={18} />
+                        </button>
+                      )}
+
+                      {/* Botón para marcar como recibida si está pendiente */}
                       {orden.estado === 'pendiente' && !mostrarCanceladas && (
                         <button
                           onClick={(e) => {
@@ -384,7 +418,6 @@ const OrdenesCompra = () => {
                         <span className="text-gray-400 italic select-none">Sin permisos</span>
                       )}
 
-                    
                       {canDelete && orden.estado !== 'cancelada' && !mostrarCanceladas && (
                         <button
                           onClick={(e) => {

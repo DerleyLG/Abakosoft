@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { FiDollarSign } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import AsyncSelect from 'react-select/async';
 
 const CostosIndirectosNuevo = () => {
+    const [allMetodosPago, setAllMetodosPago] = useState([]);
+    const [pagoData, setPagoData] = useState({
+      id_metodo_pago: '',
+      referencia: '',
+      observaciones_pago: '',
+    });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,6 +32,18 @@ const CostosIndirectosNuevo = () => {
   // Sugerencias (vista previa) para auto-distribución por driver
   const [sugerencias, setSugerencias] = useState([]); // [{ id_orden_fabricacion, driver_valor, peso, valor_asignado? }]
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
+
+  // Cargar métodos de pago (hook separado y al tope)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/metodos-pago');
+        setAllMetodosPago(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        setAllMetodosPago([]);
+      }
+    })();
+  }, []);
 
   // Prefill de OF si navegamos desde Órdenes de Fabricación
   useEffect(() => {
@@ -115,7 +134,7 @@ const CostosIndirectosNuevo = () => {
         return;
       }
 
-    // Preparar payload con opciones de asignación
+    // Preparar payload con opciones de asignación y datos de pago
     const payload = {
       tipo_costo: tipoCosto,
       fecha: usarPeriodo ? fechaInicio : fecha,
@@ -136,6 +155,9 @@ const CostosIndirectosNuevo = () => {
               .filter((a) => a.valor_asignado > 0),
           }
         : {}),
+      id_metodo_pago: pagoData.id_metodo_pago || undefined,
+      referencia: pagoData.referencia || undefined,
+      observaciones_pago: pagoData.observaciones_pago || undefined,
     };
 
     if (asignarAOF && asignacionMultiple) {
@@ -183,7 +205,7 @@ const CostosIndirectosNuevo = () => {
                 setFechaFin('');
               }
             }}
-            className="h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
+            className="cursor-pointer h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
           />
           <label htmlFor="usarPeriodo" className="cursor-pointer ml-2 block text-lg font-medium text-gray-700">
             Registrar con fecha de inicio y fecha de fin
@@ -191,6 +213,8 @@ const CostosIndirectosNuevo = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Información de Pago */}
+                    
           {/* Campos de fecha según modo */}
           {!usarPeriodo ? (
             <div>
@@ -321,6 +345,47 @@ const CostosIndirectosNuevo = () => {
                   className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                 />
               </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      <div className="flex flex-col">
+                        <label htmlFor="id_metodo_pago" className="mb-2 font-medium text-slate-600">Método de Pago</label>
+                        <select
+                          id="id_metodo_pago"
+                          name="id_metodo_pago"
+                          value={pagoData.id_metodo_pago}
+                          onChange={e => setPagoData(prev => ({ ...prev, id_metodo_pago: e.target.value }))}
+                          className="border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-slate-600"
+                        >
+                          <option value="">Selecciona método (Opcional)</option>
+                          {allMetodosPago.map(m => (
+                            <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="referencia" className="mb-2 font-medium text-slate-600">Referencia / No. Transacción</label>
+                        <input
+                          type="text"
+                          id="referencia"
+                          name="referencia"
+                          value={pagoData.referencia}
+                          onChange={e => setPagoData(prev => ({ ...prev, referencia: e.target.value }))}
+                          placeholder="Ej: No. de cuenta"
+                          className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="observaciones_pago" className="mb-2 font-medium text-slate-600">Observaciones del Pago</label>
+                        <input
+                          type="text"
+                          id="observaciones_pago"
+                          name="observaciones_pago"
+                          value={pagoData.observaciones_pago}
+                          onChange={e => setPagoData(prev => ({ ...prev, observaciones_pago: e.target.value }))}
+                          placeholder="Opcional"
+                          className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                        />
+                      </div>
+                    </div>
 
               {asignarAOF && !asignacionMultiple && (
                 <div className="md:col-span-2">

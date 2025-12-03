@@ -179,7 +179,6 @@ module.exports = {
             id_orden_fabricacion
           );
 
-
         if (esCompuesto) {
           console.log(
             `Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`
@@ -531,6 +530,43 @@ module.exports = {
       return res
         .status(500)
         .json({ error: "Error al actualizar el costo de fabricación" });
+    }
+  },
+
+  updateResponsable: async (req, res) => {
+    const id = req.params.id;
+    const { id_trabajador } = req.body;
+    if (!id_trabajador) {
+      return res.status(400).json({ error: "Falta id_trabajador" });
+    }
+    try {
+      // Verifica que el avance exista
+      const existe = await exists(
+        "avance_etapas_produccion",
+        "id_avance_etapa",
+        id
+      );
+      if (!existe) {
+        return res.status(404).json({ error: "Avance no encontrado" });
+      }
+      // Verifica que el trabajador exista
+      const existeTrab = await exists(
+        "trabajadores",
+        "id_trabajador",
+        id_trabajador
+      );
+      if (!existeTrab) {
+        return res.status(404).json({ error: "Trabajador no encontrado" });
+      }
+      // Actualiza el responsable
+      await db.execute(
+        "UPDATE avance_etapas_produccion SET id_trabajador = ? WHERE id_avance_etapa = ?",
+        [id_trabajador, id]
+      );
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error actualizando responsable avance:", error);
+      return res.status(500).json({ error: "Error actualizando responsable" });
     }
   },
 };
