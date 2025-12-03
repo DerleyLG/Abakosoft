@@ -30,6 +30,7 @@ router.get("/:id", controller.getAvancesByOrden);
 router.post("/", controller.create);
 router.put("/:id", controller.update);
 router.put("/:id/costo", controller.updateCosto);
+router.put("/:id/responsable", controller.updateResponsable);
 router.delete("/:id", controller.delete);
 
 module.exports = router;

@@ -38,7 +38,10 @@ const tesoreriaController = {
 
   getMovimientosTesoreria: async (req, res) => {
     try {
-      const movimientos = await TesoreriaModel.getMovimientosTesoreria();
+      const { tipo_documento } = req.query;
+      const movimientos = await TesoreriaModel.getMovimientosTesoreria(
+        tipo_documento
+      );
       res.json(movimientos);
     } catch (error) {
       console.error("Error al obtener movimientos de tesorería:", error);

@@ -68,6 +68,9 @@ exports.createCostoIndirecto = async (req, res) => {
     fecha_fin,
     id_orden_fabricacion,
     asignaciones,
+    id_metodo_pago,
+    referencia,
+    observaciones_pago,
   } = req.body;
 
   if (!tipo_costo || !fecha || valor === undefined) {
@@ -112,6 +115,26 @@ exports.createCostoIndirecto = async (req, res) => {
       valor,
       observaciones: observaciones || null,
     };
+
+    // Registrar movimiento en tesorería si se envía método de pago
+    if (id_metodo_pago && Number(valor) > 0) {
+      try {
+        const tesoreriaModel = require("../models/tesoreriaModel");
+        await tesoreriaModel.insertarMovimiento({
+          id_documento: created.id,
+          tipo_documento: "costo_indirecto",
+          monto: -Math.abs(Number(valor)),
+          id_metodo_pago,
+          referencia: referencia || null,
+          observaciones: observaciones_pago || null,
+          fecha_movimiento: fecha,
+        });
+        created.movimiento_tesoreria = true;
+      } catch (err) {
+        created.movimiento_tesoreria = false;
+        created.movimiento_tesoreria_error = err.message;
+      }
+    }
 
     const d = new Date(fecha);
     const anio = d.getFullYear();

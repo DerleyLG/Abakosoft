@@ -14,6 +14,7 @@ const TIPOS_ORIGEN_MOVIMIENTO = {
   AJUSTE_MANUAL: "ajuste_manual", // Para correcciones manuales de stock (positivas o negativas)
   DEVOLUCION_CLIENTE: "devolucion_cliente", // Cuando un cliente devuelve un producto y vuelve al stock
   DEVOLUCION_PROVEEDOR: "devolucion_proveedor", // Cuando se devuelve stock a un proveedor
+  REVERSION_COMPRA: "reversion_compra", // Cuando se revierte el stock por cambio de estado de orden de compra
 };
 
 module.exports = {

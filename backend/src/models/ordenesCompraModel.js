@@ -1,6 +1,14 @@
 const db = require("../database/db");
 
 module.exports = {
+  updateEstado: async (id, estado, connection = db) => {
+    const [result] = await (connection || db).query(
+      "UPDATE ordenes_compra SET estado = ? WHERE id_orden_compra = ?",
+      [estado, id]
+    );
+    return result;
+  },
+
   getAll: async (estadosToFilter = ["pendiente", "completada"]) => {
     const placeholders = estadosToFilter.map(() => "?").join(",");
     const [rows] = await db.query(
@@ -109,8 +117,8 @@ module.exports = {
     connection = db
   ) => {
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre, comprobante_fecha_subida)
-       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)`,
+      `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre, comprobante_fecha_subida, stock_actualizado, tesoreria_actualizada)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, 0, 0)`,
       [
         id_proveedor,
         categoria_costo,
@@ -135,6 +143,8 @@ module.exports = {
       comprobante_path,
       comprobante_nombre,
       comprobante_fecha_subida,
+      stock_actualizado,
+      tesoreria_actualizada,
     },
     connection = db
   ) => {
@@ -157,6 +167,15 @@ module.exports = {
     if (estado !== undefined) {
       updates.push("estado = ?");
       values.push(estado);
+    }
+    // Nuevos campos para duplicidad
+    if (typeof stock_actualizado !== "undefined") {
+      updates.push("stock_actualizado = ?");
+      values.push(stock_actualizado ? 1 : 0);
+    }
+    if (typeof tesoreria_actualizada !== "undefined") {
+      updates.push("tesoreria_actualizada = ?");
+      values.push(tesoreria_actualizada ? 1 : 0);
     }
     if (fecha !== undefined) {
       updates.push("fecha = ?");

@@ -98,14 +98,37 @@ const getOrdenCompraById = async (req, res) => {
       return res.status(404).json({ error: "Orden de compra no encontrada" });
     }
     const detalles = await detalleOrdenCompra.getByOrdenCompra(id);
-    console.log("getOrdenCompraById - Orden:", orden);
-    console.log("getOrdenCompraById - Detalles:", detalles);
-    const response = { ...orden, detalles };
-    console.log("getOrdenCompraById - Response:", response);
+    // Obtener movimiento de tesorería y método de pago
+    const tesoreriaModel = require("../models/tesoreriaModel");
+    const movimiento = await tesoreriaModel.getByDocumentoIdAndTipo(
+      id,
+      "orden_compra"
+    );
+    let metodo_pago = null;
+    if (movimiento && movimiento.id_metodo_pago) {
+      const [metodos] = await require("../database/db").query(
+        "SELECT * FROM metodos_pago WHERE id_metodo_pago = ?",
+        [movimiento.id_metodo_pago]
+      );
+      metodo_pago = metodos[0] || null;
+    }
+    // Auditoría básica
+    console.log(`[AUDITORÍA] Consulta de orden #${id} por usuario`);
+    const response = {
+      ...orden,
+      detalles,
+      movimiento_tesoreria: movimiento,
+      metodo_pago,
+    };
     res.json(response);
   } catch (error) {
     console.error("Error al obtener la orden de compra:", error);
-    res.status(500).json({ error: "Error al obtener la orden de compra" });
+    res
+      .status(500)
+      .json({
+        error:
+          "No se pudo obtener la orden. Intenta nuevamente o contacta soporte.",
+      });
   }
 };
 
@@ -316,6 +339,18 @@ async function confirmarRecepcion(req, res) {
       );
     }
 
+    // Evitar duplicados: solo sumar stock y tesorería si no se ha hecho antes
+    if (orden.stock_actualizado) {
+      throw new Error(
+        "El stock ya fue sumado para esta orden. No se puede duplicar la operación."
+      );
+    }
+    if (orden.tesoreria_actualizada) {
+      throw new Error(
+        "El movimiento de tesorería ya fue registrado para esta orden. No se puede duplicar la operación."
+      );
+    }
+
     const detalles = await detalleOrdenCompra.getByOrdenCompra(id, connection);
     if (detalles.length === 0) {
       throw new Error("La orden de compra no tiene detalles para recibir.");
@@ -340,13 +375,49 @@ async function confirmarRecepcion(req, res) {
       );
     }
 
-    await ordenCompras.update(id, { estado: "completada" }, connection);
+    // Crear movimiento de tesorería si se envía método de pago
+    const body = req.body || {};
+    const { id_metodo_pago, referencia, observaciones_pago } = body;
+    let movimientoTesoreriaCreado = false;
+    if (id_metodo_pago && id_metodo_pago !== "0") {
+      let totalCompra = 0;
+      for (const item of detalles) {
+        totalCompra +=
+          Number(item.cantidad) * Number(item.precio_unitario || 0);
+      }
+      const movimientoData = {
+        id_documento: id,
+        tipo_documento: "orden_compra",
+        monto: -totalCompra,
+        id_metodo_pago: id_metodo_pago,
+        referencia: referencia || null,
+        observaciones: observaciones_pago || null,
+      };
+      await require("../models/tesoreriaModel").updateOrCreateMovimiento(
+        movimientoData,
+        connection
+      );
+      movimientoTesoreriaCreado = true;
+    }
+    // Actualizar flags para evitar duplicados
+    await ordenCompras.update(
+      id,
+      {
+        estado: "completada",
+        stock_actualizado: true,
+        tesoreria_actualizada: movimientoTesoreriaCreado,
+      },
+      connection
+    );
 
     await connection.commit();
     connection.release();
     res.status(200).json({
       message:
-        "Recepción de mercancía confirmada y stock actualizado correctamente.",
+        "Recepción de mercancía confirmada, stock actualizado" +
+        (movimientoTesoreriaCreado
+          ? " y movimiento de tesorería registrado."
+          : "."),
     });
   } catch (error) {
     if (connection) {
@@ -654,6 +725,103 @@ const deleteOrdenCompra = async (req, res) => {
   }
 };
 
+// Actualizar solo el estado de la orden de compra
+async function updateEstadoOrdenCompra(req, res) {
+  const { id } = req.params;
+  const { estado } = req.body;
+  if (!estado || !["pendiente", "completada"].includes(estado)) {
+    return res.status(400).json({ error: "Estado inválido." });
+  }
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    // Obtener la orden actual
+    const [ordenRows] = await connection.query(
+      "SELECT * FROM ordenes_compra WHERE id_orden_compra = ?",
+      [id]
+    );
+    if (!ordenRows.length) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: "Orden de compra no encontrada." });
+    }
+    const orden = ordenRows[0];
+    // Si el estado pasa de completada a pendiente, revertir flags y operaciones
+    if (orden.estado === "completada" && estado === "pendiente") {
+      // Revertir stock solo si estaba actualizado
+      if (orden.stock_actualizado) {
+        const detalles = await connection.query(
+          "SELECT * FROM detalle_orden_compra WHERE id_orden_compra = ?",
+          [id]
+        );
+        for (const detalle of detalles[0]) {
+          try {
+            await require("../models/inventarioModel").processInventoryMovement(
+              {
+                id_articulo: Number(detalle.id_articulo),
+                cantidad_movida: Number(detalle.cantidad),
+                tipo_movimiento: require("../models/inventarioModel")
+                  .TIPOS_MOVIMIENTO.SALIDA,
+                tipo_origen_movimiento:
+                  require("../models/inventarioModel").TIPOS_ORIGEN_MOVIMIENTO
+                    .DEVOLUCION_PROVEEDOR || "reversion_compra",
+                observaciones: `Reversión por cambio de estado a pendiente en OC #${id}`,
+                referencia_documento_id: id,
+                referencia_documento_tipo: "reversion_orden_compra",
+              },
+              connection
+            );
+          } catch (err) {
+            await connection.rollback();
+            connection.release();
+            return res.status(409).json({
+              error: `No se puede revertir el stock del artículo ${detalle.id_articulo} porque el stock disponible es insuficiente. Disponible: ${err.message}`,
+            });
+          }
+        }
+      }
+      // Revertir tesorería solo si estaba actualizada
+      if (orden.tesoreria_actualizada) {
+        // Eliminar el movimiento de tesorería asociado a la orden de compra
+        await require("../models/tesoreriaModel").deleteByDocumentoAndTipo(
+          id,
+          "orden_compra",
+          connection
+        );
+      }
+      // Actualizar estado y flags
+      await ordenCompras.update(
+        id,
+        {
+          estado: estado,
+          stock_actualizado: false,
+          tesoreria_actualizada: false,
+        },
+        connection
+      );
+    } else {
+      // Cambio normal de estado
+      await ordenCompras.updateEstado(id, estado, connection);
+    }
+    await connection.commit();
+    connection.release();
+    return res.json({ message: `Estado actualizado a ${estado}` });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
+    console.error(
+      "Error al actualizar el estado de la orden de compra:",
+      error
+    );
+    return res
+      .status(500)
+      .json({ error: "Error al actualizar el estado de la orden de compra." });
+  }
+}
+
 module.exports = {
   getOrdenesCompra,
   getOrdenCompraById,
@@ -661,4 +829,5 @@ module.exports = {
   updateOrdenCompra,
   deleteOrdenCompra,
   confirmarRecepcion,
+  updateEstadoOrdenCompra,
 };

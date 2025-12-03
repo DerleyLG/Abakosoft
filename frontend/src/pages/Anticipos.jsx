@@ -56,7 +56,7 @@ const ListaAnticipos = () => {
                   <td className="px-4 py-2 font-mono">#{a.id_orden_fabricacion}</td>
                   <td className="px-4 py-2">{a.cliente || 'N/D'}</td>
                   <td className="px-4 py-2">
-                    {new Date(a.fecha).toLocaleDateString('es-CO')}
+                    {a.fecha ? new Date(a.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                   </td>
                   <td className="px-4 py-2">${Number(a.monto).toLocaleString()}</td>
                   <td className="px-4 py-2">${Number(a.monto_usado).toLocaleString()}</td>

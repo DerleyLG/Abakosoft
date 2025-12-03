@@ -28,11 +28,19 @@ router.post(
   upload.single("comprobante"),
   ordenesCompraController.createOrdenCompra
 );
+
 router.put(
   "/:id",
   checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
   upload.single("comprobante"),
   ordenesCompraController.updateOrdenCompra
+);
+
+// Solo admin puede cambiar el estado de la orden
+router.put(
+  "/:id/estado",
+  checkRole([ROLES.ADMIN]),
+  ordenesCompraController.updateEstadoOrdenCompra
 );
 
 // Confirmar recepción: supervisor y admin
