@@ -18,12 +18,11 @@ import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
 
 const ListaOrdenesFabricacion = () => {
- 
   const formatCOP = (number) => {
     const n = Number(number) || 0;
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(n);
@@ -32,7 +31,7 @@ const ListaOrdenesFabricacion = () => {
   const cleanCOPFormat = (formattedValue) => {
     if (formattedValue === null || formattedValue === undefined) return 0;
     const s = String(formattedValue);
-    const onlyNums = s.replace(/[^0-9]/g, '');
+    const onlyNums = s.replace(/[^0-9]/g, "");
     return parseInt(onlyNums, 10) || 0;
   };
   const [ordenes, setOrdenes] = useState([]);
@@ -48,7 +47,7 @@ const ListaOrdenesFabricacion = () => {
     useState({});
   const [etapasDisponibles, setEtapasDisponibles] = useState({});
   const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState({});
-const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas'); 
+  const [filtroEstadoActivas, setFiltroEstadoActivas] = useState("todas");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -64,25 +63,26 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
   const historialCostos = useRef({});
   const costoManualEditado = useRef({});
   const [editandoCosto, setEditandoCosto] = useState({});
-  const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({}); 
-    const [editandoAvanceResponsable, setEditandoAvanceResponsable] = useState({});
+  const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({});
+  const [editandoAvanceResponsable, setEditandoAvanceResponsable] = useState(
+    {}
+  );
 
- 
-  const [articulosCatalogo, setArticulosCatalogo] = useState([]); 
+  const [articulosCatalogo, setArticulosCatalogo] = useState([]);
   const [articuloQuery, setArticuloQuery] = useState("");
-  const [articuloSeleccion, setArticuloSeleccion] = useState(null); 
+  const [articuloSeleccion, setArticuloSeleccion] = useState(null);
   const [showSugArticulos, setShowSugArticulos] = useState(false);
   const articuloFilterRef = useRef(null);
   const sugerenciasArticulos = useMemo(() => {
-    const q = (articuloQuery || '').trim().toLowerCase();
+    const q = (articuloQuery || "").trim().toLowerCase();
     if (!q) return articulosCatalogo.slice(0, 8);
-    return articulosCatalogo.filter(a => (a.label || '').toLowerCase().includes(q)).slice(0, 8);
+    return articulosCatalogo
+      .filter((a) => (a.label || "").toLowerCase().includes(q))
+      .slice(0, 8);
   }, [articuloQuery, articulosCatalogo]);
 
-  
   const esOrdenCompletada = (estado) =>
-    typeof estado === 'string' && estado.toLowerCase().trim() === 'completada';
-
+    typeof estado === "string" && estado.toLowerCase().trim() === "completada";
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -90,13 +90,20 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
         const [resTrabajadores, resEtapas, resArticulos] = await Promise.all([
           api.get("/trabajadores"),
           api.get("/etapas-produccion"),
-          api.get("/articulos", { params: { page: 1, pageSize: 10000, sortBy: 'descripcion', sortDir: 'asc' } }),
+          api.get("/articulos", {
+            params: {
+              page: 1,
+              pageSize: 10000,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          }),
         ]);
-        
-      
-        const articulosArr = Array.isArray(resArticulos.data?.data) ? resArticulos.data.data : [];
-    
-        
+
+        const articulosArr = Array.isArray(resArticulos.data?.data)
+          ? resArticulos.data.data
+          : [];
+
         setTrabajadores(
           resTrabajadores.data.map((trab) => ({
             value: trab.id_trabajador,
@@ -112,13 +119,15 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
             cargo: etp.cargo,
           }))
         );
-        
-        setArticulosCatalogo(
-          articulosArr.map((a) => ({
-            value: a.id_articulo,
-            label: a.descripcion ? `${a.referencia || ''} - ${a.descripcion}`.trim() : (a.referencia || `ID ${a.id_articulo}`),
-          }))
-        );
+
+        const catalogoMapeado = articulosArr.map((a) => ({
+          value: a.id_articulo,
+          label: a.descripcion
+            ? `${a.referencia || ""} - ${a.descripcion}`.trim()
+            : a.referencia || `ID ${a.id_articulo}`,
+        }));
+
+        setArticulosCatalogo(catalogoMapeado);
       } catch (error) {
         console.error("Error al cargar datos iniciales", error);
         toast.error("Error al cargar datos iniciales");
@@ -130,15 +139,17 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
   // Cerrar sugerencias cuando se haga clic fuera del filtro de artículos
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (articuloFilterRef.current && !articuloFilterRef.current.contains(e.target)) {
+      if (
+        articuloFilterRef.current &&
+        !articuloFilterRef.current.contains(e.target)
+      ) {
         setShowSugArticulos(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  
   useEffect(() => {
     if (mostrarFormularioAvance) {
       const ord = ordenes.find(
@@ -150,49 +161,53 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
     }
   }, [ordenes, mostrarFormularioAvance]);
 
-  
-
   useEffect(() => {
     const fetchOrdenes = async () => {
-      try { 
+      try {
         setLoading(true);
-        const params = { page, pageSize, sortBy: 'id', sortDir: 'desc' };
+        const params = { page, pageSize, sortBy: "id", sortDir: "desc" };
         if (mostrarCanceladas) {
-          params.estados = 'cancelada';
-        } else if (filtroEstadoActivas !== 'todas') {
+          params.estados = "cancelada";
+        } else if (filtroEstadoActivas !== "todas") {
           params.estados = filtroEstadoActivas;
         }
-        const res = await api.get('/ordenes-fabricacion', { params });
+        const res = await api.get("/ordenes-fabricacion", { params });
         const payload = res.data || {};
         const rows = Array.isArray(payload.data) ? payload.data : [];
-        
+
         // Parsear detalles y avances de cada orden
-        const ordenesProcesadas = rows.map(orden => ({
+        const ordenesProcesadas = rows.map((orden) => ({
           ...orden,
           detalles: Array.isArray(orden.detalles)
             ? orden.detalles
-            : typeof orden.detalles === 'string'
+            : typeof orden.detalles === "string"
             ? (() => {
-                try { return JSON.parse(orden.detalles); } 
-                catch { return []; }
+                try {
+                  return JSON.parse(orden.detalles);
+                } catch {
+                  return [];
+                }
               })()
             : [],
           avances: Array.isArray(orden.avances)
             ? orden.avances
-            : typeof orden.avances === 'string'
+            : typeof orden.avances === "string"
             ? (() => {
-                try { return JSON.parse(orden.avances); }
-                catch { return []; }
+                try {
+                  return JSON.parse(orden.avances);
+                } catch {
+                  return [];
+                }
               })()
-            : []
+            : [],
         }));
-        
+
         setOrdenes(ordenesProcesadas);
         setTotal(payload.total || 0);
         setTotalPages(payload.totalPages || 1);
         setHasNext(!!payload.hasNext);
         setHasPrev(!!payload.hasPrev);
-     
+
         const nuevosArticulosPendientes = {};
         ordenesProcesadas.forEach((orden) => {
           const detallesEnOrden = orden.detalles;
@@ -438,55 +453,55 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
     });
   };
 
-   const toggleMostrarCanceladas = () => {
-  
-  if (!mostrarCanceladas) {
-   setFiltroEstadoActivas('todas'); 
-  }
-  setMostrarCanceladas((prev) => !prev);
-  setExpandedOrden(null);
-  setPage(1);
- };
- 
- const handleFiltroEstadoChange = (e) => {
-  setMostrarCanceladas(false); 
-  setFiltroEstadoActivas(e.target.value);
-  setExpandedOrden(null);
-  setPage(1);
- };
+  const toggleMostrarCanceladas = () => {
+    if (!mostrarCanceladas) {
+      setFiltroEstadoActivas("todas");
+    }
+    setMostrarCanceladas((prev) => !prev);
+    setExpandedOrden(null);
+    setPage(1);
+  };
+
+  const handleFiltroEstadoChange = (e) => {
+    setMostrarCanceladas(false);
+    setFiltroEstadoActivas(e.target.value);
+    setExpandedOrden(null);
+    setPage(1);
+  };
 
   const expandirOrden = (id) => {
     setExpandedOrden((prevId) => (prevId === id ? null : id));
   };
 
   const ordenesFiltradas = ordenes.filter((o) => {
-  const estado = o.estado?.toLowerCase() || "";
-  const cliente = o.nombre_cliente?.toLowerCase() || "";
-  const fecha = o.fecha_inicio
-    ? new Date(o.fecha_inicio).toLocaleDateString("es-CO", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-    : "";
+    const estado = o.estado?.toLowerCase() || "";
+    const cliente = o.nombre_cliente?.toLowerCase() || "";
+    const fecha = o.fecha_inicio
+      ? new Date(o.fecha_inicio).toLocaleDateString("es-CO", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "";
 
-  const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase();
 
-  const coincideBusqueda =
-    estado.includes(term) || cliente.includes(term) || fecha.includes(term);
+    const coincideBusqueda =
+      estado.includes(term) || cliente.includes(term) || fecha.includes(term);
 
-  
-  const coincideEstado =
-    filtroEstadoActivas === "todas"
-      ? true
-      : estado === filtroEstadoActivas.toLowerCase();
+    const coincideEstado =
+      filtroEstadoActivas === "todas"
+        ? true
+        : estado === filtroEstadoActivas.toLowerCase();
 
-  const coincideArticulo = articuloSeleccion
-    ? o.detalles.some(d => Number(d.id_articulo) === Number(articuloSeleccion.value))
-    : true;
+    const coincideArticulo = articuloSeleccion
+      ? o.detalles.some(
+          (d) => Number(d.id_articulo) === Number(articuloSeleccion.value)
+        )
+      : true;
 
-  return coincideBusqueda && coincideEstado && coincideArticulo;
-});
+    return coincideBusqueda && coincideEstado && coincideArticulo;
+  });
 
   const renderDetalles = (orden) => {
     if (!orden.detalles || orden.detalles.length === 0) {
@@ -594,9 +609,17 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                 </thead>
                 <tbody>
                   {data.avances.map((avance, idx2) => {
-                    const nombreCargoEtapa = etapas.find(et => String(et.value) === String(avance.id_etapa_produccion))?.cargo;
+                    const nombreCargoEtapa = etapas.find(
+                      (et) =>
+                        String(et.value) === String(avance.id_etapa_produccion)
+                    )?.cargo;
                     const trabajadoresFiltrados = nombreCargoEtapa
-                      ? trabajadores.filter(t => t.cargo && String(t.cargo).toLowerCase().trim() === String(nombreCargoEtapa).toLowerCase().trim())
+                      ? trabajadores.filter(
+                          (t) =>
+                            t.cargo &&
+                            String(t.cargo).toLowerCase().trim() ===
+                              String(nombreCargoEtapa).toLowerCase().trim()
+                        )
                       : trabajadores;
 
                     return (
@@ -616,56 +639,112 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                                 <FiEdit />
                               </button>
                             </div>
-                          ) : editandoAvanceResponsable?.[avance.id_avance_etapa] !== undefined ? (
+                          ) : editandoAvanceResponsable?.[
+                              avance.id_avance_etapa
+                            ] !== undefined ? (
                             <div className="flex items-center gap-2">
                               <select
-                                value={editandoAvanceResponsable[avance.id_avance_etapa]}
-                                onChange={e => {
-                                  setEditandoAvanceResponsable(prev => ({ ...prev, [avance.id_avance_etapa]: e.target.value }));
+                                value={
+                                  editandoAvanceResponsable[
+                                    avance.id_avance_etapa
+                                  ]
+                                }
+                                onChange={(e) => {
+                                  setEditandoAvanceResponsable((prev) => ({
+                                    ...prev,
+                                    [avance.id_avance_etapa]: e.target.value,
+                                  }));
                                 }}
                                 className="border rounded px-2 py-1 border-slate-300"
                               >
                                 <option value="">Selecciona responsable</option>
-                                {trabajadoresFiltrados.map(trab => (
-                                  <option key={trab.value} value={String(trab.value)}>{trab.label}</option>
+                                {trabajadoresFiltrados.map((trab) => (
+                                  <option
+                                    key={trab.value}
+                                    value={String(trab.value)}
+                                  >
+                                    {trab.label}
+                                  </option>
                                 ))}
                               </select>
                               <button
                                 className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
                                 onClick={async () => {
-                                  const nuevoTrabajadorRaw = editandoAvanceResponsable[avance.id_avance_etapa];
-                                  if (nuevoTrabajadorRaw === undefined || nuevoTrabajadorRaw === "") {
-                                    toast.error("Selecciona un responsable válido");
+                                  const nuevoTrabajadorRaw =
+                                    editandoAvanceResponsable[
+                                      avance.id_avance_etapa
+                                    ];
+                                  if (
+                                    nuevoTrabajadorRaw === undefined ||
+                                    nuevoTrabajadorRaw === ""
+                                  ) {
+                                    toast.error(
+                                      "Selecciona un responsable válido"
+                                    );
                                     return;
                                   }
-                                  const idTrabajadorNum = Number(nuevoTrabajadorRaw);
-                                  if (!Number.isFinite(idTrabajadorNum) || idTrabajadorNum <= 0) {
-                                    toast.error("Selecciona un responsable válido");
+                                  const idTrabajadorNum =
+                                    Number(nuevoTrabajadorRaw);
+                                  if (
+                                    !Number.isFinite(idTrabajadorNum) ||
+                                    idTrabajadorNum <= 0
+                                  ) {
+                                    toast.error(
+                                      "Selecciona un responsable válido"
+                                    );
                                     return;
                                   }
                                   try {
-                                    await api.put(`/avances-etapa/${avance.id_avance_etapa}/responsable`, { id_trabajador: idTrabajadorNum });
-                                    setOrdenes(prev => prev.map(o => {
-                                      if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
-                                      const avancesActualizados = (o.avances || []).map(av =>
-                                        av.id_avance_etapa === avance.id_avance_etapa
-                                          ? {
-                                              ...av,
-                                              id_trabajador: idTrabajadorNum,
-                                              nombre_trabajador: (trabajadores.find(t => String(t.value) === String(nuevoTrabajadorRaw)) || {}).label || av.nombre_trabajador || "N/A",
-                                            }
-                                          : av
-                                      );
-                                      return { ...o, avances: avancesActualizados };
-                                    }));
-                                    setEditandoAvanceResponsable(prev => {
+                                    await api.put(
+                                      `/avances-etapa/${avance.id_avance_etapa}/responsable`,
+                                      { id_trabajador: idTrabajadorNum }
+                                    );
+                                    setOrdenes((prev) =>
+                                      prev.map((o) => {
+                                        if (
+                                          o.id_orden_fabricacion !==
+                                          orden.id_orden_fabricacion
+                                        )
+                                          return o;
+                                        const avancesActualizados = (
+                                          o.avances || []
+                                        ).map((av) =>
+                                          av.id_avance_etapa ===
+                                          avance.id_avance_etapa
+                                            ? {
+                                                ...av,
+                                                id_trabajador: idTrabajadorNum,
+                                                nombre_trabajador:
+                                                  (
+                                                    trabajadores.find(
+                                                      (t) =>
+                                                        String(t.value) ===
+                                                        String(
+                                                          nuevoTrabajadorRaw
+                                                        )
+                                                    ) || {}
+                                                  ).label ||
+                                                  av.nombre_trabajador ||
+                                                  "N/A",
+                                              }
+                                            : av
+                                        );
+                                        return {
+                                          ...o,
+                                          avances: avancesActualizados,
+                                        };
+                                      })
+                                    );
+                                    setEditandoAvanceResponsable((prev) => {
                                       const n = { ...prev };
                                       delete n[avance.id_avance_etapa];
                                       return n;
                                     });
                                     toast.success("Trabajador actualizado");
                                   } catch (error) {
-                                    const msg = error?.response?.data?.error || "No se pudo actualizar el responsable";
+                                    const msg =
+                                      error?.response?.data?.error ||
+                                      "No se pudo actualizar el responsable";
                                     toast.error(msg);
                                   }
                                 }}
@@ -675,7 +754,7 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                               <button
                                 className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
                                 onClick={() =>
-                                  setEditandoAvanceResponsable(prev => {
+                                  setEditandoAvanceResponsable((prev) => {
                                     const n = { ...prev };
                                     delete n[avance.id_avance_etapa];
                                     return n;
@@ -701,9 +780,11 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                                   className="text-slate-700 hover:text-slate-900 cursor-pointer"
                                   title="Editar responsable"
                                   onClick={() =>
-                                    setEditandoAvanceResponsable(prev => ({
+                                    setEditandoAvanceResponsable((prev) => ({
                                       ...prev,
-                                      [avance.id_avance_etapa]: String(avance.id_trabajador || "")
+                                      [avance.id_avance_etapa]: String(
+                                        avance.id_trabajador || ""
+                                      ),
                                     }))
                                   }
                                 >
@@ -719,7 +800,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                         <td className="px-2 py-2 border-b border-gray-300">
                           {ordenCompletada ? (
                             <div className="flex items-center gap-2">
-                              <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                              <span>
+                                {formatCOP(Number(avance.costo_fabricacion))}
+                              </span>
                               <button
                                 className="text-slate-300 cursor-not-allowed"
                                 title="La orden está completada. No se puede editar el costo."
@@ -728,43 +811,68 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                                 <FiEdit />
                               </button>
                             </div>
-                          ) : editandoAvanceCosto[avance.id_avance_etapa] !== undefined ? (
+                          ) : editandoAvanceCosto[avance.id_avance_etapa] !==
+                            undefined ? (
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
-                                value={editandoAvanceCosto[avance.id_avance_etapa]}
+                                value={
+                                  editandoAvanceCosto[avance.id_avance_etapa]
+                                }
                                 onChange={(e) => {
                                   const raw = e.target.value;
                                   if (!raw || raw.trim() === "") {
-                                    setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: "" }));
+                                    setEditandoAvanceCosto((prev) => ({
+                                      ...prev,
+                                      [avance.id_avance_etapa]: "",
+                                    }));
                                     return;
                                   }
                                   const num = cleanCOPFormat(raw);
-                                  setEditandoAvanceCosto((prev) => ({ ...prev, [avance.id_avance_etapa]: formatCOP(num) }));
+                                  setEditandoAvanceCosto((prev) => ({
+                                    ...prev,
+                                    [avance.id_avance_etapa]: formatCOP(num),
+                                  }));
                                 }}
                                 className="border rounded px-2 py-1 border-slate-300"
                               />
                               <button
                                 className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
                                 onClick={async () => {
-                                  const formVal = editandoAvanceCosto[avance.id_avance_etapa];
+                                  const formVal =
+                                    editandoAvanceCosto[avance.id_avance_etapa];
                                   const num = cleanCOPFormat(formVal);
                                   if (!num || num <= 0) {
                                     toast.error("Ingresa un costo válido");
                                     return;
                                   }
                                   try {
-                                    await api.put(`/avances-etapa/${avance.id_avance_etapa}/costo`, { costo_fabricacion: num });
+                                    await api.put(
+                                      `/avances-etapa/${avance.id_avance_etapa}/costo`,
+                                      { costo_fabricacion: num }
+                                    );
                                     // actualizar en memoria
-                                    setOrdenes((prev) => prev.map((o) => {
-                                      if (o.id_orden_fabricacion !== orden.id_orden_fabricacion) return o;
-                                      const avancesActualizados = (o.avances || []).map((av) =>
-                                        av.id_avance_etapa === avance.id_avance_etapa
-                                          ? { ...av, costo_fabricacion: num }
-                                          : av
-                                      );
-                                      return { ...o, avances: avancesActualizados };
-                                    }));
+                                    setOrdenes((prev) =>
+                                      prev.map((o) => {
+                                        if (
+                                          o.id_orden_fabricacion !==
+                                          orden.id_orden_fabricacion
+                                        )
+                                          return o;
+                                        const avancesActualizados = (
+                                          o.avances || []
+                                        ).map((av) =>
+                                          av.id_avance_etapa ===
+                                          avance.id_avance_etapa
+                                            ? { ...av, costo_fabricacion: num }
+                                            : av
+                                        );
+                                        return {
+                                          ...o,
+                                          avances: avancesActualizados,
+                                        };
+                                      })
+                                    );
                                     setEditandoAvanceCosto((prev) => {
                                       const n = { ...prev };
                                       delete n[avance.id_avance_etapa];
@@ -772,7 +880,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                                     });
                                     toast.success("Costo actualizado");
                                   } catch (error) {
-                                    const msg = error?.response?.data?.error || "No se pudo actualizar el costo";
+                                    const msg =
+                                      error?.response?.data?.error ||
+                                      "No se pudo actualizar el costo";
                                     toast.error(msg);
                                   }
                                 }}
@@ -794,14 +904,18 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span>{formatCOP(Number(avance.costo_fabricacion))}</span>
+                              <span>
+                                {formatCOP(Number(avance.costo_fabricacion))}
+                              </span>
                               <button
                                 className="text-slate-700 hover:text-slate-900 cursor-pointer"
                                 title="Editar costo"
                                 onClick={() =>
                                   setEditandoAvanceCosto((prev) => ({
                                     ...prev,
-                                    [avance.id_avance_etapa]: formatCOP(Number(avance.costo_fabricacion) || 0),
+                                    [avance.id_avance_etapa]: formatCOP(
+                                      Number(avance.costo_fabricacion) || 0
+                                    ),
                                   }))
                                 }
                               >
@@ -819,8 +933,8 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                         <td className="px-2 py-2 border-b border-gray-300">
                           {new Date(avance.fecha_registro).toLocaleDateString()}
                         </td>
-                    </tr>
-                  );
+                      </tr>
+                    );
                   })}
                 </tbody>
               </table>
@@ -912,7 +1026,6 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
           idEtapaFinal: art.id_etapa_final,
         }));
 
-      
       setOrdenes((prevOrdenes) =>
         prevOrdenes.map((o) =>
           o.id_orden_fabricacion === idOrden ? updatedOrden : o
@@ -945,24 +1058,44 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h2 className="text-4xl font-bold text-gray-800">Órdenes de fabricación</h2>
+          <h2 className="text-4xl font-bold text-gray-800">
+            Órdenes de fabricación
+          </h2>
           <div className="w-full md:flex-1 md:ml-100px md:justify-end flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
             {/* Filtro por artículo */}
-            <div className="w-full md:w-[28rem] lg:w-[32rem] relative" ref={articuloFilterRef}>
-              <label className="block text-gray-700 font-semibold mb-1">Artículo en la orden</label>
+            <div
+              className="w-full md:w-[28rem] lg:w-[32rem] relative"
+              ref={articuloFilterRef}
+            >
+              <label className="block text-gray-700 font-semibold mb-1">
+                Artículo en la orden
+              </label>
               <div className="flex gap-2 items-center">
                 <input
                   type="text"
                   placeholder="Escribe y selecciona…"
                   className="flex-grow border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                   value={articuloQuery}
-                  onChange={(e) => { setArticuloQuery(e.target.value); setArticuloSeleccion(null); setShowSugArticulos(true); }}
+                  onChange={(e) => {
+                    setArticuloQuery(e.target.value);
+                    setArticuloSeleccion(null);
+                    setShowSugArticulos(true);
+                  }}
                   onFocus={() => setShowSugArticulos(true)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') { setShowSugArticulos(false); e.currentTarget.blur(); }
-                    if (e.key === 'Enter') {
+                    if (e.key === "Escape") {
+                      setShowSugArticulos(false);
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === "Enter") {
                       const s = sugerenciasArticulos;
-                      if (s.length > 0) { const opt = s[0]; setArticuloSeleccion(opt); setArticuloQuery(opt.label); setShowSugArticulos(false); e.preventDefault(); }
+                      if (s.length > 0) {
+                        const opt = s[0];
+                        setArticuloSeleccion(opt);
+                        setArticuloQuery(opt.label);
+                        setShowSugArticulos(false);
+                        e.preventDefault();
+                      }
                     }
                   }}
                 />
@@ -971,7 +1104,11 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                   className="h-[42px] px-3 border border-slate-300 rounded-md cursor-pointer text-slate-600 hover:bg-slate-100 flex items-center justify-center"
                   title="Limpiar"
                   aria-label="Limpiar"
-                  onClick={() => { setArticuloQuery(''); setArticuloSeleccion(null); setShowSugArticulos(false); }}
+                  onClick={() => {
+                    setArticuloQuery("");
+                    setArticuloSeleccion(null);
+                    setShowSugArticulos(false);
+                  }}
                 >
                   <FiX size={18} />
                 </button>
@@ -983,7 +1120,11 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                       <li
                         key={opt.value}
                         className="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
-                        onMouseDown={() => { setArticuloSeleccion(opt); setArticuloQuery(opt.label); setShowSugArticulos(false); }}
+                        onMouseDown={() => {
+                          setArticuloSeleccion(opt);
+                          setArticuloQuery(opt.label);
+                          setShowSugArticulos(false);
+                        }}
                       >
                         {opt.label}
                       </li>
@@ -991,17 +1132,20 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                   </ul>
                 </div>
               )}
-             
             </div>
             {/* Filtro por estado */}
             <div className="w-full md:w-64">
-              <label className="block text-gray-700 font-semibold mb-1">Filtrar por estado:</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Filtrar por estado:
+              </label>
               <select
                 value={filtroEstadoActivas}
                 onChange={handleFiltroEstadoChange}
                 disabled={mostrarCanceladas}
                 className={`w-full h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-                  mostrarCanceladas ? "bg-gray-200 cursor-not-allowed text-gray-600" : "bg-gray-100 text-gray-800"
+                  mostrarCanceladas
+                    ? "bg-gray-200 cursor-not-allowed text-gray-600"
+                    : "bg-gray-100 text-gray-800"
                 }`}
               >
                 <option value="todas">Todas</option>
@@ -1043,7 +1187,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
           <button
             onClick={toggleMostrarCanceladas}
             className={`w-full h-[42px] flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-              mostrarCanceladas ? "bg-red-600 hover:bg-red-500 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+              mostrarCanceladas
+                ? "bg-red-600 hover:bg-red-500 text-white"
+                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
             }`}
           >
             {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
@@ -1071,7 +1217,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="text-center py-4 text-gray-500">Cargando…</td>
+                <td colSpan="6" className="text-center py-4 text-gray-500">
+                  Cargando…
+                </td>
               </tr>
             ) : ordenesFiltradas.length > 0 ? (
               ordenesFiltradas.map((orden) => (
@@ -1086,16 +1234,24 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                   >
                     <td className="px-4 py-2">{orden.id_orden_fabricacion}</td>
                     <td className="px-4 py-2">
-                     {orden.fecha_inicio
-    ? String(orden.fecha_inicio).substring(0, 10).split("-").reverse().join("/")
-    : ""}
-</td>
+                      {orden.fecha_inicio
+                        ? String(orden.fecha_inicio)
+                            .substring(0, 10)
+                            .split("-")
+                            .reverse()
+                            .join("/")
+                        : ""}
+                    </td>
 
-<td className="px-4 py-2">
-  {orden.fecha_fin_estimada
-    ? String(orden.fecha_fin_estimada).substring(0, 10).split("-").reverse().join("/")
-    : ""}
-</td>
+                    <td className="px-4 py-2">
+                      {orden.fecha_fin_estimada
+                        ? String(orden.fecha_fin_estimada)
+                            .substring(0, 10)
+                            .split("-")
+                            .reverse()
+                            .join("/")
+                        : ""}
+                    </td>
                     <td className="px-4 py-2 capitalize">{orden.estado}</td>
                     <td className="px-4 py-2">
                       {orden.nombre_cliente
@@ -1109,7 +1265,12 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate('/costos_indirectos/nuevo', { state: { id_orden_fabricacion: orden.id_orden_fabricacion } });
+                            navigate("/costos_indirectos/nuevo", {
+                              state: {
+                                id_orden_fabricacion:
+                                  orden.id_orden_fabricacion,
+                              },
+                            });
                           }}
                           className="text-emerald-700 hover:text-emerald-500 transition cursor-pointer"
                           title="Registrar costo indirecto para esta OF"
@@ -1129,7 +1290,9 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                           </button>
                         )}
                         {!canDelete && (
-                          <span className="text-gray-400 italic select-none">Sin permisos</span>
+                          <span className="text-gray-400 italic select-none">
+                            Sin permisos
+                          </span>
                         )}
                       </div>
                     </td>
@@ -1174,7 +1337,14 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                                 <FiPlus /> Registrar nuevo avance
                               </button>
                               <button
-                                onClick={() => navigate('/costos_indirectos/nuevo', { state: { id_orden_fabricacion: orden.id_orden_fabricacion } })}
+                                onClick={() =>
+                                  navigate("/costos_indirectos/nuevo", {
+                                    state: {
+                                      id_orden_fabricacion:
+                                        orden.id_orden_fabricacion,
+                                    },
+                                  })
+                                }
                                 className="text-emerald-700 flex items-center gap-2 hover:underline cursor-pointer"
                                 title="Registrar un costo indirecto y asignarlo a esta OF"
                               >
@@ -1186,200 +1356,237 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
                         {mostrarFormularioAvance ===
                           orden.id_orden_fabricacion &&
                           !esOrdenCompletada(orden.estado) && (
-                          <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
-                            <form
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                 if (esOrdenCompletada(orden.estado)) {
-                                   toast.error("La orden está completada. No se pueden registrar más avances.");
-                                   setMostrarFormularioAvance(null);
-                                   return;
-                                 }
-                                const form = formularios[orden.id_orden_fabricacion] || {};
-                                const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                const valorEnEdicion = editandoCosto[claveCosto];
-                                const costoNormalizado =
-                                  valorEnEdicion !== undefined
-                                    ? cleanCOPFormat(valorEnEdicion)
-                                    : Number(form?.costo_fabricacion) || 0;
+                            <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  if (esOrdenCompletada(orden.estado)) {
+                                    toast.error(
+                                      "La orden está completada. No se pueden registrar más avances."
+                                    );
+                                    setMostrarFormularioAvance(null);
+                                    return;
+                                  }
+                                  const form =
+                                    formularios[orden.id_orden_fabricacion] ||
+                                    {};
+                                  const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                  const valorEnEdicion =
+                                    editandoCosto[claveCosto];
+                                  const costoNormalizado =
+                                    valorEnEdicion !== undefined
+                                      ? cleanCOPFormat(valorEnEdicion)
+                                      : Number(form?.costo_fabricacion) || 0;
 
-                                const formNormalizado = {
-                                  ...form,
-                                  costo_fabricacion: costoNormalizado,
-                                };
+                                  const formNormalizado = {
+                                    ...form,
+                                    costo_fabricacion: costoNormalizado,
+                                  };
 
-                                manejarRegistroAvance(
-                                  orden.id_orden_fabricacion,
-                                  formNormalizado
-                                );
-                              }}
-                              className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
-                            >
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                <select
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.articulo || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "articulo",
-                                      Number(e.target.value)
-                                    )
-                                  }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
-                                >
-                                  <option value="">
-                                    Selecciona el artículo
-                                  </option>
-                                  {(
-                                    articulosPendientesPorOrden[
-                                      orden.id_orden_fabricacion
-                                    ] || []
-                                  ).map((art) => (
-                                    <option key={art.value} value={art.value}>
-                                      {art.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <select
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.etapa || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "etapa",
-                                      Number(e.target.value)
-                                    )
-                                  }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
-                                >
-                                  <option value="">Selecciona etapa</option>
-                                  {(
-                                    etapasDisponibles[
-                                      orden.id_orden_fabricacion
-                                    ] || []
-                                  ).map((etapa) => (
-                                    <option
-                                      key={etapa.value}
-                                      value={etapa.value}
-                                    >
-                                      {etapa.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <select
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.trabajador || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "trabajador",
-                                      Number(e.target.value)
-                                    )
-                                  }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
-                                >
-                                  <option value="">
-                                    Selecciona trabajador
-                                  </option>
-                                  {(
-                                    trabajadoresDisponibles[
-                                      orden.id_orden_fabricacion
-                                    ] || []
-                                  ).map((trab) => (
-                                    <option key={trab.value} value={trab.value}>
-                                      {trab.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="number"
-                                  placeholder="Cantidad"
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.cantidad || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "cantidad",
-                                      e.target.value
-                                    )
-                                  }
-                                   className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Costo de fabricación unitario"
-                                  value={(() => {
-                                    const form = formularios[orden.id_orden_fabricacion] || {};
-                                    const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                    const enEdicion = editandoCosto[clave];
-                                    if (enEdicion !== undefined) return enEdicion;
-                                    const num = Number(form?.costo_fabricacion);
-                                    return Number.isFinite(num) && num > 0 ? formatCOP(num) : "";
-                                  })()}
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    const form = formularios[orden.id_orden_fabricacion] || {};
-                                    const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                    if (!raw || raw.trim() === "") {
-                                      setEditandoCosto((prev) => ({ ...prev, [clave]: "" }));
-                                      actualizarFormulario(orden.id_orden_fabricacion, "costo_fabricacion", "");
-                                      return;
+                                  manejarRegistroAvance(
+                                    orden.id_orden_fabricacion,
+                                    formNormalizado
+                                  );
+                                }}
+                                className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
+                              >
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                  <select
+                                    value={
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.articulo || ""
                                     }
-                                    const num = cleanCOPFormat(raw);
-                                    costoManualEditado.current[clave] = true;
-                                    setEditandoCosto((prev) => ({ ...prev, [clave]: formatCOP(num) }));
-                                    actualizarFormulario(orden.id_orden_fabricacion, "costo_fabricacion", num);
-                                  }}
-                                  onFocus={() => { /* mantener formato mientras escribe */ }}
-                                  onBlur={() => { /* ya formateado en onChange */ }}
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Observaciones"
-                                  value={
-                                    formularios[orden.id_orden_fabricacion]
-                                      ?.observaciones || ""
-                                  }
-                                  onChange={(e) =>
-                                    actualizarFormulario(
-                                      orden.id_orden_fabricacion,
-                                      "observaciones",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="border rounded px-2 py-1 border-slate-300 p-5"
-                                />
-                              </div>
-                              <div className="flex justify-end gap-2 mt-4">
-                                <button
-                                  type="submit"
-                                  className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 cursor-pointer"
-                                >
-                                  Registrar avance
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setMostrarFormularioAvance(null)
-                                  }
-                                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 cursor-pointer"
-                                >
-                                  Cerrar
-                                </button>
-                              </div>
-                            </form>
-                          </div>
-                        )}
+                                    onChange={(e) =>
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "articulo",
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                    className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  >
+                                    <option value="">
+                                      Selecciona el artículo
+                                    </option>
+                                    {(
+                                      articulosPendientesPorOrden[
+                                        orden.id_orden_fabricacion
+                                      ] || []
+                                    ).map((art) => (
+                                      <option key={art.value} value={art.value}>
+                                        {art.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.etapa || ""
+                                    }
+                                    onChange={(e) =>
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "etapa",
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                    className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  >
+                                    <option value="">Selecciona etapa</option>
+                                    {(
+                                      etapasDisponibles[
+                                        orden.id_orden_fabricacion
+                                      ] || []
+                                    ).map((etapa) => (
+                                      <option
+                                        key={etapa.value}
+                                        value={etapa.value}
+                                      >
+                                        {etapa.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.trabajador || ""
+                                    }
+                                    onChange={(e) =>
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "trabajador",
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                    className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  >
+                                    <option value="">
+                                      Selecciona trabajador
+                                    </option>
+                                    {(
+                                      trabajadoresDisponibles[
+                                        orden.id_orden_fabricacion
+                                      ] || []
+                                    ).map((trab) => (
+                                      <option
+                                        key={trab.value}
+                                        value={trab.value}
+                                      >
+                                        {trab.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="number"
+                                    placeholder="Cantidad"
+                                    value={
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.cantidad || ""
+                                    }
+                                    onChange={(e) =>
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "cantidad",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Costo de fabricación unitario"
+                                    value={(() => {
+                                      const form =
+                                        formularios[
+                                          orden.id_orden_fabricacion
+                                        ] || {};
+                                      const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                      const enEdicion = editandoCosto[clave];
+                                      if (enEdicion !== undefined)
+                                        return enEdicion;
+                                      const num = Number(
+                                        form?.costo_fabricacion
+                                      );
+                                      return Number.isFinite(num) && num > 0
+                                        ? formatCOP(num)
+                                        : "";
+                                    })()}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      const form =
+                                        formularios[
+                                          orden.id_orden_fabricacion
+                                        ] || {};
+                                      const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                      if (!raw || raw.trim() === "") {
+                                        setEditandoCosto((prev) => ({
+                                          ...prev,
+                                          [clave]: "",
+                                        }));
+                                        actualizarFormulario(
+                                          orden.id_orden_fabricacion,
+                                          "costo_fabricacion",
+                                          ""
+                                        );
+                                        return;
+                                      }
+                                      const num = cleanCOPFormat(raw);
+                                      costoManualEditado.current[clave] = true;
+                                      setEditandoCosto((prev) => ({
+                                        ...prev,
+                                        [clave]: formatCOP(num),
+                                      }));
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "costo_fabricacion",
+                                        num
+                                      );
+                                    }}
+                                    onFocus={() => {
+                                      /* mantener formato mientras escribe */
+                                    }}
+                                    onBlur={() => {
+                                      /* ya formateado en onChange */
+                                    }}
+                                    className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Observaciones"
+                                    value={
+                                      formularios[orden.id_orden_fabricacion]
+                                        ?.observaciones || ""
+                                    }
+                                    onChange={(e) =>
+                                      actualizarFormulario(
+                                        orden.id_orden_fabricacion,
+                                        "observaciones",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="border rounded px-2 py-1 border-slate-300 p-5"
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2 mt-4">
+                                  <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 cursor-pointer"
+                                  >
+                                    Registrar avance
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setMostrarFormularioAvance(null)
+                                    }
+                                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 cursor-pointer"
+                                  >
+                                    Cerrar
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
                       </td>
                     </tr>
                   )}
@@ -1397,7 +1604,11 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
         <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> — <span className="font-semibold text-gray-800">{total}</span> órdenes
+              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
+              de{" "}
+              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
+              — <span className="font-semibold text-gray-800">{total}</span>{" "}
+              órdenes
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -1416,7 +1627,10 @@ const [filtroEstadoActivas, setFiltroEstadoActivas] = useState('todas');
               </button>
               <select
                 value={pageSize}
-                onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value));
+                  setPage(1);
+                }}
                 className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
               >
                 <option value={10}>10 / página</option>

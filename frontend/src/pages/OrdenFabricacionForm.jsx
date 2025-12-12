@@ -21,7 +21,7 @@ const CrearOrdenFabricacion = () => {
   const [articulosOptions, setArticulosOptions] = useState([]);
   const [etapasProduccion, setEtapasProduccion] = useState([]);
   const [idEtapaDefault, setIdEtapaDefault] = useState(null);
-const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
+  const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
   const [detalles, setDetalles] = useState([]);
 
   // Para AsyncSelect
@@ -29,40 +29,44 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
   const timerRef = useRef(null);
 
   // Función para cargar artículos con búsqueda
-  const loadArticulosOptions = useCallback((inputValue, callback) => {
-    const cacheKey = inputValue?.toLowerCase() || '';
+  const loadArticulosOptions = useCallback(
+    (inputValue, callback) => {
+      const cacheKey = inputValue?.toLowerCase() || "";
 
-    // Si no hay búsqueda, retornar todos los artículos
-    if (!inputValue || inputValue.trim() === '') {
-      callback(articulosOptions);
-      return;
-    }
+      // Si no hay búsqueda, retornar todos los artículos
+      if (!inputValue || inputValue.trim() === "") {
+        callback(articulosOptions);
+        return;
+      }
 
-    // Si ya está en caché, retornar inmediatamente
-    if (cacheRef.current[cacheKey]) {
-      callback(cacheRef.current[cacheKey]);
-      return;
-    }
+      // Si ya está en caché, retornar inmediatamente
+      if (cacheRef.current[cacheKey]) {
+        callback(cacheRef.current[cacheKey]);
+        return;
+      }
 
-    // Limpiar el timer anterior
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+      // Limpiar el timer anterior
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
 
-    // Debounce: esperar 300ms
-    timerRef.current = setTimeout(() => {
-      // Filtrar localmente
-      const filtered = articulosOptions.filter(art => 
-        art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-        art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-        art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
-      );
-      
-      // Guardar en caché
-      cacheRef.current[cacheKey] = filtered;
-      callback(filtered);
-    }, 300);
-  }, [articulosOptions]);
+      // Debounce: esperar 300ms
+      timerRef.current = setTimeout(() => {
+        // Filtrar localmente
+        const filtered = articulosOptions.filter(
+          (art) =>
+            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
+        );
+
+        // Guardar en caché
+        cacheRef.current[cacheKey] = filtered;
+        callback(filtered);
+      }, 300);
+    },
+    [articulosOptions]
+  );
 
   useEffect(() => {
     if (etapasProduccion.length > 0) {
@@ -85,12 +89,16 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
     }
   }, [etapasProduccion]);
 
- useEffect(() => {
+  useEffect(() => {
     const fetchOrdenesPedido = async () => {
       try {
         const res = await api.get("/pedidos");
         const payload = res.data || {};
-        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
+        const rows = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload)
+          ? payload
+          : [];
         setOrdenesPedido(rows);
 
         if (idPedidoSeleccionado) {
@@ -108,36 +116,57 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
 
     const fetchArticulos = async () => {
       try {
-        const res = await api.get("/articulos", { params: { page: 1, pageSize: 200, sortBy: 'descripcion', sortDir: 'asc' } });
+        // Primera llamada para saber cuántos artículos hay en total
+        const resInicial = await api.get("/articulos", {
+          params: { page: 1, pageSize: 1 },
+        });
+        const total = resInicial.data.total || 0;
+
+        // Ahora obtener TODOS los artículos en una sola llamada
+        const res = await api.get("/articulos", {
+          params: {
+            page: 1,
+            pageSize: total || 10000,
+            sortBy: "descripcion",
+            sortDir: "asc",
+          },
+        });
         const payload = res.data || {};
-        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
-        
+        const rows = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload)
+          ? payload
+          : [];
+
         // Obtener categorías para filtrar solo artículos fabricables
         const resCategorias = await api.get("/categorias");
-        const categorias = Array.isArray(resCategorias.data) ? resCategorias.data : [];
+        const categorias = Array.isArray(resCategorias.data)
+          ? resCategorias.data
+          : [];
         const categoriasMap = {};
-        categorias.forEach(cat => {
+        categorias.forEach((cat) => {
           categoriasMap[cat.id_categoria] = cat.tipo;
         });
-        
+
         // Filtrar solo artículos fabricables
-        const articulosFabricables = rows.filter(art => 
-          categoriasMap[art.id_categoria] === 'articulo_fabricable'
+        const articulosFabricables = rows.filter(
+          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable"
         );
-        
+
         setArticulos(articulosFabricables);
-        
+
         // Crear opciones para AsyncSelect
         const opciones = articulosFabricables.map((art) => ({
           value: art.id_articulo,
-          label: `${art.descripcion} (Ref: ${art.referencia || 'N/A'})`,
+          label: `${art.descripcion} (Ref: ${art.referencia || "N/A"})`,
           referencia: art.referencia,
           descripcion: art.descripcion,
           ...art,
         }));
         setArticulosOptions(opciones);
-        cacheRef.current[''] = opciones;
+        cacheRef.current[""] = opciones;
       } catch (error) {
+        console.error("Error al cargar artículos:", error);
         toast.error("Error al cargar artículos");
       }
     };
@@ -146,7 +175,11 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
       try {
         const res = await api.get("/etapas-produccion");
         const payload = res.data || {};
-        const rows = Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : [];
+        const rows = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload)
+          ? payload
+          : [];
         setEtapasProduccion(rows);
       } catch (error) {
         toast.error("Error al cargar etapas de producción");
@@ -180,22 +213,24 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
             return componentesRes.data.map((comp) => ({
               id: Date.now() + Math.random(),
               articulo: comp,
-              cantidad: comp.cantidad, 
+              cantidad: comp.cantidad,
               descripcion: `Componente para: ${articuloOriginal.descripcion}`,
               id_etapa_final: idEtapaDefault || "",
             }));
           } else {
             // Si no es compuesto, devolvemos el artículo original
-            return [{
-              id: Date.now() + Math.random(),
-              articulo: articuloOriginal || {
-                id_articulo: item.id_articulo,
-                descripcion: item.descripcion,
+            return [
+              {
+                id: Date.now() + Math.random(),
+                articulo: articuloOriginal || {
+                  id_articulo: item.id_articulo,
+                  descripcion: item.descripcion,
+                },
+                cantidad: item.cantidad,
+                descripcion: "",
+                id_etapa_final: idEtapaDefault || "",
               },
-              cantidad: item.cantidad,
-              descripcion: "",
-              id_etapa_final: idEtapaDefault || "",
-            }];
+            ];
           }
         });
 
@@ -211,24 +246,24 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
       cargarArticulosDelPedido();
     }
   }, [idPedidoSeleccionado, articulos, idEtapaDefault]);
- 
 
   const handleDetalleChange = (index, campo, valor) => {
     const nuevosDetalles = [...detalles];
     nuevosDetalles[index][campo] = campo === "cantidad" ? Number(valor) : valor;
 
-   if (campo === "articulo") {
-    const esCompuesto = valor?.es_compuesto === 1;
-    nuevosDetalles[index].mensajeError = esCompuesto
-      ? 'Este artículo es compuesto. No se puede fabricar manualmente.'
-      : null;
-  }
+    if (campo === "articulo") {
+      const esCompuesto = valor?.es_compuesto === 1;
+      nuevosDetalles[index].mensajeError = esCompuesto
+        ? "Este artículo es compuesto. No se puede fabricar manualmente."
+        : null;
+    }
 
-  setDetalles(nuevosDetalles);
-  const tieneCompuesto = nuevosDetalles.some(d => d.articulo?.es_compuesto === 1);
-  setHayArticuloCompuesto(tieneCompuesto);
+    setDetalles(nuevosDetalles);
+    const tieneCompuesto = nuevosDetalles.some(
+      (d) => d.articulo?.es_compuesto === 1
+    );
+    setHayArticuloCompuesto(tieneCompuesto);
   };
-
 
   const handleRemoveDetalle = (index) => {
     setDetalles((prevDetalles) => prevDetalles.filter((_, i) => i !== index));
@@ -282,7 +317,7 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
           id_etapa_final: parseInt(d.id_etapa_final),
         })),
       };
-      
+
       await api.post("/ordenes-fabricacion", payload);
 
       toast.success("Orden de fabricación creada");
@@ -295,8 +330,6 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
       toast.error(mensajeBackend);
     }
   };
-
-
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
@@ -388,7 +421,7 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
           </div>
 
           {/* Detalles */}
-        
+
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Detalles de la orden</h3>
@@ -415,10 +448,20 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
                     cacheOptions
                     loadOptions={loadArticulosOptions}
                     defaultOptions={articulosOptions}
-                    value={articulosOptions.find(opt => opt.value === detalle.articulo?.id_articulo) || null}
+                    value={
+                      articulosOptions.find(
+                        (opt) => opt.value === detalle.articulo?.id_articulo
+                      ) || null
+                    }
                     onChange={(option) => {
-                      const articuloSeleccionado = option ? articulos.find(a => a.id_articulo === option.value) : null;
-                      handleDetalleChange(index, "articulo", articuloSeleccionado);
+                      const articuloSeleccionado = option
+                        ? articulos.find((a) => a.id_articulo === option.value)
+                        : null;
+                      handleDetalleChange(
+                        index,
+                        "articulo",
+                        articuloSeleccionado
+                      );
                     }}
                     placeholder="Busca o selecciona un artículo..."
                     isClearable
@@ -494,11 +537,16 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
                     className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                   />
                 </div>
-{detalle.mensajeError && (
-      <div className="md:col-span-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <span className="block sm:inline">{detalle.mensajeError}</span>
-      </div>
-    )}
+                {detalle.mensajeError && (
+                  <div
+                    className="md:col-span-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+                    role="alert"
+                  >
+                    <span className="block sm:inline">
+                      {detalle.mensajeError}
+                    </span>
+                  </div>
+                )}
                 {index > 0 && (
                   <button
                     type="button"
@@ -511,8 +559,7 @@ const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
               </div>
             ))}
           </div>
-          
-           
+
           {/* Botón submit */}
           <div className="pt-4 border-t flex justify-end gap-4">
             <button
