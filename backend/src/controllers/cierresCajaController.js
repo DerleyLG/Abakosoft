@@ -130,7 +130,29 @@ const cierresCajaController = {
     try {
       const { id } = req.params;
       const { fecha_fin, observaciones } = req.body;
-      const id_usuario_cierre = req.user.id_usuario;
+
+      // Intentar obtener id_usuario de diferentes campos posibles en el token
+      const id_usuario_cierre =
+        req.user?.id_usuario || req.user?.userId || req.user?.id || null;
+
+      // Log detallado para debugging
+      console.log("=== DEBUGGING CIERRE DE PERÍODO ===");
+      console.log("req.user completo:", JSON.stringify(req.user, null, 2));
+      console.log("id_usuario_cierre extraído:", id_usuario_cierre);
+      console.log("tipo de id_usuario_cierre:", typeof id_usuario_cierre);
+      console.log("===================================");
+
+      if (!id_usuario_cierre) {
+        console.error(
+          "Token no tiene id_usuario. Campos disponibles:",
+          Object.keys(req.user || {})
+        );
+        return res.status(401).json({
+          error:
+            "Usuario no autenticado correctamente. Token no contiene identificador de usuario válido.",
+          debug: Object.keys(req.user || {}),
+        });
+      }
 
       // Validar que el cierre exista y esté abierto
       const cierre = await cierresCajaModel.getById(id);
@@ -308,9 +330,8 @@ const cierresCajaController = {
    */
   verificarEstadoSistema: async (req, res) => {
     try {
-     
       const estado = await migracionService.necesitaMigracion();
-      
+
       res.json(estado);
     } catch (error) {
       console.error("[verificarEstadoSistema] Error:", error);
@@ -337,6 +358,34 @@ const cierresCajaController = {
       console.error("Error en migración:", error);
       res.status(500).json({
         error: error.message || "Error durante la migración de períodos",
+      });
+    }
+  },
+
+  /**
+   * POST /api/cierres-caja/limpiar-datos
+   * Limpiar todos los registros de control de caja (TRUNCATE)
+   */
+  limpiarDatos: async (req, res) => {
+    try {
+      // Verificar permisos (solo admin)
+      if (req.user && req.user.rol !== "admin") {
+        return res.status(403).json({
+          error: "Solo administradores pueden limpiar datos",
+        });
+      }
+
+      // Ejecutar truncate en las tablas relacionadas
+      await cierresCajaModel.limpiarDatos();
+
+      res.json({
+        success: true,
+        message: "Todos los registros de control de caja han sido eliminados",
+      });
+    } catch (error) {
+      console.error("Error limpiando datos:", error);
+      res.status(500).json({
+        error: error.message || "Error al limpiar los datos",
       });
     }
   },

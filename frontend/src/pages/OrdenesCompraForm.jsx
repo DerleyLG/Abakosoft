@@ -22,9 +22,19 @@ const cleanCOPFormat = (formattedValue) => {
 };
 
 const CrearOrdenCompra = () => {
+  // Obtener fecha actual en formato YYYY-MM-DD
+  const obtenerFechaActual = () => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(hoy.getDate()).padStart(2, "0")}`;
+  };
+
   const [proveedores, setProveedores] = useState([]);
   const [idProveedor, setIdProveedor] = useState("");
   const [categoriaCosto, setCategoriaCosto] = useState("");
+  const [fechaCompra, setFechaCompra] = useState(obtenerFechaActual());
   const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -277,6 +287,10 @@ const CrearOrdenCompra = () => {
       toast.error("Selecciona un proveedor");
       return false;
     }
+    if (!fechaCompra) {
+      toast.error("Selecciona la fecha de compra");
+      return false;
+    }
     if (articulosSeleccionados.length === 0) {
       toast.error("Agrega al menos un artículo a la orden de compra");
       return false;
@@ -343,6 +357,7 @@ const CrearOrdenCompra = () => {
 
     const datos = {
       id_proveedor: parseInt(idProveedor),
+      fecha: fechaCompra,
       categoria_costo: categoriaCosto.trim() || null,
       id_orden_fabricacion: null,
       estado: "pendiente",
@@ -363,6 +378,7 @@ const CrearOrdenCompra = () => {
 
         // Agregar campos como strings
         formData.append("id_proveedor", datos.id_proveedor);
+        formData.append("fecha", datos.fecha);
         if (datos.categoria_costo)
           formData.append("categoria_costo", datos.categoria_costo);
         formData.append("items", JSON.stringify(datos.items));
@@ -496,6 +512,23 @@ const CrearOrdenCompra = () => {
           <h3 className="text-xl font-bold mb-2 text-gray-800">
             Datos de Pago
           </h3>
+          <div>
+            <label
+              htmlFor="fechaCompra"
+              className="block text-sm font-semibold text-gray-700 mb-1"
+            >
+              Fecha de Compra <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="fechaCompra"
+              type="date"
+              value={fechaCompra}
+              onChange={(e) => setFechaCompra(e.target.value)}
+              required
+              className="cursor-pointer w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+            />
+          </div>
           <div>
             <label
               htmlFor="metodoPago"

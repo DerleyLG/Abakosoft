@@ -123,12 +123,10 @@ const getOrdenCompraById = async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error("Error al obtener la orden de compra:", error);
-    res
-      .status(500)
-      .json({
-        error:
-          "No se pudo obtener la orden. Intenta nuevamente o contacta soporte.",
-      });
+    res.status(500).json({
+      error:
+        "No se pudo obtener la orden. Intenta nuevamente o contacta soporte.",
+    });
   }
 };
 
@@ -151,6 +149,7 @@ async function createOrdenCompra(req, res) {
 
     const {
       id_proveedor,
+      fecha,
       categoria_costo,
       id_orden_fabricacion,
       id_metodo_pago,
@@ -159,6 +158,13 @@ async function createOrdenCompra(req, res) {
     } = req.body;
 
     const items = itemsParsed;
+
+    // Validar fecha obligatoria
+    if (!fecha) {
+      return res.status(400).json({
+        error: "La fecha de compra es obligatoria",
+      });
+    }
 
     // Obtener información del archivo si existe
     const comprobante = req.file
@@ -169,14 +175,12 @@ async function createOrdenCompra(req, res) {
         }
       : null;
 
-    // Validar que la fecha actual no esté en un período cerrado
-    // Usar la misma zona horaria que se usa para crear la orden
-    const fechaHoy = getTodayYMDForTZ();
-    const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fechaHoy);
+    // Validar que la fecha de compra no esté en un período cerrado
+    const fechaCerrada = await cierresCajaModel.validarFechaCerrada(fecha);
     if (fechaCerrada) {
       return res.status(400).json({
         error:
-          "No se pueden crear órdenes de compra en períodos cerrados. La fecha actual está en un período cerrado de caja.",
+          "No se pueden crear órdenes de compra con fecha en un período cerrado de caja.",
       });
     }
 
@@ -258,6 +262,7 @@ async function createOrdenCompra(req, res) {
 
     const ordenId = await ordenCompras.create(
       id_proveedor,
+      fecha,
       categoria_costo || null,
       id_orden_fabricacion || null,
       estadoFinal,
@@ -290,6 +295,7 @@ async function createOrdenCompra(req, res) {
       id_metodo_pago: id_metodo_pago,
       referencia: referencia,
       observaciones: observaciones_pago,
+      fecha_movimiento: fecha,
     };
     await tesoreriaModel.insertarMovimiento(movimientoData, connection);
 
