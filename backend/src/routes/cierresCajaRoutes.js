@@ -7,7 +7,6 @@ const { requirePermission } = require("../middlewares/permissions");
 // Todas las rutas requieren autenticación
 router.use(verifyToken);
 
-
 router.get("/", requirePermission(["admin"]), cierresCajaController.getAll);
 
 /**
@@ -55,11 +54,7 @@ router.get(
  * Crear nuevo período (solo primera vez)
  * Requiere: solo admin
  */
-router.post(
-  "/",
-  requirePermission(["admin"]),
-  cierresCajaController.create
-);
+router.post("/", requirePermission(["admin"]), cierresCajaController.create);
 
 /**
  * POST /api/cierres-caja/:id/cerrar
@@ -114,6 +109,17 @@ router.post(
   "/migrar-historicos",
   requirePermission(["admin"]),
   cierresCajaController.migrarPeriodosHistoricos
+);
+
+/**
+ * POST /api/cierres-caja/limpiar-datos
+ * Limpiar todos los registros de control de caja
+ * Requiere: solo admin
+ */
+router.post(
+  "/limpiar-datos",
+  requirePermission(["admin"]),
+  cierresCajaController.limpiarDatos
 );
 
 module.exports = router;

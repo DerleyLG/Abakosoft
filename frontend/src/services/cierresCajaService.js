@@ -84,6 +84,14 @@ const cierresCajaService = {
   },
 
   /**
+   * Limpiar todos los datos de control de caja
+   */
+  limpiarDatos: async () => {
+    const response = await api.post("/cierres-caja/limpiar-datos");
+    return response.data;
+  },
+
+  /**
    * Actualizar saldos iniciales de un período abierto
    */
   actualizarSaldosIniciales: async (id, saldos_iniciales) => {

@@ -110,6 +110,7 @@ module.exports = {
 
   create: async (
     id_proveedor,
+    fecha,
     categoria_costo,
     id_orden_fabricacion,
     estado,
@@ -118,12 +119,13 @@ module.exports = {
   ) => {
     const [result] = await (connection || db).query(
       `INSERT INTO ordenes_compra (id_proveedor, categoria_costo, id_orden_fabricacion, estado, fecha, comprobante_path, comprobante_nombre, comprobante_fecha_subida, stock_actualizado, tesoreria_actualizada)
-       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, 0, 0)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
       [
         id_proveedor,
         categoria_costo,
         id_orden_fabricacion,
         estado,
+        fecha,
         comprobante?.path || null,
         comprobante?.nombre || null,
         comprobante?.fecha_subida || null,

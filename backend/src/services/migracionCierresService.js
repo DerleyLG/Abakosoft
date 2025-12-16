@@ -145,15 +145,27 @@ async function migrarPeriodosHistoricos() {
   try {
     await connection.beginTransaction();
 
-
-
-    // 1. Verificar si ya hay cierres
+    // 1. Verificar si ya hay cierres y eliminarlos
     const [cierresExistentes] = await connection.query(
       "SELECT COUNT(*) as count FROM cierres_caja"
     );
 
     if (cierresExistentes[0].count > 0) {
-      throw new Error("Ya existen cierres en el sistema. No se puede migrar.");
+      console.log(
+        `⚠️ Se encontraron ${cierresExistentes[0].count} cierres existentes. Eliminando...`
+      );
+
+      // Desactivar foreign key checks temporalmente
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+
+      // Truncar tablas
+      await connection.query("TRUNCATE TABLE detalle_cierre_caja");
+      await connection.query("TRUNCATE TABLE cierres_caja");
+
+      // Reactivar foreign key checks
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+
+      console.log("✅ Cierres anteriores eliminados");
     }
 
     // 2. Encontrar fecha del primer movimiento
@@ -172,9 +184,12 @@ async function migrarPeriodosHistoricos() {
     console.log(` Primer movimiento: ${fechaInicio}`);
     console.log(` Primer período iniciará: ${primerLunes}`);
 
-    // 3. Obtener métodos de pago
+    // 3. Obtener métodos de pago (excluir crédito)
     const [metodosPago] = await connection.query(
-      "SELECT id_metodo_pago FROM metodos_pago ORDER BY id_metodo_pago"
+      `SELECT id_metodo_pago 
+       FROM metodos_pago 
+       WHERE LOWER(nombre) NOT LIKE '%credito%'
+       ORDER BY id_metodo_pago`
     );
 
     if (metodosPago.length === 0) {
@@ -238,15 +253,17 @@ async function migrarPeriodosHistoricos() {
 
       const id_cierre = resultPeriodo.insertId;
 
-      // Calcular movimientos de este período
+      // Calcular movimientos de este período (excluir crédito)
       const queryMovimientos = `
         SELECT 
           mt.id_metodo_pago,
           SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
           SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
         FROM movimientos_tesoreria mt
+        JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
         WHERE DATE(mt.fecha_movimiento) >= ?
           ${fecha_fin ? "AND DATE(mt.fecha_movimiento) <= ?" : ""}
+          AND LOWER(mp.nombre) NOT LIKE '%credito%'
         GROUP BY mt.id_metodo_pago
       `;
 

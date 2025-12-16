@@ -107,7 +107,7 @@ const cierresCajaModel = {
       return null;
     }
 
-    // Detalle por método de pago
+    // Detalle por método de pago (excluir crédito)
     const queryDetalle = `
       SELECT 
         d.id_detalle,
@@ -120,6 +120,7 @@ const cierresCajaModel = {
       FROM detalle_cierre_caja d
       JOIN metodos_pago mp ON d.id_metodo_pago = mp.id_metodo_pago
       WHERE d.id_cierre = ?
+        AND LOWER(mp.nombre) NOT LIKE '%credito%'
       ORDER BY mp.nombre
     `;
 
@@ -135,8 +136,10 @@ const cierresCajaModel = {
           SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
           SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
         FROM movimientos_tesoreria mt
+        JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
         WHERE DATE(mt.fecha_movimiento) >= ?
           AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
+          AND LOWER(mp.nombre) NOT LIKE '%credito%'
         GROUP BY mt.id_metodo_pago
       `;
 
@@ -231,6 +234,7 @@ const cierresCajaModel = {
     const { fecha_inicio, fecha_fin } = cierre[0];
 
     // Calcular totales por método de pago
+    // Excluir "Crédito" porque los abonos ya se contabilizan en efectivo/transferencia
     const query = `
       SELECT 
         mt.id_metodo_pago,
@@ -239,13 +243,16 @@ const cierresCajaModel = {
         SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
       FROM movimientos_tesoreria mt
       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-      WHERE DATE(mt.fecha_movimiento) BETWEEN ? AND ?
+      WHERE DATE(mt.fecha_movimiento) >= ?
+        AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
+        AND LOWER(mp.nombre) NOT LIKE '%credito%'
       GROUP BY mt.id_metodo_pago, mp.nombre
     `;
 
     const [totales] = await db.query(query, [
       fecha_inicio,
-      fecha_fin || fecha_inicio,
+      fecha_fin,
+      fecha_fin,
     ]);
     return totales;
   },
@@ -349,15 +356,18 @@ const cierresCajaModel = {
 
       // 3. Crear siguiente período automáticamente
       // Calcular saldos finales correctamente (saldo_inicial + ingresos - egresos)
+      // Excluir crédito de los saldos para el siguiente período
       const [saldosFinales] = await connection.query(
         `SELECT 
-          id_metodo_pago, 
-          saldo_inicial,
-          COALESCE(total_ingresos, 0) as total_ingresos,
-          COALESCE(total_egresos, 0) as total_egresos,
-          (saldo_inicial + COALESCE(total_ingresos, 0) - COALESCE(total_egresos, 0)) as saldo_final
-         FROM detalle_cierre_caja 
-         WHERE id_cierre = ?`,
+          d.id_metodo_pago, 
+          d.saldo_inicial,
+          COALESCE(d.total_ingresos, 0) as total_ingresos,
+          COALESCE(d.total_egresos, 0) as total_egresos,
+          (d.saldo_inicial + COALESCE(d.total_ingresos, 0) - COALESCE(d.total_egresos, 0)) as saldo_final
+         FROM detalle_cierre_caja d
+         JOIN metodos_pago mp ON d.id_metodo_pago = mp.id_metodo_pago
+         WHERE d.id_cierre = ?
+           AND LOWER(mp.nombre) NOT LIKE '%credito%'`,
         [id_cierre]
       );
 
@@ -592,6 +602,35 @@ const cierresCajaModel = {
     } catch (error) {
       console.error("Error validando período:", error);
       throw error;
+    }
+  },
+
+  /**
+   * Limpiar todos los datos de control de caja (TRUNCATE)
+   */
+  limpiarDatos: async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Desactivar foreign key checks temporalmente
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+
+      // Truncar tablas en orden
+      await connection.query("TRUNCATE TABLE detalle_cierre_caja");
+      await connection.query("TRUNCATE TABLE cierres_caja");
+
+      // Reactivar foreign key checks
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+
+      await connection.commit();
+      return { success: true };
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error limpiando datos:", error);
+      throw error;
+    } finally {
+      connection.release();
     }
   },
 };

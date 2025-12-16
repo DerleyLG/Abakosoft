@@ -120,4 +120,15 @@ router.post(
   cierresCajaController.migrarPeriodosHistoricos
 );
 
+/**
+ * POST /api/cierres-caja/recalcular-historicos
+ * Recalcular totales de períodos históricos cerrados
+ * Requiere: solo admin
+ */
+router.post(
+  "/recalcular-historicos",
+  requirePermission(["admin"]),
+  cierresCajaController.recalcularHistoricos
+);
+
 module.exports = router;

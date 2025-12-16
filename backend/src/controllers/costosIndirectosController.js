@@ -1,6 +1,9 @@
 const CostosIndirectos = require("../models/costosIndirectosModel");
 const CostosIndirectosAsignados = require("../models/costosIndirectosAsignadosModel");
 const db = require("../database/db");
+const {
+  validarFechaNoEnPeriodoCerrado,
+} = require("../utils/validacionCierres");
 
 exports.getAll = async (req, res) => {
   try {
@@ -98,6 +101,12 @@ exports.createCostoIndirecto = async (req, res) => {
     });
   }
 
+  // Validar que la fecha no esté en un período cerrado
+  const validacion = await validarFechaNoEnPeriodoCerrado(fecha);
+  if (!validacion.valido) {
+    return res.status(400).json({ error: validacion.error });
+  }
+
   try {
     const [result] = await CostosIndirectos.create({
       tipo_costo,
@@ -116,8 +125,8 @@ exports.createCostoIndirecto = async (req, res) => {
       observaciones: observaciones || null,
     };
 
-    // Registrar movimiento en tesorería si se envía método de pago
-    if (id_metodo_pago && Number(valor) > 0) {
+    // Registrar movimiento en tesorería (ahora obligatorio)
+    if (Number(valor) > 0) {
       try {
         const tesoreriaModel = require("../models/tesoreriaModel");
         await tesoreriaModel.insertarMovimiento({
