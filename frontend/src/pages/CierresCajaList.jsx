@@ -80,7 +80,7 @@ const CierresCajaList = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       const [historico, abierto] = await Promise.all([
         cierresCajaService.getAll(),
         cierresCajaService.getCierreAbierto().catch(() => null),
@@ -108,8 +108,8 @@ const CierresCajaList = () => {
 
       // Formatear fechas para mostrar
       const formatearFecha = (fecha) => {
-        if (!fecha) return '-';
-        const [year, month, day] = fecha.split('T')[0].split('-');
+        if (!fecha) return "-";
+        const [year, month, day] = fecha.split("T")[0].split("-");
         return `${day}/${month}/${year}`;
       };
 
@@ -121,10 +121,18 @@ const CierresCajaList = () => {
             <div class="bg-blue-50 border border-blue-200 rounded p-4 mb-3">
               <p class="text-sm mb-2"><strong> Resumen:</strong></p>
               <ul class="list-disc pl-5 text-sm space-y-1">
-                <li><strong>Primer movimiento:</strong> ${formatearFecha(estado.primera_fecha_movimiento)}</li>
-                <li><strong>Primer período:</strong> Desde ${formatearFecha(estado.primer_lunes)}</li>
-                <li><strong>Total movimientos:</strong> ${estado.cantidad_movimientos}</li>
-                <li><strong>Períodos a crear:</strong> ${estado.periodos_a_crear}</li>
+                <li><strong>Primer movimiento:</strong> ${formatearFecha(
+                  estado.primera_fecha_movimiento
+                )}</li>
+                <li><strong>Primer período:</strong> Desde ${formatearFecha(
+                  estado.primer_lunes
+                )}</li>
+                <li><strong>Total movimientos:</strong> ${
+                  estado.cantidad_movimientos
+                }</li>
+                <li><strong>Períodos a crear:</strong> ${
+                  estado.periodos_a_crear
+                }</li>
               </ul>
             </div>
             <div class="bg-green-50 border border-green-200 rounded p-3 mb-3">
@@ -189,27 +197,37 @@ const CierresCajaList = () => {
   const manejarLimpiarDatos = async () => {
     try {
       // Obtener último cierre cerrado con detalles
-      const cierresCerrados = cierres.filter((c) => c.estado === "cerrado");
-      const ultimoCerradoBasico = cierresCerrados[cierresCerrados.length - 1];
-      
+      const cierresCerrados = cierres
+        .filter((c) => c.estado === "cerrado")
+        .sort((a, b) => b.id_cierre - a.id_cierre); // Ordenar descendente por id_cierre
+      const ultimoCerradoBasico = cierresCerrados[0]; // Primer elemento es el más reciente
+
       let ultimoCerrado = null;
-      let saldosHTML = '';
-      
+      let saldosHTML = "";
+
       if (ultimoCerradoBasico) {
         // Obtener detalle completo del último cierre
-        ultimoCerrado = await cierresCajaService.getById(ultimoCerradoBasico.id_cierre);
-        
+        ultimoCerrado = await cierresCajaService.getById(
+          ultimoCerradoBasico.id_cierre
+        );
+
         // Construir HTML de saldos (backend devuelve 'detalle_metodos')
-        if (ultimoCerrado.detalle_metodos && ultimoCerrado.detalle_metodos.length > 0) {
+        if (
+          ultimoCerrado.detalle_metodos &&
+          ultimoCerrado.detalle_metodos.length > 0
+        ) {
           saldosHTML = ultimoCerrado.detalle_metodos
-            .map(det => {
-              const colorClase = det.saldo_final < 0 ? 'text-red-700' : 'text-green-700';
+            .map((det) => {
+              const colorClase =
+                det.saldo_final < 0 ? "text-red-700" : "text-green-700";
               return `<div class="flex justify-between text-xs py-1 border-b">
                 <span class="font-medium">${det.metodo_nombre}:</span>
-                <span class="font-bold ${colorClase}">${formatMonto(det.saldo_final)}</span>
+                <span class="font-bold ${colorClase}">${formatMonto(
+                det.saldo_final
+              )}</span>
               </div>`;
             })
-            .join('');
+            .join("");
         }
       }
 
@@ -226,20 +244,28 @@ const CierresCajaList = () => {
               </ul>
             </div>
 
-            ${ultimoCerrado ? `
+            ${
+              ultimoCerrado
+                ? `
             <div class="bg-blue-50 border border-blue-200 rounded p-4 mb-3">
               <p class="text-sm mb-2"><strong>💡 Recomendación:</strong></p>
               <p class="text-sm mb-2">Anota los <strong>saldos finales</strong> del último período cerrado:</p>
               <div class="bg-white rounded p-3 text-xs">
-                <p class="font-bold mb-2">Período #${ultimoCerrado.id_cierre}</p>
-                <p class="text-gray-600 mb-2">${formatFecha(ultimoCerrado.fecha_inicio)} - ${formatFecha(ultimoCerrado.fecha_fin)}</p>
+                <p class="font-bold mb-2">Período #${
+                  ultimoCerrado.id_cierre
+                }</p>
+                <p class="text-gray-600 mb-2">${formatFecha(
+                  ultimoCerrado.fecha_inicio
+                )} - ${formatFecha(ultimoCerrado.fecha_fin)}</p>
                 <div class="border-t pt-2">
                   <p class="font-semibold mb-2 text-gray-700">Saldos Finales:</p>
                   ${saldosHTML}
                 </div>
               </div>
             </div>
-            ` : '<div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3"><p class="text-sm">No hay períodos cerrados. Se eliminarán todos los períodos actuales.</p></div>'}
+            `
+                : '<div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3"><p class="text-sm">No hay períodos cerrados. Se eliminarán todos los períodos actuales.</p></div>'
+            }
 
             <div class="bg-yellow-50 border border-yellow-300 rounded p-3 mb-3">
               <p class="text-sm"><strong> Importante:</strong> Usa estos saldos finales como <strong>saldos iniciales</strong> cuando vuelvas a crear períodos.</p>
@@ -334,7 +360,7 @@ const CierresCajaList = () => {
             onSuccess={fetchData}
           />
         )}
-        
+
         <div className="flex items-center justify-center min-h-[80vh]">
           <div className="text-center max-w-3xl">
             <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-6 shadow-lg">
@@ -346,16 +372,19 @@ const CierresCajaList = () => {
             <p className="text-xl text-gray-600 mb-8">
               Elige cómo deseas iniciar tu control de caja
             </p>
-            
+
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               {/* Opción 1: Manual */}
               <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200 hover:border-blue-400 transition">
                 <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                   <FiPlus className="text-blue-600" size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Inicio Manual</h3>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                  Inicio Manual
+                </h3>
                 <p className="text-gray-600 mb-4 text-sm">
-                  Crea un período desde hoy, ingresando los saldos iniciales de cada método de pago
+                  Crea un período desde hoy, ingresando los saldos iniciales de
+                  cada método de pago
                 </p>
                 <button
                   onClick={() => setMostrarModalIniciar(true)}
@@ -371,9 +400,12 @@ const CierresCajaList = () => {
                 <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                   <FiZap className="text-green-600" size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Cálculo Automático</h3>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                  Cálculo Automático
+                </h3>
                 <p className="text-gray-600 mb-4 text-sm">
-                  Sistema crea períodos semanales basándose en tus movimientos históricos
+                  Sistema crea períodos semanales basándose en tus movimientos
+                  históricos
                 </p>
                 <button
                   onClick={manejarMigracionAutomatica}
@@ -390,8 +422,14 @@ const CierresCajaList = () => {
                 <strong>💡 ¿Cuál elegir?</strong>
               </p>
               <ul className="text-sm text-gray-600 mt-2 space-y-1">
-                <li><strong>Manual:</strong> Para empezar de cero o si no tienes historial</li>
-                <li><strong>Automático:</strong> Si tienes movimientos registrados y quieres crear períodos retroactivos</li>
+                <li>
+                  <strong>Manual:</strong> Para empezar de cero o si no tienes
+                  historial
+                </li>
+                <li>
+                  <strong>Automático:</strong> Si tienes movimientos registrados
+                  y quieres crear períodos retroactivos
+                </li>
               </ul>
             </div>
           </div>
@@ -408,7 +446,7 @@ const CierresCajaList = () => {
           onSuccess={fetchData}
         />
       )}
-      
+
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>

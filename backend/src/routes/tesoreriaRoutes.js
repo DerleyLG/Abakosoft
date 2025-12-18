@@ -29,6 +29,7 @@ router.get(
 router.get("/ordenes-compra/count", TesoreriaController.getOrdenesCompraCount);
 router.get("/costos/count", TesoreriaController.getCostosIndirectosCount);
 router.get("/materia-prima/count", TesoreriaController.getMateriaPrimaCount);
+router.get("/anticipos/count", TesoreriaController.getAnticiposCount);
 router.get("/ventas-cobros", TesoreriaController.getVentasCobrosReport);
 router.get(
   "/:documento/:idDocumento",
