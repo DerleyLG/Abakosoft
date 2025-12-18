@@ -1,10 +1,8 @@
-
-const db = require('../database/db');
+const db = require("../database/db");
 
 module.exports = {
-
-    getAll: async () => {
-  const [rows] = await db.query(`
+  getAll: async () => {
+    const [rows] = await db.query(`
     SELECT 
       a.id_anticipo,
       a.id_trabajador,
@@ -25,20 +23,41 @@ module.exports = {
     ORDER BY a.fecha DESC
   `);
 
-  return rows;
-},
+    return rows;
+  },
 
-
-  crear: async ({ id_trabajador, fecha, id_orden_fabricacion, monto, observaciones }) => {
+  // Alias para compatibilidad
+  create: async ({
+    id_trabajador,
+    fecha,
+    id_orden_fabricacion,
+    monto,
+    observaciones,
+  }) => {
     const [result] = await db.query(
       `INSERT INTO anticipos_trabajadores
       (id_trabajador,  id_orden_fabricacion,fecha, monto,  observaciones)
       VALUES (?, ?, ?, ?, ?)`,
-      [id_trabajador, id_orden_fabricacion,fecha, monto, observaciones]
+      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones]
     );
     return result.insertId;
   },
 
+  crear: async ({
+    id_trabajador,
+    fecha,
+    id_orden_fabricacion,
+    monto,
+    observaciones,
+  }) => {
+    const [result] = await db.query(
+      `INSERT INTO anticipos_trabajadores
+      (id_trabajador,  id_orden_fabricacion,fecha, monto,  observaciones)
+      VALUES (?, ?, ?, ?, ?)`,
+      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones]
+    );
+    return result.insertId;
+  },
 
   getActivo: async (id_trabajador, id_orden_fabricacion) => {
     const [rows] = await db.query(
@@ -50,7 +69,6 @@ module.exports = {
     return rows[0];
   },
 
- 
   descontar: async (id_anticipo, montoAplicado) => {
     // Obtener anticipo actual
     const [rows] = await db.query(
@@ -58,11 +76,12 @@ module.exports = {
       [id_anticipo]
     );
     const anticipo = rows[0];
-    const nuevoMontoUsado = Number(anticipo.monto_usado) + Number(montoAplicado);
+    const nuevoMontoUsado =
+      Number(anticipo.monto_usado) + Number(montoAplicado);
 
-    let nuevoEstado = 'parcial';
+    let nuevoEstado = "parcial";
     if (nuevoMontoUsado >= Number(anticipo.monto)) {
-      nuevoEstado = 'saldado';
+      nuevoEstado = "saldado";
     }
 
     await db.query(
@@ -71,5 +90,5 @@ module.exports = {
        WHERE id_anticipo = ?`,
       [nuevoMontoUsado, nuevoEstado, id_anticipo]
     );
-  }
+  },
 };

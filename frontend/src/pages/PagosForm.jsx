@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import api from "../services/api";
 import { FiArrowRight, FiArrowLeft, FiX } from "react-icons/fi";
 import AnticipoAlert from "../components/AnticipoAlert";
-import { confirmAlert } from 'react-confirm-alert';
+import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
 
@@ -12,8 +12,17 @@ const FormularioPagoAvances = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
 
+  // Obtener fecha actual en formato local YYYY-MM-DD
+  const obtenerFechaActual = () => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(hoy.getDate()).padStart(2, "0")}`;
+  };
+
   const [avances, setAvances] = useState([]);
-  const [fechaPago, setFechaPago] = useState(new Date().toISOString().split("T")[0]);
+  const [fechaPago, setFechaPago] = useState(obtenerFechaActual());
   const [observaciones, setObservaciones] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [esAnticipo, setEsAnticipo] = useState(false);
@@ -22,15 +31,22 @@ const FormularioPagoAvances = () => {
   const [ordenSeleccionada, setOrdenSeleccionada] = useState("");
   const [trabajadorSeleccionado, setTrabajadorSeleccionado] = useState("");
   const [trabajadores, setTrabajadores] = useState([]);
- 
+
   const [mostrarAlertaAnticipo, setMostrarAlertaAnticipo] = useState(false);
 
+  // Estados para datos de pago
+  const [metodosPago, setMetodosPago] = useState([]);
+  const [idMetodoPago, setIdMetodoPago] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [observacionesPago, setObservacionesPago] = useState("");
 
   useEffect(() => {
     // Solo si estamos en modo "pago normal" y tenemos avances cargados
     if (!esAnticipo && state?.avances && state.avances.length > 0) {
       // Buscar el primer avance válido que tenga trabajador y orden y que no sea un descuento
-      const avanceInicial = state.avances.find(a => a && a.id_trabajador && a.id_orden_fabricacion && !a.es_descuento);
+      const avanceInicial = state.avances.find(
+        (a) => a && a.id_trabajador && a.id_orden_fabricacion && !a.es_descuento
+      );
       if (!avanceInicial) {
         setMostrarAlertaAnticipo(false);
         return;
@@ -51,18 +67,20 @@ const FormularioPagoAvances = () => {
           if (res.data) {
             // Mostramos la alerta de confirmación
             confirmAlert({
-              title: 'Anticipo disponible',
-              message: `El trabajador ${avanceInicial.nombre_trabajador || ''} tiene un anticipo activo de $${res.data.monto.toLocaleString()}. ¿Deseas aplicar el descuento en este pago?`,
+              title: "Anticipo disponible",
+              message: `El trabajador ${
+                avanceInicial.nombre_trabajador || ""
+              } tiene un anticipo activo de $${res.data.monto.toLocaleString()}. ¿Deseas aplicar el descuento en este pago?`,
               buttons: [
                 {
-                  label: 'Sí, aplicar',
+                  label: "Sí, aplicar",
                   onClick: () => {
                     setMostrarAlertaAnticipo(true);
                     toast.success("Puedes aplicar el descuento para este pago");
                   },
                 },
                 {
-                  label: 'No, dejarlo para después',
+                  label: "No, dejarlo para después",
                   onClick: () => {
                     setMostrarAlertaAnticipo(false);
                     toast("Descuento no aplicado");
@@ -83,22 +101,36 @@ const FormularioPagoAvances = () => {
       // Si el modo es "registrar anticipo", no hay necesidad de mostrar la alerta de anticipo para pagos normales
       setMostrarAlertaAnticipo(false);
     }
-  }, [state?.avances, esAnticipo]); 
+  }, [state?.avances, esAnticipo]);
 
   useEffect(() => {
     if (state?.avances?.length > 0) {
       setAvances(state.avances);
       // Si el usuario activa modo anticipo, rellenar orden y trabajador automáticamente
       const primerAvance = state.avances[0];
-      if (primerAvance?.id_orden_fabricacion) setOrdenSeleccionada(primerAvance.id_orden_fabricacion);
-      if (primerAvance?.id_trabajador) setTrabajadorSeleccionado(primerAvance.id_trabajador);
+      if (primerAvance?.id_orden_fabricacion)
+        setOrdenSeleccionada(primerAvance.id_orden_fabricacion);
+      if (primerAvance?.id_trabajador)
+        setTrabajadorSeleccionado(primerAvance.id_trabajador);
     }
   }, [state]);
+
+  // Cargar métodos de pago
+  useEffect(() => {
+    api
+      .get("/metodos-pago")
+      .then((res) => setMetodosPago(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => {
+        console.error("Error cargando métodos de pago:", err);
+        setMetodosPago([]);
+      });
+  }, []);
 
   useEffect(() => {
     // Cargar trabajadores siempre que haya avances o modo anticipo
     if (state?.avances?.length > 0 || esAnticipo) {
-      api.get("/trabajadores")
+      api
+        .get("/trabajadores")
         .then((res) => setTrabajadores(res.data))
         .catch(() => toast.error("Error al cargar trabajadores"));
     }
@@ -112,10 +144,13 @@ const FormularioPagoAvances = () => {
   useEffect(() => {
     if (esAnticipo) {
       // Cargar órdenes de fabricación disponibles para anticipo (solo pendientes o en proceso)
-      api.get("/ordenes-fabricacion?estados=pendiente,en proceso")
+      api
+        .get("/ordenes-fabricacion?estados=pendiente,en proceso")
         .then((res) => {
           // La respuesta es paginada, extraer el array 'data'
-          const ordenesArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          const ordenesArray = Array.isArray(res.data)
+            ? res.data
+            : res.data?.data || [];
           setOrdenes(ordenesArray);
         })
         .catch(() => {
@@ -124,9 +159,12 @@ const FormularioPagoAvances = () => {
         });
 
       // Cargar trabajadores (siempre que sea anticipo)
-      api.get("/trabajadores")
+      api
+        .get("/trabajadores")
         .then((res) => {
-          const trabajadoresArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          const trabajadoresArray = Array.isArray(res.data)
+            ? res.data
+            : res.data?.data || [];
           setTrabajadores(trabajadoresArray);
         })
         .catch(() => {
@@ -139,6 +177,10 @@ const FormularioPagoAvances = () => {
   const handleRegistrarPago = async () => {
     if (!esAnticipo && totalFinal < 0) {
       toast.error("El total a pagar no puede ser menor a cero.");
+      return;
+    }
+    if (!idMetodoPago) {
+      toast.error("El método de pago es obligatorio.");
       return;
     }
     if (esAnticipo) {
@@ -158,6 +200,9 @@ const FormularioPagoAvances = () => {
           monto: montoAnticipo,
           observaciones,
           fecha: fechaPago,
+          id_metodo_pago: idMetodoPago,
+          referencia: referencia.trim() || null,
+          observaciones_pago: observacionesPago.trim() || null,
         });
         toast.success("Anticipo registrado correctamente");
         navigate("/pagos_anticipados");
@@ -167,6 +212,9 @@ const FormularioPagoAvances = () => {
           id_orden_fabricacion: avances?.[0]?.id_orden_fabricacion || "",
           fecha_pago: fechaPago,
           observaciones,
+          id_metodo_pago: idMetodoPago,
+          referencia: referencia.trim() || null,
+          observaciones_pago: observacionesPago.trim() || null,
           detalles: avances.map((a) => ({
             id_avance_etapa: a.es_descuento ? null : a.id_avance_etapa,
             cantidad: a.cantidad,
@@ -180,7 +228,10 @@ const FormularioPagoAvances = () => {
         navigate("/trabajadores/pagos");
       }
     } catch (error) {
-      const mensaje = error.response?.data?.error || error.response?.data?.message || "Error al registrar pago.";
+      const mensaje =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Error al registrar pago.";
       toast.error(mensaje);
     } finally {
       setGuardando(false);
@@ -214,12 +265,12 @@ const FormularioPagoAvances = () => {
     };
 
     setAvances([...avances, descuento]);
-    setMostrarAlertaAnticipo(false); 
+    setMostrarAlertaAnticipo(false);
   };
 
   const quitarDescuentoDeAnticipo = () => {
     setAvances(avances.filter((a) => !a.es_descuento));
-    setMostrarAlertaAnticipo(true); 
+    setMostrarAlertaAnticipo(true);
   };
 
   const trabajadorActual = trabajadores.find(
@@ -251,7 +302,9 @@ const FormularioPagoAvances = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de pago</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Fecha de pago
+          </label>
           <input
             type="date"
             value={fechaPago}
@@ -259,22 +312,46 @@ const FormularioPagoAvances = () => {
             className="w-full border border-slate-300 rounded-xl px-4 py-2"
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1 ">Registrar como anticipo</label>
-          <label className="inline-flex items-center gap-2 text-slate-600">
-            <input
-              type="checkbox"
-              checked={esAnticipo}
-              onChange={(e) => setEsAnticipo(e.target.checked)}
-              className="accent-slate-700 w-4 h-4 cursor-pointer"
-            />
-            Marcar este pago como anticipo
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Método de Pago <span className="text-red-500">*</span>
           </label>
+          <select
+            value={idMetodoPago}
+            onChange={(e) => setIdMetodoPago(e.target.value)}
+            required
+            className="w-full border border-slate-300 bg-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+          >
+            <option value="">Selecciona método de pago</option>
+            {metodosPago.map((m) => (
+              <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                {m.nombre}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1 ">
+          Registrar como anticipo
+        </label>
+        <label className="inline-flex items-center gap-2 text-slate-600">
+          <input
+            type="checkbox"
+            checked={esAnticipo}
+            onChange={(e) => setEsAnticipo(e.target.checked)}
+            className="accent-slate-700 w-4 h-4 cursor-pointer"
+          />
+          Marcar este pago como anticipo
+        </label>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
+          Observaciones
+        </label>
         <textarea
           value={observaciones}
           onChange={(e) => setObservaciones(e.target.value)}
@@ -284,99 +361,152 @@ const FormularioPagoAvances = () => {
       </div>
 
       {esAnticipo ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Orden de fabricación</label>
-            <select
-              value={ordenSeleccionada}
-              onChange={(e) => {
-                setOrdenSeleccionada(e.target.value);
-                const orden = Array.isArray(ordenes) ? ordenes.find(o => o.id_orden_fabricacion === Number(e.target.value)) : null;
-                if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
-              }}
-              className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
-              disabled={!Array.isArray(ordenes) || ordenes.length === 0}
-            >
-              {!Array.isArray(ordenes) || ordenes.length === 0 ? (
-                <option value="" disabled>No hay órdenes pendientes o en proceso</option>
-              ) : (
-                <>
-                  <option value="">Seleccione una orden</option>
-                  {ordenes.map((o) => (
-                    <option key={o.id_orden_fabricacion} value={o.id_orden_fabricacion}>
-                      #{o.id_orden_fabricacion} - {o.nombre_cliente || "Cliente"}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Orden de fabricación
+              </label>
+              <select
+                value={ordenSeleccionada}
+                onChange={(e) => {
+                  setOrdenSeleccionada(e.target.value);
+                  const orden = Array.isArray(ordenes)
+                    ? ordenes.find(
+                        (o) => o.id_orden_fabricacion === Number(e.target.value)
+                      )
+                    : null;
+                  if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
+                }}
+                className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
+                disabled={!Array.isArray(ordenes) || ordenes.length === 0}
+              >
+                {!Array.isArray(ordenes) || ordenes.length === 0 ? (
+                  <option value="" disabled>
+                    No hay órdenes pendientes o en proceso
+                  </option>
+                ) : (
+                  <>
+                    <option value="">Seleccione una orden</option>
+                    {ordenes.map((o) => (
+                      <option
+                        key={o.id_orden_fabricacion}
+                        value={o.id_orden_fabricacion}
+                      >
+                        #{o.id_orden_fabricacion} -{" "}
+                        {o.nombre_cliente || "Cliente"}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Trabajador
+              </label>
+              <select
+                value={trabajadorSeleccionado}
+                onChange={(e) => setTrabajadorSeleccionado(e.target.value)}
+                className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
+              >
+                <option value="">Seleccione un trabajador</option>
+                {Array.isArray(trabajadores) &&
+                  trabajadores.map((t) => (
+                    <option key={t.id_trabajador} value={t.id_trabajador}>
+                      {t.nombre} - {t.cargo}
                     </option>
                   ))}
-                </>
-              )}
-            </select>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Monto del anticipo
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                min="0"
+                value={
+                  montoAnticipo === 0 ? "" : montoAnticipo.toLocaleString()
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setMontoAnticipo(raw ? parseFloat(raw) : 0);
+                }}
+                className="w-full border border-slate-300 rounded-xl px-4 py-2"
+                placeholder="0"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Trabajador</label>
-            <select
-              value={trabajadorSeleccionado}
-              onChange={(e) => setTrabajadorSeleccionado(e.target.value)}
-              className="w-full border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition"
-            >
-              <option value="">Seleccione un trabajador</option>
-              {Array.isArray(trabajadores) && trabajadores.map((t) => (
-                <option key={t.id_trabajador} value={t.id_trabajador}>
-                  {t.nombre} - {t.cargo}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Referencia / No. Transacción
+              </label>
+              <input
+                type="text"
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                placeholder="Ej: No. de cuenta, comprobante"
+                className="w-full border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Observaciones del Pago
+              </label>
+              <input
+                type="text"
+                value={observacionesPago}
+                onChange={(e) => setObservacionesPago(e.target.value)}
+                placeholder="Opcional"
+                className="w-full border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Monto del anticipo</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              min="0"
-              value={montoAnticipo === 0 ? '' : montoAnticipo.toLocaleString()}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, '');
-                setMontoAnticipo(raw ? parseFloat(raw) : 0);
-              }}
-              className="w-full border border-slate-300 rounded-xl px-4 py-2"
-              placeholder="0"
-            />
-          </div>
-        </div>
+        </>
       ) : (
         <>
-          {avances.length > 0 && avances[0]?.id_trabajador && avances[0]?.id_orden_fabricacion && (
-            <>
-              {/* Solo se muestra AnticipoAlert si mostrarAlertaAnticipo es true */}
-              {mostrarAlertaAnticipo && (
-                <AnticipoAlert
-                  idTrabajador={avances[0].id_trabajador}
-                  idOrdenFabricacion={avances[0].id_orden_fabricacion}
-                  nombreTrabajador={nombreTrabajador}
-                  totalAvance={totalFinal}
-                  onAplicarDescuento={aplicarDescuentoDeAnticipo}
-                  onQuitarDescuento={() => setMostrarAlertaAnticipo(true)} // Esto hace que la alerta reaparezca si se quita el descuento
-                />
-              )}
+          {avances.length > 0 &&
+            avances[0]?.id_trabajador &&
+            avances[0]?.id_orden_fabricacion && (
+              <>
+                {/* Solo se muestra AnticipoAlert si mostrarAlertaAnticipo es true */}
+                {mostrarAlertaAnticipo && (
+                  <AnticipoAlert
+                    idTrabajador={avances[0].id_trabajador}
+                    idOrdenFabricacion={avances[0].id_orden_fabricacion}
+                    nombreTrabajador={nombreTrabajador}
+                    totalAvance={totalFinal}
+                    onAplicarDescuento={aplicarDescuentoDeAnticipo}
+                    onQuitarDescuento={() => setMostrarAlertaAnticipo(true)} // Esto hace que la alerta reaparezca si se quita el descuento
+                  />
+                )}
 
-              {/* Este botón se muestra si NO hay alerta activa Y ya se aplicó un descuento */}
-              {!mostrarAlertaAnticipo && avances.some(a => a.es_descuento) && (
-                <div className="my-4">
-                  <button
-                    onClick={quitarDescuentoDeAnticipo}
-                    className="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 border border-red-600 px-3 py-1 rounded-md"
-                  >
-                    <FiX className="w-4 h-4" />
-                    Quitar descuento por anticipo
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                {/* Este botón se muestra si NO hay alerta activa Y ya se aplicó un descuento */}
+                {!mostrarAlertaAnticipo &&
+                  avances.some((a) => a.es_descuento) && (
+                    <div className="my-4">
+                      <button
+                        onClick={quitarDescuentoDeAnticipo}
+                        className="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 border border-red-600 px-3 py-1 rounded-md"
+                      >
+                        <FiX className="w-4 h-4" />
+                        Quitar descuento por anticipo
+                      </button>
+                    </div>
+                  )}
+              </>
+            )}
 
           <div className="mb-6">
-            <h4 className="text-lg font-bold text-slate-700 mb-2">Detalles del Pago</h4>
+            <h4 className="text-lg font-bold text-slate-700 mb-2">
+              Detalles del Pago
+            </h4>
             <div className="overflow-x-auto rounded-xl border border-slate-300">
               <table className="w-full table-auto text-sm">
                 <thead className="bg-slate-100 text-slate-700">
@@ -395,12 +525,18 @@ const FormularioPagoAvances = () => {
                       <td className="px-4 py-2">
                         {a.es_descuento
                           ? "—"
-                          : `#${a.id_orden_fabricacion}${a.nombre_cliente ? ' - ' + a.nombre_cliente : ''}`}
+                          : `#${a.id_orden_fabricacion}${
+                              a.nombre_cliente ? " - " + a.nombre_cliente : ""
+                            }`}
                       </td>
                       <td className="px-4 py-2">{a.descripcion || "—"}</td>
-                      <td className="px-4 py-2">{a.es_descuento ? "—" : a.nombre_etapa}</td>
+                      <td className="px-4 py-2">
+                        {a.es_descuento ? "—" : a.nombre_etapa}
+                      </td>
                       <td className="px-4 py-2">{a.cantidad}</td>
-                      <td className="px-4 py-2">${a.costo_fabricacion.toLocaleString()}</td>
+                      <td className="px-4 py-2">
+                        ${a.costo_fabricacion.toLocaleString()}
+                      </td>
                       <td className="px-4 py-2">
                         ${(a.cantidad * a.costo_fabricacion).toLocaleString()}
                       </td>
@@ -413,6 +549,35 @@ const FormularioPagoAvances = () => {
               Total a pagar: ${totalFinal.toLocaleString()}
             </p>
           </div>
+
+          {!esAnticipo && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Referencia / No. Transacción
+                </label>
+                <input
+                  type="text"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  placeholder="Ej: No. de cuenta, comprobante"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Observaciones del Pago
+                </label>
+                <input
+                  type="text"
+                  value={observacionesPago}
+                  onChange={(e) => setObservacionesPago(e.target.value)}
+                  placeholder="Opcional"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -421,7 +586,10 @@ const FormularioPagoAvances = () => {
           onClick={handleRegistrarPago}
           disabled={
             guardando ||
-            (esAnticipo && (!ordenSeleccionada || !trabajadorSeleccionado || montoAnticipo <= 0)) ||
+            (esAnticipo &&
+              (!ordenSeleccionada ||
+                !trabajadorSeleccionado ||
+                montoAnticipo <= 0)) ||
             (!esAnticipo && mostrarAlertaAnticipo)
           }
           className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -429,7 +597,6 @@ const FormularioPagoAvances = () => {
           {guardando ? "Guardando..." : "Registrar Pago"}
         </button>
       </div>
-
     </div>
   );
 };

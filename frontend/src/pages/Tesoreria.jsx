@@ -43,6 +43,10 @@ const TesoreriaDashboard = () => {
     comprasTransferencia: 0,
     costosEfectivo: 0,
     costosTransferencia: 0,
+    pagosEfectivo: 0,
+    pagosTransferencia: 0,
+    anticiposEfectivo: 0,
+    anticiposTransferencia: 0,
     abonosEfectivo: 0,
     abonosTransferencia: 0,
     transferenciasIngresoEfectivo: 0,
@@ -57,6 +61,7 @@ const TesoreriaDashboard = () => {
     ordenesCompraCount: 0,
     costosCount: 0,
     materiaPrimaCount: 0,
+    anticiposCount: 0,
   });
 
   // Utilidad para parsear fechas 'YYYY-MM-DD' (string) o Date a fecha local sin hora
@@ -91,6 +96,10 @@ const TesoreriaDashboard = () => {
       comprasTransferencia: 0,
       costosEfectivo: 0,
       costosTransferencia: 0,
+      pagosEfectivo: 0,
+      pagosTransferencia: 0,
+      anticiposEfectivo: 0,
+      anticiposTransferencia: 0,
       abonosEfectivo: 0,
       abonosTransferencia: 0,
       transferenciasIngresoEfectivo: 0,
@@ -162,6 +171,20 @@ const TesoreriaDashboard = () => {
         } else if (mov.id_metodo_pago === transferenciaId) {
           resumen.costosTransferencia += montoAbsoluto;
         }
+      } else if (tipo === "pago_trabajador") {
+        // Pagos a trabajadores como egresos
+        if (mov.id_metodo_pago === efectivoId) {
+          resumen.pagosEfectivo += montoAbsoluto;
+        } else if (mov.id_metodo_pago === transferenciaId) {
+          resumen.pagosTransferencia += montoAbsoluto;
+        }
+      } else if (tipo === "anticipo") {
+        // Anticipos como egresos
+        if (mov.id_metodo_pago === efectivoId) {
+          resumen.anticiposEfectivo += montoAbsoluto;
+        } else if (mov.id_metodo_pago === transferenciaId) {
+          resumen.anticiposTransferencia += montoAbsoluto;
+        }
       } else if (tipo === "abono_credito") {
         // Abonos de crédito como ingresos (NO se suman a ventas, solo a abonos)
         if (mov.id_metodo_pago === efectivoId) {
@@ -187,6 +210,7 @@ const TesoreriaDashboard = () => {
           ordenesCountRes,
           costosCountRes,
           materiaPrimaCountRes,
+          anticiposCountRes,
         ] = await Promise.all([
           api.get("/tesoreria/movimientos-tesoreria"),
           api.get("/tesoreria/metodos-pago"),
@@ -196,6 +220,7 @@ const TesoreriaDashboard = () => {
           api.get("/tesoreria/ordenes-compra/count"),
           api.get("/tesoreria/costos/count"),
           api.get("/tesoreria/materia-prima/count"),
+          api.get("/tesoreria/anticipos/count"),
         ]);
 
         const movimientosData = movimientosRes.data;
@@ -208,7 +233,8 @@ const TesoreriaDashboard = () => {
           egresosRes.data.totalPagosTrabajadores +
           egresosRes.data.totalOrdenesCompra +
           egresosRes.data.totalCostos +
-          egresosRes.data.totalMateriaPrima;
+          egresosRes.data.totalMateriaPrima +
+          egresosRes.data.totalAnticipos;
 
         setEgresosSummary({
           totalEgresos: totalEgresos,
@@ -216,6 +242,7 @@ const TesoreriaDashboard = () => {
           ordenesCompraCount: ordenesCountRes.data.count,
           costosCount: costosCountRes.data.count,
           materiaPrimaCount: materiaPrimaCountRes.data.count,
+          anticiposCount: anticiposCountRes.data.count,
         });
 
         const resumenCalculado = calcularResumenFinanciero(
@@ -267,6 +294,10 @@ const TesoreriaDashboard = () => {
         return "abono_credito";
       if (tipoLower === "costo_indirecto" || tipoLower.includes("costo"))
         return "costo_indirecto";
+      if (tipoLower === "pago_trabajador" || tipoLower.includes("pago"))
+        return "pago_trabajador";
+      if (tipoLower === "anticipo" || tipoLower.includes("anticipo"))
+        return "anticipo";
       if (
         tipoLower === "transferencia_fondos" ||
         tipoLower.includes("transferencia")
@@ -396,6 +427,8 @@ const TesoreriaDashboard = () => {
     resumenFinanciero.transferenciasIngresoEfectivo -
     resumenFinanciero.comprasEfectivo -
     resumenFinanciero.costosEfectivo -
+    resumenFinanciero.pagosEfectivo -
+    resumenFinanciero.anticiposEfectivo -
     resumenFinanciero.transferenciasEgresoEfectivo;
   const balanceTransferencia =
     resumenFinanciero.ventasTransferencia +
@@ -403,6 +436,8 @@ const TesoreriaDashboard = () => {
     resumenFinanciero.transferenciasIngresoTransferencia -
     resumenFinanciero.comprasTransferencia -
     resumenFinanciero.costosTransferencia -
+    resumenFinanciero.pagosTransferencia -
+    resumenFinanciero.anticiposTransferencia -
     resumenFinanciero.transferenciasEgresoTransferencia;
   const efectivoClass =
     balanceEfectivo >= 0 ? "text-green-600" : "text-red-600";
@@ -449,62 +484,104 @@ const TesoreriaDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700">
+        <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-700">
               Balance Efectivo
             </h3>
-            <span className={`text-2xl font-bold ${efectivoClass}`}>
-              {formatCurrency(balanceEfectivo)}
-            </span>
-            <div className="text-sm mt-1">
-              <span className="text-green-600">
-                Ventas: {formatCurrency(resumenFinanciero.ventasEfectivo)}
+            <FiDollarSign size={28} className="text-gray-300" />
+          </div>
+          <div className={`text-3xl font-bold mb-3 ${efectivoClass}`}>
+            {formatCurrency(balanceEfectivo)}
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Ventas:</span>
+              <span className="font-medium text-green-700">
+                {formatCurrency(resumenFinanciero.ventasEfectivo)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-red-600">
-                Compras: -{formatCurrency(resumenFinanciero.comprasEfectivo)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Abonos credito:</span>
+              <span className="font-medium text-green-700">
+                {formatCurrency(resumenFinanciero.abonosEfectivo)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-red-600">
-                Costos: -{formatCurrency(resumenFinanciero.costosEfectivo)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Compras:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.comprasEfectivo)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-green-600">
-                Abonos: {formatCurrency(resumenFinanciero.abonosEfectivo)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Costos:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.costosEfectivo)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Pagos Trababajdores.:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.pagosEfectivo)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Anticipos:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.anticiposEfectivo)}
               </span>
             </div>
           </div>
-          <FiDollarSign size={40} className="text-gray-400" />
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700">
+
+        <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-700">
               Balance Transferencia
             </h3>
-            <span className={`text-2xl font-bold ${transferenciaClass}`}>
-              {formatCurrency(balanceTransferencia)}
-            </span>
-            <div className="text-sm mt-1">
-              <span className="text-green-600">
-                Ventas: {formatCurrency(resumenFinanciero.ventasTransferencia)}
+            <FiCreditCard size={28} className="text-gray-300" />
+          </div>
+          <div className={`text-3xl font-bold mb-3 ${transferenciaClass}`}>
+            {formatCurrency(balanceTransferencia)}
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Ventas:</span>
+              <span className="font-medium text-green-700">
+                {formatCurrency(resumenFinanciero.ventasTransferencia)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-red-600">
-                Compras: -
-                {formatCurrency(resumenFinanciero.comprasTransferencia)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Abonos:</span>
+              <span className="font-medium text-green-700">
+                {formatCurrency(resumenFinanciero.abonosTransferencia)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-red-600">
-                Costos: -{formatCurrency(resumenFinanciero.costosTransferencia)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Compras:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.comprasTransferencia)}
               </span>
-              <span className="text-gray-400"> || </span>
-              <span className="text-green-600">
-                Abonos: {formatCurrency(resumenFinanciero.abonosTransferencia)}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Costos:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.costosTransferencia)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Pagos Trab.:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.pagosTransferencia)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Anticipos:</span>
+              <span className="font-medium text-red-700">
+                -{formatCurrency(resumenFinanciero.anticiposTransferencia)}
               </span>
             </div>
           </div>
-          <FiCreditCard size={40} className="text-gray-400 cursor-pointer" />
         </div>
       </div>
 
@@ -533,6 +610,8 @@ const TesoreriaDashboard = () => {
               <option value="venta">Venta</option>
               <option value="compra">Compra</option>
               <option value="costo_indirecto">Costo Indirecto</option>
+              <option value="pago_trabajador">Pagos a Trabajadores</option>
+              <option value="anticipo">Anticipos</option>
               <option value="abono_credito">Abonos Crédito</option>
               <option value="transferencia_fondos">Transferencia fondos</option>
             </select>

@@ -186,6 +186,12 @@ const TesoreriaModel = {
         WHERE DATE_FORMAT(fecha_compra, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
       `);
 
+      const [anticipos] = await db.query(`
+        SELECT SUM(monto) AS totalAnticipos
+        FROM anticipos_trabajadores
+        WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      `);
+
       const summary = {
         totalPagosTrabajadores: Number(
           pagosTrabajadores[0].totalPagosTrabajadores || 0
@@ -195,13 +201,15 @@ const TesoreriaModel = {
         totalMateriaPrima: Number(
           comprasMateriaPrima[0].totalMateriaPrima || 0
         ),
+        totalAnticipos: Number(anticipos[0].totalAnticipos || 0),
       };
 
       summary.totalEgresos =
         summary.totalPagosTrabajadores +
         summary.totalOrdenesCompra +
         summary.totalCostos +
-        summary.totalMateriaPrima;
+        summary.totalMateriaPrima +
+        summary.totalAnticipos;
 
       return summary;
     } catch (error) {
@@ -320,7 +328,13 @@ const TesoreriaModel = {
     `);
     return result[0].count;
   },
-
+  getAnticiposCount: async () => {
+    const [result] = await db.query(
+      `SELECT COUNT(*) as count FROM anticipos_trabajadores
+       WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`
+    );
+    return result[0].count;
+  },
   async getVentasCobrosReport({ desde, hasta, id_cliente, estado_pago }) {
     const paramsOV = [];
     const whereOV = ["1=1"]; // filtros sobre OV

@@ -4,6 +4,9 @@ const detalleModel = require("../models/detallePagoTrabajadorModel"); // Tu mode
 const trabajadorModel = require("../models/trabajadoresModel"); // Tu modelo de trabajadores
 const avanceEtapasModel = require("../models/avanceEtapasModel"); // Tu modelo de avances de etapa
 const AnticiposModel = require("../models/anticiposModel"); // Tu modelo de anticipos
+const {
+  validarFechaNoEnPeriodoCerrado,
+} = require("../utils/validacionCierres");
 
 module.exports = {
   // Obtener pagos paginados (siempre paginado)
@@ -74,9 +77,19 @@ module.exports = {
         id_trabajador,
         fecha_pago,
         observaciones = "",
+        id_metodo_pago,
+        referencia,
+        observaciones_pago,
         detalles,
         appliedAnticipos = [], // [{ id_anticipo, id_orden_fabricacion, monto_aplicado }]
       } = req.body;
+
+      // Validar que la fecha no esté en un período cerrado
+      const validacion = await validarFechaNoEnPeriodoCerrado(fecha_pago);
+      if (!validacion.valido) {
+        await connection.rollback();
+        return res.status(400).json({ error: validacion.error });
+      }
 
       // Validar trabajador
       const trabajadorExistente = await trabajadorModel.getById(id_trabajador);
@@ -91,6 +104,12 @@ module.exports = {
         return res
           .status(400)
           .json({ error: "La fecha de pago es obligatoria." });
+      }
+      if (!id_metodo_pago) {
+        await connection.rollback();
+        return res
+          .status(400)
+          .json({ error: "El método de pago es obligatorio." });
       }
       if (!Array.isArray(detalles) || detalles.length === 0) {
         await connection.rollback();
@@ -222,6 +241,29 @@ module.exports = {
 
       // Recalcular total
       await pagosModel.calcularMonto(id_pago, connection);
+
+      // Obtener el monto total calculado
+      const [pagoResult] = await connection.query(
+        "SELECT monto_total FROM pagos_trabajadores WHERE id_pago = ?",
+        [id_pago]
+      );
+      const montoTotal = pagoResult[0]?.monto_total || 0;
+
+      // Crear movimiento de tesorería
+      const tesoreriaModel = require("../models/tesoreriaModel");
+      await tesoreriaModel.insertarMovimiento(
+        {
+          id_documento: id_pago,
+          tipo_documento: "pago_trabajador",
+          monto: -Math.abs(Number(montoTotal)),
+          id_metodo_pago,
+          referencia: referencia || null,
+          observaciones: observaciones_pago || null,
+          fecha_movimiento: fecha_pago,
+        },
+        connection
+      );
+
       await connection.commit();
       return res.status(201).json({ success: true, id_pago });
     } catch (error) {
@@ -377,6 +419,104 @@ module.exports = {
     } catch (error) {
       console.error("Error eliminando pago:", error);
       res.status(500).json({ error: "Error eliminando pago" });
+    }
+  },
+
+  // Crear anticipo con integración de tesorería
+  createAnticipo: async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const {
+        id_trabajador,
+        id_orden_fabricacion,
+        monto,
+        observaciones = "",
+        fecha,
+        id_metodo_pago,
+        referencia,
+        observaciones_pago,
+      } = req.body;
+
+      // Validar que la fecha no esté en un período cerrado
+      const validacion = await validarFechaNoEnPeriodoCerrado(fecha);
+      if (!validacion.valido) {
+        await connection.rollback();
+        return res.status(400).json({ error: validacion.error });
+      }
+
+      // Validar campos obligatorios
+      if (!id_trabajador || !id_orden_fabricacion || !monto || !fecha) {
+        await connection.rollback();
+        return res.status(400).json({
+          error:
+            "Faltan campos obligatorios: id_trabajador, id_orden_fabricacion, monto, fecha",
+        });
+      }
+
+      if (!id_metodo_pago) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: "El método de pago es obligatorio.",
+        });
+      }
+
+      if (monto <= 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: "El monto debe ser mayor a cero.",
+        });
+      }
+
+      // Validar trabajador
+      const trabajadorExistente = await trabajadorModel.getById(id_trabajador);
+      if (!trabajadorExistente) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: "El trabajador especificado no existe.",
+        });
+      }
+
+      // Crear anticipo
+      const id_anticipo = await AnticiposModel.create({
+        id_trabajador,
+        id_orden_fabricacion,
+        monto,
+        observaciones,
+        fecha,
+      });
+
+      // Crear movimiento de tesorería
+      const tesoreriaModel = require("../models/tesoreriaModel");
+      await tesoreriaModel.insertarMovimiento(
+        {
+          id_documento: id_anticipo,
+          tipo_documento: "anticipo",
+          monto: -Math.abs(Number(monto)),
+          id_metodo_pago,
+          referencia: referencia || null,
+          observaciones: observaciones_pago || null,
+          fecha_movimiento: fecha,
+        },
+        connection
+      );
+
+      await connection.commit();
+      return res.status(201).json({
+        success: true,
+        id_anticipo,
+        message:
+          "Anticipo registrado correctamente con movimiento de tesorería",
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error creando anticipo:", error);
+      return res.status(500).json({
+        error: error.message || "Error creando anticipo",
+      });
+    } finally {
+      connection.release();
     }
   },
 };

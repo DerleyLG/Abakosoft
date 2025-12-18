@@ -122,6 +122,18 @@ const tesoreriaController = {
         .json({ error: "Error al obtener el conteo de materia prima" });
     }
   },
+
+  getAnticiposCount: async (req, res) => {
+    try {
+      const count = await TesoreriaModel.getAnticiposCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Error al obtener el conteo de anticipos:", error);
+      res
+        .status(500)
+        .json({ error: "Error al obtener el conteo de anticipos" });
+    }
+  },
   getMovimientoByDocumento: async (req, res) => {
     try {
       const idDocumento = req.params.idDocumento;
