@@ -217,14 +217,14 @@ const handleEdit = (id) => {
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Monto Total</th>
               <th className="px-4 py-3">Método de pago</th>
-         
+              <th className="px-4 py-3">Saldo Pendiente</th>
               <th className="px-4 py-3">Acciones</th>
             </tr>
           </thead>
           <tbody>
   {loading && (
     <tr>
-      <td colSpan="7" className="text-center py-6 text-gray-500">Cargando...</td>
+      <td colSpan="8" className="text-center py-6 text-gray-500">Cargando...</td>
     </tr>
   )}
   {!loading && filteredOrdenes.length > 0 ? (
@@ -291,10 +291,20 @@ const handleEdit = (id) => {
               )}
             </td>
 
-           
-        
+            <td className="px-4 py-3">
+              {isCredito ? (
+                <span className={`font-semibold ${
+                  Number(orden.saldo_pendiente || 0) === 0 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  ${Number(orden.saldo_pendiente || 0).toLocaleString()}
+                </span>
+              ) : (
+                <span className="text-gray-400">-</span>
+              )}
+            </td>
 
-         
               <td className="pl-3 py-3 text-center flex gap-4">
               {canEdit && !mostrarAnuladas && (!orden.id_pedido) && (
                 <button
@@ -343,7 +353,7 @@ const handleEdit = (id) => {
        
           {expandedId === orden.id_orden_venta && (
             <tr>
-              <td colSpan="7" className="bg-gray-100 px-6 py-4 border-b">
+              <td colSpan="8" className="bg-gray-100 px-6 py-4 border-b">
                 <div className="mt-3">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-200 text-gray-700">
@@ -386,7 +396,7 @@ const handleEdit = (id) => {
     })
   ) : (!loading && (
     <tr>
-      <td colSpan="7" className="text-center py-6 text-gray-500">
+      <td colSpan="8" className="text-center py-6 text-gray-500">
         No se encontraron órdenes que coincidan con la búsqueda.
       </td>
     </tr>

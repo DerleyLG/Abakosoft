@@ -145,15 +145,16 @@ module.exports = {
     const [rows] = await db.query(
       `SELECT
          a.id_articulo,
+         a.referencia,
          a.descripcion,
          a.precio_venta,
          a.id_categoria,
-         i.stock,
+         COALESCE(i.stock, 0) as stock,
          c.tipo as categoria_tipo
        FROM articulos AS a
-       JOIN inventario AS i ON a.id_articulo = i.id_articulo
-       LEFT JOIN categorias AS c ON a.id_categoria = c.id_categoria
-       WHERE i.stock > 0 AND c.tipo = 'articulo_fabricable'
+       JOIN categorias AS c ON a.id_categoria = c.id_categoria
+       LEFT JOIN inventario AS i ON a.id_articulo = i.id_articulo
+       WHERE c.tipo = 'articulo_fabricable'
        ORDER BY a.descripcion ASC`
     );
     return rows;

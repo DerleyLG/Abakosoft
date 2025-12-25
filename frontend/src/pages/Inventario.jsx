@@ -1,33 +1,32 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import toast from 'react-hot-toast';
-import { FiPlus, FiEdit3, FiPackage, FiBox, FiTool } from 'react-icons/fi';
-import Swal from 'sweetalert2';
-import { confirmAlert } from 'react-confirm-alert';
-import 'react-confirm-alert/src/react-confirm-alert.css';
-import withReactContent from 'sweetalert2-react-content';
-import { FiTrash2 } from 'react-icons/fi';
-import '../styles/confirmAlert.css';
-import { useAuth } from '../context/AuthContext';
-import { can, ACTIONS } from '../utils/permissions';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+import toast from "react-hot-toast";
+import { FiPlus, FiEdit3, FiPackage, FiBox, FiTool } from "react-icons/fi";
+import Swal from "sweetalert2";
+import { confirmAlert } from "react-confirm-alert";
+import "react-confirm-alert/src/react-confirm-alert.css";
+import withReactContent from "sweetalert2-react-content";
+import { FiTrash2 } from "react-icons/fi";
+import "../styles/confirmAlert.css";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
 
 const MySwal = withReactContent(Swal);
 
 const Inventario = () => {
   const [inventario, setInventario] = useState([]);
-  const [allItems, setAllItems] = useState([]); // fuente única para filtrar en cliente
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const [categorias, setCategorias] = useState([]);
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
-  const [activeTab, setActiveTab] = useState('articulo_fabricable');
-  // Eliminado índice cruzado; el backend ya entrega categoría por ítem
-  const [stockFabricadoFilter, setStockFabricadoFilter] = useState('');
-  const [stockProcesoFilter, setStockProcesoFilter] = useState('');
-  const [stockDisponibleFilter, setStockDisponibleFilter] = useState('');
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
+  const [activeTab, setActiveTab] = useState("articulo_fabricable");
+  const [stockFabricadoFilter, setStockFabricadoFilter] = useState("");
+  const [stockProcesoFilter, setStockProcesoFilter] = useState("");
+  const [stockDisponibleFilter, setStockDisponibleFilter] = useState("");
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.rol;
@@ -35,132 +34,100 @@ const Inventario = () => {
   const canEdit = can(role, ACTIONS.INVENTORY_EDIT);
   const canDelete = can(role, ACTIONS.INVENTORY_DELETE);
 
-  // 1) Cargar categorías e inventario completo una sola vez o cuando se necesite refrescar
+  // Cargar categorías una sola vez
   useEffect(() => {
-    const initialFetch = async () => {
+    const fetchCategorias = async () => {
       try {
-        const [resCat, resAll, resArticulos] = await Promise.all([
-          api.get('/categorias'),
-          api.get('/inventario', { params: { page: 1, pageSize: 10000 } }),
-          api.get('/articulos'), // Traer artículos con id_categoria
-        ]);
-        setCategorias(Array.isArray(resCat.data) ? resCat.data : []);
-        
-        const payload = resAll.data;
-        let items = Array.isArray(payload) ? payload : (payload?.data || []);
-        
-        // Si los items del inventario no tienen id_categoria, cruzarlos con artículos
-        const articulos = Array.isArray(resArticulos.data) ? resArticulos.data : [];
-      
-        
-        const articulosMap = {};
-        articulos.forEach(art => {
-          articulosMap[art.id_articulo] = art.id_categoria;
-        });
-        
-        items = items.map(item => ({
-          ...item,
-          id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
-        }));
-        
-
-        setAllItems(items);
+        const res = await api.get("/categorias");
+        setCategorias(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
-        console.error('Error cargando inventario o categorías', error);
-        const msg = error.response?.data?.mensaje || error.response?.data?.message || error.message;
+        console.error("Error cargando categorías", error);
+      }
+    };
+    fetchCategorias();
+  }, []);
+
+  // Cargar inventario con filtros desde el backend
+  useEffect(() => {
+    const fetchInventario = async () => {
+      try {
+        const res = await api.get("/inventario", {
+          params: {
+            page,
+            pageSize,
+            buscar: searchTerm || undefined,
+            tipo_categoria: activeTab || undefined,
+            id_categoria: categoriaSeleccionada || undefined,
+            stock_fabricado: stockFabricadoFilter || undefined,
+            stock_en_proceso: stockProcesoFilter || undefined,
+            stock_disponible: stockDisponibleFilter || undefined,
+            sortBy: "descripcion",
+            sortDir: "asc",
+          },
+        });
+        const payload = res.data || {};
+        setInventario(Array.isArray(payload.data) ? payload.data : []);
+        setTotal(Number(payload.total) || 0);
+        setTotalPages(Number(payload.totalPages) || 1);
+      } catch (error) {
+        console.error("Error cargando inventario", error);
+        const msg =
+          error.response?.data?.mensaje ||
+          error.response?.data?.message ||
+          error.message;
         toast.error(msg);
       }
     };
-    initialFetch();
-  }, []);
-
-  // 2) Aplicar filtro y paginar en cliente cada vez que cambian filtros o paginación
-  useEffect(() => {
-    const term = (searchTerm || '').toLowerCase();
-    const rule = (val, r) => {
-      if (!r) return true;
-      const n = Number(val || 0);
-      if (r === 'gt0') return n > 0;
-      if (r === 'eq0') return n === 0;
-      return true;
-    };
-
-  
-
-    const filtered = (allItems || [])
-      .filter((it) => {
-        const bySearch = term
-          ? ((it.descripcion || '').toLowerCase().includes(term) || (it.referencia || '').toLowerCase().includes(term))
-          : true;
-        
-        // Obtener tipo de categoría del item
-        const catDelItem = categorias.find(c => String(c.id_categoria) === String(it.id_categoria));
-        const tipoDelItem = catDelItem?.tipo;
-        
-        // Filtro por tab activo
-        const byTab = tipoDelItem === activeTab;
-        
-        // Filtro por categoría específica (si está seleccionada)
-        const byCat = categoriaSeleccionada
-          ? String(it.id_categoria) === String(categoriaSeleccionada)
-          : true;
-        const okDisp = rule(it.stock_disponible ?? it.stock, stockDisponibleFilter);
-        const okFab = rule(it.stock_fabricado, stockFabricadoFilter);
-        const okProc = (typeof it.stock_en_proceso !== 'undefined')
-          ? rule(it.stock_en_proceso, stockProcesoFilter)
-          : true;
-        return bySearch && byTab && byCat && okDisp && okFab && okProc;
-      })
-      .sort((a, b) => String(a.descripcion || '').localeCompare(String(b.descripcion || '')));
-
-    const total = filtered.length;
-    const tp = Math.max(1, Math.ceil(total / pageSize));
-    const start = (page - 1) * pageSize;
-    const paged = filtered.slice(start, start + pageSize);
-    setInventario(paged);
-    setTotalPages(tp);
-  }, [allItems, page, pageSize, searchTerm, categoriaSeleccionada, activeTab, stockDisponibleFilter, stockFabricadoFilter, stockProcesoFilter, categorias]);
+    fetchInventario();
+  }, [
+    page,
+    pageSize,
+    searchTerm,
+    activeTab,
+    categoriaSeleccionada,
+    stockFabricadoFilter,
+    stockProcesoFilter,
+    stockDisponibleFilter,
+  ]);
 
   const cargarInventario = async () => {
     try {
-      const [resAll, resArticulos] = await Promise.all([
-        api.get('/inventario', { params: { page: 1, pageSize: 10000 } }),
-        api.get('/articulos'),
-      ]);
-      
-      const payload = resAll.data;
-      let items = Array.isArray(payload) ? payload : (payload?.data || []);
-      
-      // Cruzar con artículos para obtener id_categoria si falta
-      const articulos = Array.isArray(resArticulos.data) ? resArticulos.data : [];
-      const articulosMap = {};
-      articulos.forEach(art => {
-        articulosMap[art.id_articulo] = art.id_categoria;
+      const res = await api.get("/inventario", {
+        params: {
+          page,
+          pageSize,
+          buscar: searchTerm || undefined,
+          tipo_categoria: activeTab || undefined,
+          id_categoria: categoriaSeleccionada || undefined,
+          stock_fabricado: stockFabricadoFilter || undefined,
+          stock_en_proceso: stockProcesoFilter || undefined,
+          stock_disponible: stockDisponibleFilter || undefined,
+          sortBy: "descripcion",
+          sortDir: "asc",
+        },
       });
-      
-      items = items.map(item => ({
-        ...item,
-        id_categoria: item.id_categoria ?? articulosMap[item.id_articulo] ?? null
-      }));
-      
-      setAllItems(items);
+      const payload = res.data || {};
+      setInventario(Array.isArray(payload.data) ? payload.data : []);
+      setTotal(Number(payload.total) || 0);
+      setTotalPages(Number(payload.totalPages) || 1);
     } catch (error) {
-      console.error('Error al cargar inventario', error);
-      toast.error('Error al cargar inventario');
+      console.error("Error al cargar inventario", error);
+      toast.error("Error al cargar inventario");
     }
   };
 
   const handleDelete = (id_articulo) => {
     confirmAlert({
-      title: 'Confirmar eliminación',
-      message: '¿Seguro que quieres quitar este artículo del inventario? Si tiene stock, no se permitirá.',
+      title: "Confirmar eliminación",
+      message:
+        "¿Seguro que quieres quitar este artículo del inventario? Si tiene stock, no se permitirá.",
       buttons: [
         {
-          label: 'Sí',
+          label: "Sí",
           onClick: async () => {
             try {
               await api.delete(`/inventario/${id_articulo}`);
-              toast.success('Artículo removido del inventario');
+              toast.success("Artículo removido del inventario");
               cargarInventario();
             } catch (error) {
               const mensajeBackend =
@@ -169,13 +136,13 @@ const Inventario = () => {
                 error.message;
               toast.error(mensajeBackend);
             }
-          }
+          },
         },
         {
-          label: 'No',
-          onClick: () => { }
-        }
-      ]
+          label: "No",
+          onClick: () => {},
+        },
+      ],
     });
   };
 
@@ -196,17 +163,27 @@ const Inventario = () => {
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
+      confirmButtonText: "Guardar",
+      cancelButtonText: "Cancelar",
       preConfirm: () => {
-        const stock = parseInt(document.getElementById('swal-input1').value, 10);
-        const stockMinimo = parseInt(document.getElementById('swal-input2').value, 10);
+        const stock = parseInt(
+          document.getElementById("swal-input1").value,
+          10
+        );
+        const stockMinimo = parseInt(
+          document.getElementById("swal-input2").value,
+          10
+        );
         if (isNaN(stock) || stock < 0) {
-          Swal.showValidationMessage('El stock debe ser un número mayor o igual a 0');
+          Swal.showValidationMessage(
+            "El stock debe ser un número mayor o igual a 0"
+          );
           return false;
         }
         if (isNaN(stockMinimo) || stockMinimo < 0) {
-          Swal.showValidationMessage('El stock mínimo debe ser un número mayor o igual a 0');
+          Swal.showValidationMessage(
+            "El stock mínimo debe ser un número mayor o igual a 0"
+          );
           return false;
         }
         return { stock, stockMinimo };
@@ -219,11 +196,17 @@ const Inventario = () => {
           stock: formValues.stock,
           stock_minimo: formValues.stockMinimo,
         });
-        toast.success('Inventario actualizado correctamente');
+        toast.success("Inventario actualizado correctamente");
         cargarInventario();
       } catch (error) {
-        console.error('Error al actualizar inventario', error.response?.data || error.message);
-        const mensajeBackend = error.response?.data?.error || error.response?.data?.message || 'Error al actualizar inventario';
+        console.error(
+          "Error al actualizar inventario",
+          error.response?.data || error.message
+        );
+        const mensajeBackend =
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Error al actualizar inventario";
         toast.error(mensajeBackend);
       }
     }
@@ -231,32 +214,32 @@ const Inventario = () => {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setCategoriaSeleccionada('');
+    setCategoriaSeleccionada("");
     setPage(1);
   };
 
   const getCategoriasFiltradas = () => {
-    return categorias.filter(cat => cat.tipo === activeTab);
+    return categorias.filter((cat) => cat.tipo === activeTab);
   };
 
   const tabsConfig = {
-    'articulo_fabricable': {
-      label: 'Artículos Fabricables',
+    articulo_fabricable: {
+      label: "Artículos Fabricables",
       icon: FiPackage,
-      color: 'blue'
+      color: "blue",
     },
-    'materia_prima': {
-      label: 'Materia Prima',
+    materia_prima: {
+      label: "Materia Prima",
       icon: FiBox,
-      color: 'green'
+      color: "green",
     },
-    'costo_produccion': {
-      label: 'Costos de Producción',
+    costo_produccion: {
+      label: "Costos de Producción",
       icon: FiTool,
-      color: 'orange'
-    }
+      color: "orange",
+    },
   };
-  
+
   const filteredItems = inventario;
 
   return (
@@ -266,7 +249,7 @@ const Inventario = () => {
           <h2 className="text-4xl font-bold text-gray-800">Inventario</h2>
           {canCreate && (
             <button
-              onClick={() => navigate('/inventario/nuevo')}
+              onClick={() => navigate("/inventario/nuevo")}
               className="h-[42px] inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
             >
               <FiPlus size={20} />
@@ -288,7 +271,7 @@ const Inventario = () => {
                   className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-all cursor-pointer ${
                     isActive
                       ? `text-${config.color}-600 border-b-2 border-${config.color}-600 bg-${config.color}-50`
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
                   }`}
                 >
                   <Icon size={18} />
@@ -303,20 +286,30 @@ const Inventario = () => {
           {/* Primera fila: Búsqueda y Categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div className="sm:col-span-2 lg:col-span-2">
-              <label className="block text-gray-700 font-semibold mb-1">Buscar</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Buscar
+              </label>
               <input
                 type="text"
                 placeholder="Buscar artículo..."
                 value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
               />
             </div>
             <div>
-              <label className="block text-gray-700 font-semibold mb-1">Categoría</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Categoría
+              </label>
               <select
                 value={categoriaSeleccionada}
-                onChange={(e) => { setCategoriaSeleccionada(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setCategoriaSeleccionada(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar por categoría"
               >
@@ -329,14 +322,19 @@ const Inventario = () => {
               </select>
             </div>
           </div>
-          
+
           {/* Segunda fila: Filtros de stock */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-gray-700 font-semibold mb-1">Stock fabricado</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Stock fabricado
+              </label>
               <select
                 value={stockFabricadoFilter}
-                onChange={(e) => { setStockFabricadoFilter(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setStockFabricadoFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock fabricado"
               >
@@ -346,10 +344,15 @@ const Inventario = () => {
               </select>
             </div>
             <div>
-              <label className="block text-gray-700 font-semibold mb-1">Stock en proceso</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Stock en proceso
+              </label>
               <select
                 value={stockProcesoFilter}
-                onChange={(e) => { setStockProcesoFilter(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setStockProcesoFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock en proceso"
               >
@@ -359,10 +362,15 @@ const Inventario = () => {
               </select>
             </div>
             <div>
-              <label className="block text-gray-700 font-semibold mb-1">Stock disponible</label>
+              <label className="block text-gray-700 font-semibold mb-1">
+                Stock disponible
+              </label>
               <select
                 value={stockDisponibleFilter}
-                onChange={(e) => { setStockDisponibleFilter(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setStockDisponibleFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock disponible"
               >
@@ -373,24 +381,34 @@ const Inventario = () => {
             </div>
           </div>
         </div>
-        {categoriaSeleccionada && filteredItems.length === 0 && allItems.length > 0 && (
-          <div className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
-            ⚠️ <strong>Filtro de categoría no disponible:</strong> Los artículos en el inventario no tienen categorías asignadas. 
-            Para habilitar este filtro, asigna categorías a tus artículos desde el módulo de Artículos.
-          </div>
-        )}
-        {categoriaSeleccionada && filteredItems.length === 0 && allItems.length === 0 && (
-          <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
-            No hay artículos inicializados en inventario para esta categoría. Puedes agregarlos desde "Agregar artículo" para iniciar con stock 0.
-          </div>
-        )}
+        {categoriaSeleccionada &&
+          filteredItems.length === 0 &&
+          allItems.length > 0 && (
+            <div className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+              ⚠️ <strong>Filtro de categoría no disponible:</strong> Los
+              artículos en el inventario no tienen categorías asignadas. Para
+              habilitar este filtro, asigna categorías a tus artículos desde el
+              módulo de Artículos.
+            </div>
+          )}
+        {categoriaSeleccionada &&
+          filteredItems.length === 0 &&
+          allItems.length === 0 && (
+            <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+              No hay artículos inicializados en inventario para esta categoría.
+              Puedes agregarlos desde "Agregar artículo" para iniciar con stock
+              0.
+            </div>
+          )}
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <div className="mb-3 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span>
+              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
+              de{" "}
+              <span className="font-semibold text-gray-800">{totalPages}</span>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -434,7 +452,9 @@ const Inventario = () => {
                   <td className="px-4 py-3">{item.stock_fabricado}</td>
                   <td className="px-4 py-3">{item.stock_en_proceso}</td>
                   <td className="px-4 py-3">{item.stock_minimo}</td>
-                  <td className="px-4 py-3">{new Date(item.ultima_actualizacion).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    {new Date(item.ultima_actualizacion).toLocaleString()}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {canEdit && (
                       <button

@@ -152,20 +152,6 @@ module.exports = {
         if (!articuloExistente) {
           throw new Error(`El artículo con ID ${id_articulo} no existe.`);
         }
-        const inventarioArticulo =
-          await inventarioModel.obtenerInventarioPorArticulo(
-            id_articulo,
-            connection
-          );
-        if (!inventarioArticulo || inventarioArticulo.stock < cantidad) {
-          throw new Error(
-            `Stock insuficiente para el artículo ${
-              articuloExistente.descripcion
-            }. Stock disponible: ${
-              inventarioArticulo?.stock || 0
-            }, solicitado: ${cantidad}`
-          );
-        }
 
         if (
           precio_unitario == null ||
