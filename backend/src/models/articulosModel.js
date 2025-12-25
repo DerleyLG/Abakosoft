@@ -107,8 +107,9 @@ const Articulo = {
     const like = `%${buscar}%`;
 
     // Construir condición de filtro
+    // Usar COALESCE para evitar problemas con NULL en c.nombre
     let whereCondition =
-      "(a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?)";
+      "(a.referencia LIKE ? OR a.descripcion LIKE ? OR COALESCE(c.nombre, '') LIKE ?)";
     let params = [like, like, like];
 
     // Agregar filtro por categoría específica (tiene prioridad)

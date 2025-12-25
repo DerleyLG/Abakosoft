@@ -99,6 +99,7 @@ module.exports = {
         pageSize = 25,
         buscar = "",
         id_categoria = null,
+        tipo_categoria = null,
         sortBy = "descripcion",
         sortDir = "asc",
         stock_fabricado = "",
@@ -110,6 +111,7 @@ module.exports = {
         pageSize,
         buscar,
         id_categoria,
+        tipo_categoria,
         sortBy,
         sortDir,
         stock_fabricado,
@@ -120,6 +122,7 @@ module.exports = {
       const { data, total } = await InventarioModel.obtenerPaginado({
         buscar,
         id_categoria,
+        tipo_categoria,
         page,
         pageSize,
         sortBy,

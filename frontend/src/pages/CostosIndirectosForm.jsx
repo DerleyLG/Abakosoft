@@ -147,6 +147,7 @@ const CostosIndirectosNuevo = () => {
 
     // Preparar payload con opciones de asignación y datos de pago
     // Fecha actual en formato YYYY-MM-DD (local)
+    // Esta es la fecha de registro que se valida contra períodos cerrados
     const hoy = new Date();
     const fechaActual = `${hoy.getFullYear()}-${String(
       hoy.getMonth() + 1
@@ -154,9 +155,9 @@ const CostosIndirectosNuevo = () => {
 
     const payload = {
       tipo_costo: tipoCosto,
-      fecha: usarPeriodo ? fechaInicio : fechaActual,
-      fecha_inicio: usarPeriodo ? fechaInicio : null,
-      fecha_fin: usarPeriodo ? fechaFin : null,
+      fecha: fechaActual, // Siempre usar fecha actual para registro y tesorería
+      fecha_inicio: usarPeriodo ? fechaInicio : null, // Fechas de vigencia (solo referencia)
+      fecha_fin: usarPeriodo ? fechaFin : null, // Fechas de vigencia (solo referencia)
       valor: Number(valorNumerico),
       observaciones: observaciones || null,
       ...(asignarAOF && !asignacionMultiple && ofSeleccionada?.value

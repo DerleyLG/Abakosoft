@@ -84,6 +84,7 @@ module.exports = {
   obtenerPaginado: async ({
     buscar = "",
     id_categoria = null,
+    tipo_categoria = null,
     page = 1,
     pageSize = 25,
     sortBy = "descripcion",
@@ -93,7 +94,7 @@ module.exports = {
     stock_disponible = "",
   }) => {
     const p = Math.max(1, parseInt(page) || 1);
-    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+    const ps = Math.min(1000, Math.max(1, parseInt(pageSize) || 25));
     const offset = (p - 1) * ps;
 
     const SORT_MAP = {
@@ -116,6 +117,10 @@ module.exports = {
     if (id_categoria) {
       filters.push("a.id_categoria = ?");
       params.push(Number(id_categoria));
+    }
+    if (tipo_categoria) {
+      filters.push("c.tipo = ?");
+      params.push(tipo_categoria);
     }
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
@@ -269,11 +274,7 @@ module.exports = {
           nuevoStockFabricado += cantidad_movida;
         }
       } else if (tipo_movimiento === TIPOS_MOVIMIENTO.SALIDA) {
-        if (!inventarioExistente || nuevoStockDisponible < cantidad_movida) {
-          throw new Error(
-            `Stock insuficiente para el artículo ${id_articulo}. Disponible: ${nuevoStockDisponible}, Solicitado: ${cantidad_movida}`
-          );
-        }
+        // Permitir stock negativo (no validar stock insuficiente)
         nuevoStockDisponible -= cantidad_movida;
       } else if (tipo_movimiento === TIPOS_MOVIMIENTO.AJUSTE) {
         if (
