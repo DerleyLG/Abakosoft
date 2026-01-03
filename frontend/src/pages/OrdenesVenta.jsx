@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { FiEye, FiArrowLeft, FiTrash2, FiPlus, FiArrowRight, FiEdit, FiCreditCard } from "react-icons/fi";
+import {
+  FiEye,
+  FiArrowLeft,
+  FiTrash2,
+  FiPlus,
+  FiArrowRight,
+  FiEdit,
+  FiCreditCard,
+} from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -15,7 +23,7 @@ const OrdenesVenta = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState('todos');
+  const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
@@ -30,19 +38,18 @@ const OrdenesVenta = () => {
   const canEdit = can(role, ACTIONS.SALES_EDIT);
   const canDelete = can(role, ACTIONS.SALES_DELETE);
 
-
   useEffect(() => {
     const fetchOrdenes = async () => {
       setLoading(true);
       try {
-        const res = await api.get('/ordenes-venta', {
+        const res = await api.get("/ordenes-venta", {
           params: {
-            estado: mostrarAnuladas ? 'anulada' : undefined,
+            estado: mostrarAnuladas ? "anulada" : undefined,
             buscar: searchTerm || undefined,
             page,
             pageSize,
-            sortBy: 'fecha',
-            sortDir: 'desc',
+            sortBy: "fecha",
+            sortDir: "desc",
           },
         });
         const payload = res.data || {};
@@ -64,8 +71,8 @@ const OrdenesVenta = () => {
   const handleCrear = () => {
     navigate("/ordenes_venta/nuevo");
   };
-  
-const handleEdit = (id) => {
+
+  const handleEdit = (id) => {
     navigate(`/ordenes_venta/editar/${id}`);
   };
 
@@ -130,16 +137,16 @@ const handleEdit = (id) => {
     setPage(1);
   };
 
-  
   const filteredOrdenes = ordenes.filter((orden) => {
     // Filtrado por estado de crédito derivado (client-side) sobre la página actual
-    if (estadoFiltro === 'todos') return true;
+    if (estadoFiltro === "todos") return true;
     const montoTotal = Number(orden.monto_total || 0);
     const saldo = Number(orden.saldo_pendiente || 0);
-    if (orden.estado_credito === null || orden.estado_credito === undefined) return false;
-    let estadoDerivado = 'pendiente';
-    if (saldo === 0) estadoDerivado = 'pagado';
-    else if (saldo < montoTotal) estadoDerivado = 'parcial';
+    if (orden.estado_credito === null || orden.estado_credito === undefined)
+      return false;
+    let estadoDerivado = "pendiente";
+    if (saldo === 0) estadoDerivado = "pagado";
+    else if (saldo < montoTotal) estadoDerivado = "parcial";
     return estadoDerivado === estadoFiltro;
   });
   return (
@@ -154,7 +161,10 @@ const handleEdit = (id) => {
             type="text"
             placeholder="Buscar por cliente"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
           <div>
@@ -180,7 +190,7 @@ const handleEdit = (id) => {
               Nueva venta
             </button>
           )}
-    <button
+          <button
             onClick={() => navigate("/tesoreria")}
             className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
           >
@@ -222,192 +232,245 @@ const handleEdit = (id) => {
             </tr>
           </thead>
           <tbody>
-  {loading && (
-    <tr>
-      <td colSpan="8" className="text-center py-6 text-gray-500">Cargando...</td>
-    </tr>
-  )}
-  {!loading && filteredOrdenes.length > 0 ? (
-    filteredOrdenes.map((orden) => {
-  
-    
-      const tieneVentaCredito = orden.estado_credito !== null && orden.estado_credito !== undefined;
-     
-      const isCredito = orden.metodo_pago === "credito" || tieneVentaCredito;
+            {loading && (
+              <tr>
+                <td colSpan="8" className="text-center py-6 text-gray-500">
+                  Cargando...
+                </td>
+              </tr>
+            )}
+            {!loading && filteredOrdenes.length > 0
+              ? filteredOrdenes.map((orden) => {
+                  const tieneVentaCredito =
+                    orden.estado_credito !== null &&
+                    orden.estado_credito !== undefined;
 
-      return (
-        <React.Fragment key={orden.id_orden_venta}>
-          <tr
-            onClick={() => toggleExpand(orden.id_orden_venta)}
-            className={`cursor-pointer transition ${
-              expandedId === orden.id_orden_venta
-                ? "bg-gray-200"
-                : "hover:bg-gray-200"
-            }`}
-          >
-          
-            <td className="px-4 py-3 font-mono text-gray-700">
-              {orden.id_orden_venta}
-            </td>
-
-            <td className="px-4 py-3">{orden.cliente_nombre}</td>
-
-            <td className="px-4 py-3">
-              {orden.fecha
-                ? orden.fecha.substring(0, 10).split("-").reverse().join("/")
-                : ""}
-            </td>
-
-            <td className="px-4 py-3">
-              ${Number(orden.monto_total || 0).toLocaleString()}
-            </td>
-
-      
-            <td className="px-4 py-3">
-              {isCredito ? (
-                (() => {
-                  const montoTotal = Number(orden.monto_total || 0);
-                  const saldo = Number(orden.saldo_pendiente || 0);
-                  let estadoDerivado = 'pendiente';
-                  if (saldo === 0) estadoDerivado = 'pagado';
-                  else if (saldo < montoTotal) estadoDerivado = 'parcial';
-
-                  const textClass = estadoDerivado === 'pendiente'
-                    ? 'text-red-800'
-                    : estadoDerivado === 'parcial'
-                    ? 'text-slate-800'
-                    : 'text-green-800';
+                  const isCredito =
+                    orden.metodo_pago === "credito" || tieneVentaCredito;
 
                   return (
-                    <span className={`px-2 py-1 rounded-md font-semibold bg-transparent ${textClass}`}>
-                      CREDITO {estadoDerivado === 'pendiente' ? "(PENDIENTE)" : estadoDerivado === 'parcial' ? "(PARCIAL)" : "(PAGADO)"}
-                    </span>
-                  );
-                })()
-              ) : (
-                <span className="px-2 py-1 rounded-md">
-                  {orden.metodo_pago || '-'}
-                </span>
-              )}
-            </td>
+                    <React.Fragment key={orden.id_orden_venta}>
+                      <tr
+                        onClick={() => toggleExpand(orden.id_orden_venta)}
+                        className={`cursor-pointer transition ${
+                          expandedId === orden.id_orden_venta
+                            ? "bg-gray-200"
+                            : "hover:bg-gray-200"
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-mono text-gray-700">
+                          {orden.id_orden_venta}
+                        </td>
 
-            <td className="px-4 py-3">
-              {isCredito ? (
-                <span className={`font-semibold ${
-                  Number(orden.saldo_pendiente || 0) === 0 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
-                }`}>
-                  ${Number(orden.saldo_pendiente || 0).toLocaleString()}
-                </span>
-              ) : (
-                <span className="text-gray-400">-</span>
-              )}
-            </td>
+                        <td className="px-4 py-3">{orden.cliente_nombre}</td>
 
-              <td className="pl-3 py-3 text-center flex gap-4">
-              {canEdit && !mostrarAnuladas && (!orden.id_pedido) && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit(orden.id_orden_venta);
-                  }}
-                  className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
-                  title="Editar"
-                >
-                  <FiEdit size={18} />
-                </button>
-              )}
+                        <td className="px-4 py-3">
+                          {orden.fecha
+                            ? orden.fecha
+                                .substring(0, 10)
+                                .split("-")
+                                .reverse()
+                                .join("/")
+                            : ""}
+                        </td>
 
-              {canDelete && !mostrarAnuladas && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(orden.id_orden_venta);
-                  }}
-                  className="text-red-600 hover:text-red-400 cursor-pointer"
-                  title="Eliminar"
-                >
-                  <FiTrash2 size={18} />
-                </button>
-              )}
-              {!canEdit && !canDelete && (
-                <span className="text-gray-400 italic select-none">Sin permisos</span>
-              )}
-              
-              {isCredito && orden.id_venta_credito && orden.saldo_pendiente > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('/ventas_credito', { state: { openCreditId: orden.id_venta_credito, openOrderId: orden.id_orden_venta } });
-                  }}
-                  className="text-indigo-600 hover:text-indigo-900 cursor-pointer"
-                  title="Ir a crédito / Registrar abono"
-                >
-                  <FiCreditCard size={18} />
-                </button>
-              )}
-            </td>
-          </tr>
+                        <td className="px-4 py-3">
+                          ${Number(orden.monto_total || 0).toLocaleString()}
+                        </td>
 
-       
-          {expandedId === orden.id_orden_venta && (
-            <tr>
-              <td colSpan="8" className="bg-gray-100 px-6 py-4 border-b">
-                <div className="mt-3">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-200 text-gray-700">
-                      <tr>
-                        <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
-                        <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
-                        <th className="px-2 py-2 border-b border-gray-300">Precio Unitario</th>
-                        <th className="px-2 py-2 border-b border-gray-300">Subtotal</th>
+                        <td className="px-4 py-3">
+                          {isCredito ? (
+                            (() => {
+                              const montoTotal = Number(orden.monto_total || 0);
+                              const saldo = Number(orden.saldo_pendiente || 0);
+                              let estadoDerivado = "pendiente";
+                              if (saldo === 0) estadoDerivado = "pagado";
+                              else if (saldo < montoTotal)
+                                estadoDerivado = "parcial";
+
+                              const textClass =
+                                estadoDerivado === "pendiente"
+                                  ? "text-red-800"
+                                  : estadoDerivado === "parcial"
+                                  ? "text-slate-800"
+                                  : "text-green-800";
+
+                              return (
+                                <span
+                                  className={`px-2 py-1 rounded-md font-semibold bg-transparent ${textClass}`}
+                                >
+                                  CREDITO{" "}
+                                  {estadoDerivado === "pendiente"
+                                    ? "(PENDIENTE)"
+                                    : estadoDerivado === "parcial"
+                                    ? "(PARCIAL)"
+                                    : "(PAGADO)"}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <span className="px-2 py-1 rounded-md">
+                              {orden.metodo_pago || "-"}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          {isCredito ? (
+                            <span
+                              className={`font-semibold ${
+                                Number(orden.saldo_pendiente || 0) === 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              $
+                              {Number(
+                                orden.saldo_pendiente || 0
+                              ).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
+                        <td className="pl-3 py-3 text-center flex gap-4">
+                          {canEdit && !mostrarAnuladas && !orden.id_pedido && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(orden.id_orden_venta);
+                              }}
+                              className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
+                              title="Editar"
+                            >
+                              <FiEdit size={18} />
+                            </button>
+                          )}
+
+                          {canDelete && !mostrarAnuladas && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(orden.id_orden_venta);
+                              }}
+                              className="text-red-600 hover:text-red-400 cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <FiTrash2 size={18} />
+                            </button>
+                          )}
+                          {!canEdit && !canDelete && (
+                            <span className="text-gray-400 italic select-none">
+                              Sin permisos
+                            </span>
+                          )}
+
+                          {isCredito &&
+                            orden.id_venta_credito &&
+                            orden.saldo_pendiente > 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate("/ventas_credito", {
+                                    state: {
+                                      openCreditId: orden.id_venta_credito,
+                                      openOrderId: orden.id_orden_venta,
+                                    },
+                                  });
+                                }}
+                                className="text-indigo-600 hover:text-indigo-900 cursor-pointer"
+                                title="Ir a crédito / Registrar abono"
+                              >
+                                <FiCreditCard size={18} />
+                              </button>
+                            )}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {orden.detalles?.length > 0 ? (
-                        orden.detalles.map((d, i) => (
-                          <tr key={i}>
-                            <td className="px-2 py-2 border-b border-gray-300">{d.descripcion}</td>
-                            <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
-                            <td className="px-2 py-2 border-b border-gray-300">
-                              ${Number(d.precio_unitario).toLocaleString()}
-                            </td>
-                            <td className="px-2 py-2 border-b border-gray-300">
-                              ${Number(d.subtotal).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
+
+                      {expandedId === orden.id_orden_venta && (
                         <tr>
-                          <td colSpan="4" className="text-center py-2 text-gray-500">
-                            No hay detalles disponibles.
+                          <td
+                            colSpan="8"
+                            className="bg-gray-100 px-6 py-4 border-b"
+                          >
+                            <div className="mt-3">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-200 text-gray-700">
+                                  <tr>
+                                    <th className="px-2 py-2 border-b border-gray-300">
+                                      Artículo
+                                    </th>
+                                    <th className="px-2 py-2 border-b border-gray-300">
+                                      Cantidad
+                                    </th>
+                                    <th className="px-2 py-2 border-b border-gray-300">
+                                      Precio Unitario
+                                    </th>
+                                    <th className="px-2 py-2 border-b border-gray-300">
+                                      Subtotal
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {orden.detalles?.length > 0 ? (
+                                    orden.detalles.map((d, i) => (
+                                      <tr key={i}>
+                                        <td className="px-2 py-2 border-b border-gray-300">
+                                          {d.descripcion}
+                                        </td>
+                                        <td className="px-2 py-2 border-b border-gray-300">
+                                          {d.cantidad}
+                                        </td>
+                                        <td className="px-2 py-2 border-b border-gray-300">
+                                          $
+                                          {Number(
+                                            d.precio_unitario
+                                          ).toLocaleString()}
+                                        </td>
+                                        <td className="px-2 py-2 border-b border-gray-300">
+                                          ${Number(d.subtotal).toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td
+                                        colSpan="4"
+                                        className="text-center py-2 text-gray-500"
+                                      >
+                                        No hay detalles disponibles.
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
                           </td>
                         </tr>
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </td>
-            </tr>
-          )}
-        </React.Fragment>
-      );
-    })
-  ) : (!loading && (
-    <tr>
-      <td colSpan="8" className="text-center py-6 text-gray-500">
-        No se encontraron órdenes que coincidan con la búsqueda.
-      </td>
-    </tr>
-  ))}
-</tbody>
+                    </React.Fragment>
+                  );
+                })
+              : !loading && (
+                  <tr>
+                    <td colSpan="8" className="text-center py-6 text-gray-500">
+                      No se encontraron órdenes que coincidan con la búsqueda.
+                    </td>
+                  </tr>
+                )}
+          </tbody>
         </table>
         {/* Paginación */}
         <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> {total ? `— ` : ''}<span className="font-semibold text-gray-800">{total || ''}</span>{total ? ` órdenes` : ''}
+              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
+              de{" "}
+              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
+              {total ? `— ` : ""}
+              <span className="font-semibold text-gray-800">{total || ""}</span>
+              {total ? ` órdenes` : ""}
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -426,7 +489,10 @@ const handleEdit = (id) => {
               </button>
               <select
                 value={pageSize}
-                onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value, 10));
+                  setPage(1);
+                }}
                 className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
               >
                 <option value={10}>10 / página</option>
