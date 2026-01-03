@@ -154,7 +154,10 @@ const OrdenVentaForm = () => {
     cargarDatosYPrecargarFormulario();
   }, [location.state]); // Dependencia location.state está correcta
 
-  const verificarYAgregarAlInventario = async (idArticulo, descripcionArticulo) => {
+  const verificarYAgregarAlInventario = async (
+    idArticulo,
+    descripcionArticulo
+  ) => {
     try {
       await api.get(`/inventario/${idArticulo}`);
       return true; // Artículo encontrado en inventario
@@ -173,7 +176,9 @@ const OrdenVentaForm = () => {
                     await api.post("/inventario/inicializar", {
                       id_articulo: Number(idArticulo),
                     });
-                    toast.success("Artículo agregado al inventario con stock 0");
+                    toast.success(
+                      "Artículo agregado al inventario con stock 0"
+                    );
                     seAceptoAgregar = true;
                   } catch (err) {
                     toast.error(
@@ -187,7 +192,9 @@ const OrdenVentaForm = () => {
               {
                 label: "No",
                 onClick: () => {
-                  toast.error("Operación cancelada. El artículo no fue inicializado.");
+                  toast.error(
+                    "Operación cancelada. El artículo no fue inicializado."
+                  );
                   resolve();
                 },
               },
@@ -542,10 +549,13 @@ const OrdenVentaForm = () => {
             </label>
             <Select
               options={articulos.map((a) => {
-                const stockText = a.stock !== undefined ? ` (Stock: ${a.stock})` : '';
+                const stockText =
+                  a.stock !== undefined ? ` (Stock: ${a.stock})` : "";
                 return {
                   value: a.id_articulo,
-                  label: a.referencia ? `${a.referencia} - ${a.descripcion}${stockText}` : `${a.descripcion}${stockText}`,
+                  label: a.referencia
+                    ? `${a.referencia} - ${a.descripcion}${stockText}`
+                    : `${a.descripcion}${stockText}`,
                   precio_venta: a.precio_venta,
                   ...a,
                 };
@@ -699,10 +709,12 @@ const OrdenVentaForm = () => {
               type="submit"
               disabled={isSubmitting}
               className={`px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg ${
-                isSubmitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                isSubmitting
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
               }`}
             >
-              {isSubmitting ? 'Guardando...' : 'Guardar Orden'}
+              {isSubmitting ? "Guardando..." : "Guardar Orden"}
             </button>
           </div>
         </form>
