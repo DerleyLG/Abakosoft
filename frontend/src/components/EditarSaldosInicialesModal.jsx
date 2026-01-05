@@ -20,7 +20,7 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
   }, [cierre]);
 
   const handleChange = (id_metodo_pago, valor) => {
-ñ    // Permitir signo negativo y números
+    ñ; // Permitir signo negativo y números
     const esNegativo = valor.startsWith("-") || valor.includes("-");
     const valorLimpio = valor.replace(/[^\d]/g, "");
     const valorNumerico = parseFloat(valorLimpio) || 0;
@@ -78,11 +78,11 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* Overlay con difuminado */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Drawer */}
       <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-slate-100 shadow-2xl flex flex-col animate-slide-in-right">
         {/* Header */}
@@ -116,9 +116,9 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
           <div className="bg-amber-50 border border-amber-200 p-4 mb-6 rounded-xl">
             <p className="text-sm text-amber-800">
               <strong>⚠️ Importante:</strong> Los saldos iniciales se utilizan
-              como punto de partida para el cálculo de los saldos finales de este
-              período. Solo puedes modificar estos valores mientras el período
-              esté abierto.
+              como punto de partida para el cálculo de los saldos finales de
+              este período. Solo puedes modificar estos valores mientras el
+              período esté abierto.
             </p>
           </div>
 
@@ -166,7 +166,9 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
                 Total Saldo Inicial:
               </span>
               <span className="text-slate-900 font-bold text-2xl">
-                {formatMonto(saldos.reduce((sum, s) => sum + s.saldo_inicial, 0))}
+                {formatMonto(
+                  saldos.reduce((sum, s) => sum + s.saldo_inicial, 0)
+                )}
               </span>
             </div>
           </div>

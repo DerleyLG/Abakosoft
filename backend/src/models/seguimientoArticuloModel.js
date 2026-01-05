@@ -4,7 +4,7 @@ const db = require("../database/db");
 const buildDateFilter = (dateColumn, mes, anio) => {
   const conditions = [];
   const params = [];
-  
+
   if (mes) {
     conditions.push(`MONTH(${dateColumn}) = ?`);
     params.push(parseInt(mes));
@@ -13,9 +13,9 @@ const buildDateFilter = (dateColumn, mes, anio) => {
     conditions.push(`YEAR(${dateColumn}) = ?`);
     params.push(parseInt(anio));
   }
-  
+
   if (conditions.length === 0) return { where: "", params: [] };
-  
+
   return {
     where: ` AND ${conditions.join(" AND ")}`,
     params,
@@ -100,7 +100,12 @@ module.exports = {
   },
 
   // Órdenes de fabricación donde aparece el artículo
-  getOrdenesFabricacion: async (idArticulo, limit = 10, mes = null, anio = null) => {
+  getOrdenesFabricacion: async (
+    idArticulo,
+    limit = 10,
+    mes = null,
+    anio = null
+  ) => {
     const dateFilter = buildDateFilter("ofa.fecha_inicio", mes, anio);
     const [rows] = await db.query(
       `
@@ -156,7 +161,12 @@ module.exports = {
   },
 
   // Movimientos de inventario recientes
-  getMovimientosInventario: async (idArticulo, limit = 10, mes = null, anio = null) => {
+  getMovimientosInventario: async (
+    idArticulo,
+    limit = 10,
+    mes = null,
+    anio = null
+  ) => {
     const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
     const [rows] = await db.query(
       `

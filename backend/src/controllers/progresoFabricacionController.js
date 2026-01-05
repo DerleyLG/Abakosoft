@@ -38,8 +38,16 @@ const progresoFabricacionController = {
    */
   getResumenPorOrden: async (req, res) => {
     try {
-      const { fecha_inicio, fecha_fin, fechaInicio, estado, page = 1, limit = 20, busqueda } = req.query;
-      
+      const {
+        fecha_inicio,
+        fecha_fin,
+        fechaInicio,
+        estado,
+        page = 1,
+        limit = 20,
+        busqueda,
+      } = req.query;
+
       // Soportar ambos formatos de fecha
       const fechaInicioFinal = fecha_inicio || fechaInicio || null;
 
@@ -48,30 +56,36 @@ const progresoFabricacionController = {
         fecha_fin: null, // Ya no usamos fecha_fin
         estado_orden: estado || null,
       });
-      
+
       // Filtrar por búsqueda si se proporciona
       if (busqueda) {
         const busquedaLower = busqueda.toLowerCase();
-        resumen = resumen.filter(orden => {
+        resumen = resumen.filter((orden) => {
           // Buscar por ID de orden
-          if (orden.id_orden_fabricacion?.toString().includes(busqueda)) return true;
+          if (orden.id_orden_fabricacion?.toString().includes(busqueda))
+            return true;
           // Buscar por cliente
-          if (orden.nombre_cliente?.toLowerCase().includes(busquedaLower)) return true;
+          if (orden.nombre_cliente?.toLowerCase().includes(busquedaLower))
+            return true;
           // Buscar por artículos (nombre o referencia)
-          if (orden.articulos?.some(art => 
-            art.nombre_articulo?.toLowerCase().includes(busquedaLower) ||
-            art.referencia_articulo?.toLowerCase().includes(busquedaLower)
-          )) return true;
+          if (
+            orden.articulos?.some(
+              (art) =>
+                art.nombre_articulo?.toLowerCase().includes(busquedaLower) ||
+                art.referencia_articulo?.toLowerCase().includes(busquedaLower)
+            )
+          )
+            return true;
           return false;
         });
       }
-      
+
       // Paginación
       const pageNum = parseInt(page) || 1;
       const limitNum = parseInt(limit) || 20;
       const startIndex = (pageNum - 1) * limitNum;
       const endIndex = startIndex + limitNum;
-      
+
       const paginatedData = resumen.slice(startIndex, endIndex);
 
       res.json({
@@ -99,7 +113,7 @@ const progresoFabricacionController = {
   getResumenMateriaPrima: async (req, res) => {
     try {
       const { fecha_inicio, fecha_fin, fechaInicio, fechaFin } = req.query;
-      
+
       const inicio = fecha_inicio || fechaInicio;
       const fin = fecha_fin || fechaFin;
 

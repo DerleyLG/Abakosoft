@@ -17,24 +17,30 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
 
   const validate = () => {
     const newErrors = {};
-    
-    if (stockDisponible === "" || isNaN(stockDisponible) || stockDisponible < 0) {
-      newErrors.stockDisponible = "El stock debe ser un número mayor o igual a 0";
+
+    if (
+      stockDisponible === "" ||
+      isNaN(stockDisponible) ||
+      stockDisponible < 0
+    ) {
+      newErrors.stockDisponible =
+        "El stock debe ser un número mayor o igual a 0";
     }
-    
+
     if (stockMinimo === "" || isNaN(stockMinimo) || stockMinimo < 0) {
-      newErrors.stockMinimo = "El stock mínimo debe ser un número mayor o igual a 0";
+      newErrors.stockMinimo =
+        "El stock mínimo debe ser un número mayor o igual a 0";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
-    
+
     setLoading(true);
     try {
       await onSave({
@@ -55,11 +61,11 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Overlay */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
@@ -91,12 +97,16 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
         <div className="px-6 py-3 bg-slate-50 border-b border-slate-200">
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-600">Referencia:</span>
-            <span className="font-medium text-slate-800">{item?.referencia || "N/A"}</span>
+            <span className="font-medium text-slate-800">
+              {item?.referencia || "N/A"}
+            </span>
           </div>
           {item?.nombre_categoria && (
             <div className="flex items-center justify-between text-sm mt-1">
               <span className="text-slate-600">Categoría:</span>
-              <span className="font-medium text-slate-800">{item.nombre_categoria}</span>
+              <span className="font-medium text-slate-800">
+                {item.nombre_categoria}
+              </span>
             </div>
           )}
         </div>
@@ -132,7 +142,9 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
               Stock Mínimo
-              <span className="font-normal text-slate-500 ml-1">(alerta cuando sea menor)</span>
+              <span className="font-normal text-slate-500 ml-1">
+                (alerta cuando sea menor)
+              </span>
             </label>
             <input
               type="number"
@@ -156,11 +168,13 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
 
           {/* Indicador visual de stock */}
           {stockDisponible !== "" && stockMinimo !== "" && (
-            <div className={`p-3 rounded-lg ${
-              parseInt(stockDisponible) <= parseInt(stockMinimo) 
-                ? "bg-amber-50 border border-amber-200" 
-                : "bg-green-50 border border-green-200"
-            }`}>
+            <div
+              className={`p-3 rounded-lg ${
+                parseInt(stockDisponible) <= parseInt(stockMinimo)
+                  ? "bg-amber-50 border border-amber-200"
+                  : "bg-green-50 border border-green-200"
+              }`}
+            >
               <div className="flex items-center gap-2">
                 {parseInt(stockDisponible) <= parseInt(stockMinimo) ? (
                   <>

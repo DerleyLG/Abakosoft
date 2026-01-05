@@ -1,8 +1,6 @@
 const db = require("../database/db");
 
-
 const progresoFabricacionModel = {
-
   getProgresoOrdenesFabricacion: async ({
     fecha_inicio = null,
     fecha_fin = null,
@@ -36,7 +34,6 @@ const progresoFabricacionModel = {
       ? `WHERE ${whereParts.join(" AND ")}`
       : "";
 
-   
     const query = `
       SELECT 
         ofa.id_orden_fabricacion,
@@ -149,13 +146,11 @@ const progresoFabricacionModel = {
     return rows;
   },
 
-  
   calcularProgresoConEstimacion: async (filtros = {}) => {
     const datos = await progresoFabricacionModel.getProgresoOrdenesFabricacion(
       filtros
     );
 
-    
     const [etapas] = await db.query(
       "SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC"
     );
@@ -175,7 +170,7 @@ const progresoFabricacionModel = {
       const tieneEnProceso = item.etapas_en_proceso > 0;
 
       // Calcular porcentaje de avance general del artículo
-      // Si la etapa final es la 3 , y ya completó la etapa 2, 
+      // Si la etapa final es la 3 , y ya completó la etapa 2,
       // entonces lleva 2/3 = 66.67%
       let porcentajeGeneral = 0;
       if (ordenEtapaFinal > 0) {
@@ -297,9 +292,9 @@ const progresoFabricacionModel = {
     const resumenPorOrden = {};
 
     // Recopilar todas las combinaciones únicas de orden/artículo para consultar
-    const articulosAConsultar = progreso.map(item => ({
+    const articulosAConsultar = progreso.map((item) => ({
       id_orden: item.id_orden_fabricacion,
-      id_articulo: item.id_articulo
+      id_articulo: item.id_articulo,
     }));
 
     // Consultar detalle de etapas para todos los artículos
@@ -307,10 +302,11 @@ const progresoFabricacionModel = {
     for (const art of articulosAConsultar) {
       const key = `${art.id_orden}_${art.id_articulo}`;
       if (!detallesPorArticulo[key]) {
-        const detalleEtapas = await progresoFabricacionModel.getDetalleEtapasPorArticulo(
-          art.id_orden,
-          art.id_articulo
-        );
+        const detalleEtapas =
+          await progresoFabricacionModel.getDetalleEtapasPorArticulo(
+            art.id_orden,
+            art.id_articulo
+          );
         detallesPorArticulo[key] = detalleEtapas;
       }
     }
@@ -341,26 +337,36 @@ const progresoFabricacionModel = {
         cantidad_completada: item.cantidad_completada_final || 0,
         cantidad_en_proceso: item.cantidad_en_proceso || 0,
         porcentaje_avance: parseFloat(item.porcentaje_avance_general) || 0,
-        etapa_actual: item.etapa_en_proceso_nombre || item.etapa_completada_nombre || "Sin iniciar",
+        etapa_actual:
+          item.etapa_en_proceso_nombre ||
+          item.etapa_completada_nombre ||
+          "Sin iniciar",
         etapa_final: item.nombre_etapa_final,
         orden_etapa_final: item.orden_etapa_final,
         etapa_completada_orden: item.etapa_completada_max_orden || 0,
         etapas_completadas_count: item.etapas_completadas_count || 0,
         etapas_completadas_nombres: item.etapas_completadas_nombres || "",
         // Detalle de cada etapa con su cantidad
-        detalle_etapas: detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [],
+        detalle_etapas:
+          detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [],
         estado: item.estado_progreso,
         costo_materia_prima: item.costo_materia_prima || 0,
         materia_usada_estimada: item.materia_usada_estimada || 0,
       });
-      
+
       // Recalcular el porcentaje de avance basado en el promedio de etapas
-      const detalleEtapas = detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [];
-      const etapasHastaFinal = detalleEtapas.filter(e => e.orden_etapa <= (item.orden_etapa_final || 999));
-      
+      const detalleEtapas =
+        detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [];
+      const etapasHastaFinal = detalleEtapas.filter(
+        (e) => e.orden_etapa <= (item.orden_etapa_final || 999)
+      );
+
       // Obtener referencia al artículo recién agregado
-      const articuloActual = resumenPorOrden[idOrden].articulos[resumenPorOrden[idOrden].articulos.length - 1];
-      
+      const articuloActual =
+        resumenPorOrden[idOrden].articulos[
+          resumenPorOrden[idOrden].articulos.length - 1
+        ];
+
       if (etapasHastaFinal.length > 0) {
         const cantidadSolicitada = item.cantidad_solicitada || 1;
         const sumaPorcentajes = etapasHastaFinal.reduce((sum, etapa) => {
@@ -368,7 +374,7 @@ const progresoFabricacionModel = {
           return sum + Math.min(porcentajeEtapa, 100);
         }, 0);
         const promedioReal = sumaPorcentajes / etapasHastaFinal.length;
-        
+
         articuloActual.porcentaje_avance = parseFloat(promedioReal.toFixed(1));
       } else {
         // Si no hay etapas registradas, el porcentaje es 0
@@ -400,7 +406,7 @@ const progresoFabricacionModel = {
           0
         );
         orden.porcentaje_general = (sumaAvances / totalArticulos).toFixed(1);
-        
+
         // También mantener el porcentaje de artículos completados 100%
         orden.porcentaje_completado = (
           (orden.articulos_completados / totalArticulos) *
