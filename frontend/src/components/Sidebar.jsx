@@ -189,8 +189,17 @@ const Sidebar = ({ isOpen }) => {
                    Tablero de Producción
                 </NavLink>
 
-                <NavLink
-                  to="/ordenes_compra"
+                <NavLink                  to="/progreso-fabricacion"
+                  className={({ isActive }) =>
+                    `block p-2 rounded text-sm transition-colors duration-200 ${
+                      isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'
+                    }`
+                  }
+                >
+                   Progreso Fabricación
+                </NavLink>
+
+                <NavLink                  to="/ordenes_compra"
                   className={({ isActive }) =>
                     `block p-2 rounded text-sm transition-colors duration-200 ${
                       isActive ? 'bg-slate-800 text-white' : 'text-gray-300 hover:bg-slate-700'

@@ -129,6 +129,7 @@ module.exports = {
                 i.id_inventario,
                 i.id_articulo,
                 a.descripcion,
+                a.referencia,
                 a.id_categoria,
                 c.nombre AS nombre_categoria,
                 i.stock AS stock_disponible,

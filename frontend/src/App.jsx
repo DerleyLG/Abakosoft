@@ -67,6 +67,7 @@ import CierresCajaList from "./pages/CierresCajaList";
 import CierresCajaDetalle from "./pages/CierresCajaDetalle";
 import CierresCajaForm from "./pages/CierresCajaForm";
 import CierresCajaCerrar from "./pages/CierresCajaCerrar";
+import ProgresoFabricacion from "./pages/ProgresoFabricacion";
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -150,6 +151,9 @@ const AppLogic = () => {
                 <Route path="cierres-caja/crear" element={<CierresCajaForm/>} />
                 <Route path="cierres-caja/:id" element={<CierresCajaDetalle/>} />
                 <Route path="cierres-caja/:id/cerrar" element={<CierresCajaCerrar/>} />
+                
+                {/* Progreso de Fabricación */}
+                <Route path="progreso-fabricacion" element={<ProgresoFabricacion/>} />
             </Route>
         </Routes>
     );
