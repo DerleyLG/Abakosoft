@@ -26,15 +26,15 @@ const Sidebar = ({ isOpen }) => {
         transform: isOpen ? "translateX(0)" : "translateX(-100%)",
       }}
     >
-           {" "}
+        {" "}
       <div className="flex flex-col flex-grow">
-               {" "}
+           {" "}
         <nav className="p-4 space-y-4">
-                   {" "}
+              {" "}
           <div className="py-3 text-center text-xl font-bold border-b border-slate-700 select-none">
-                        PANEL          {" "}
+                  PANEL     {" "}
           </div>
-                   {" "}
+              {" "}
           <NavLink
             to="/dashboard"
             className={({ isActive }) =>
@@ -45,9 +45,9 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <LayoutDashboard size={20} /> Dashboard          {" "}
+                  <LayoutDashboard size={20} /> Dashboard     {" "}
           </NavLink>
-                   {" "}
+              {" "}
           <NavLink
             to="/articulos"
             className={({ isActive }) =>
@@ -58,9 +58,9 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <Package size={20} /> Artículos          {" "}
+                  <Package size={20} /> Artículos     {" "}
           </NavLink>
-                   {" "}
+              {" "}
           <NavLink
             to="/proveedores"
             className={({ isActive }) =>
@@ -71,9 +71,9 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <Users size={20} /> Proveedores          {" "}
+                  <Users size={20} /> Proveedores     {" "}
           </NavLink>
-                   {" "}
+              {" "}
           <NavLink
             to="/categorias"
             className={({ isActive }) =>
@@ -84,9 +84,9 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <Boxes size={20} /> Categorías          {" "}
+                  <Boxes size={20} /> Categorías     {" "}
           </NavLink>
-                   {" "}
+              {" "}
           <NavLink
             to="/clientes"
             className={({ isActive }) =>
@@ -97,9 +97,9 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <Users size={20} /> Clientes          {" "}
+                  <Users size={20} /> Clientes     {" "}
           </NavLink>
-                   
+              
           {can(user?.rol, ACTIONS.WORKERS_VIEW) && (
             <NavLink
               to="/trabajadores"
@@ -115,7 +115,7 @@ const Sidebar = ({ isOpen }) => {
               <Settings size={20} /> Trabajadores
             </NavLink>
           )}
-                             {" "}
+                   {" "}
           {can(user?.rol, ACTIONS.PAYMENTS_VIEW) && (
             <NavLink
               to="/trabajadores/pagos"
@@ -127,10 +127,10 @@ const Sidebar = ({ isOpen }) => {
                 }`
               }
             >
-                            <FiCreditCard size={20} /> Pagos            {" "}
+                     <FiCreditCard size={20} /> Pagos      {" "}
             </NavLink>
           )}
-                   {" "}
+              {" "}
           <NavLink
             to="/inventario"
             className={({ isActive }) =>
@@ -141,113 +141,109 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <Warehouse size={20} /> Inventario          {" "}
+                  <Warehouse size={20} /> Inventario     {" "}
           </NavLink>
-                    {/* Órdenes con submenú */}         {" "}
+               {/* Órdenes con submenú */}    {" "}
           <div>
-                       {" "}
+                 {" "}
             <button
               onClick={() => setOrdenesOpen(!ordenesOpen)}
-              className="w-full flex items-center justify-between gap-2 p-2 rounded hover:bg-slate-700 text-gray-300"
+              className="w-full flex items-center justify-between gap-2 p-2 rounded hover:bg-slate-700 text-gray-300 cursor-pointer"
             >
-                           {" "}
+                    {" "}
               <div className="flex items-center gap-2 cursor-pointer">
-                                <ClipboardList size={20} />               
-                Órdenes              {" "}
+                        <ClipboardList size={20} />       
+                Órdenes       {" "}
               </div>
-                           {" "}
+                    {" "}
               {ordenesOpen ? (
-                <ChevronDown size={16} className="cursor-pointer" />
+                <ChevronDown size={16} className="transition-transform duration-300" />
               ) : (
-                <ChevronRight size={16} className="cursor-pointer" />
+                <ChevronRight size={16} className="transition-transform duration-300" />
               )}
-                         {" "}
+                   {" "}
             </button>
-                       {" "}
-            {ordenesOpen && (
-              <div className="ml-6 mt-1 space-y-1">
-                               {" "}
-                <NavLink
-                  to="/ordenes_venta"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                                    Órdenes de Venta                {" "}
-                </NavLink>
-                               {" "}
-                <NavLink
-                  to="/ordenes_pedido"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                                    Órdenes de Pedido                {" "}
-                </NavLink>
-                               {" "}
-                <NavLink
-                  to="/ordenes_fabricacion"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                                    Órdenes de Fabricación                {" "}
-                </NavLink>
-                <NavLink
-                  to="/kanban"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                  Tablero de Producción
-                </NavLink>
-                               {" "}
-                <NavLink
-                  to="/progreso-fabricacion"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                  Progreso Fabricación
-                </NavLink>
-                <NavLink
-                  to="/ordenes_compra"
-                  className={({ isActive }) =>
-                    `block p-2 rounded text-sm transition-colors duration-200 ${
-                      isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-gray-300 hover:bg-slate-700"
-                    }`
-                  }
-                >
-                                    Órdenes de Compra                {" "}
-                </NavLink>
-                             {" "}
-              </div>
-            )}
-                     {" "}
+
+            <div
+              className={`ml-7 border-l border-slate-700 pl-2 overflow-hidden transition-all duration-300 ease-in-out ${
+                ordenesOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              <NavLink
+                to="/ordenes_venta"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+               Órdenes Ventas
+              </NavLink>
+              <NavLink
+                to="/ordenes_pedido"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+                Órdenes Pedidos
+              </NavLink>
+              <NavLink
+                to="/ordenes_fabricacion"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+                Órdenes Fabricación
+              </NavLink>
+              <NavLink
+                to="/kanban"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+                Tablero Produccion
+              </NavLink>
+              <NavLink
+                to="/progreso-fabricacion"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+                Progreso Fabricacion
+              </NavLink>
+              <NavLink
+                to="/ordenes_compra"
+                className={({ isActive }) =>
+                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
+                    isActive
+                      ? "bg-slate-800 text-white"
+                      : "text-gray-400 hover:bg-slate-700"
+                  }`
+                }
+              >
+               Órdenes Compras
+              </NavLink>
+            </div>
           </div>
-                     
+
           <NavLink
             to="/costos_indirectos"
             className={({ isActive }) =>
@@ -258,7 +254,7 @@ const Sidebar = ({ isOpen }) => {
               }`
             }
           >
-                        <FiDollarSign size={20} /> Costos          {" "}
+                  <FiDollarSign size={20} /> Costos     {" "}
           </NavLink>
           <NavLink
             to="/tesoreria"
@@ -286,7 +282,7 @@ const Sidebar = ({ isOpen }) => {
               <FiCalendar size={20} /> Cierres de Caja
             </NavLink>
           )}
-                   {" "}
+
           {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
             <NavLink
               to="/reportes"
@@ -298,10 +294,10 @@ const Sidebar = ({ isOpen }) => {
                 }`
               }
             >
-                            <FileText size={20} /> Reportes            {" "}
+              <FileText size={20} /> Reportes
             </NavLink>
           )}
-                   
+
           {user?.rol === "admin" && (
             <NavLink
               to="/gestionUsuarios"
@@ -316,15 +312,12 @@ const Sidebar = ({ isOpen }) => {
               <Users size={20} /> Gestión de Usuarios
             </NavLink>
           )}
-                 {" "}
         </nav>
-             {" "}
       </div>
+
       <div className="p-4 border-t border-slate-700 text-center text-xs text-gray-400">
-        {/* Usuario y logout movidos al Header */}
         Abakosoft
       </div>
-         {" "}
     </aside>
   );
 };
