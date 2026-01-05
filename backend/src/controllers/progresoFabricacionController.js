@@ -55,30 +55,8 @@ const progresoFabricacionController = {
         fecha_inicio: fechaInicioFinal,
         fecha_fin: null, // Ya no usamos fecha_fin
         estado_orden: estado || null,
+        busqueda: busqueda || null, // Filtrado en SQL para mejor rendimiento
       });
-
-      // Filtrar por búsqueda si se proporciona
-      if (busqueda) {
-        const busquedaLower = busqueda.toLowerCase();
-        resumen = resumen.filter((orden) => {
-          // Buscar por ID de orden
-          if (orden.id_orden_fabricacion?.toString().includes(busqueda))
-            return true;
-          // Buscar por cliente
-          if (orden.nombre_cliente?.toLowerCase().includes(busquedaLower))
-            return true;
-          // Buscar por artículos (nombre o referencia)
-          if (
-            orden.articulos?.some(
-              (art) =>
-                art.nombre_articulo?.toLowerCase().includes(busquedaLower) ||
-                art.referencia_articulo?.toLowerCase().includes(busquedaLower)
-            )
-          )
-            return true;
-          return false;
-        });
-      }
 
       // Paginación
       const pageNum = parseInt(page) || 1;
