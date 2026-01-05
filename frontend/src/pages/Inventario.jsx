@@ -427,15 +427,22 @@ const Inventario = () => {
                     setDrawerSeguimiento(true);
                   }}
                 >
-                  <td className="px-4 py-3 font-medium text-slate-700">{item.referencia || "-"}</td>
-                  <td className="px-4 py-3 max-w-xs truncate" title={item.descripcion}>{item.descripcion}</td>
+                  <td className="px-4 py-3 font-medium text-slate-700">
+                    {item.referencia || "-"}
+                  </td>
+                  <td
+                    className="px-4 py-3 max-w-xs truncate"
+                    title={item.descripcion}
+                  >
+                    {item.descripcion}
+                  </td>
                   <td className="px-4 py-3">{item.stock_disponible ?? 0}</td>
                   <td className="px-4 py-3">{item.stock_fabricado ?? 0}</td>
                   <td className="px-4 py-3">{item.stock_en_proceso ?? 0}</td>
                   <td className="px-4 py-3">{item.stock_minimo ?? 0}</td>
                   <td className="px-4 py-3">
-                    {item.ultima_actualizacion 
-                      ? new Date(item.ultima_actualizacion).toLocaleString() 
+                    {item.ultima_actualizacion
+                      ? new Date(item.ultima_actualizacion).toLocaleString()
                       : "-"}
                   </td>
                   <td className="px-4 py-3 text-center">

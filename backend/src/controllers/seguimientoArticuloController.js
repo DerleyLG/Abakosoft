@@ -12,15 +12,46 @@ module.exports = {
         return res.status(404).json({ error: "Artículo no encontrado" });
       }
 
-      const [ordenesVenta, ordenesPedido, ordenesFabricacion, ordenesCompra, movimientos, resumen] =
-        await Promise.all([
-          SeguimientoArticuloModel.getOrdenesVenta(id, parseInt(limit), mes, anio),
-          SeguimientoArticuloModel.getOrdenesPedido(id, parseInt(limit), mes, anio),
-          SeguimientoArticuloModel.getOrdenesFabricacion(id, parseInt(limit), mes, anio),
-          SeguimientoArticuloModel.getOrdenesCompra(id, parseInt(limit), mes, anio),
-          SeguimientoArticuloModel.getMovimientosInventario(id, parseInt(limit), mes, anio),
-          SeguimientoArticuloModel.getResumen(id, mes, anio),
-        ]);
+      const [
+        ordenesVenta,
+        ordenesPedido,
+        ordenesFabricacion,
+        ordenesCompra,
+        movimientos,
+        resumen,
+      ] = await Promise.all([
+        SeguimientoArticuloModel.getOrdenesVenta(
+          id,
+          parseInt(limit),
+          mes,
+          anio
+        ),
+        SeguimientoArticuloModel.getOrdenesPedido(
+          id,
+          parseInt(limit),
+          mes,
+          anio
+        ),
+        SeguimientoArticuloModel.getOrdenesFabricacion(
+          id,
+          parseInt(limit),
+          mes,
+          anio
+        ),
+        SeguimientoArticuloModel.getOrdenesCompra(
+          id,
+          parseInt(limit),
+          mes,
+          anio
+        ),
+        SeguimientoArticuloModel.getMovimientosInventario(
+          id,
+          parseInt(limit),
+          mes,
+          anio
+        ),
+        SeguimientoArticuloModel.getResumen(id, mes, anio),
+      ]);
 
       res.json({
         articulo,
@@ -30,11 +61,14 @@ module.exports = {
         ordenesCompra,
         movimientos,
         resumen,
-        filtro: mes && anio ? { mes: parseInt(mes), anio: parseInt(anio) } : null,
+        filtro:
+          mes && anio ? { mes: parseInt(mes), anio: parseInt(anio) } : null,
       });
     } catch (error) {
       console.error("Error al obtener seguimiento del artículo:", error);
-      res.status(500).json({ error: "Error al obtener seguimiento del artículo" });
+      res
+        .status(500)
+        .json({ error: "Error al obtener seguimiento del artículo" });
     }
   },
 
@@ -43,7 +77,12 @@ module.exports = {
     try {
       const { id } = req.params;
       const { limit = 20, mes, anio } = req.query;
-      const data = await SeguimientoArticuloModel.getOrdenesVenta(id, parseInt(limit), mes, anio);
+      const data = await SeguimientoArticuloModel.getOrdenesVenta(
+        id,
+        parseInt(limit),
+        mes,
+        anio
+      );
       res.json(data);
     } catch (error) {
       console.error("Error al obtener órdenes de venta:", error);
@@ -56,7 +95,10 @@ module.exports = {
     try {
       const { id } = req.params;
       const { limit = 20 } = req.query;
-      const data = await SeguimientoArticuloModel.getOrdenesPedido(id, parseInt(limit));
+      const data = await SeguimientoArticuloModel.getOrdenesPedido(
+        id,
+        parseInt(limit)
+      );
       res.json(data);
     } catch (error) {
       console.error("Error al obtener órdenes de pedido:", error);
@@ -69,11 +111,16 @@ module.exports = {
     try {
       const { id } = req.params;
       const { limit = 20 } = req.query;
-      const data = await SeguimientoArticuloModel.getOrdenesFabricacion(id, parseInt(limit));
+      const data = await SeguimientoArticuloModel.getOrdenesFabricacion(
+        id,
+        parseInt(limit)
+      );
       res.json(data);
     } catch (error) {
       console.error("Error al obtener órdenes de fabricación:", error);
-      res.status(500).json({ error: "Error al obtener órdenes de fabricación" });
+      res
+        .status(500)
+        .json({ error: "Error al obtener órdenes de fabricación" });
     }
   },
 
@@ -82,7 +129,10 @@ module.exports = {
     try {
       const { id } = req.params;
       const { limit = 20 } = req.query;
-      const data = await SeguimientoArticuloModel.getOrdenesCompra(id, parseInt(limit));
+      const data = await SeguimientoArticuloModel.getOrdenesCompra(
+        id,
+        parseInt(limit)
+      );
       res.json(data);
     } catch (error) {
       console.error("Error al obtener órdenes de compra:", error);

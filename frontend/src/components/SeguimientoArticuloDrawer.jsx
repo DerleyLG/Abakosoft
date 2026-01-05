@@ -49,11 +49,15 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState("resumen");
   const [error, setError] = useState(null);
-  
+
   // Inicializar con mes y año actual
   const fechaActual = new Date();
-  const [mesSeleccionado, setMesSeleccionado] = useState(String(fechaActual.getMonth() + 1));
-  const [anioSeleccionado, setAnioSeleccionado] = useState(String(fechaActual.getFullYear()));
+  const [mesSeleccionado, setMesSeleccionado] = useState(
+    String(fechaActual.getMonth() + 1)
+  );
+  const [anioSeleccionado, setAnioSeleccionado] = useState(
+    String(fechaActual.getFullYear())
+  );
 
   useEffect(() => {
     if (isOpen && idArticulo) {
@@ -74,7 +78,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
         params.append("anio", anioSeleccionado);
       }
       const queryString = params.toString();
-      const url = `/seguimiento-articulo/${idArticulo}${queryString ? `?${queryString}` : ""}`;
+      const url = `/seguimiento-articulo/${idArticulo}${
+        queryString ? `?${queryString}` : ""
+      }`;
       const res = await api.get(url);
       setData(res.data);
     } catch (err) {
@@ -153,23 +159,31 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             </div>
             <div className="text-xs text-blue-500 mt-1">Fabricado</div>
           </div>
-          <div className={`rounded-xl p-4 text-center ${
-            (articulo?.stock_disponible || 0) <= (articulo?.stock_minimo || 0)
-              ? "bg-amber-50"
-              : "bg-green-50"
-          }`}>
-            <div className={`text-2xl font-bold ${
+          <div
+            className={`rounded-xl p-4 text-center ${
               (articulo?.stock_disponible || 0) <= (articulo?.stock_minimo || 0)
-                ? "text-amber-700"
-                : "text-green-700"
-            }`}>
+                ? "bg-amber-50"
+                : "bg-green-50"
+            }`}
+          >
+            <div
+              className={`text-2xl font-bold ${
+                (articulo?.stock_disponible || 0) <=
+                (articulo?.stock_minimo || 0)
+                  ? "text-amber-700"
+                  : "text-green-700"
+              }`}
+            >
               {articulo?.stock_minimo || 0}
             </div>
-            <div className={`text-xs mt-1 ${
-              (articulo?.stock_disponible || 0) <= (articulo?.stock_minimo || 0)
-                ? "text-amber-500"
-                : "text-green-500"
-            }`}>
+            <div
+              className={`text-xs mt-1 ${
+                (articulo?.stock_disponible || 0) <=
+                (articulo?.stock_minimo || 0)
+                  ? "text-amber-500"
+                  : "text-green-500"
+              }`}
+            >
               Stock Mínimo
             </div>
           </div>
@@ -178,7 +192,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
         {/* Tarjetas de resumen */}
         <div className="space-y-3">
           {/* Ventas */}
-          <div 
+          <div
             className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setActiveTab("ventas")}
           >
@@ -189,19 +203,25 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 </div>
                 <div>
                   <div className="text-sm opacity-80">Órdenes de Venta</div>
-                  <div className="text-2xl font-bold">{ventas?.total_ordenes || 0}</div>
+                  <div className="text-2xl font-bold">
+                    {ventas?.total_ordenes || 0}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-sm opacity-80">Total vendido</div>
-                <div className="font-semibold">{ventas?.total_cantidad || 0} uds</div>
-                <div className="text-xs opacity-70">{formatCurrency(ventas?.total_monto)}</div>
+                <div className="font-semibold">
+                  {ventas?.total_cantidad || 0} uds
+                </div>
+                <div className="text-xs opacity-70">
+                  {formatCurrency(ventas?.total_monto)}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Pedidos */}
-          <div 
+          <div
             className="bg-gradient-to-r from-violet-500 to-violet-600 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setActiveTab("pedidos")}
           >
@@ -212,18 +232,22 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 </div>
                 <div>
                   <div className="text-sm opacity-80">Órdenes de Pedido</div>
-                  <div className="text-2xl font-bold">{pedidos?.total_ordenes || 0}</div>
+                  <div className="text-2xl font-bold">
+                    {pedidos?.total_ordenes || 0}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-sm opacity-80">Cantidad pedida</div>
-                <div className="font-semibold">{pedidos?.total_cantidad || 0} uds</div>
+                <div className="font-semibold">
+                  {pedidos?.total_cantidad || 0} uds
+                </div>
               </div>
             </div>
           </div>
 
           {/* Fabricación */}
-          <div 
+          <div
             className="bg-gradient-to-r from-slate-600 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setActiveTab("fabricacion")}
           >
@@ -233,21 +257,26 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                   <FiSettings size={20} />
                 </div>
                 <div>
-                  <div className="text-sm opacity-80">Órdenes de Fabricación</div>
-                  <div className="text-2xl font-bold">{fabricacion?.total_ordenes || 0}</div>
+                  <div className="text-sm opacity-80">
+                    Órdenes de Fabricación
+                  </div>
+                  <div className="text-2xl font-bold">
+                    {fabricacion?.total_ordenes || 0}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-sm opacity-80">Fabricado</div>
                 <div className="font-semibold">
-                  {fabricacion?.total_fabricado || 0} / {fabricacion?.total_solicitado || 0}
+                  {fabricacion?.total_fabricado || 0} /{" "}
+                  {fabricacion?.total_solicitado || 0}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Compras */}
-          <div 
+          <div
             className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setActiveTab("compras")}
           >
@@ -258,13 +287,19 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 </div>
                 <div>
                   <div className="text-sm opacity-80">Órdenes de Compra</div>
-                  <div className="text-2xl font-bold">{compras?.total_ordenes || 0}</div>
+                  <div className="text-2xl font-bold">
+                    {compras?.total_ordenes || 0}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-sm opacity-80">Total comprado</div>
-                <div className="font-semibold">{compras?.total_cantidad || 0} uds</div>
-                <div className="text-xs opacity-70">{formatCurrency(compras?.total_monto)}</div>
+                <div className="font-semibold">
+                  {compras?.total_cantidad || 0} uds
+                </div>
+                <div className="text-xs opacity-70">
+                  {formatCurrency(compras?.total_monto)}
+                </div>
               </div>
             </div>
           </div>
@@ -289,15 +324,24 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                     ) : (
                       <FiTrendingDown className="text-red-500" size={14} />
                     )}
-                    <span className="text-slate-600">{mov.tipo_origen_movimiento}</span>
+                    <span className="text-slate-600">
+                      {mov.tipo_origen_movimiento}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`font-medium ${
-                      mov.tipo_movimiento === "entrada" ? "text-green-600" : "text-red-600"
-                    }`}>
-                      {mov.tipo_movimiento === "entrada" ? "+" : "-"}{mov.cantidad_movida}
+                    <span
+                      className={`font-medium ${
+                        mov.tipo_movimiento === "entrada"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {mov.tipo_movimiento === "entrada" ? "+" : "-"}
+                      {mov.cantidad_movida}
                     </span>
-                    <span className="text-xs text-slate-400">{formatDate(mov.fecha)}</span>
+                    <span className="text-xs text-slate-400">
+                      {formatDate(mov.fecha)}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -328,9 +372,15 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <FiHash className="text-slate-400" size={14} />
-                <span className="font-semibold text-slate-800">OV-{orden.id_orden_venta}</span>
+                <span className="font-semibold text-slate-800">
+                  OV-{orden.id_orden_venta}
+                </span>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(orden.estado)}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
+                  orden.estado
+                )}`}
+              >
                 {orden.estado}
               </span>
             </div>
@@ -378,9 +428,15 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <FiHash className="text-slate-400" size={14} />
-                <span className="font-semibold text-slate-800">PED-{orden.id_pedido}</span>
+                <span className="font-semibold text-slate-800">
+                  PED-{orden.id_pedido}
+                </span>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(orden.estado)}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
+                  orden.estado
+                )}`}
+              >
                 {orden.estado}
               </span>
             </div>
@@ -421,9 +477,10 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
     return (
       <div className="space-y-3">
         {ordenes.map((orden) => {
-          const progreso = orden.cantidad > 0 
-            ? Math.round((orden.cantidad_fabricada / orden.cantidad) * 100) 
-            : 0;
+          const progreso =
+            orden.cantidad > 0
+              ? Math.round((orden.cantidad_fabricada / orden.cantidad) * 100)
+              : 0;
           return (
             <div
               key={orden.id_orden_fabricacion}
@@ -432,9 +489,15 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <FiHash className="text-slate-400" size={14} />
-                  <span className="font-semibold text-slate-800">OF-{orden.id_orden_fabricacion}</span>
+                  <span className="font-semibold text-slate-800">
+                    OF-{orden.id_orden_fabricacion}
+                  </span>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(orden.estado)}`}>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
+                    orden.estado
+                  )}`}
+                >
                   {orden.estado}
                 </span>
               </div>
@@ -450,7 +513,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <div className="bg-slate-50 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2 text-sm">
-                  <span className="text-slate-600">Progreso de fabricación</span>
+                  <span className="text-slate-600">
+                    Progreso de fabricación
+                  </span>
                   <span className="font-semibold text-slate-800">
                     {orden.cantidad_fabricada} / {orden.cantidad}
                   </span>
@@ -463,7 +528,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                     style={{ width: `${Math.min(progreso, 100)}%` }}
                   />
                 </div>
-                <div className="text-right text-xs text-slate-500 mt-1">{progreso}%</div>
+                <div className="text-right text-xs text-slate-500 mt-1">
+                  {progreso}%
+                </div>
               </div>
             </div>
           );
@@ -492,9 +559,15 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <FiHash className="text-slate-400" size={14} />
-                <span className="font-semibold text-slate-800">OC-{orden.id_orden_compra}</span>
+                <span className="font-semibold text-slate-800">
+                  OC-{orden.id_orden_compra}
+                </span>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(orden.estado)}`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
+                  orden.estado
+                )}`}
+              >
                 {orden.estado}
               </span>
             </div>
@@ -563,7 +636,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 {data?.articulo && (
                   <p className="text-slate-300 text-sm truncate max-w-[280px]">
                     {data.articulo.referencia && (
-                      <span className="text-slate-400">{data.articulo.referencia} - </span>
+                      <span className="text-slate-400">
+                        {data.articulo.referencia} -{" "}
+                      </span>
                     )}
                     {data.articulo.descripcion}
                   </p>
@@ -586,7 +661,8 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               {data.articulo.precio_venta > 0 && (
                 <div className="text-slate-400">
-                  Precio: <span className="text-white font-medium">
+                  Precio:{" "}
+                  <span className="text-white font-medium">
                     {formatCurrency(data.articulo.precio_venta)}
                   </span>
                 </div>
@@ -608,7 +684,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 cursor-pointer"
             >
               {MESES.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
               ))}
             </select>
             <select
@@ -617,7 +695,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 cursor-pointer"
             >
               {getAniosDisponibles().map((a) => (
-                <option key={a.value} value={a.value}>{a.label}</option>
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
               ))}
             </select>
             {(mesSeleccionado || anioSeleccionado) && (
@@ -630,7 +710,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             )}
             {mesSeleccionado && anioSeleccionado && (
               <span className="text-xs text-slate-500 ml-auto">
-                Mostrando: {MESES.find(m => m.value === mesSeleccionado)?.label} {anioSeleccionado}
+                Mostrando:{" "}
+                {MESES.find((m) => m.value === mesSeleccionado)?.label}{" "}
+                {anioSeleccionado}
               </span>
             )}
           </div>
@@ -638,7 +720,10 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
 
         {/* Tabs */}
         <div className="bg-white border-b border-slate-200 px-2 flex-shrink-0">
-          <div className="flex overflow-x-auto gap-1 py-2" style={{ scrollbarWidth: 'thin' }}>
+          <div
+            className="flex overflow-x-auto gap-1 py-2"
+            style={{ scrollbarWidth: "thin" }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}

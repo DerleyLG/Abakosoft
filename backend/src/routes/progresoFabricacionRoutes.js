@@ -21,7 +21,10 @@ router.get("/resumen", progresoFabricacionController.getResumenPorOrden);
  * Obtiene el resumen de materia prima consumida en un período
  * Query params: fecha_inicio, fecha_fin (requeridos)
  */
-router.get("/materia-prima", progresoFabricacionController.getResumenMateriaPrima);
+router.get(
+  "/materia-prima",
+  progresoFabricacionController.getResumenMateriaPrima
+);
 
 /**
  * GET /api/progreso-fabricacion/orden/:id
