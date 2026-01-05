@@ -13,6 +13,7 @@ import {
   FiArrowRight,
   FiEdit,
   FiX,
+  FiTrendingUp,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
@@ -1265,6 +1266,18 @@ const ListaOrdenesFabricacion = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            navigate(
+                              `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                            );
+                          }}
+                          className="text-blue-600 hover:text-blue-400 transition cursor-pointer"
+                          title="Ver progreso de fabricación"
+                        >
+                          <FiTrendingUp size={18} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             navigate("/costos_indirectos/nuevo", {
                               state: {
                                 id_orden_fabricacion:
@@ -1312,14 +1325,27 @@ const ListaOrdenesFabricacion = () => {
                           const completada = esOrdenCompletada(orden.estado);
                           if (completada) {
                             return (
-                              <button
-                                type="button"
-                                disabled
-                                title="La orden está completada. No se pueden registrar más avances."
-                                className="mt-4 text-slate-400 flex items-center gap-2 cursor-not-allowed"
-                              >
-                                <FiPlus /> Registrar nuevo avance
-                              </button>
+                              <div className="mt-4 flex items-center gap-6">
+                                <button
+                                  type="button"
+                                  disabled
+                                  title="La orden está completada. No se pueden registrar más avances."
+                                  className="text-slate-400 flex items-center gap-2 cursor-not-allowed"
+                                >
+                                  <FiPlus /> Registrar nuevo avance
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    navigate(
+                                      `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                                    )
+                                  }
+                                  className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
+                                  title="Ver progreso de fabricación"
+                                >
+                                  <FiTrendingUp /> Ver progreso de fabricación
+                                </button>
+                              </div>
                             );
                           }
                           return (
@@ -1349,6 +1375,17 @@ const ListaOrdenesFabricacion = () => {
                                 title="Registrar un costo indirecto y asignarlo a esta OF"
                               >
                                 <FiPlus /> Registrar costo indirecto
+                              </button>
+                              <button
+                                onClick={() =>
+                                  navigate(
+                                    `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                                  )
+                                }
+                                className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
+                                title="Ver progreso de fabricación"
+                              >
+                                <FiTrendingUp /> Ver progreso de fabricación
                               </button>
                             </div>
                           );

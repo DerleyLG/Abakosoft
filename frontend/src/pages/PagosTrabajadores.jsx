@@ -32,7 +32,6 @@ const PagosTrabajadores = () => {
     fetchInit();
   }, []);
 
-  // Cargar pagos paginados cuando cambian filtros/paginación
   useEffect(() => {
     const fetchPagos = async () => {
       setLoading(true);
@@ -101,7 +100,7 @@ const PagosTrabajadores = () => {
       try {
         await api.delete(`/pagos/${id_pago}`);
         toast.success('Pago eliminado correctamente');
-        // Recargar pagos
+  
         const resPagos = await api.get('/pagos', {
           params: {
             page,
@@ -124,7 +123,7 @@ const PagosTrabajadores = () => {
     }
   };
 
-  // Al cambiar el filtro de trabajador, volver a página 1
+ 
   const onTrabajadorChange = (e) => {
     setTrabajadorFiltro(e.target.value);
     setPage(1);
@@ -234,16 +233,6 @@ const PagosTrabajadores = () => {
   
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpand(pago.id_pago);
-                        }}
-                        className="text-blue-600 hover:text-blue-400 transition cursor-pointer"
-                        title="Ver detalles"
-                      >
-                        <FiEye size={20} />
-                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

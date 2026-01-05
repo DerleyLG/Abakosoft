@@ -2,17 +2,22 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import { FiPlus, FiEdit3, FiPackage, FiBox, FiTool } from "react-icons/fi";
-import Swal from "sweetalert2";
+import {
+  FiPlus,
+  FiEdit3,
+  FiPackage,
+  FiBox,
+  FiTool,
+  FiTrash2,
+  FiEye,
+} from "react-icons/fi";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
-import withReactContent from "sweetalert2-react-content";
-import { FiTrash2 } from "react-icons/fi";
 import "../styles/confirmAlert.css";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
-
-const MySwal = withReactContent(Swal);
+import EditarStockModal from "../components/EditarStockModal";
+import SeguimientoArticuloDrawer from "../components/SeguimientoArticuloDrawer";
 
 const Inventario = () => {
   const [inventario, setInventario] = useState([]);
@@ -27,6 +32,10 @@ const Inventario = () => {
   const [stockFabricadoFilter, setStockFabricadoFilter] = useState("");
   const [stockProcesoFilter, setStockProcesoFilter] = useState("");
   const [stockDisponibleFilter, setStockDisponibleFilter] = useState("");
+  const [modalEditarStock, setModalEditarStock] = useState(false);
+  const [itemSeleccionado, setItemSeleccionado] = useState(null);
+  const [drawerSeguimiento, setDrawerSeguimiento] = useState(false);
+  const [articuloSeguimiento, setArticuloSeguimiento] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.rol;
@@ -146,69 +155,35 @@ const Inventario = () => {
     });
   };
 
-  const editarStockYMinimo = async (item) => {
-    let stockValue = item.stock_disponible;
-    let stockMinimoValue = item.stock_minimo;
+  const abrirModalEditarStock = (item) => {
+    setItemSeleccionado(item);
+    setModalEditarStock(true);
+  };
 
-    const { value: formValues } = await MySwal.fire({
-      title: `Editar stock y mínimo de "${item.descripcion}"`,
-      html: `
-        <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-          <label for="swal-input1" style="font-weight: 600;">Stock disponible:</label>
-          <input id="swal-input1" type="number" min="0" class="swal2-input" value="${stockValue}" />
+  const cerrarModalEditarStock = () => {
+    setModalEditarStock(false);
+    setItemSeleccionado(null);
+  };
 
-          <label for="swal-input2" style="font-weight: 600; margin-top: 1rem;">Stock mínimo:</label>
-          <input id="swal-input2" type="number" min="0" class="swal2-input" value="${stockMinimoValue}" />
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: "Guardar",
-      cancelButtonText: "Cancelar",
-      preConfirm: () => {
-        const stock = parseInt(
-          document.getElementById("swal-input1").value,
-          10
-        );
-        const stockMinimo = parseInt(
-          document.getElementById("swal-input2").value,
-          10
-        );
-        if (isNaN(stock) || stock < 0) {
-          Swal.showValidationMessage(
-            "El stock debe ser un número mayor o igual a 0"
-          );
-          return false;
-        }
-        if (isNaN(stockMinimo) || stockMinimo < 0) {
-          Swal.showValidationMessage(
-            "El stock mínimo debe ser un número mayor o igual a 0"
-          );
-          return false;
-        }
-        return { stock, stockMinimo };
-      },
-    });
-
-    if (formValues) {
-      try {
-        await api.put(`/inventario/${item.id_articulo}`, {
-          stock: formValues.stock,
-          stock_minimo: formValues.stockMinimo,
-        });
-        toast.success("Inventario actualizado correctamente");
-        cargarInventario();
-      } catch (error) {
-        console.error(
-          "Error al actualizar inventario",
-          error.response?.data || error.message
-        );
-        const mensajeBackend =
-          error.response?.data?.error ||
-          error.response?.data?.message ||
-          "Error al actualizar inventario";
-        toast.error(mensajeBackend);
-      }
+  const guardarStockYMinimo = async (datos) => {
+    try {
+      await api.put(`/inventario/${datos.id_articulo}`, {
+        stock: datos.stock,
+        stock_minimo: datos.stock_minimo,
+      });
+      toast.success("Inventario actualizado correctamente");
+      cargarInventario();
+    } catch (error) {
+      console.error(
+        "Error al actualizar inventario",
+        error.response?.data || error.message
+      );
+      const mensajeBackend =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Error al actualizar inventario";
+      toast.error(mensajeBackend);
+      throw error;
     }
   };
 
@@ -431,6 +406,7 @@ const Inventario = () => {
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
+              <th className="px-4 py-3">Referencia</th>
               <th className="px-4 py-3">Artículo</th>
               <th className="px-4 py-3">Stock disponible</th>
               <th className="px-4 py-3">Stock fabricado</th>
@@ -445,22 +421,40 @@ const Inventario = () => {
               filteredItems.map((item) => (
                 <tr
                   key={item.id_inventario}
-                  className="hover:bg-slate-300 transition select-none"
+                  className="hover:bg-slate-300 transition select-none cursor-pointer"
+                  onClick={() => {
+                    setArticuloSeguimiento(item.id_articulo);
+                    setDrawerSeguimiento(true);
+                  }}
                 >
-                  <td className="px-4 py-3">{item.descripcion}</td>
-                  <td className="px-4 py-3">{item.stock_disponible}</td>
-                  <td className="px-4 py-3">{item.stock_fabricado}</td>
-                  <td className="px-4 py-3">{item.stock_en_proceso}</td>
-                  <td className="px-4 py-3">{item.stock_minimo}</td>
+                  <td className="px-4 py-3 font-medium text-slate-700">{item.referencia || "-"}</td>
+                  <td className="px-4 py-3 max-w-xs truncate" title={item.descripcion}>{item.descripcion}</td>
+                  <td className="px-4 py-3">{item.stock_disponible ?? 0}</td>
+                  <td className="px-4 py-3">{item.stock_fabricado ?? 0}</td>
+                  <td className="px-4 py-3">{item.stock_en_proceso ?? 0}</td>
+                  <td className="px-4 py-3">{item.stock_minimo ?? 0}</td>
                   <td className="px-4 py-3">
-                    {new Date(item.ultima_actualizacion).toLocaleString()}
+                    {item.ultima_actualizacion 
+                      ? new Date(item.ultima_actualizacion).toLocaleString() 
+                      : "-"}
                   </td>
                   <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArticuloSeguimiento(item.id_articulo);
+                        setDrawerSeguimiento(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-400 transition mr-3 cursor-pointer"
+                      title="Ver seguimiento del artículo"
+                    >
+                      <FiEye size={18} />
+                    </button>
                     {canEdit && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          editarStockYMinimo(item);
+                          abrirModalEditarStock(item);
                         }}
                         className="text-slate-700 hover:text-slate-400 transition mr-3 cursor-pointer"
                         title="Editar stock y stock mínimo"
@@ -485,7 +479,7 @@ const Inventario = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-gray-500">
+                <td colSpan="8" className="text-center py-6 text-gray-500">
                   No se encontraron artículos en inventario.
                 </td>
               </tr>
@@ -493,6 +487,24 @@ const Inventario = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Modal para editar stock */}
+      <EditarStockModal
+        isOpen={modalEditarStock}
+        onClose={cerrarModalEditarStock}
+        item={itemSeleccionado}
+        onSave={guardarStockYMinimo}
+      />
+
+      {/* Drawer de seguimiento del artículo */}
+      <SeguimientoArticuloDrawer
+        isOpen={drawerSeguimiento}
+        onClose={() => {
+          setDrawerSeguimiento(false);
+          setArticuloSeguimiento(null);
+        }}
+        idArticulo={articuloSeguimiento}
+      />
     </div>
   );
 };
