@@ -6,6 +6,7 @@ const progresoFabricacionModel = {
     fecha_fin = null,
     id_orden_fabricacion = null,
     estado_orden = null,
+    busqueda = null,
   } = {}) => {
     const whereParts = [];
     const params = [];
@@ -28,6 +29,18 @@ const progresoFabricacionModel = {
     } else {
       // Por defecto excluir órdenes canceladas
       whereParts.push("ofa.estado != 'Cancelada'");
+    }
+
+    // Filtro de búsqueda en SQL para mejor rendimiento
+    if (busqueda) {
+      whereParts.push(`(
+        ofa.id_orden_fabricacion LIKE ? OR
+        c.nombre LIKE ? OR
+        art.descripcion LIKE ? OR
+        art.referencia LIKE ?
+      )`);
+      const busquedaParam = `%${busqueda}%`;
+      params.push(busquedaParam, busquedaParam, busquedaParam, busquedaParam);
     }
 
     const whereClause = whereParts.length
@@ -277,8 +290,61 @@ const progresoFabricacionModel = {
   },
 
   /**
-   * Obtiene resumen agrupado por orden de fabricación
+   * Obtiene el detalle de avances por etapa para múltiples artículos en batch (optimizado)
    */
+  getDetalleEtapasBatch: async (articulosAConsultar) => {
+    if (!articulosAConsultar || articulosAConsultar.length === 0) {
+      return {};
+    }
+
+    // Crear placeholders para la consulta IN
+    const condiciones = articulosAConsultar
+      .map(() => "(aep.id_orden_fabricacion = ? AND aep.id_articulo = ?)")
+      .join(" OR ");
+    const params = articulosAConsultar.flatMap((art) => [
+      art.id_orden,
+      art.id_articulo,
+    ]);
+
+    const query = `
+      SELECT 
+        aep.id_orden_fabricacion,
+        aep.id_articulo,
+        ep.id_etapa,
+        ep.nombre AS nombre_etapa,
+        ep.orden AS orden_etapa,
+        aep.estado,
+        COALESCE(SUM(aep.cantidad), 0) AS cantidad,
+        MAX(aep.fecha_registro) AS ultima_fecha
+      FROM avance_etapas_produccion aep
+      JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+      WHERE ${condiciones}
+      GROUP BY aep.id_orden_fabricacion, aep.id_articulo, ep.id_etapa, ep.nombre, ep.orden, aep.estado
+      ORDER BY aep.id_orden_fabricacion, aep.id_articulo, ep.orden ASC
+    `;
+
+    const [rows] = await db.query(query, params);
+
+    // Agrupa resultados por clave orden_articulo
+    const resultado = {};
+    rows.forEach((row) => {
+      const key = `${row.id_orden_fabricacion}_${row.id_articulo}`;
+      if (!resultado[key]) {
+        resultado[key] = [];
+      }
+      resultado[key].push({
+        id_etapa: row.id_etapa,
+        nombre_etapa: row.nombre_etapa,
+        orden_etapa: row.orden_etapa,
+        estado: row.estado,
+        cantidad: row.cantidad,
+        ultima_fecha: row.ultima_fecha,
+      });
+    });
+
+    return resultado;
+  },
+
   getResumenPorOrden: async (filtros = {}) => {
     const progreso =
       await progresoFabricacionModel.calcularProgresoConEstimacion(filtros);
@@ -292,24 +358,21 @@ const progresoFabricacionModel = {
     const resumenPorOrden = {};
 
     // Recopilar todas las combinaciones únicas de orden/artículo para consultar
-    const articulosAConsultar = progreso.map((item) => ({
-      id_orden: item.id_orden_fabricacion,
-      id_articulo: item.id_articulo,
-    }));
-
-    // Consultar detalle de etapas para todos los artículos
-    const detallesPorArticulo = {};
-    for (const art of articulosAConsultar) {
-      const key = `${art.id_orden}_${art.id_articulo}`;
-      if (!detallesPorArticulo[key]) {
-        const detalleEtapas =
-          await progresoFabricacionModel.getDetalleEtapasPorArticulo(
-            art.id_orden,
-            art.id_articulo
-          );
-        detallesPorArticulo[key] = detalleEtapas;
+    const articulosUnicos = new Map();
+    progreso.forEach((item) => {
+      const key = `${item.id_orden_fabricacion}_${item.id_articulo}`;
+      if (!articulosUnicos.has(key)) {
+        articulosUnicos.set(key, {
+          id_orden: item.id_orden_fabricacion,
+          id_articulo: item.id_articulo,
+        });
       }
-    }
+    });
+    const articulosAConsultar = Array.from(articulosUnicos.values());
+
+    // Consultar detalle de etapas para todos los artículos en UNA sola consulta (batch)
+    const detallesPorArticulo =
+      await progresoFabricacionModel.getDetalleEtapasBatch(articulosAConsultar);
 
     progreso.forEach((item) => {
       const idOrden = item.id_orden_fabricacion;
