@@ -329,7 +329,7 @@ module.exports = {
               cantidad_movida: detalle.cantidad,
               tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
               tipo_origen_movimiento:
-                inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.DEVOLUCION_CLIENTE,
+                inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.ANULACION_VENTA,
               observaciones: `Reintegro por anulación de orden de venta #${id}`,
               referencia_documento_id: id,
               referencia_documento_tipo: "anulacion_orden_venta",
@@ -444,7 +444,7 @@ module.exports = {
             cantidad_movida: detalle.cantidad,
             tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
             tipo_origen_movimiento:
-              inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.DEVOLUCION_CLIENTE,
+              inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.ANULACION_VENTA,
             observaciones: `Reintegro por anulación de orden de venta #${id}`,
             referencia_documento_id: id,
             referencia_documento_tipo: "anulacion_orden_venta",

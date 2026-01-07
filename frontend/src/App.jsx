@@ -68,6 +68,8 @@ import CierresCajaDetalle from "./pages/CierresCajaDetalle";
 import CierresCajaForm from "./pages/CierresCajaForm";
 import CierresCajaCerrar from "./pages/CierresCajaCerrar";
 import ProgresoFabricacion from "./pages/ProgresoFabricacion";
+import MovimientosArticuloPage from "./pages/MovimientosArticuloPage";
+import SeguimientoInventarioPage from "./pages/SeguimientoInventarioPage";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -148,6 +150,8 @@ const AppLogic = () => {
         />
         <Route path="inventario" element={<Inventario />} />
         <Route path="inventario/nuevo" element={<InventarioForm />} />
+        <Route path="inventario/seguimiento" element={<SeguimientoInventarioPage />} />
+        <Route path="inventario/movimientos/:id" element={<MovimientosArticuloPage />} />
         <Route path="ordenes" element={<Ordenes />} />
         <Route path="ordenes_compra" element={<OrdenesCompra />} />
         <Route

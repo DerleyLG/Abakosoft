@@ -160,14 +160,52 @@ module.exports = {
     return rows;
   },
 
-  // Movimientos de inventario recientes
+  // Movimientos de inventario recientes (básico)
   getMovimientosInventario: async (
     idArticulo,
     limit = 10,
     mes = null,
     anio = null
   ) => {
+    try {
+      console.log("[Model] getMovimientosInventario - idArticulo:", idArticulo, "limit:", limit);
+      const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
+      console.log("[Model] dateFilter:", dateFilter);
+      const query = `
+        SELECT 
+          mi.id_movimiento,
+          mi.fecha_movimiento AS fecha,
+          mi.tipo_movimiento,
+          mi.tipo_origen_movimiento,
+          mi.cantidad_movida,
+          mi.observaciones
+        FROM movimientos_inventario mi
+        WHERE mi.id_articulo = ?${dateFilter.where}
+        ORDER BY mi.fecha_movimiento DESC
+        LIMIT ?
+      `;
+      const params = [idArticulo, ...dateFilter.params, limit];
+      console.log("[Model] Ejecutando query con params:", params);
+      const [rows] = await db.query(query, params);
+      console.log("[Model] Query ejecutada, filas:", rows?.length || 0);
+      return rows;
+    } catch (error) {
+      console.error("[Model] Error en getMovimientosInventario:", error);
+      throw error;
+    }
+  },
+
+  // Movimientos de inventario DETALLADOS con información del documento relacionado
+  // Incluye: cliente/proveedor, fecha, referencia, descripción, stock antes/después, valor COP
+  getMovimientosDetallados: async (
+    idArticulo,
+    limit = 50,
+    mes = null,
+    anio = null
+  ) => {
     const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
+    
+    // Query principal que obtiene movimientos con información contextual
     const [rows] = await db.query(
       `
       SELECT 
@@ -176,15 +214,139 @@ module.exports = {
         mi.tipo_movimiento,
         mi.tipo_origen_movimiento,
         mi.cantidad_movida,
-        mi.observaciones
+        mi.observaciones,
+        mi.referencia_documento_id,
+        mi.referencia_documento_tipo,
+        a.referencia AS articulo_referencia,
+        a.descripcion AS articulo_descripcion,
+        
+        -- Información de VENTA
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN c_venta.nombre 
+          ELSE NULL 
+        END AS cliente_venta,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN dov.cantidad 
+          ELSE NULL 
+        END AS cantidad_venta,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN dov.precio_unitario 
+          ELSE NULL 
+        END AS precio_unitario_venta,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN (dov.cantidad * dov.precio_unitario) 
+          ELSE NULL 
+        END AS valor_total_venta,
+        
+        -- Información de COMPRA
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN prov_compra.nombre 
+          ELSE NULL 
+        END AS proveedor_compra,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN doc.cantidad 
+          ELSE NULL 
+        END AS cantidad_compra,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN doc.precio_unitario 
+          ELSE NULL 
+        END AS precio_unitario_compra,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN (doc.cantidad * doc.precio_unitario) 
+          ELSE NULL 
+        END AS valor_total_compra,
+        
+        -- Información de FABRICACIÓN (lotes)
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN t_fab.nombre 
+          ELSE NULL 
+        END AS trabajador_fabricacion,
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN lf.cantidad 
+          ELSE NULL 
+        END AS cantidad_fabricada,
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN ofa.id_orden_fabricacion
+          ELSE NULL 
+        END AS id_orden_fabricacion,
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN c_pedido.nombre 
+          ELSE NULL 
+        END AS cliente_pedido_fab
+        
       FROM movimientos_inventario mi
+      JOIN articulos a ON mi.id_articulo = a.id_articulo
+      
+      -- JOINs para VENTAS (incluye anulaciones)
+      LEFT JOIN ordenes_venta ov ON mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') 
+        AND mi.referencia_documento_id = ov.id_orden_venta
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta 
+        AND dov.id_articulo = mi.id_articulo
+      LEFT JOIN clientes c_venta ON ov.id_cliente = c_venta.id_cliente
+      
+      -- JOINs para COMPRAS (incluye anulaciones)
+      LEFT JOIN ordenes_compra oc ON mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') 
+        AND mi.referencia_documento_id = oc.id_orden_compra
+      LEFT JOIN detalle_orden_compra doc ON oc.id_orden_compra = doc.id_orden_compra 
+        AND doc.id_articulo = mi.id_articulo
+      LEFT JOIN proveedores prov_compra ON oc.id_proveedor = prov_compra.id_proveedor
+      
+      -- JOINs para FABRICACIÓN (lotes)
+      LEFT JOIN lotes_fabricados lf ON mi.tipo_origen_movimiento = 'produccion' 
+        AND mi.referencia_documento_id = lf.id_lote
+      LEFT JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
+      LEFT JOIN trabajadores t_fab ON lf.id_trabajador = t_fab.id_trabajador
+      LEFT JOIN pedidos p_fab ON ofa.id_pedido = p_fab.id_pedido
+      LEFT JOIN clientes c_pedido ON p_fab.id_cliente = c_pedido.id_cliente
+      
       WHERE mi.id_articulo = ?${dateFilter.where}
       ORDER BY mi.fecha_movimiento DESC
       LIMIT ?
     `,
       [idArticulo, ...dateFilter.params, limit]
     );
-    return rows;
+
+    // Calcular stock antes y después para cada movimiento
+    // Primero obtenemos el stock actual
+    const [[stockActual]] = await db.query(
+      `SELECT COALESCE(stock, 0) AS stock_actual FROM inventario WHERE id_articulo = ?`,
+      [idArticulo]
+    );
+
+    let stockActualNum = stockActual?.stock_actual || 0;
+    
+    // Procesar los movimientos para agregar stock_antes y stock_despues
+    // Los movimientos vienen ordenados DESC (más reciente primero)
+    const movimientosConStock = rows.map((mov, index) => {
+      const stockDespues = stockActualNum;
+      
+      // Calcular stock antes según el tipo de movimiento
+      let stockAntes;
+      if (mov.tipo_movimiento === 'entrada') {
+        stockAntes = stockDespues - mov.cantidad_movida;
+      } else if (mov.tipo_movimiento === 'salida') {
+        stockAntes = stockDespues + mov.cantidad_movida;
+      } else {
+        // ajuste - necesitamos interpretarlo según observaciones o contexto
+        stockAntes = stockDespues; // Los ajustes son más complejos
+      }
+
+      // Actualizar el stockActual para el próximo movimiento (más antiguo)
+      stockActualNum = stockAntes;
+
+      return {
+        ...mov,
+        stock_antes: Math.max(0, stockAntes),
+        stock_despues: Math.max(0, stockDespues),
+        // Determinar entidad relacionada y valor
+        entidad: mov.cliente_venta || mov.proveedor_compra || mov.trabajador_fabricacion || (mov.cliente_pedido_fab ? `Pedido: ${mov.cliente_pedido_fab}` : null) || 'N/A',
+        valor_documento: mov.valor_total_venta || mov.valor_total_compra || null,
+        cantidad_documento: mov.cantidad_venta || mov.cantidad_compra || mov.cantidad_fabricada || mov.cantidad_movida,
+        precio_unitario: mov.precio_unitario_venta || mov.precio_unitario_compra || null
+      };
+    });
+
+    return movimientosConStock;
   },
 
   // Resumen de totales (con filtro de mes opcional)
@@ -263,6 +425,196 @@ module.exports = {
         total_fabricado: fabricado[0]?.total_fabricado || 0,
       },
       compras: compras[0],
+    };
+  },
+
+  // Obtener TODOS los movimientos de inventario (para vista general) con paginación
+  getAllMovimientos: async (
+    page = 1,
+    pageSize = 25,
+    mes = null,
+    anio = null,
+    tipoOrigen = null,
+    idArticulo = null,
+    buscar = null
+  ) => {
+    const offset = (page - 1) * pageSize;
+    
+    // Construir condiciones de filtro
+    let whereConditions = [];
+    let params = [];
+    
+    if (mes) {
+      whereConditions.push("MONTH(mi.fecha_movimiento) = ?");
+      params.push(parseInt(mes));
+    }
+    if (anio) {
+      whereConditions.push("YEAR(mi.fecha_movimiento) = ?");
+      params.push(parseInt(anio));
+    }
+    if (tipoOrigen) {
+      whereConditions.push("mi.tipo_origen_movimiento = ?");
+      params.push(tipoOrigen);
+    }
+    if (idArticulo) {
+      whereConditions.push("mi.id_articulo = ?");
+      params.push(idArticulo);
+    }
+    if (buscar) {
+      whereConditions.push("(a.referencia LIKE ? OR a.descripcion LIKE ?)");
+      params.push(`%${buscar}%`, `%${buscar}%`);
+    }
+    
+    const whereClause = whereConditions.length > 0 
+      ? `WHERE ${whereConditions.join(" AND ")}` 
+      : "";
+    
+    // Query para contar total
+    const [[countResult]] = await db.query(
+      `SELECT COUNT(*) AS total FROM movimientos_inventario mi
+       JOIN articulos a ON mi.id_articulo = a.id_articulo
+       ${whereClause}`,
+      params
+    );
+    const total = countResult.total;
+    
+    // Query principal
+    const [rows] = await db.query(
+      `
+      SELECT 
+        mi.id_movimiento,
+        mi.id_articulo,
+        mi.fecha_movimiento AS fecha,
+        mi.tipo_movimiento,
+        mi.tipo_origen_movimiento,
+        mi.cantidad_movida,
+        mi.observaciones,
+        mi.referencia_documento_id,
+        mi.referencia_documento_tipo,
+        a.referencia AS articulo_referencia,
+        a.descripcion AS articulo_descripcion,
+        inv.stock AS stock_actual,
+        
+        -- Información de VENTA
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN c_venta.nombre 
+          ELSE NULL 
+        END AS cliente_venta,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN dov.precio_unitario 
+          ELSE NULL 
+        END AS precio_unitario_venta,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') THEN (dov.cantidad * dov.precio_unitario) 
+          ELSE NULL 
+        END AS valor_total_venta,
+        
+        -- Información de COMPRA
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN prov_compra.nombre 
+          ELSE NULL 
+        END AS proveedor_compra,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN doc.precio_unitario 
+          ELSE NULL 
+        END AS precio_unitario_compra,
+        CASE 
+          WHEN mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') THEN (doc.cantidad * doc.precio_unitario) 
+          ELSE NULL 
+        END AS valor_total_compra,
+        
+        -- Información de FABRICACIÓN (lotes)
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN t_fab.nombre 
+          ELSE NULL 
+        END AS trabajador_fabricacion,
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN c_pedido.nombre 
+          ELSE NULL 
+        END AS cliente_pedido_fab,
+        CASE 
+          WHEN mi.tipo_origen_movimiento = 'produccion' THEN ofa.id_orden_fabricacion 
+          ELSE NULL 
+        END AS id_orden_fabricacion
+        
+      FROM movimientos_inventario mi
+      JOIN articulos a ON mi.id_articulo = a.id_articulo
+      LEFT JOIN inventario inv ON mi.id_articulo = inv.id_articulo
+      
+      -- JOINs para VENTAS
+      LEFT JOIN ordenes_venta ov ON mi.tipo_origen_movimiento IN ('venta', 'anulacion_venta', 'devolucion_cliente') 
+        AND mi.referencia_documento_id = ov.id_orden_venta
+      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta 
+        AND dov.id_articulo = mi.id_articulo
+      LEFT JOIN clientes c_venta ON ov.id_cliente = c_venta.id_cliente
+      
+      -- JOINs para COMPRAS
+      LEFT JOIN ordenes_compra oc ON mi.tipo_origen_movimiento IN ('compra', 'anulacion_compra', 'devolucion_proveedor') 
+        AND mi.referencia_documento_id = oc.id_orden_compra
+      LEFT JOIN detalle_orden_compra doc ON oc.id_orden_compra = doc.id_orden_compra 
+        AND doc.id_articulo = mi.id_articulo
+      LEFT JOIN proveedores prov_compra ON oc.id_proveedor = prov_compra.id_proveedor
+      
+      -- JOINs para FABRICACIÓN
+      LEFT JOIN lotes_fabricados lf ON mi.tipo_origen_movimiento = 'produccion' 
+        AND mi.referencia_documento_id = lf.id_lote
+      LEFT JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
+      LEFT JOIN trabajadores t_fab ON lf.id_trabajador = t_fab.id_trabajador
+      LEFT JOIN pedidos p_fab ON ofa.id_pedido = p_fab.id_pedido
+      LEFT JOIN clientes c_pedido ON p_fab.id_cliente = c_pedido.id_cliente
+      
+      ${whereClause}
+      ORDER BY mi.fecha_movimiento DESC
+      LIMIT ? OFFSET ?
+    `,
+      [...params, pageSize, offset]
+    );
+
+    // Procesar los movimientos para calcular stock antes/después
+    const movimientosProcesados = rows.map(mov => {
+      let stockDespues = mov.stock_actual || 0;
+      let stockAntes;
+      
+      // Para calcular stock_antes necesitamos el historial, pero como es costoso,
+      // calculamos aproximadamente basándonos en el stock actual y los movimientos
+      // Los movimientos más recientes afectan el stock actual
+      if (mov.tipo_movimiento === 'entrada') {
+        // Si fue entrada, antes tenía menos
+        stockAntes = stockDespues - mov.cantidad_movida;
+      } else {
+        // Si fue salida, antes tenía más
+        stockAntes = stockDespues + mov.cantidad_movida;
+      }
+
+      return {
+        id_movimiento: mov.id_movimiento,
+        id_articulo: mov.id_articulo,
+        fecha: mov.fecha,
+        tipo_movimiento: mov.tipo_movimiento,
+        tipo_origen_movimiento: mov.tipo_origen_movimiento,
+        cantidad_movida: mov.cantidad_movida,
+        observaciones: mov.observaciones,
+        referencia_documento_id: mov.referencia_documento_id,
+        referencia_documento_tipo: mov.referencia_documento_tipo,
+        articulo_referencia: mov.articulo_referencia,
+        articulo_descripcion: mov.articulo_descripcion,
+        stock_antes: Math.max(0, stockAntes),
+        stock_despues: Math.max(0, stockDespues),
+        stock_actual: mov.stock_actual,
+        entidad: mov.cliente_venta || mov.proveedor_compra || mov.trabajador_fabricacion || 
+                 (mov.cliente_pedido_fab ? `Pedido: ${mov.cliente_pedido_fab}` : null) || null,
+        valor_documento: mov.valor_total_venta || mov.valor_total_compra || null,
+        precio_unitario: mov.precio_unitario_venta || mov.precio_unitario_compra || null,
+        id_orden_fabricacion: mov.id_orden_fabricacion || null
+      };
+    });
+
+    return {
+      data: movimientosProcesados,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
     };
   },
 };
