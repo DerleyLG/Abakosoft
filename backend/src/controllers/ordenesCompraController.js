@@ -671,11 +671,14 @@ const deleteOrdenCompra = async (req, res) => {
       throw new Error("Orden de compra no encontrada.");
     }
 
+    let mensajeRespuesta = "";
+
     if (ordenExistente.estado === "pendiente") {
       await ordenCompras.update(id, { estado: "cancelada" }, connection);
       console.log(
         `Orden de compra #${id} marcada como 'cancelada' (estaba pendiente).`
       );
+      mensajeRespuesta = `Orden de compra #${id} cancelada. No se generó movimiento de inventario porque la orden estaba pendiente (el stock ya fue revertido previamente o nunca se recibió).`;
     } else if (ordenExistente.estado === "completada") {
       const detalles = await detalleOrdenCompra.getByOrdenCompra(
         id,
@@ -688,7 +691,7 @@ const deleteOrdenCompra = async (req, res) => {
             cantidad_movida: Number(detalle.cantidad),
             tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.SALIDA,
             tipo_origen_movimiento:
-              inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.DEVOLUCION_PROVEEDOR,
+              inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.ANULACION_COMPRA,
             observaciones: `Reversión por cancelación de orden de compra completada #${id}`,
             referencia_documento_id: id,
             referencia_documento_tipo: "cancelacion_orden_compra",
@@ -703,6 +706,7 @@ const deleteOrdenCompra = async (req, res) => {
       console.log(
         `Orden de compra #${id} marcada como 'cancelada' y stock revertido (estaba completada).`
       );
+      mensajeRespuesta = `Orden de compra #${id} cancelada y stock revertido correctamente.`;
     } else if (ordenExistente.estado === "cancelada") {
       throw new Error(
         `La orden de compra #${id} ya está cancelada y no puede ser modificada.`
@@ -712,9 +716,7 @@ const deleteOrdenCompra = async (req, res) => {
     await connection.commit();
     connection.release();
     res.json({
-      message: `Orden de compra #${id} cancelada y stock ${
-        ordenExistente.estado === "completada" ? "revertido" : "no afectado"
-      } correctamente.`,
+      message: mensajeRespuesta,
     });
   } catch (error) {
     if (connection) {
@@ -771,7 +773,7 @@ async function updateEstadoOrdenCompra(req, res) {
                   .TIPOS_MOVIMIENTO.SALIDA,
                 tipo_origen_movimiento:
                   require("../models/inventarioModel").TIPOS_ORIGEN_MOVIMIENTO
-                    .DEVOLUCION_PROVEEDOR || "reversion_compra",
+                    .ANULACION_COMPRA,
                 observaciones: `Reversión por cambio de estado a pendiente en OC #${id}`,
                 referencia_documento_id: id,
                 referencia_documento_tipo: "reversion_orden_compra",

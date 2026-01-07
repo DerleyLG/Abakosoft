@@ -10,6 +10,7 @@ import {
   FiTool,
   FiTrash2,
   FiEye,
+  FiActivity,
 } from "react-icons/fi";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -222,15 +223,24 @@ const Inventario = () => {
       <div className="flex flex-col mb-6 gap-4">
         <div className="w-full flex items-center justify-between gap-4">
           <h2 className="text-4xl font-bold text-gray-800">Inventario</h2>
-          {canCreate && (
+          <div className="flex gap-2">
             <button
-              onClick={() => navigate("/inventario/nuevo")}
-              className="h-[42px] inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+              onClick={() => navigate("/inventario/seguimiento")}
+              className="h-[42px] inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
             >
-              <FiPlus size={20} />
-              Agregar artículo
+              <FiActivity size={20} />
+              Seguimiento
             </button>
-          )}
+            {canCreate && (
+              <button
+                onClick={() => navigate("/inventario/nuevo")}
+                className="h-[42px] inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+              >
+                <FiPlus size={20} />
+                Agregar artículo
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Sistema de Tabs */}
@@ -378,31 +388,6 @@ const Inventario = () => {
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <div className="mb-3 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
-              de{" "}
-              <span className="font-semibold text-gray-800">{totalPages}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
-              >
-                ← Anterior
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
-              >
-                Siguiente →
-              </button>
-            </div>
-          </div>
-        </div>
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
             <tr>
@@ -493,6 +478,33 @@ const Inventario = () => {
             )}
           </tbody>
         </table>
+        
+        {/* Paginación */}
+        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 font-medium">
+              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
+              de{" "}
+              <span className="font-semibold text-gray-800">{totalPages}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Modal para editar stock */}
