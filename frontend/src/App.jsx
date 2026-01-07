@@ -150,8 +150,14 @@ const AppLogic = () => {
         />
         <Route path="inventario" element={<Inventario />} />
         <Route path="inventario/nuevo" element={<InventarioForm />} />
-        <Route path="inventario/seguimiento" element={<SeguimientoInventarioPage />} />
-        <Route path="inventario/movimientos/:id" element={<MovimientosArticuloPage />} />
+        <Route
+          path="inventario/seguimiento"
+          element={<SeguimientoInventarioPage />}
+        />
+        <Route
+          path="inventario/movimientos/:id"
+          element={<MovimientosArticuloPage />}
+        />
         <Route path="ordenes" element={<Ordenes />} />
         <Route path="ordenes_compra" element={<OrdenesCompra />} />
         <Route

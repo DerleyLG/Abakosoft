@@ -771,9 +771,8 @@ async function updateEstadoOrdenCompra(req, res) {
                 cantidad_movida: Number(detalle.cantidad),
                 tipo_movimiento: require("../models/inventarioModel")
                   .TIPOS_MOVIMIENTO.SALIDA,
-                tipo_origen_movimiento:
-                  require("../models/inventarioModel").TIPOS_ORIGEN_MOVIMIENTO
-                    .ANULACION_COMPRA,
+                tipo_origen_movimiento: require("../models/inventarioModel")
+                  .TIPOS_ORIGEN_MOVIMIENTO.ANULACION_COMPRA,
                 observaciones: `Reversión por cambio de estado a pendiente en OC #${id}`,
                 referencia_documento_id: id,
                 referencia_documento_tipo: "reversion_orden_compra",

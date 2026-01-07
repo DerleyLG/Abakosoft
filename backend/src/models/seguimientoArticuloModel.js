@@ -168,7 +168,12 @@ module.exports = {
     anio = null
   ) => {
     try {
-      console.log("[Model] getMovimientosInventario - idArticulo:", idArticulo, "limit:", limit);
+      console.log(
+        "[Model] getMovimientosInventario - idArticulo:",
+        idArticulo,
+        "limit:",
+        limit
+      );
       const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
       console.log("[Model] dateFilter:", dateFilter);
       const query = `
@@ -204,7 +209,7 @@ module.exports = {
     anio = null
   ) => {
     const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
-    
+
     // Query principal que obtiene movimientos con información contextual
     const [rows] = await db.query(
       `
@@ -314,17 +319,17 @@ module.exports = {
     );
 
     let stockActualNum = stockActual?.stock_actual || 0;
-    
+
     // Procesar los movimientos para agregar stock_antes y stock_despues
     // Los movimientos vienen ordenados DESC (más reciente primero)
     const movimientosConStock = rows.map((mov, index) => {
       const stockDespues = stockActualNum;
-      
+
       // Calcular stock antes según el tipo de movimiento
       let stockAntes;
-      if (mov.tipo_movimiento === 'entrada') {
+      if (mov.tipo_movimiento === "entrada") {
         stockAntes = stockDespues - mov.cantidad_movida;
-      } else if (mov.tipo_movimiento === 'salida') {
+      } else if (mov.tipo_movimiento === "salida") {
         stockAntes = stockDespues + mov.cantidad_movida;
       } else {
         // ajuste - necesitamos interpretarlo según observaciones o contexto
@@ -339,10 +344,23 @@ module.exports = {
         stock_antes: Math.max(0, stockAntes),
         stock_despues: Math.max(0, stockDespues),
         // Determinar entidad relacionada y valor
-        entidad: mov.cliente_venta || mov.proveedor_compra || mov.trabajador_fabricacion || (mov.cliente_pedido_fab ? `Pedido: ${mov.cliente_pedido_fab}` : null) || 'N/A',
-        valor_documento: mov.valor_total_venta || mov.valor_total_compra || null,
-        cantidad_documento: mov.cantidad_venta || mov.cantidad_compra || mov.cantidad_fabricada || mov.cantidad_movida,
-        precio_unitario: mov.precio_unitario_venta || mov.precio_unitario_compra || null
+        entidad:
+          mov.cliente_venta ||
+          mov.proveedor_compra ||
+          mov.trabajador_fabricacion ||
+          (mov.cliente_pedido_fab
+            ? `Pedido: ${mov.cliente_pedido_fab}`
+            : null) ||
+          "N/A",
+        valor_documento:
+          mov.valor_total_venta || mov.valor_total_compra || null,
+        cantidad_documento:
+          mov.cantidad_venta ||
+          mov.cantidad_compra ||
+          mov.cantidad_fabricada ||
+          mov.cantidad_movida,
+        precio_unitario:
+          mov.precio_unitario_venta || mov.precio_unitario_compra || null,
       };
     });
 
@@ -439,11 +457,11 @@ module.exports = {
     buscar = null
   ) => {
     const offset = (page - 1) * pageSize;
-    
+
     // Construir condiciones de filtro
     let whereConditions = [];
     let params = [];
-    
+
     if (mes) {
       whereConditions.push("MONTH(mi.fecha_movimiento) = ?");
       params.push(parseInt(mes));
@@ -464,11 +482,12 @@ module.exports = {
       whereConditions.push("(a.referencia LIKE ? OR a.descripcion LIKE ?)");
       params.push(`%${buscar}%`, `%${buscar}%`);
     }
-    
-    const whereClause = whereConditions.length > 0 
-      ? `WHERE ${whereConditions.join(" AND ")}` 
-      : "";
-    
+
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
+
     // Query para contar total
     const [[countResult]] = await db.query(
       `SELECT COUNT(*) AS total FROM movimientos_inventario mi
@@ -477,7 +496,7 @@ module.exports = {
       params
     );
     const total = countResult.total;
-    
+
     // Query principal
     const [rows] = await db.query(
       `
@@ -571,14 +590,14 @@ module.exports = {
     );
 
     // Procesar los movimientos para calcular stock antes/después
-    const movimientosProcesados = rows.map(mov => {
+    const movimientosProcesados = rows.map((mov) => {
       let stockDespues = mov.stock_actual || 0;
       let stockAntes;
-      
+
       // Para calcular stock_antes necesitamos el historial, pero como es costoso,
       // calculamos aproximadamente basándonos en el stock actual y los movimientos
       // Los movimientos más recientes afectan el stock actual
-      if (mov.tipo_movimiento === 'entrada') {
+      if (mov.tipo_movimiento === "entrada") {
         // Si fue entrada, antes tenía menos
         stockAntes = stockDespues - mov.cantidad_movida;
       } else {
@@ -601,11 +620,19 @@ module.exports = {
         stock_antes: Math.max(0, stockAntes),
         stock_despues: Math.max(0, stockDespues),
         stock_actual: mov.stock_actual,
-        entidad: mov.cliente_venta || mov.proveedor_compra || mov.trabajador_fabricacion || 
-                 (mov.cliente_pedido_fab ? `Pedido: ${mov.cliente_pedido_fab}` : null) || null,
-        valor_documento: mov.valor_total_venta || mov.valor_total_compra || null,
-        precio_unitario: mov.precio_unitario_venta || mov.precio_unitario_compra || null,
-        id_orden_fabricacion: mov.id_orden_fabricacion || null
+        entidad:
+          mov.cliente_venta ||
+          mov.proveedor_compra ||
+          mov.trabajador_fabricacion ||
+          (mov.cliente_pedido_fab
+            ? `Pedido: ${mov.cliente_pedido_fab}`
+            : null) ||
+          null,
+        valor_documento:
+          mov.valor_total_venta || mov.valor_total_compra || null,
+        precio_unitario:
+          mov.precio_unitario_venta || mov.precio_unitario_compra || null,
+        id_orden_fabricacion: mov.id_orden_fabricacion || null,
       };
     });
 
@@ -614,7 +641,7 @@ module.exports = {
       total,
       page,
       pageSize,
-      totalPages: Math.ceil(total / pageSize)
+      totalPages: Math.ceil(total / pageSize),
     };
   },
 };

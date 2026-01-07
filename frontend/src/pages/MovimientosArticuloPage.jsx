@@ -55,10 +55,30 @@ const TIPOS_MOVIMIENTO = [
   { value: "", label: "Todos los tipos", icon: FiActivity, color: "slate" },
   { value: "venta", label: "Ventas", icon: FiShoppingCart, color: "red" },
   { value: "compra", label: "Compras", icon: FiTruck, color: "green" },
-  { value: "produccion", label: "Fabricación", icon: FiSettings, color: "blue" },
-  { value: "ajuste_manual", label: "Ajustes", icon: FiActivity, color: "amber" },
-  { value: "anulacion_venta", label: "Anul. Venta", icon: FiTrendingUp, color: "teal" },
-  { value: "anulacion_compra", label: "Anul. Compra", icon: FiTrendingDown, color: "rose" },
+  {
+    value: "produccion",
+    label: "Fabricación",
+    icon: FiSettings,
+    color: "blue",
+  },
+  {
+    value: "ajuste_manual",
+    label: "Ajustes",
+    icon: FiActivity,
+    color: "amber",
+  },
+  {
+    value: "anulacion_venta",
+    label: "Anul. Venta",
+    icon: FiTrendingUp,
+    color: "teal",
+  },
+  {
+    value: "anulacion_compra",
+    label: "Anul. Compra",
+    icon: FiTrendingDown,
+    color: "rose",
+  },
 ];
 
 const ITEMS_POR_PAGINA = 15;
@@ -66,18 +86,18 @@ const ITEMS_POR_PAGINA = 15;
 const MovimientosArticuloPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   // Estados principales
   const [loading, setLoading] = useState(true);
   const [articulo, setArticulo] = useState(null);
   const [movimientos, setMovimientos] = useState([]);
-  
+
   // Filtros
   const [mesSeleccionado, setMesSeleccionado] = useState("");
   const [anioSeleccionado, setAnioSeleccionado] = useState("");
   const [tipoSeleccionado, setTipoSeleccionado] = useState("");
   const [busqueda, setBusqueda] = useState("");
-  
+
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1);
 
@@ -105,40 +125,51 @@ const MovimientosArticuloPage = () => {
   // Filtrar movimientos
   const movimientosFiltrados = useMemo(() => {
     let resultado = [...movimientos];
-    
+
     // Filtrar por mes
     if (mesSeleccionado) {
-      resultado = resultado.filter(mov => {
+      resultado = resultado.filter((mov) => {
         const fecha = new Date(mov.fecha);
-        return (fecha.getMonth() + 1) === parseInt(mesSeleccionado);
+        return fecha.getMonth() + 1 === parseInt(mesSeleccionado);
       });
     }
-    
+
     // Filtrar por año
     if (anioSeleccionado) {
-      resultado = resultado.filter(mov => {
+      resultado = resultado.filter((mov) => {
         const fecha = new Date(mov.fecha);
         return fecha.getFullYear() === parseInt(anioSeleccionado);
       });
     }
-    
+
     // Filtrar por tipo
     if (tipoSeleccionado) {
-      resultado = resultado.filter(mov => mov.tipo_origen_movimiento === tipoSeleccionado);
+      resultado = resultado.filter(
+        (mov) => mov.tipo_origen_movimiento === tipoSeleccionado
+      );
     }
-    
+
     // Filtrar por búsqueda (entidad, observaciones, referencia de documento)
     if (busqueda.trim()) {
       const searchLower = busqueda.toLowerCase();
-      resultado = resultado.filter(mov => 
-        (mov.entidad && mov.entidad.toLowerCase().includes(searchLower)) ||
-        (mov.observaciones && mov.observaciones.toLowerCase().includes(searchLower)) ||
-        (mov.referencia_documento_id && String(mov.referencia_documento_id).includes(searchLower))
+      resultado = resultado.filter(
+        (mov) =>
+          (mov.entidad && mov.entidad.toLowerCase().includes(searchLower)) ||
+          (mov.observaciones &&
+            mov.observaciones.toLowerCase().includes(searchLower)) ||
+          (mov.referencia_documento_id &&
+            String(mov.referencia_documento_id).includes(searchLower))
       );
     }
-    
+
     return resultado;
-  }, [movimientos, mesSeleccionado, anioSeleccionado, tipoSeleccionado, busqueda]);
+  }, [
+    movimientos,
+    mesSeleccionado,
+    anioSeleccionado,
+    tipoSeleccionado,
+    busqueda,
+  ]);
 
   // Calcular resumen
   const resumen = useMemo(() => {
@@ -150,31 +181,31 @@ const MovimientosArticuloPage = () => {
       anulaciones: { cantidad: 0, unidades: 0 },
     };
 
-    movimientosFiltrados.forEach(mov => {
+    movimientosFiltrados.forEach((mov) => {
       const cantidad = mov.cantidad_movida || 0;
       const valor = mov.valor_documento || 0;
 
       switch (mov.tipo_origen_movimiento) {
-        case 'venta':
+        case "venta":
           stats.ventas.cantidad++;
           stats.ventas.valor += valor;
           stats.ventas.unidades += cantidad;
           break;
-        case 'compra':
+        case "compra":
           stats.compras.cantidad++;
           stats.compras.valor += valor;
           stats.compras.unidades += cantidad;
           break;
-        case 'produccion':
+        case "produccion":
           stats.produccion.cantidad++;
           stats.produccion.unidades += cantidad;
           break;
-        case 'ajuste_manual':
+        case "ajuste_manual":
           stats.ajustes.cantidad++;
           stats.ajustes.unidades += cantidad;
           break;
-        case 'anulacion_venta':
-        case 'anulacion_compra':
+        case "anulacion_venta":
+        case "anulacion_compra":
           stats.anulaciones.cantidad++;
           stats.anulaciones.unidades += cantidad;
           break;
@@ -185,7 +216,9 @@ const MovimientosArticuloPage = () => {
   }, [movimientosFiltrados]);
 
   // Paginación
-  const totalPaginas = Math.ceil(movimientosFiltrados.length / ITEMS_POR_PAGINA);
+  const totalPaginas = Math.ceil(
+    movimientosFiltrados.length / ITEMS_POR_PAGINA
+  );
   const movimientosPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
     return movimientosFiltrados.slice(inicio, inicio + ITEMS_POR_PAGINA);
@@ -215,17 +248,69 @@ const MovimientosArticuloPage = () => {
 
   const getTipoInfo = (tipoOrigen) => {
     const info = {
-      venta: { bg: "bg-red-100", text: "text-red-700", label: "Venta", icon: FiShoppingCart },
-      compra: { bg: "bg-green-100", text: "text-green-700", label: "Compra", icon: FiTruck },
-      produccion: { bg: "bg-blue-100", text: "text-blue-700", label: "Fabricación", icon: FiSettings },
-      inicial: { bg: "bg-slate-100", text: "text-slate-700", label: "Inicial", icon: FiLayers },
-      ajuste_manual: { bg: "bg-amber-100", text: "text-amber-700", label: "Ajuste", icon: FiActivity },
-      anulacion_venta: { bg: "bg-teal-100", text: "text-teal-700", label: "Anul. Venta", icon: FiTrendingUp },
-      anulacion_compra: { bg: "bg-rose-100", text: "text-rose-700", label: "Anul. Compra", icon: FiTrendingDown },
-      devolucion_cliente: { bg: "bg-purple-100", text: "text-purple-700", label: "Dev. Cliente", icon: FiTrendingUp },
-      devolucion_proveedor: { bg: "bg-pink-100", text: "text-pink-700", label: "Dev. Proveedor", icon: FiTrendingDown },
+      venta: {
+        bg: "bg-red-100",
+        text: "text-red-700",
+        label: "Venta",
+        icon: FiShoppingCart,
+      },
+      compra: {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        label: "Compra",
+        icon: FiTruck,
+      },
+      produccion: {
+        bg: "bg-blue-100",
+        text: "text-blue-700",
+        label: "Fabricación",
+        icon: FiSettings,
+      },
+      inicial: {
+        bg: "bg-slate-100",
+        text: "text-slate-700",
+        label: "Inicial",
+        icon: FiLayers,
+      },
+      ajuste_manual: {
+        bg: "bg-amber-100",
+        text: "text-amber-700",
+        label: "Ajuste",
+        icon: FiActivity,
+      },
+      anulacion_venta: {
+        bg: "bg-teal-100",
+        text: "text-teal-700",
+        label: "Anul. Venta",
+        icon: FiTrendingUp,
+      },
+      anulacion_compra: {
+        bg: "bg-rose-100",
+        text: "text-rose-700",
+        label: "Anul. Compra",
+        icon: FiTrendingDown,
+      },
+      devolucion_cliente: {
+        bg: "bg-purple-100",
+        text: "text-purple-700",
+        label: "Dev. Cliente",
+        icon: FiTrendingUp,
+      },
+      devolucion_proveedor: {
+        bg: "bg-pink-100",
+        text: "text-pink-700",
+        label: "Dev. Proveedor",
+        icon: FiTrendingDown,
+      },
     };
-    return info[tipoOrigen] || { bg: "bg-slate-100", text: "text-slate-700", label: tipoOrigen, icon: FiActivity };
+    return (
+      info[tipoOrigen] || {
+        bg: "bg-slate-100",
+        text: "text-slate-700",
+        label: tipoOrigen,
+        icon: FiActivity,
+      }
+    );
   };
 
   const limpiarFiltros = () => {
@@ -241,29 +326,46 @@ const MovimientosArticuloPage = () => {
       return;
     }
 
-    const headers = ["Fecha", "Tipo", "Entidad", "Documento", "Tipo Mov.", "Cantidad", "Stock Antes", "Stock Después", "Valor Documento", "Observaciones"];
-    const rows = movimientosFiltrados.map(mov => [
+    const headers = [
+      "Fecha",
+      "Tipo",
+      "Entidad",
+      "Documento",
+      "Tipo Mov.",
+      "Cantidad",
+      "Stock Antes",
+      "Stock Después",
+      "Valor Documento",
+      "Observaciones",
+    ];
+    const rows = movimientosFiltrados.map((mov) => [
       formatDate(mov.fecha),
       getTipoInfo(mov.tipo_origen_movimiento).label,
       mov.entidad || "N/A",
-      mov.referencia_documento_id ? `${mov.referencia_documento_tipo}-${mov.referencia_documento_id}` : "N/A",
+      mov.referencia_documento_id
+        ? `${mov.referencia_documento_tipo}-${mov.referencia_documento_id}`
+        : "N/A",
       mov.tipo_movimiento,
       mov.cantidad_movida,
       mov.stock_antes,
       mov.stock_despues,
       mov.valor_documento || 0,
-      mov.observaciones || ""
+      mov.observaciones || "",
     ]);
 
     const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
       .join("\n");
 
-    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\ufeff" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `movimientos_${articulo?.referencia || id}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `movimientos_${articulo?.referencia || id}_${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success("Archivo exportado correctamente");
@@ -296,8 +398,12 @@ const MovimientosArticuloPage = () => {
                   <FiArrowLeft size={20} />
                 </button>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-800">Análisis de Movimientos</h1>
-                  <p className="text-sm text-slate-500">Historial completo de movimientos de inventario</p>
+                  <h1 className="text-xl font-bold text-slate-800">
+                    Análisis de Movimientos
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    Historial completo de movimientos de inventario
+                  </p>
                 </div>
               </div>
               <button
@@ -321,16 +427,24 @@ const MovimientosArticuloPage = () => {
                       <span className="px-2 py-1 bg-white/20 rounded text-xs font-medium">
                         {articulo.referencia}
                       </span>
-                      <h2 className="text-lg font-semibold">{articulo.descripcion}</h2>
+                      <h2 className="text-lg font-semibold">
+                        {articulo.descripcion}
+                      </h2>
                     </div>
                     <div className="flex items-center gap-6 mt-2 text-sm text-slate-300">
                       <span className="flex items-center gap-1">
                         <FiBox size={14} />
-                        Stock: <strong className="text-white">{articulo.stock_disponible || 0}</strong>
+                        Stock:{" "}
+                        <strong className="text-white">
+                          {articulo.stock_disponible || 0}
+                        </strong>
                       </span>
                       <span className="flex items-center gap-1">
                         <FiSettings size={14} />
-                        Fabricado: <strong className="text-white">{articulo.stock_fabricado || 0}</strong>
+                        Fabricado:{" "}
+                        <strong className="text-white">
+                          {articulo.stock_fabricado || 0}
+                        </strong>
                       </span>
                       {articulo.categoria && (
                         <span className="flex items-center gap-1">
@@ -354,7 +468,10 @@ const MovimientosArticuloPage = () => {
           <div className="flex items-center gap-2 mb-4">
             <FiFilter className="text-slate-400" size={18} />
             <h3 className="font-medium text-slate-700">Filtros</h3>
-            {(mesSeleccionado || anioSeleccionado || tipoSeleccionado || busqueda) && (
+            {(mesSeleccionado ||
+              anioSeleccionado ||
+              tipoSeleccionado ||
+              busqueda) && (
               <button
                 onClick={limpiarFiltros}
                 className="ml-auto text-xs text-slate-500 hover:text-slate-700 underline"
@@ -373,7 +490,9 @@ const MovimientosArticuloPage = () => {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {MESES.map((mes) => (
-                  <option key={mes.value} value={mes.value}>{mes.label}</option>
+                  <option key={mes.value} value={mes.value}>
+                    {mes.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -387,30 +506,41 @@ const MovimientosArticuloPage = () => {
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {getAniosDisponibles().map((anio) => (
-                  <option key={anio.value} value={anio.value}>{anio.label}</option>
+                  <option key={anio.value} value={anio.value}>
+                    {anio.label}
+                  </option>
                 ))}
               </select>
             </div>
 
             {/* Tipo */}
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Tipo de Movimiento</label>
+              <label className="block text-xs text-slate-500 mb-1">
+                Tipo de Movimiento
+              </label>
               <select
                 value={tipoSeleccionado}
                 onChange={(e) => setTipoSeleccionado(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {TIPOS_MOVIMIENTO.map((tipo) => (
-                  <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                  <option key={tipo.value} value={tipo.value}>
+                    {tipo.label}
+                  </option>
                 ))}
               </select>
             </div>
 
             {/* Búsqueda */}
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+              <label className="block text-xs text-slate-500 mb-1">
+                Buscar
+              </label>
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <FiSearch
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={16}
+                />
                 <input
                   type="text"
                   value={busqueda}
@@ -433,9 +563,12 @@ const MovimientosArticuloPage = () => {
               </div>
               <span className="text-sm font-medium text-slate-600">Ventas</span>
             </div>
-            <div className="text-2xl font-bold text-slate-800">{resumen.ventas.cantidad}</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.ventas.cantidad}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
-              {resumen.ventas.unidades} uds · {formatCurrency(resumen.ventas.valor)}
+              {resumen.ventas.unidades} uds ·{" "}
+              {formatCurrency(resumen.ventas.valor)}
             </div>
           </div>
 
@@ -445,11 +578,16 @@ const MovimientosArticuloPage = () => {
               <div className="p-2 bg-green-100 rounded-lg">
                 <FiTruck className="text-green-600" size={18} />
               </div>
-              <span className="text-sm font-medium text-slate-600">Compras</span>
+              <span className="text-sm font-medium text-slate-600">
+                Compras
+              </span>
             </div>
-            <div className="text-2xl font-bold text-slate-800">{resumen.compras.cantidad}</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.compras.cantidad}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
-              {resumen.compras.unidades} uds · {formatCurrency(resumen.compras.valor)}
+              {resumen.compras.unidades} uds ·{" "}
+              {formatCurrency(resumen.compras.valor)}
             </div>
           </div>
 
@@ -459,9 +597,13 @@ const MovimientosArticuloPage = () => {
               <div className="p-2 bg-blue-100 rounded-lg">
                 <FiSettings className="text-blue-600" size={18} />
               </div>
-              <span className="text-sm font-medium text-slate-600">Fabricación</span>
+              <span className="text-sm font-medium text-slate-600">
+                Fabricación
+              </span>
             </div>
-            <div className="text-2xl font-bold text-slate-800">{resumen.produccion.cantidad}</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.produccion.cantidad}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
               {resumen.produccion.unidades} unidades
             </div>
@@ -473,9 +615,13 @@ const MovimientosArticuloPage = () => {
               <div className="p-2 bg-amber-100 rounded-lg">
                 <FiActivity className="text-amber-600" size={18} />
               </div>
-              <span className="text-sm font-medium text-slate-600">Ajustes</span>
+              <span className="text-sm font-medium text-slate-600">
+                Ajustes
+              </span>
             </div>
-            <div className="text-2xl font-bold text-slate-800">{resumen.ajustes.cantidad}</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.ajustes.cantidad}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
               {resumen.ajustes.unidades} unidades
             </div>
@@ -487,9 +633,13 @@ const MovimientosArticuloPage = () => {
               <div className="p-2 bg-rose-100 rounded-lg">
                 <FiTrendingUp className="text-rose-600" size={18} />
               </div>
-              <span className="text-sm font-medium text-slate-600">Anulaciones</span>
+              <span className="text-sm font-medium text-slate-600">
+                Anulaciones
+              </span>
             </div>
-            <div className="text-2xl font-bold text-slate-800">{resumen.anulaciones.cantidad}</div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.anulaciones.cantidad}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
               {resumen.anulaciones.unidades} unidades
             </div>
@@ -501,8 +651,12 @@ const MovimientosArticuloPage = () => {
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FiBarChart2 className="text-slate-400" size={18} />
-              <h3 className="font-medium text-slate-700">Historial de Movimientos</h3>
-              <span className="text-xs text-slate-400">({movimientosFiltrados.length} registros)</span>
+              <h3 className="font-medium text-slate-700">
+                Historial de Movimientos
+              </h3>
+              <span className="text-xs text-slate-400">
+                ({movimientosFiltrados.length} registros)
+              </span>
             </div>
           </div>
 
@@ -517,40 +671,66 @@ const MovimientosArticuloPage = () => {
                 <table className="w-full">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fecha</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Entidad</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Documento</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Cantidad</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Stock</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Fecha
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Tipo
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Entidad
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Documento
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Cantidad
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Stock
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Valor
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {movimientosPaginados.map((mov) => {
                       const tipoInfo = getTipoInfo(mov.tipo_origen_movimiento);
                       const IconComponent = tipoInfo.icon;
-                      const esEntrada = mov.tipo_movimiento === 'entrada';
+                      const esEntrada = mov.tipo_movimiento === "entrada";
 
                       return (
-                        <tr key={mov.id_movimiento} className="hover:bg-slate-50 transition-colors">
+                        <tr
+                          key={mov.id_movimiento}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <FiCalendar size={14} className="text-slate-400" />
-                              <span className="text-sm text-slate-700">{formatDate(mov.fecha)}</span>
+                              <FiCalendar
+                                size={14}
+                                className="text-slate-400"
+                              />
+                              <span className="text-sm text-slate-700">
+                                {formatDate(mov.fecha)}
+                              </span>
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${tipoInfo.bg} ${tipoInfo.text}`}>
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${tipoInfo.bg} ${tipoInfo.text}`}
+                            >
                               <IconComponent size={12} />
                               {tipoInfo.label}
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            {mov.entidad && mov.entidad !== 'N/A' ? (
+                            {mov.entidad && mov.entidad !== "N/A" ? (
                               <div className="flex items-center gap-2">
                                 <FiUser size={14} className="text-slate-400" />
-                                <span className="text-sm text-slate-700">{mov.entidad}</span>
+                                <span className="text-sm text-slate-700">
+                                  {mov.entidad}
+                                </span>
                               </div>
                             ) : (
                               <span className="text-sm text-slate-400">-</span>
@@ -559,26 +739,41 @@ const MovimientosArticuloPage = () => {
                           <td className="px-4 py-3">
                             {mov.referencia_documento_id ? (
                               <span className="text-sm text-slate-600 font-mono">
-                                {mov.referencia_documento_tipo === 'orden_venta' ? 'OV' : 
-                                 mov.referencia_documento_tipo === 'orden_compra' ? 'OC' :
-                                 mov.referencia_documento_tipo === 'lote' ? 'Lote' : ''}-{mov.referencia_documento_id}
+                                {mov.referencia_documento_tipo === "orden_venta"
+                                  ? "OV"
+                                  : mov.referencia_documento_tipo ===
+                                    "orden_compra"
+                                  ? "OC"
+                                  : mov.referencia_documento_tipo === "lote"
+                                  ? "Lote"
+                                  : ""}
+                                -{mov.referencia_documento_id}
                               </span>
                             ) : (
                               <span className="text-sm text-slate-400">-</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold ${
-                              esEntrada ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              {esEntrada ? '+' : '-'}{mov.cantidad_movida}
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold ${
+                                esEntrada
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {esEntrada ? "+" : "-"}
+                              {mov.cantidad_movida}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1 text-sm">
-                              <span className="text-slate-500">{mov.stock_antes}</span>
+                              <span className="text-slate-500">
+                                {mov.stock_antes}
+                              </span>
                               <span className="text-slate-300">→</span>
-                              <span className="font-medium text-slate-700">{mov.stock_despues}</span>
+                              <span className="font-medium text-slate-700">
+                                {mov.stock_despues}
+                              </span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -601,46 +796,56 @@ const MovimientosArticuloPage = () => {
               {totalPaginas > 1 && (
                 <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
                   <div className="text-sm text-slate-500">
-                    Mostrando {((paginaActual - 1) * ITEMS_POR_PAGINA) + 1} - {Math.min(paginaActual * ITEMS_POR_PAGINA, movimientosFiltrados.length)} de {movimientosFiltrados.length}
+                    Mostrando {(paginaActual - 1) * ITEMS_POR_PAGINA + 1} -{" "}
+                    {Math.min(
+                      paginaActual * ITEMS_POR_PAGINA,
+                      movimientosFiltrados.length
+                    )}{" "}
+                    de {movimientosFiltrados.length}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                      onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
                       disabled={paginaActual === 1}
                       className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <FiChevronLeft size={18} />
                     </button>
-                    
-                    {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
-                      let pageNum;
-                      if (totalPaginas <= 5) {
-                        pageNum = i + 1;
-                      } else if (paginaActual <= 3) {
-                        pageNum = i + 1;
-                      } else if (paginaActual >= totalPaginas - 2) {
-                        pageNum = totalPaginas - 4 + i;
-                      } else {
-                        pageNum = paginaActual - 2 + i;
+
+                    {Array.from(
+                      { length: Math.min(5, totalPaginas) },
+                      (_, i) => {
+                        let pageNum;
+                        if (totalPaginas <= 5) {
+                          pageNum = i + 1;
+                        } else if (paginaActual <= 3) {
+                          pageNum = i + 1;
+                        } else if (paginaActual >= totalPaginas - 2) {
+                          pageNum = totalPaginas - 4 + i;
+                        } else {
+                          pageNum = paginaActual - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setPaginaActual(pageNum)}
+                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                              paginaActual === pageNum
+                                ? "bg-slate-800 text-white"
+                                : "hover:bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
                       }
-                      
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setPaginaActual(pageNum)}
-                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                            paginaActual === pageNum
-                              ? 'bg-slate-800 text-white'
-                              : 'hover:bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    
+                    )}
+
                     <button
-                      onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                      onClick={() =>
+                        setPaginaActual((p) => Math.min(totalPaginas, p + 1))
+                      }
                       disabled={paginaActual === totalPaginas}
                       className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
