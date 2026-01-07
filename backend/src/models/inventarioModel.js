@@ -7,15 +7,15 @@ const TIPOS_MOVIMIENTO = {
 };
 
 const TIPOS_ORIGEN_MOVIMIENTO = {
-  INICIAL: "inicial", // Para el primer ingreso de un artículo al inventario 
+  INICIAL: "inicial", // Para el primer ingreso de un artículo al inventario
   PRODUCCION: "produccion", // Cuando un lote se fabrica y se ingresa al stock disponible
   VENTA: "venta", // Cuando un producto se vende y sale del stock disponible
   COMPRA: "compra", // Cuando se compra stock a un proveedor y entra al stock disponible
   AJUSTE_MANUAL: "ajuste_manual", // Para correcciones manuales de stock (positivas o negativas)
   ANULACION_VENTA: "anulacion_venta", // Reintegro de stock por anulación de orden de venta
   ANULACION_COMPRA: "anulacion_compra", // Reversión de stock por cancelación de orden de compra
-  DEVOLUCION_CLIENTE: "devolucion_cliente", // Cuando un cliente devuelve físicamente un producto 
-  DEVOLUCION_PROVEEDOR: "devolucion_proveedor", // Cuando se devuelve físicamente stock a un proveedor 
+  DEVOLUCION_CLIENTE: "devolucion_cliente", // Cuando un cliente devuelve físicamente un producto
+  DEVOLUCION_PROVEEDOR: "devolucion_proveedor", // Cuando se devuelve físicamente stock a un proveedor
 };
 
 module.exports = {

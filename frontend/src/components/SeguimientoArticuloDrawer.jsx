@@ -59,7 +59,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
   // Filtros de fecha (vacíos = mostrar todos)
   const [mesSeleccionado, setMesSeleccionado] = useState("");
   const [anioSeleccionado, setAnioSeleccionado] = useState("");
-  
+
   // Filtro para tipo de movimiento (null = se determinará automáticamente)
   const [tipoMovimientoFiltro, setTipoMovimientoFiltro] = useState(null);
 
@@ -75,11 +75,18 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
     if (!data?.movimientosDetallados || activeTab !== "movimientos") return;
     // Solo establecer si no hay filtro seleccionado
     if (tipoMovimientoFiltro) return;
-    
+
     const movimientos = data.movimientosDetallados;
-    const tiposDisponibles = ['venta', 'compra', 'produccion', 'ajuste_manual', 'anulacion_venta', 'anulacion_compra'];
-    const primerTipoConDatos = tiposDisponibles.find(tipo => 
-      movimientos.some(m => m.tipo_origen_movimiento === tipo)
+    const tiposDisponibles = [
+      "venta",
+      "compra",
+      "produccion",
+      "ajuste_manual",
+      "anulacion_venta",
+      "anulacion_compra",
+    ];
+    const primerTipoConDatos = tiposDisponibles.find((tipo) =>
+      movimientos.some((m) => m.tipo_origen_movimiento === tipo)
     );
     if (primerTipoConDatos) {
       setTipoMovimientoFiltro(primerTipoConDatos);
@@ -87,7 +94,10 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
   }, [data?.movimientosDetallados, activeTab]);
 
   const fetchSeguimiento = async () => {
-    console.log("[SeguimientoDrawer] Iniciando fetchSeguimiento para artículo:", idArticulo);
+    console.log(
+      "[SeguimientoDrawer] Iniciando fetchSeguimiento para artículo:",
+      idArticulo
+    );
     setLoading(true);
     setError(null);
     try {
@@ -105,7 +115,10 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
       }`;
       console.log("[SeguimientoDrawer] Haciendo petición a:", url);
       const res = await api.get(url);
-      console.log("[SeguimientoDrawer] Respuesta recibida:", res.data ? "OK" : "SIN DATA");
+      console.log(
+        "[SeguimientoDrawer] Respuesta recibida:",
+        res.data ? "OK" : "SIN DATA"
+      );
       setData(res.data);
     } catch (err) {
       console.error("[SeguimientoDrawer] Error al cargar seguimiento:", err);
@@ -190,7 +203,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 ? "bg-amber-50"
                 : "bg-green-50"
             }`}
-          > 
+          >
             <div
               className={`text-2xl font-bold ${
                 (articulo?.stock_disponible || 0) <=
@@ -624,109 +637,131 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
   const renderMovimientosDetallados = () => {
     const todosMovimientos = data?.movimientosDetallados || [];
 
-    
     const getTipoOrigenInfo = (tipoOrigen) => {
       const info = {
-        venta: { 
-          bg: "bg-red-100", 
-          text: "text-red-700", 
+        venta: {
+          bg: "bg-red-100",
+          text: "text-red-700",
           border: "border-red-300",
           bgActive: "bg-red-500",
           textActive: "text-white",
           label: "Ventas",
-          icon: FiShoppingCart 
+          icon: FiShoppingCart,
         },
-        compra: { 
-          bg: "bg-green-100", 
-          text: "text-green-700", 
+        compra: {
+          bg: "bg-green-100",
+          text: "text-green-700",
           border: "border-green-300",
           bgActive: "bg-green-500",
           textActive: "text-white",
           label: "Compras",
-          icon: FiTruck 
+          icon: FiTruck,
         },
-        produccion: { 
-          bg: "bg-blue-100", 
-          text: "text-blue-700", 
+        produccion: {
+          bg: "bg-blue-100",
+          text: "text-blue-700",
           border: "border-blue-300",
           bgActive: "bg-blue-500",
           textActive: "text-white",
           label: "Fabricación",
-          icon: FiSettings 
+          icon: FiSettings,
         },
-        inicial: { 
-          bg: "bg-slate-100", 
-          text: "text-slate-700", 
+        inicial: {
+          bg: "bg-slate-100",
+          text: "text-slate-700",
           border: "border-slate-300",
           bgActive: "bg-slate-500",
           textActive: "text-white",
           label: "Inicial",
-          icon: FiLayers 
+          icon: FiLayers,
         },
-        ajuste_manual: { 
-          bg: "bg-amber-100", 
-          text: "text-amber-700", 
+        ajuste_manual: {
+          bg: "bg-amber-100",
+          text: "text-amber-700",
           border: "border-amber-300",
           bgActive: "bg-amber-500",
           textActive: "text-white",
           label: "Ajustes",
-          icon: FiActivity 
+          icon: FiActivity,
         },
-        anulacion_venta: { 
-          bg: "bg-teal-100", 
-          text: "text-teal-700", 
+        anulacion_venta: {
+          bg: "bg-teal-100",
+          text: "text-teal-700",
           border: "border-teal-300",
           bgActive: "bg-teal-500",
           textActive: "text-white",
           label: "Anul. Venta",
-          icon: FiTrendingUp 
+          icon: FiTrendingUp,
         },
-        anulacion_compra: { 
-          bg: "bg-rose-100", 
-          text: "text-rose-700", 
+        anulacion_compra: {
+          bg: "bg-rose-100",
+          text: "text-rose-700",
           border: "border-rose-300",
           bgActive: "bg-rose-500",
           textActive: "text-white",
           label: "Anul. Compra",
-          icon: FiTrendingDown 
+          icon: FiTrendingDown,
         },
-        devolucion_cliente: { 
-          bg: "bg-purple-100", 
-          text: "text-purple-700", 
+        devolucion_cliente: {
+          bg: "bg-purple-100",
+          text: "text-purple-700",
           border: "border-purple-300",
           bgActive: "bg-purple-500",
           textActive: "text-white",
           label: "Dev. Cliente",
-          icon: FiTrendingUp 
+          icon: FiTrendingUp,
         },
-        devolucion_proveedor: { 
-          bg: "bg-pink-100", 
-          text: "text-pink-700", 
+        devolucion_proveedor: {
+          bg: "bg-pink-100",
+          text: "text-pink-700",
           border: "border-pink-300",
           bgActive: "bg-pink-500",
           textActive: "text-white",
           label: "Dev. Proveedor",
-          icon: FiTrendingDown 
+          icon: FiTrendingDown,
         },
       };
-      return info[tipoOrigen] || { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300", bgActive: "bg-slate-500", textActive: "text-white", label: tipoOrigen, icon: FiActivity };
+      return (
+        info[tipoOrigen] || {
+          bg: "bg-slate-100",
+          text: "text-slate-700",
+          border: "border-slate-300",
+          bgActive: "bg-slate-500",
+          textActive: "text-white",
+          label: tipoOrigen,
+          icon: FiActivity,
+        }
+      );
     };
 
     // Tipos de movimiento disponibles para filtrar
-    const tiposDisponibles = ['venta', 'compra', 'produccion', 'ajuste_manual', 'anulacion_venta', 'anulacion_compra'];
-    
+    const tiposDisponibles = [
+      "venta",
+      "compra",
+      "produccion",
+      "ajuste_manual",
+      "anulacion_venta",
+      "anulacion_compra",
+    ];
+
     // Contar movimientos por tipo
     const conteosPorTipo = tiposDisponibles.reduce((acc, tipo) => {
-      acc[tipo] = todosMovimientos.filter(m => m.tipo_origen_movimiento === tipo).length;
+      acc[tipo] = todosMovimientos.filter(
+        (m) => m.tipo_origen_movimiento === tipo
+      ).length;
       return acc;
     }, {});
 
     // Solo mostrar tipos que tengan movimientos
-    const tiposConDatos = tiposDisponibles.filter(tipo => conteosPorTipo[tipo] > 0);
-    
+    const tiposConDatos = tiposDisponibles.filter(
+      (tipo) => conteosPorTipo[tipo] > 0
+    );
+
     // Filtrar movimientos según el tipo seleccionado
-    const movimientos = tipoMovimientoFiltro 
-      ? todosMovimientos.filter(m => m.tipo_origen_movimiento === tipoMovimientoFiltro)
+    const movimientos = tipoMovimientoFiltro
+      ? todosMovimientos.filter(
+          (m) => m.tipo_origen_movimiento === tipoMovimientoFiltro
+        )
       : [];
 
     return (
@@ -737,7 +772,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             <FiFilter size={12} /> Filtrar por fecha tipo:
           </p>
           <div className="flex flex-wrap gap-2">
-            {tiposConDatos.map(tipo => {
+            {tiposConDatos.map((tipo) => {
               const info = getTipoOrigenInfo(tipo);
               const IconComponent = info.icon;
               const isActive = tipoMovimientoFiltro === tipo;
@@ -746,16 +781,18 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                   key={tipo}
                   onClick={() => setTipoMovimientoFiltro(tipo)}
                   className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all border ${
-                    isActive 
-                      ? `${info.bgActive} ${info.textActive} border-transparent shadow-md` 
+                    isActive
+                      ? `${info.bgActive} ${info.textActive} border-transparent shadow-md`
                       : `${info.bg} ${info.text} ${info.border} hover:shadow-sm`
                   }`}
                 >
                   <IconComponent size={14} />
                   {info.label}
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                    isActive ? 'bg-white/20' : 'bg-white/50'
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                      isActive ? "bg-white/20" : "bg-white/50"
+                    }`}
+                  >
                     {conteosPorTipo[tipo]}
                   </span>
                 </button>
@@ -763,7 +800,9 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             })}
           </div>
           {tiposConDatos.length === 0 && (
-            <p className="text-slate-400 text-sm">No hay movimientos registrados</p>
+            <p className="text-slate-400 text-sm">
+              No hay movimientos registrados
+            </p>
           )}
         </div>
 
@@ -777,138 +816,187 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
         >
           <FiExternalLink size={16} />
           <span className="font-medium ">Ver Análisis Completo</span>
-          <span className="text-xs text-slate-300">(filtros avanzados, exportar)</span>
+          <span className="text-xs text-slate-300">
+            (filtros avanzados, exportar)
+          </span>
         </button>
 
         {/* Lista de movimientos filtrados */}
         {movimientos.length === 0 ? (
           <div className="text-center py-10 text-slate-400">
             <FiActivity size={40} className="mx-auto mb-3 opacity-50" />
-            <p>No hay movimientos de tipo "{tipoMovimientoFiltro ? getTipoOrigenInfo(tipoMovimientoFiltro).label : 'seleccionado'}"</p>
+            <p>
+              No hay movimientos de tipo "
+              {tipoMovimientoFiltro
+                ? getTipoOrigenInfo(tipoMovimientoFiltro).label
+                : "seleccionado"}
+              "
+            </p>
           </div>
         ) : (
-        <div className="space-y-3">
-          {movimientos.map((mov) => {
-            const tipoInfo = getTipoOrigenInfo(mov.tipo_origen_movimiento);
-            const IconComponent = tipoInfo.icon;
-            const esEntrada = mov.tipo_movimiento === 'entrada';
-            
-            return (
-              <div
-                key={mov.id_movimiento}
-                className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-              >
-                {/* Header del movimiento */}
-                <div className={`px-4 py-3 ${tipoInfo.bg} border-b border-slate-100`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg bg-white/50`}>
-                        <IconComponent size={16} className={tipoInfo.text} />
-                      </div>
-                      <div>
-                        <span className={`font-semibold ${tipoInfo.text}`}>
-                          {tipoInfo.label}
-                        </span>
-                        {mov.referencia_documento_id && (
-                          <span className="ml-2 text-xs text-slate-500">
-                            #{mov.referencia_documento_tipo === 'orden_venta' ? 'OV' : 
-                              mov.referencia_documento_tipo === 'orden_compra' ? 'OC' :
-                              mov.referencia_documento_tipo === 'lote' ? 'Lote' : ''}-{mov.referencia_documento_id}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <FiCalendar size={12} className="text-slate-400" />
-                      <span className="text-xs text-slate-600">
-                        {formatDate(mov.fecha)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+          <div className="space-y-3">
+            {movimientos.map((mov) => {
+              const tipoInfo = getTipoOrigenInfo(mov.tipo_origen_movimiento);
+              const IconComponent = tipoInfo.icon;
+              const esEntrada = mov.tipo_movimiento === "entrada";
 
-                {/* Contenido del movimiento */}
-                <div className="p-4">
-                  {/* Fila: Entidad (Cliente/Proveedor/Trabajador) */}
-                  {mov.entidad && mov.entidad !== 'N/A' && (
-                    <div className="flex items-center gap-2 mb-3 text-sm">
-                      <FiUser size={14} className="text-slate-400" />
-                      <span className="text-slate-700 font-medium">{mov.entidad}</span>
-                    </div>
-                  )}
-
-                  {/* Fila: Artículo */}
-                  <div className="flex items-center gap-2 mb-3 text-sm">
-                    <FiPackage size={14} className="text-slate-400" />
-                    <span className="text-slate-600">
-                      <span className="font-medium text-slate-800">{mov.articulo_referencia}</span>
-                      {mov.articulo_descripcion && (
-                        <span className="text-slate-500"> - {mov.articulo_descripcion}</span>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Flujo de Stock */}
-                  <div className="bg-slate-50 rounded-lg p-3 mb-3">
+              return (
+                <div
+                  key={mov.id_movimiento}
+                  className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  {/* Header del movimiento */}
+                  <div
+                    className={`px-4 py-3 ${tipoInfo.bg} border-b border-slate-100`}
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="text-center">
-                        <div className="text-xs text-slate-500 mb-1">Stock Inicial</div>
-                        <div className="text-lg font-bold text-slate-700">{mov.stock_antes}</div>
-                      </div>
-                      
-                      <div className="text-center flex flex-col items-center">
-                        <div className="text-xs text-slate-500 mb-1">Unidades</div>
-                        <div className="flex items-center gap-2">
-                          <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-                            esEntrada ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {esEntrada ? '+' : '-'}{mov.cantidad_movida}
-                          </div>
-                          <FiArrowRight size={16} className="text-slate-400" />
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg bg-white/50`}>
+                          <IconComponent size={16} className={tipoInfo.text} />
+                        </div>
+                        <div>
+                          <span className={`font-semibold ${tipoInfo.text}`}>
+                            {tipoInfo.label}
+                          </span>
+                          {mov.referencia_documento_id && (
+                            <span className="ml-2 text-xs text-slate-500">
+                              #
+                              {mov.referencia_documento_tipo === "orden_venta"
+                                ? "OV"
+                                : mov.referencia_documento_tipo ===
+                                  "orden_compra"
+                                ? "OC"
+                                : mov.referencia_documento_tipo === "lote"
+                                ? "Lote"
+                                : ""}
+                              -{mov.referencia_documento_id}
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      <div className="text-center">
-                        <div className="text-xs text-slate-500 mb-1">Stock Final</div>
-                        <div className="text-lg font-bold text-slate-700">{mov.stock_despues}</div>
+                      <div className="flex items-center gap-2">
+                        <FiCalendar size={12} className="text-slate-400" />
+                        <span className="text-xs text-slate-600">
+                          {formatDate(mov.fecha)}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Valor del documento (si aplica) */}
-                  {mov.valor_documento && (
-                    <div className="flex items-center justify-between bg-emerald-50 rounded-lg px-3 py-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <FiDollarSign size={14} className="text-emerald-600" />
-                        <span className="text-sm text-emerald-700">Valor del documento</span>
+                  {/* Contenido del movimiento */}
+                  <div className="p-4">
+                    {/* Fila: Entidad (Cliente/Proveedor/Trabajador) */}
+                    {mov.entidad && mov.entidad !== "N/A" && (
+                      <div className="flex items-center gap-2 mb-3 text-sm">
+                        <FiUser size={14} className="text-slate-400" />
+                        <span className="text-slate-700 font-medium">
+                          {mov.entidad}
+                        </span>
                       </div>
-                      <span className="font-bold text-emerald-700">
-                        {formatCurrency(mov.valor_documento)}
+                    )}
+
+                    {/* Fila: Artículo */}
+                    <div className="flex items-center gap-2 mb-3 text-sm">
+                      <FiPackage size={14} className="text-slate-400" />
+                      <span className="text-slate-600">
+                        <span className="font-medium text-slate-800">
+                          {mov.articulo_referencia}
+                        </span>
+                        {mov.articulo_descripcion && (
+                          <span className="text-slate-500">
+                            {" "}
+                            - {mov.articulo_descripcion}
+                          </span>
+                        )}
                       </span>
                     </div>
-                  )}
 
-                  {/* Precio unitario (si aplica) */}
-                  {mov.precio_unitario && (
-                    <div className="flex items-center justify-between text-sm text-slate-500 px-1">
-                      <span>Precio unitario:</span>
-                      <span className="font-medium">{formatCurrency(mov.precio_unitario)}</span>
-                    </div>
-                  )}
+                    {/* Flujo de Stock */}
+                    <div className="bg-slate-50 rounded-lg p-3 mb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-center">
+                          <div className="text-xs text-slate-500 mb-1">
+                            Stock Inicial
+                          </div>
+                          <div className="text-lg font-bold text-slate-700">
+                            {mov.stock_antes}
+                          </div>
+                        </div>
 
-                  {/* Observaciones */}
-                  {mov.observaciones && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      <p className="text-xs text-slate-500 italic">
-                        {mov.observaciones}
-                      </p>
+                        <div className="text-center flex flex-col items-center">
+                          <div className="text-xs text-slate-500 mb-1">
+                            Unidades
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                esEntrada
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {esEntrada ? "+" : "-"}
+                              {mov.cantidad_movida}
+                            </div>
+                            <FiArrowRight
+                              size={16}
+                              className="text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-center">
+                          <div className="text-xs text-slate-500 mb-1">
+                            Stock Final
+                          </div>
+                          <div className="text-lg font-bold text-slate-700">
+                            {mov.stock_despues}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Valor del documento (si aplica) */}
+                    {mov.valor_documento && (
+                      <div className="flex items-center justify-between bg-emerald-50 rounded-lg px-3 py-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <FiDollarSign
+                            size={14}
+                            className="text-emerald-600"
+                          />
+                          <span className="text-sm text-emerald-700">
+                            Valor del documento
+                          </span>
+                        </div>
+                        <span className="font-bold text-emerald-700">
+                          {formatCurrency(mov.valor_documento)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Precio unitario (si aplica) */}
+                    {mov.precio_unitario && (
+                      <div className="flex items-center justify-between text-sm text-slate-500 px-1">
+                        <span>Precio unitario:</span>
+                        <span className="font-medium">
+                          {formatCurrency(mov.precio_unitario)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Observaciones */}
+                    {mov.observaciones && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 italic">
+                          {mov.observaciones}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
         )}
       </div>
     );

@@ -478,7 +478,7 @@ const Inventario = () => {
             )}
           </tbody>
         </table>
-        
+
         {/* Paginación */}
         <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
