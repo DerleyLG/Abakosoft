@@ -838,7 +838,12 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
             {movimientos.map((mov) => {
               const tipoInfo = getTipoOrigenInfo(mov.tipo_origen_movimiento);
               const IconComponent = tipoInfo.icon;
-              const esEntrada = mov.tipo_movimiento === "entrada";
+              // Para ajustes, determinar si aumentó o disminuyó por el signo de cantidad_movida
+              const esAjuste = mov.tipo_movimiento === "ajuste";
+              const esEntrada = esAjuste
+                ? mov.cantidad_movida > 0
+                : mov.tipo_movimiento === "entrada";
+              const cantidadAbsoluta = Math.abs(mov.cantidad_movida);
 
               return (
                 <div
@@ -918,7 +923,13 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                           <div className="text-xs text-slate-500 mb-1">
                             Stock Inicial
                           </div>
-                          <div className="text-lg font-bold text-slate-700">
+                          <div
+                            className={`text-lg font-bold ${
+                              mov.stock_antes < 0
+                                ? "text-red-600"
+                                : "text-slate-700"
+                            }`}
+                          >
                             {mov.stock_antes}
                           </div>
                         </div>
@@ -936,7 +947,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                               }`}
                             >
                               {esEntrada ? "+" : "-"}
-                              {mov.cantidad_movida}
+                              {cantidadAbsoluta}
                             </div>
                             <FiArrowRight
                               size={16}
@@ -949,7 +960,13 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                           <div className="text-xs text-slate-500 mb-1">
                             Stock Final
                           </div>
-                          <div className="text-lg font-bold text-slate-700">
+                          <div
+                            className={`text-lg font-bold ${
+                              mov.stock_despues < 0
+                                ? "text-red-600"
+                                : "text-slate-700"
+                            }`}
+                          >
                             {mov.stock_despues}
                           </div>
                         </div>
@@ -957,22 +974,44 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                     </div>
 
                     {/* Valor del documento (si aplica) */}
-                    {mov.valor_documento && (
-                      <div className="flex items-center justify-between bg-emerald-50 rounded-lg px-3 py-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <FiDollarSign
-                            size={14}
-                            className="text-emerald-600"
-                          />
-                          <span className="text-sm text-emerald-700">
-                            Valor del documento
-                          </span>
-                        </div>
-                        <span className="font-bold text-emerald-700">
-                          {formatCurrency(mov.valor_documento)}
-                        </span>
-                      </div>
-                    )}
+                    {mov.valor_documento &&
+                      (() => {
+                        // Determinar si el dinero entra o sale
+                        const esDineroEntra =
+                          mov.tipo_origen_movimiento === "venta" ||
+                          mov.tipo_origen_movimiento === "anulacion_compra" ||
+                          mov.tipo_origen_movimiento === "devolucion_proveedor";
+                        const esDineroSale =
+                          mov.tipo_origen_movimiento === "compra" ||
+                          mov.tipo_origen_movimiento === "anulacion_venta" ||
+                          mov.tipo_origen_movimiento === "devolucion_cliente";
+                        const colorBg = esDineroEntra
+                          ? "bg-emerald-50"
+                          : "bg-red-50";
+                        const colorIcon = esDineroEntra
+                          ? "text-emerald-600"
+                          : "text-red-600";
+                        const colorText = esDineroEntra
+                          ? "text-emerald-700"
+                          : "text-red-700";
+
+                        return (
+                          <div
+                            className={`flex items-center justify-between ${colorBg} rounded-lg px-3 py-2 mb-2`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <FiDollarSign size={14} className={colorIcon} />
+                              <span className={`text-sm ${colorText}`}>
+                                Valor del documento
+                              </span>
+                            </div>
+                            <span className={`font-bold ${colorText}`}>
+                              {esDineroSale ? "-" : ""}
+                              {formatCurrency(mov.valor_documento)}
+                            </span>
+                          </div>
+                        );
+                      })()}
 
                     {/* Precio unitario (si aplica) */}
                     {mov.precio_unitario && (

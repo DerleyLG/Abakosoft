@@ -332,62 +332,6 @@ const SeguimientoInventarioPage = () => {
     setPage(1);
   };
 
-  const exportarCSV = () => {
-    if (movimientos.length === 0) {
-      toast.error("No hay datos para exportar");
-      return;
-    }
-
-    const headers = [
-      "Fecha",
-      "Artículo",
-      "Referencia",
-      "Tipo",
-      "Documento",
-      "Entidad",
-      "Tipo Entidad",
-      "Movimiento",
-      "Cantidad",
-      "Stock Antes",
-      "Stock Después",
-      "Valor",
-      "Observaciones",
-    ];
-    const rows = movimientos.map((mov) => {
-      const entidadInfo = getEntidadInfo(mov);
-      return [
-        formatDate(mov.fecha),
-        mov.articulo_descripcion || "-",
-        mov.articulo_referencia || "-",
-        getTipoInfo(mov.tipo_origen_movimiento).label,
-        getDocumentoInfo(mov) || "N/A",
-        entidadInfo.aplica ? entidadInfo.valor : "No aplica",
-        entidadInfo.tooltip || "-",
-        mov.tipo_movimiento,
-        mov.cantidad_movida,
-        mov.stock_antes,
-        mov.stock_despues,
-        tieneValorMonetario(mov.tipo_origen_movimiento)
-          ? mov.valor_documento || 0
-          : "No aplica",
-        mov.observaciones || "",
-      ];
-    });
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `movimientos_inventario_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
-    link.click();
-    toast.success("Archivo exportado correctamente");
-  };
-
   const hayFiltrosActivos =
     mesSeleccionado || anioSeleccionado || tipoSeleccionado || busqueda;
 
@@ -424,14 +368,6 @@ const SeguimientoInventarioPage = () => {
                 className={loading ? "animate-spin" : ""}
               />
               Actualizar
-            </button>
-            <button
-              onClick={exportarCSV}
-              disabled={movimientos.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <FiDownload size={16} />
-              Exportar CSV
             </button>
           </div>
         </div>
@@ -625,7 +561,12 @@ const SeguimientoInventarioPage = () => {
                 {movimientos.map((mov) => {
                   const tipoInfo = getTipoInfo(mov.tipo_origen_movimiento);
                   const IconComponent = tipoInfo.icon;
-                  const esEntrada = mov.tipo_movimiento === "entrada";
+                  // Para ajustes, determinar si aumentó o disminuyó por el signo de cantidad_movida
+                  const esAjuste = mov.tipo_movimiento === "ajuste";
+                  const esEntrada = esAjuste
+                    ? mov.cantidad_movida > 0
+                    : mov.tipo_movimiento === "entrada";
+                  const cantidadAbsoluta = Math.abs(mov.cantidad_movida);
                   const entidadInfo = getEntidadInfo(mov);
                   const documentoInfo = getDocumentoInfo(mov);
 
@@ -694,7 +635,13 @@ const SeguimientoInventarioPage = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="font-medium text-slate-700">
+                        <span
+                          className={`font-medium ${
+                            mov.stock_antes < 0
+                              ? "text-red-600"
+                              : "text-slate-700"
+                          }`}
+                        >
                           {mov.stock_antes}
                         </span>
                       </td>
@@ -707,20 +654,49 @@ const SeguimientoInventarioPage = () => {
                           }`}
                         >
                           {esEntrada ? "+" : "-"}
-                          {mov.cantidad_movida}
+                          {cantidadAbsoluta}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="font-medium text-slate-700">
+                        <span
+                          className={`font-medium ${
+                            mov.stock_despues < 0
+                              ? "text-red-600"
+                              : "text-slate-700"
+                          }`}
+                        >
                           {mov.stock_despues}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         {tieneValorMonetario(mov.tipo_origen_movimiento) ? (
                           mov.valor_documento ? (
-                            <span className="font-medium text-emerald-700">
-                              {formatCurrency(mov.valor_documento)}
-                            </span>
+                            (() => {
+                              const esDineroEntra =
+                                mov.tipo_origen_movimiento === "venta" ||
+                                mov.tipo_origen_movimiento ===
+                                  "anulacion_compra" ||
+                                mov.tipo_origen_movimiento ===
+                                  "devolucion_proveedor";
+                              const esDineroSale =
+                                mov.tipo_origen_movimiento === "compra" ||
+                                mov.tipo_origen_movimiento ===
+                                  "anulacion_venta" ||
+                                mov.tipo_origen_movimiento ===
+                                  "devolucion_cliente";
+                              const colorClass = esDineroEntra
+                                ? "text-emerald-700"
+                                : esDineroSale
+                                ? "text-red-600"
+                                : "text-slate-600";
+
+                              return (
+                                <span className={`font-medium ${colorClass}`}>
+                                  {esDineroSale ? "-" : ""}
+                                  {formatCurrency(mov.valor_documento)}
+                                </span>
+                              );
+                            })()
                           ) : (
                             <span className="text-slate-400">-</span>
                           )
