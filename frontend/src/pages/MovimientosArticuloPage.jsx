@@ -22,6 +22,8 @@ import {
   FiHash,
   FiBox,
   FiBarChart2,
+  FiArrowDownRight,
+  FiArrowUpRight,
 } from "react-icons/fi";
 import api from "../services/api";
 import toast from "react-hot-toast";
@@ -178,41 +180,85 @@ const MovimientosArticuloPage = () => {
       compras: { cantidad: 0, valor: 0, unidades: 0 },
       produccion: { cantidad: 0, unidades: 0 },
       ajustes: { cantidad: 0, unidades: 0 },
-      anulaciones: { cantidad: 0, unidades: 0 },
+      anulacionesVenta: { cantidad: 0, valor: 0, unidades: 0 },
+      anulacionesCompra: { cantidad: 0, valor: 0, unidades: 0 },
+      ajusteInicial: { cantidad: 0, unidades: 0 },
+      entradas: 0,
+      salidas: 0,
+      ajustesPositivos: 0,
+      ajustesNegativos: 0,
     };
 
     movimientosFiltrados.forEach((mov) => {
-      const cantidad = mov.cantidad_movida || 0;
-      const valor = mov.valor_documento || 0;
+      const cantidad = Number(mov.cantidad_movida) || 0;
+      const valor = Number(mov.valor_documento) || 0;
+
+      if (mov.tipo_movimiento === "entrada") stats.entradas += cantidad;
+      else if (mov.tipo_movimiento === "salida") stats.salidas += cantidad;
+      else if (mov.tipo_movimiento === "ajuste") {
+        if (cantidad > 0) stats.ajustesPositivos += cantidad;
+        else if (cantidad < 0) stats.ajustesNegativos += Math.abs(cantidad);
+      }
 
       switch (mov.tipo_origen_movimiento) {
         case "venta":
           stats.ventas.cantidad++;
           stats.ventas.valor += valor;
-          stats.ventas.unidades += cantidad;
+          stats.ventas.unidades += Math.abs(cantidad);
           break;
         case "compra":
           stats.compras.cantidad++;
           stats.compras.valor += valor;
-          stats.compras.unidades += cantidad;
+          stats.compras.unidades += Math.abs(cantidad);
           break;
         case "produccion":
           stats.produccion.cantidad++;
-          stats.produccion.unidades += cantidad;
+          stats.produccion.unidades += Math.abs(cantidad);
           break;
         case "ajuste_manual":
           stats.ajustes.cantidad++;
-          stats.ajustes.unidades += cantidad;
+          stats.ajustes.unidades += Math.abs(cantidad);
           break;
         case "anulacion_venta":
+          stats.anulacionesVenta.cantidad++;
+          stats.anulacionesVenta.valor += valor;
+          stats.anulacionesVenta.unidades += Math.abs(cantidad);
+          break;
         case "anulacion_compra":
-          stats.anulaciones.cantidad++;
-          stats.anulaciones.unidades += cantidad;
+          stats.anulacionesCompra.cantidad++;
+          stats.anulacionesCompra.valor += valor;
+          stats.anulacionesCompra.unidades += Math.abs(cantidad);
+          break;
+        case "inicial":
+        case "ajuste_inicial":
+          stats.ajusteInicial.cantidad++;
+          stats.ajusteInicial.unidades += Math.abs(cantidad);
           break;
       }
     });
 
-    return stats;
+    const balance = {
+      dinero: {
+        ingresos: stats.ventas.valor - stats.anulacionesVenta.valor,
+        egresos: stats.compras.valor - stats.anulacionesCompra.valor,
+        neto:
+          stats.ventas.valor -
+          stats.anulacionesVenta.valor -
+          (stats.compras.valor - stats.anulacionesCompra.valor),
+      },
+      stock: {
+        entradas: stats.entradas + stats.ajustesPositivos,
+        salidas: stats.salidas + stats.ajustesNegativos,
+        ajustesPositivos: stats.ajustesPositivos,
+        ajustesNegativos: stats.ajustesNegativos,
+        neto:
+          stats.entradas +
+          stats.ajustesPositivos -
+          (stats.salidas + stats.ajustesNegativos),
+      },
+    };
+
+    return { ...stats, balance };
   }, [movimientosFiltrados]);
 
   // Paginación
@@ -239,11 +285,12 @@ const MovimientosArticuloPage = () => {
   };
 
   const formatCurrency = (value) => {
+    const numValue = Number(value);
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
       minimumFractionDigits: 0,
-    }).format(value || 0);
+    }).format(isNaN(numValue) ? 0 : numValue);
   };
 
   const getTipoInfo = (tipoOrigen) => {
@@ -320,57 +367,6 @@ const MovimientosArticuloPage = () => {
     setBusqueda("");
   };
 
-  const exportarCSV = () => {
-    if (movimientosFiltrados.length === 0) {
-      toast.error("No hay datos para exportar");
-      return;
-    }
-
-    const headers = [
-      "Fecha",
-      "Tipo",
-      "Entidad",
-      "Documento",
-      "Tipo Mov.",
-      "Cantidad",
-      "Stock Antes",
-      "Stock Después",
-      "Valor Documento",
-      "Observaciones",
-    ];
-    const rows = movimientosFiltrados.map((mov) => [
-      formatDate(mov.fecha),
-      getTipoInfo(mov.tipo_origen_movimiento).label,
-      mov.entidad || "N/A",
-      mov.referencia_documento_id
-        ? `${mov.referencia_documento_tipo}-${mov.referencia_documento_id}`
-        : "N/A",
-      mov.tipo_movimiento,
-      mov.cantidad_movida,
-      mov.stock_antes,
-      mov.stock_despues,
-      mov.valor_documento || 0,
-      mov.observaciones || "",
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob(["\ufeff" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `movimientos_${articulo?.referencia || id}_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Archivo exportado correctamente");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -393,7 +389,7 @@ const MovimientosArticuloPage = () => {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => navigate(-1)}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600"
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 cursor-pointer"
                 >
                   <FiArrowLeft size={20} />
                 </button>
@@ -406,13 +402,6 @@ const MovimientosArticuloPage = () => {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={exportarCSV}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
-              >
-                <FiDownload size={16} />
-                Exportar CSV
-              </button>
             </div>
 
             {/* Info del artículo */}
@@ -554,7 +543,7 @@ const MovimientosArticuloPage = () => {
         </div>
 
         {/* Resumen del periodo */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           {/* Ventas */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3 mb-3">
@@ -627,21 +616,161 @@ const MovimientosArticuloPage = () => {
             </div>
           </div>
 
-          {/* Anulaciones */}
+          {/* Anulaciones de Venta */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-rose-100 rounded-lg">
-                <FiTrendingUp className="text-rose-600" size={18} />
+              <div className="p-2 bg-teal-100 rounded-lg">
+                <FiTrendingUp className="text-teal-600" size={18} />
               </div>
               <span className="text-sm font-medium text-slate-600">
-                Anulaciones
+                Anul. Venta
               </span>
             </div>
             <div className="text-2xl font-bold text-slate-800">
-              {resumen.anulaciones.cantidad}
+              {resumen.anulacionesVenta.cantidad}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              {resumen.anulaciones.unidades} unidades
+              {resumen.anulacionesVenta.unidades} uds ·{" "}
+              {formatCurrency(resumen.anulacionesVenta.valor)}
+            </div>
+          </div>
+
+          {/* Anulaciones de Compra */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-rose-100 rounded-lg">
+                <FiTrendingDown className="text-rose-600" size={18} />
+              </div>
+              <span className="text-sm font-medium text-slate-600">
+                Anul. Compra
+              </span>
+            </div>
+            <div className="text-2xl font-bold text-slate-800">
+              {resumen.anulacionesCompra.cantidad}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {resumen.anulacionesCompra.unidades} uds ·{" "}
+              {formatCurrency(resumen.anulacionesCompra.valor)}
+            </div>
+          </div>
+        </div>
+
+        {/* Balance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Balance de Dinero */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <FiDollarSign className="text-emerald-600" size={20} />
+              </div>
+              <h3 className="font-semibold text-slate-700">
+                Balance de Dinero
+              </h3>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <FiArrowDownRight className="text-emerald-500" size={16} />
+                  <span className="text-sm text-slate-600">Ingresos netos</span>
+                  <span className="text-xs text-slate-400">
+                    (Ventas - Anul. Ventas)
+                  </span>
+                </div>
+                <span
+                  className={`font-semibold ${
+                    resumen.balance.dinero.ingresos >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {formatCurrency(resumen.balance.dinero.ingresos)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <FiArrowUpRight className="text-red-500" size={16} />
+                  <span className="text-sm text-slate-600">Egresos netos</span>
+                  <span className="text-xs text-slate-400">
+                    (Compras - Anul. Compras)
+                  </span>
+                </div>
+                <span
+                  className={`font-semibold ${
+                    resumen.balance.dinero.egresos > 0
+                      ? "text-red-600"
+                      : "text-emerald-600"
+                  }`}
+                >
+                  {resumen.balance.dinero.egresos > 0 ? "-" : ""}
+                  {formatCurrency(Math.abs(resumen.balance.dinero.egresos))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="font-medium text-slate-700">Margen Neto</span>
+                <span
+                  className={`text-lg font-bold ${
+                    resumen.balance.dinero.neto >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {resumen.balance.dinero.neto >= 0 ? "" : "-"}
+                  {formatCurrency(Math.abs(resumen.balance.dinero.neto))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Balance de Stock */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <FiPackage className="text-blue-600" size={20} />
+              </div>
+              <h3 className="font-semibold text-slate-700">Balance de Stock</h3>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <FiArrowDownRight className="text-emerald-500" size={16} />
+                  <span className="text-sm text-slate-600">Entradas</span>
+                  <span className="text-xs text-slate-400">
+                    (Compras + Anul. Ventas + Fab. + Ajustes positivos)
+                  </span>
+                </div>
+                <span className="font-semibold text-emerald-600">
+                  +{resumen.balance.stock.entradas} uds
+                  {resumen.balance.stock.ajustesPositivos > 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <FiArrowUpRight className="text-red-500" size={16} />
+                  <span className="text-sm text-slate-600">Salidas</span>
+                  <span className="text-xs text-slate-400">
+                    (Ventas + Anul. Compras + Ajustes negativos)
+                  </span>
+                </div>
+                <span className="font-semibold text-red-600">
+                  -{resumen.balance.stock.salidas} uds
+                  {resumen.balance.stock.ajustesNegativos > 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="font-medium text-slate-700">
+                  Variación Neta
+                </span>
+                <span
+                  className={`text-lg font-bold ${
+                    resumen.balance.stock.neto >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {resumen.balance.stock.neto >= 0 ? "+" : ""}
+                  {resumen.balance.stock.neto} uds
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -684,10 +813,13 @@ const MovimientosArticuloPage = () => {
                         Documento
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Stock Inicial
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Cantidad
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        Stock
+                        Stock Final
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Valor
@@ -698,7 +830,12 @@ const MovimientosArticuloPage = () => {
                     {movimientosPaginados.map((mov) => {
                       const tipoInfo = getTipoInfo(mov.tipo_origen_movimiento);
                       const IconComponent = tipoInfo.icon;
-                      const esEntrada = mov.tipo_movimiento === "entrada";
+                      // Para ajustes, determinar si aumentó o disminuyó por el signo de cantidad_movida
+                      const esAjuste = mov.tipo_movimiento === "ajuste";
+                      const esEntrada = esAjuste
+                        ? mov.cantidad_movida > 0
+                        : mov.tipo_movimiento === "entrada";
+                      const cantidadAbsoluta = Math.abs(mov.cantidad_movida);
 
                       return (
                         <tr
@@ -739,19 +876,40 @@ const MovimientosArticuloPage = () => {
                           <td className="px-4 py-3">
                             {mov.referencia_documento_id ? (
                               <span className="text-sm text-slate-600 font-mono">
-                                {mov.referencia_documento_tipo === "orden_venta"
-                                  ? "OV"
-                                  : mov.referencia_documento_tipo ===
-                                    "orden_compra"
-                                  ? "OC"
-                                  : mov.referencia_documento_tipo === "lote"
-                                  ? "Lote"
-                                  : ""}
-                                -{mov.referencia_documento_id}
+                                {mov.tipo_origen_movimiento === "venta"
+                                  ? `OV #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento ===
+                                    "anulacion_venta"
+                                  ? `Anul. OV #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento === "compra"
+                                  ? `OC #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento ===
+                                    "anulacion_compra"
+                                  ? `Anul. OC #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento === "produccion"
+                                  ? `OF #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento ===
+                                    "devolucion_cliente"
+                                  ? `Dev. OV #${mov.referencia_documento_id}`
+                                  : mov.tipo_origen_movimiento ===
+                                    "devolucion_proveedor"
+                                  ? `Dev. OC #${mov.referencia_documento_id}`
+                                  : `#${mov.referencia_documento_id}`}
                               </span>
                             ) : (
                               <span className="text-sm text-slate-400">-</span>
                             )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`font-medium ${
+                                mov.stock_antes < 0
+                                  ? "text-red-600"
+                                  : "text-slate-700"
+                              }`}
+                            >
+                              {mov.stock_antes}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span
@@ -762,25 +920,50 @@ const MovimientosArticuloPage = () => {
                               }`}
                             >
                               {esEntrada ? "+" : "-"}
-                              {mov.cantidad_movida}
+                              {cantidadAbsoluta}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-1 text-sm">
-                              <span className="text-slate-500">
-                                {mov.stock_antes}
-                              </span>
-                              <span className="text-slate-300">→</span>
-                              <span className="font-medium text-slate-700">
-                                {mov.stock_despues}
-                              </span>
-                            </div>
+                            <span
+                              className={`font-medium ${
+                                mov.stock_despues < 0
+                                  ? "text-red-600"
+                                  : "text-slate-700"
+                              }`}
+                            >
+                              {mov.stock_despues}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-right">
                             {mov.valor_documento ? (
-                              <span className="text-sm font-medium text-emerald-600">
-                                {formatCurrency(mov.valor_documento)}
-                              </span>
+                              (() => {
+                                const esDineroEntra =
+                                  mov.tipo_origen_movimiento === "venta" ||
+                                  mov.tipo_origen_movimiento ===
+                                    "anulacion_compra" ||
+                                  mov.tipo_origen_movimiento ===
+                                    "devolucion_proveedor";
+                                const esDineroSale =
+                                  mov.tipo_origen_movimiento === "compra" ||
+                                  mov.tipo_origen_movimiento ===
+                                    "anulacion_venta" ||
+                                  mov.tipo_origen_movimiento ===
+                                    "devolucion_cliente";
+                                const colorClass = esDineroEntra
+                                  ? "text-emerald-600"
+                                  : esDineroSale
+                                  ? "text-red-600"
+                                  : "text-slate-600";
+
+                                return (
+                                  <span
+                                    className={`text-sm font-medium ${colorClass}`}
+                                  >
+                                    {esDineroSale ? "-" : ""}
+                                    {formatCurrency(mov.valor_documento)}
+                                  </span>
+                                );
+                              })()
                             ) : (
                               <span className="text-sm text-slate-400">-</span>
                             )}
