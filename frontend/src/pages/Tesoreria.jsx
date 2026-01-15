@@ -312,7 +312,16 @@ const TesoreriaDashboard = () => {
   };
 
   const getIdReferencia = (mov) => {
-    return mov.id_documento ?? mov.id_orden_venta ?? mov.id_orden_compra ?? "-";
+    if (!mov.id_documento) return "-";
+    const tipo = mov.tipo_documento ? mov.tipo_documento.toLowerCase() : "";
+    if (tipo === "orden_venta") return `OV-${mov.id_documento}`;
+    if (tipo === "abono_credito") return `OV-${mov.id_documento} (Abono)`;
+    if (tipo === "orden_compra") return `OC-${mov.id_documento}`;
+    if (tipo === "pago_trabajador") return `PT-${mov.id_documento}`;
+    if (tipo === "anticipo") return `ANT-${mov.id_documento}`;
+    if (tipo === "costo_indirecto") return `CI-${mov.id_documento}`;
+    if (tipo === "transferencia_fondos") return `TR-${mov.id_documento}`;
+    return `#${mov.id_documento}`;
   };
 
   // Calcular movimientos filtrados y paginados
