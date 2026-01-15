@@ -830,7 +830,7 @@ const MovimientosArticuloPage = () => {
                     {movimientosPaginados.map((mov) => {
                       const tipoInfo = getTipoInfo(mov.tipo_origen_movimiento);
                       const IconComponent = tipoInfo.icon;
-                      // Para ajustes, determinar si aumentó o disminuyó por el signo de cantidad_movida
+               
                       const esAjuste = mov.tipo_movimiento === "ajuste";
                       const esEntrada = esAjuste
                         ? mov.cantidad_movida > 0

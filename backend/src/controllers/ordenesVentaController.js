@@ -215,7 +215,7 @@ module.exports = {
         );
       }
 
-      // Si el método resuelto corresponde a 'credito' (búsqueda por nombre), tratamos como venta a crédito
+      // Si el método resuelto corresponde a 'credito', crear crédito y actualizar id_metodo_pago a 4
       const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
       if (
         resolvedMetodoId &&
@@ -231,6 +231,12 @@ module.exports = {
             estado: "pendiente",
             observaciones: observaciones_pago || null,
           },
+          connection
+        );
+        // Forzar id_metodo_pago a 4 (CREDITO)
+        await ordenModel.update(
+          id_orden_venta,
+          { id_metodo_pago: creditoMetodoId },
           connection
         );
       } else {
@@ -402,6 +408,49 @@ module.exports = {
 
       if (updatedRows === 0) {
         throw new Error("No se pudo actualizar la orden de venta.");
+      }
+
+      // Reparar y actualizar crédito asociado: recalcular estado y saldo según abonos, siempre
+      const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
+      if (
+        (ordenActual.id_metodo_pago &&
+          Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId)) ||
+        (id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId))
+      ) {
+        const credito = await ventasCreditoModel.getByOrdenVentaId(
+          id,
+          connection
+        );
+        if (credito) {
+          // Buscar abonos realizados
+          const AbonosCreditoModel = require("../models/AbonosCredito");
+          const resumen = await AbonosCreditoModel.obtenerResumenCredito(
+            credito.id_venta_credito
+          );
+          const totalAbonado = resumen ? Number(resumen.total_abonado) : 0;
+          let nuevoEstado;
+          let nuevoSaldo;
+          if (totalAbonado >= nuevoTotal) {
+            nuevoEstado = "pagado";
+            nuevoSaldo = 0;
+          } else if (totalAbonado > 0) {
+            nuevoEstado = "parcial";
+            nuevoSaldo = Math.max(nuevoTotal - totalAbonado, 0);
+          } else {
+            nuevoEstado = "pendiente";
+            nuevoSaldo = nuevoTotal;
+          }
+          await connection.query(
+            `UPDATE ventas_credito SET monto_total = ?, saldo_pendiente = ?, estado = ? WHERE id_orden_venta = ?`,
+            [nuevoTotal, nuevoSaldo, nuevoEstado, id]
+          );
+          // Forzar id_metodo_pago a 4 (CREDITO) si hay crédito
+          await ordenModel.update(
+            id,
+            { id_metodo_pago: creditoMetodoId },
+            connection
+          );
+        }
       }
 
       await connection.commit();

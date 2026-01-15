@@ -52,9 +52,21 @@ const AbonosCreditoModel = {
         [data.monto, data.monto, data.monto, idVentaCredito]
       );
 
+      // Obtener el id_orden_venta correspondiente a este idVentaCredito
+      const [ventaCreditoRows] = await conn.query(
+        "SELECT id_orden_venta FROM ventas_credito WHERE id_venta_credito = ? LIMIT 1",
+        [idVentaCredito]
+      );
+      const id_orden_venta =
+        ventaCreditoRows.length > 0 ? ventaCreditoRows[0].id_orden_venta : null;
+      if (!id_orden_venta) {
+        throw new Error(
+          "No se encontró la orden de venta asociada a este abono de crédito."
+        );
+      }
       await TesoreriaModel.insertarMovimiento(
         {
-          id_documento: idVentaCredito,
+          id_documento: id_orden_venta,
           tipo_documento: "abono_credito",
           monto: data.monto,
           id_metodo_pago: data.id_metodo_pago,

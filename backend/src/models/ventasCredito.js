@@ -1,27 +1,40 @@
-const db = require('../database/db')
+// Actualiza el monto_total y saldo_pendiente de un crédito existente
+
+const db = require("../database/db");
 
 module.exports = {
+  actualizarMontoCreditoPorOrden: async (
+    id_orden_venta,
+    nuevo_monto,
+    connection = db
+  ) => {
+    const executor = connection || db;
+    const [result] = await executor.query(
+      `UPDATE ventas_credito SET monto_total = ?, saldo_pendiente = ? WHERE id_orden_venta = ?`,
+      [nuevo_monto, nuevo_monto, id_orden_venta]
+    );
+    return result.affectedRows;
+  },
 
-crearVentaCredito: async (data, connection = db) => {
-        const executor = connection;
-        
-      
-        const [result] = await executor.query(
-            `INSERT INTO ventas_credito (id_orden_venta, id_cliente, monto_total, saldo_pendiente, fecha, estado, observaciones)
+  crearVentaCredito: async (data, connection = db) => {
+    const executor = connection;
+
+    const [result] = await executor.query(
+      `INSERT INTO ventas_credito (id_orden_venta, id_cliente, monto_total, saldo_pendiente, fecha, estado, observaciones)
              VALUES (?, ?, ?, ?, CURDATE(), ?, ?)`,
-            [
-                data.id_orden_venta,
-                data.id_cliente,
-                data.monto_total,
-                data.monto_total, 
-                "pendiente", 
-                data.observaciones || null
-            ]
-        );
-        return result.insertId;
-    },
+      [
+        data.id_orden_venta,
+        data.id_cliente,
+        data.monto_total,
+        data.monto_total,
+        "pendiente",
+        data.observaciones || null,
+      ]
+    );
+    return result.insertId;
+  },
 
-     getByOrdenVentaId: async (id_orden_venta, connection = db) => {
+  getByOrdenVentaId: async (id_orden_venta, connection = db) => {
     const [rows] = await (connection || db).query(
       "SELECT * FROM ventas_credito WHERE id_orden_venta = ?",
       [id_orden_venta]
@@ -67,5 +80,4 @@ crearVentaCredito: async (data, connection = db) => {
     );
     return rows[0];
   },
-
 };

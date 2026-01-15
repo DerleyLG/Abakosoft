@@ -169,20 +169,20 @@ module.exports = {
   },
 
   create: async (
-    { id_cliente, estado, fecha, monto, total, id_pedido } = {},
+    { id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago } = {},
     connection = db
   ) => {
     const [result] = await (connection || db).query(
-      `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total, id_pedido)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id_cliente, estado, fecha, monto, total, id_pedido]
+      `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago]
     );
     return result.insertId;
   },
 
   update: async (
     id,
-    { id_cliente, estado, id_pedido, total },
+    { id_cliente, estado, id_pedido, total, id_metodo_pago },
     connection = db
   ) => {
     const [result] = await (connection || db).query(
@@ -190,9 +190,10 @@ module.exports = {
        SET id_cliente = COALESCE(?, id_cliente), 
            estado = COALESCE(?, estado), 
            id_pedido = COALESCE(?, id_pedido),
-           total = COALESCE(?, total)
+           total = COALESCE(?, total),
+           id_metodo_pago = COALESCE(?, id_metodo_pago)
        WHERE id_orden_venta = ?`,
-      [id_cliente, estado, id_pedido, total, id]
+      [id_cliente, estado, id_pedido, total, id_metodo_pago, id]
     );
     return result.affectedRows;
   },
