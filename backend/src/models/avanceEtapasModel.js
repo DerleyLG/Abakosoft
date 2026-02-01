@@ -4,6 +4,32 @@ const inventarioModel = require("./inventarioModel");
 const LoteModel = require("./lotesFabricadosModel");
 
 module.exports = {
+  getAvancesRealesPorFecha: async (desde, hasta) => {
+    const [rows] = await db.query(
+      `SELECT 
+        a.id_orden_fabricacion,
+        a.id_etapa_produccion,
+        e.nombre AS nombre_etapa,
+        a.id_articulo,
+        art.descripcion AS descripcion_articulo,
+        art.referencia,
+        art.precio_venta,
+        u.abreviatura AS abreviatura_unidad,
+        SUM(a.cantidad) AS cantidad_avanzada,
+        MAX(a.fecha_registro) AS fecha_ultimo_avance
+      FROM avance_etapas_produccion a
+      JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
+      JOIN articulos art ON a.id_articulo = art.id_articulo
+      JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
+      LEFT JOIN unidades u ON art.id_unidad = u.id_unidad
+      WHERE a.fecha_registro BETWEEN ? AND ?
+        AND ofa.estado != 'cancelada'
+      GROUP BY a.id_orden_fabricacion, a.id_etapa_produccion, a.id_articulo, art.referencia, art.precio_venta, u.abreviatura
+      ORDER BY a.id_orden_fabricacion, a.id_etapa_produccion, a.id_articulo`,
+      [desde, hasta],
+    );
+    return rows;
+  },
   getAll: async (id_trabajador) => {
     const [rows] = await db.query(
       `
@@ -34,7 +60,7 @@ module.exports = {
       ${id_trabajador ? "AND a.id_trabajador = ?" : ""}
       ORDER BY art.descripcion ASC, a.fecha_registro DESC;
     `,
-      id_trabajador ? [id_trabajador] : []
+      id_trabajador ? [id_trabajador] : [],
     );
 
     return rows;
@@ -78,7 +104,7 @@ module.exports = {
     if (buscar && buscar.trim()) {
       const like = `%${buscar.trim()}%`;
       whereParts.push(
-        "(art.descripcion LIKE ? OR e.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR a.id_orden_fabricacion LIKE ? )"
+        "(art.descripcion LIKE ? OR e.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR a.id_orden_fabricacion LIKE ? )",
       );
       params.push(like, like, like, like, like);
     }
@@ -213,7 +239,7 @@ module.exports = {
     if (buscar && buscar.trim()) {
       const like = `%${buscar.trim()}%`;
       whereParts.push(
-        "(a.descripcion LIKE ? OR ep.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR ae.id_orden_fabricacion LIKE ?)"
+        "(a.descripcion LIKE ? OR ep.nombre LIKE ? OR t.nombre LIKE ? OR c.nombre LIKE ? OR ae.id_orden_fabricacion LIKE ?)",
       );
       params.push(like, like, like, like, like);
     }
@@ -272,7 +298,7 @@ module.exports = {
   getById: async (id) => {
     const [rows] = await db.query(
       "SELECT * FROM avance_etapas_produccion WHERE id_avance_etapa = ?",
-      [id]
+      [id],
     );
     return rows[0];
   },
@@ -283,7 +309,7 @@ module.exports = {
        FROM detalle_pago_trabajador d
        JOIN avance_etapas_produccion a ON a.id_avance_etapa = d.id_avance_etapa
        WHERE a.id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
     return (rows?.[0]?.cnt || 0) > 0;
   },
@@ -303,7 +329,7 @@ module.exports = {
       WHERE ae.id_orden_fabricacion = ?
       ORDER BY ae.fecha_registro DESC
     `,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
     return rows;
   },
@@ -341,7 +367,7 @@ module.exports = {
       observaciones = null,
       costo_fabricacion,
     },
-    connection = db
+    connection = db,
   ) => {
     const estadoSeguro = estado ?? "en proceso";
     const costoSeguro = costo_fabricacion ?? 0;
@@ -358,7 +384,7 @@ module.exports = {
         estadoSeguro,
         observaciones,
         costoSeguro,
-      ]
+      ],
     );
     return result.insertId;
   },
@@ -366,7 +392,7 @@ module.exports = {
   getEstadoOrden: async (id_orden_fabricacion, connection = db) => {
     const [rows] = await (connection || db).query(
       `SELECT estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
     return rows[0]?.estado || null;
   },
@@ -374,18 +400,18 @@ module.exports = {
   actualizarEstadoOrden: async (
     id_orden_fabricacion,
     nuevoEstado,
-    connection = db
+    connection = db,
   ) => {
     // actualizar la OF
     await (connection || db).query(
       `UPDATE ordenes_fabricacion SET estado = ? WHERE id_orden_fabricacion = ?`,
-      [nuevoEstado, id_orden_fabricacion]
+      [nuevoEstado, id_orden_fabricacion],
     );
 
     // obtener pedido asociado
     const [rows] = await (connection || db).query(
       `SELECT id_pedido FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
 
     if (rows.length && rows[0].id_pedido) {
@@ -400,7 +426,7 @@ module.exports = {
       if (nuevoEstadoPedido) {
         await (connection || db).query(
           `UPDATE pedidos SET estado = ? WHERE id_pedido = ?`,
-          [nuevoEstadoPedido, rows[0].id_pedido]
+          [nuevoEstadoPedido, rows[0].id_pedido],
         );
       }
     }
@@ -416,7 +442,7 @@ module.exports = {
       cantidad,
       estado,
       observaciones = null,
-    }
+    },
   ) => {
     await db.query(
       `UPDATE avance_etapas_produccion 
@@ -431,7 +457,7 @@ module.exports = {
         estado,
         observaciones,
         id,
-      ]
+      ],
     );
   },
 
@@ -439,7 +465,7 @@ module.exports = {
     const dbOrConn = connection || db;
     const [result] = await dbOrConn.query(
       "UPDATE avance_etapas_produccion SET pagado = ? WHERE id_avance_etapa = ?",
-      [pagado, id_avance_etapa]
+      [pagado, id_avance_etapa],
     );
     return result.insertId;
   },
@@ -450,27 +476,27 @@ module.exports = {
   updateCostoFabricacion: async (
     id_avance_etapa,
     nuevo_costo,
-    connection = db
+    connection = db,
   ) => {
     await (connection || db).query(
       `UPDATE avance_etapas_produccion 
        SET costo_fabricacion = ?
        WHERE id_avance_etapa = ?`,
-      [nuevo_costo, id_avance_etapa]
+      [nuevo_costo, id_avance_etapa],
     );
   },
 
   delete: async (id) => {
     await db.query(
       "DELETE FROM avance_etapas_produccion WHERE id_avance_etapa = ?",
-      [id]
+      [id],
     );
   },
 
   getCantidadTotalArticuloEnOrden: async (
     idOrden,
     idArticulo,
-    connection = db
+    connection = db,
   ) => {
     const query = `
       SELECT cantidad
@@ -486,7 +512,7 @@ module.exports = {
     idOrden,
     idArticulo,
     idEtapa,
-    connection = db
+    connection = db,
   ) => {
     const query = `
       SELECT SUM(cantidad) AS total
@@ -504,7 +530,7 @@ module.exports = {
   getEtapasTotalmenteCompletadas: async (
     idOrdenFabricacion,
     idArticulo,
-    connection = db
+    connection = db,
   ) => {
     const [rows] = await (connection || db).query(
       `
@@ -521,7 +547,7 @@ module.exports = {
       GROUP BY a.id_etapa_produccion, d.cantidad
       HAVING total_avance >= cantidad_orden;
     `,
-      [idOrdenFabricacion, idArticulo]
+      [idOrdenFabricacion, idArticulo],
     );
 
     return rows.map((row) => row.id_etapa_produccion);
@@ -530,13 +556,13 @@ module.exports = {
   getCantidadTotalArticulo: async (
     id_orden_fabricacion,
     id_articulo,
-    connection = db
+    connection = db,
   ) => {
     const [rows] = await (connection || db).query(
       `SELECT cantidad 
        FROM detalle_orden_fabricacion 
        WHERE id_orden_fabricacion = ? AND id_articulo = ?`,
-      [id_orden_fabricacion, id_articulo]
+      [id_orden_fabricacion, id_articulo],
     );
 
     if (rows.length === 0) return 0;
@@ -547,7 +573,7 @@ module.exports = {
     id_orden_fabricacion,
     id_articulo,
     id_etapa_produccion,
-    connection = db
+    connection = db,
   ) => {
     const [rows] = await (connection || db).query(
       `SELECT SUM(cantidad) AS total 
@@ -555,7 +581,7 @@ module.exports = {
        WHERE id_orden_fabricacion = ? 
          AND id_articulo = ? 
          AND id_etapa_produccion = ?`,
-      [id_orden_fabricacion, id_articulo, id_etapa_produccion]
+      [id_orden_fabricacion, id_articulo, id_etapa_produccion],
     );
 
     return rows[0].total || 0;
@@ -566,24 +592,24 @@ module.exports = {
     id_articulo,
     id_etapa,
     cantidadSolicitada,
-    connection = db
+    connection = db,
   ) => {
     const [etapaActual] = await (connection || db).query(
       `SELECT orden FROM etapas_produccion WHERE id_etapa = ?`,
-      [id_etapa]
+      [id_etapa],
     );
 
     if (!etapaActual.length || etapaActual[0].orden === 1) {
       const [[detalle]] = await (connection || db).query(
         `SELECT cantidad FROM detalle_orden_fabricacion
          WHERE id_orden_fabricacion = ? AND id_articulo = ?`,
-        [id_orden_fabricacion, id_articulo]
+        [id_orden_fabricacion, id_articulo],
       );
 
       const [[sumaActual]] = await (connection || db).query(
         `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
          WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
-        [id_orden_fabricacion, id_articulo, id_etapa]
+        [id_orden_fabricacion, id_articulo, id_etapa],
       );
 
       const totalDisponible = detalle.cantidad - (sumaActual.total || 0);
@@ -596,7 +622,7 @@ module.exports = {
 
     const [[etapaAnterior]] = await (connection || db).query(
       `SELECT id_etapa FROM etapas_produccion WHERE orden = ?`,
-      [etapaActual[0].orden - 1]
+      [etapaActual[0].orden - 1],
     );
 
     const id_etapa_anterior = etapaAnterior.id_etapa;
@@ -604,13 +630,13 @@ module.exports = {
     const [[completadas]] = await (connection || db).query(
       `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
-      [id_orden_fabricacion, id_articulo, id_etapa_anterior]
+      [id_orden_fabricacion, id_articulo, id_etapa_anterior],
     );
 
     const [[usadas]] = await (connection || db).query(
       `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
-      [id_orden_fabricacion, id_articulo, id_etapa]
+      [id_orden_fabricacion, id_articulo, id_etapa],
     );
 
     const disponibles = (completadas.total || 0) - (usadas.total || 0);
@@ -628,7 +654,7 @@ module.exports = {
        WHERE id_articulo = ? AND id_etapa_produccion = ?
        ORDER BY id_avance_etapa DESC
        LIMIT 1`,
-      [id_articulo, id_etapaProduccion]
+      [id_articulo, id_etapaProduccion],
     );
 
     if (rows.length > 0) {
@@ -649,7 +675,7 @@ module.exports = {
       driver = "cantidad",
       estados = ["pendiente", "en proceso"],
     } = {},
-    connection = db
+    connection = db,
   ) => {
     if (!anio || !mes) return [];
     const estadosPlaceholders = estados.map(() => "?").join(",");
@@ -684,7 +710,7 @@ module.exports = {
   checkearSiOrdenCompleta: async (id_orden_fabricacion, connection = db) => {
     const [ordenData] = await (connection || db).query(
       `SELECT id_pedido, estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
 
     if (!ordenData.length) {
@@ -697,7 +723,7 @@ module.exports = {
 
     if (estadoActualOrden === "completada") {
       console.log(
-        `Orden ${id_orden_fabricacion} ya está completada. No se requiere acción.`
+        `Orden ${id_orden_fabricacion} ya está completada. No se requiere acción.`,
       );
       return true;
     }
@@ -720,18 +746,18 @@ module.exports = {
       GROUP BY
         dof.id_articulo, dof.cantidad, dof.id_etapa_final
     `,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
 
     const hayArticulosIncompletos = articulosProgreso.some(
       (articulo) =>
-        articulo.cantidad_avanzada_final < articulo.cantidad_total_requerida
+        articulo.cantidad_avanzada_final < articulo.cantidad_total_requerida,
     );
 
     if (!hayArticulosIncompletos) {
       const esParaCompuesto =
         await detalleOrdenesFabricacionModel.esArticuloCompuesto(
-          id_orden_fabricacion
+          id_orden_fabricacion,
         );
 
       if (esParaCompuesto) {
@@ -741,7 +767,7 @@ module.exports = {
                  JOIN ordenes_fabricacion ofab ON dofp.id_pedido = ofab.id_pedido
                  JOIN articulos a ON dofp.id_articulo = a.id_articulo
                  WHERE ofab.id_orden_fabricacion = ? AND a.es_compuesto = 1`,
-            [id_orden_fabricacion]
+            [id_orden_fabricacion],
           );
 
           if (articulosPedido.length > 0) {
@@ -751,7 +777,7 @@ module.exports = {
 
             const [ultimoAvance] = await (connection || db).query(
               `SELECT id_trabajador FROM avance_etapas_produccion WHERE id_orden_fabricacion = ? ORDER BY fecha_registro DESC LIMIT 1`,
-              [id_orden_fabricacion]
+              [id_orden_fabricacion],
             );
 
             const id_trabajador_final =
@@ -765,7 +791,7 @@ module.exports = {
                 cantidad: cantidad_final,
                 observaciones: `Lote de producto compuesto creado al completar la OF #${id_orden_fabricacion} de sus componentes.`,
               },
-              connection
+              connection,
             );
 
             await inventarioModel.processInventoryMovement({
@@ -779,29 +805,29 @@ module.exports = {
             });
           } else {
             console.warn(
-              `No se encontró un artículo compuesto en el pedido asociado a la orden ${id_orden_fabricacion}. No se creó el lote final.`
+              `No se encontró un artículo compuesto en el pedido asociado a la orden ${id_orden_fabricacion}. No se creó el lote final.`,
             );
           }
         } catch (error) {
           console.error(
             ` Error al crear el lote del producto final para la orden ${id_orden_fabricacion}:`,
-            error
+            error,
           );
         }
       }
       await (connection || db).query(
         `UPDATE ordenes_fabricacion SET estado = 'completada' WHERE id_orden_fabricacion = ?`,
-        [id_orden_fabricacion]
+        [id_orden_fabricacion],
       );
 
       if (id_pedido) {
         await (connection || db).query(
           `UPDATE pedidos SET estado = 'listo para entrega' WHERE id_pedido = ?`,
-          [id_pedido]
+          [id_pedido],
         );
       } else {
         console.warn(
-          `No se encontró id_pedido para la orden ${id_orden_fabricacion}. No se actualizó el pedido.`
+          `No se encontró id_pedido para la orden ${id_orden_fabricacion}. No se actualizó el pedido.`,
         );
       }
 
@@ -815,13 +841,13 @@ module.exports = {
     id_orden_fabricacion,
     id_articulo,
     id_etapa_produccion,
-    connection = db
+    connection = db,
   ) => {
     const [[detalle]] = await (connection || db).query(
       `SELECT cantidad AS cantidad_total FROM detalle_orden_fabricacion
        WHERE id_orden_fabricacion = ? AND id_articulo = ?
        LIMIT 1`,
-      [id_orden_fabricacion, id_articulo]
+      [id_orden_fabricacion, id_articulo],
     );
     const cantidad_total = Number(detalle?.cantidad_total ?? 0);
 
@@ -829,7 +855,7 @@ module.exports = {
       `SELECT COALESCE(SUM(cantidad), 0) AS total_registrado
        FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
-      [id_orden_fabricacion, id_articulo, id_etapa_produccion]
+      [id_orden_fabricacion, id_articulo, id_etapa_produccion],
     );
     const total_registrado = Number(suma?.total_registrado ?? 0);
 
@@ -838,14 +864,14 @@ module.exports = {
         `UPDATE avance_etapas_produccion
          SET estado = 'completado'
          WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ? AND estado <> 'completado'`,
-        [id_orden_fabricacion, id_articulo, id_etapa_produccion]
+        [id_orden_fabricacion, id_articulo, id_etapa_produccion],
       );
     } else {
       await (connection || db).query(
         `UPDATE avance_etapas_produccion
          SET estado = 'en proceso'
          WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ? AND estado <> 'en proceso'`,
-        [id_orden_fabricacion, id_articulo, id_etapa_produccion]
+        [id_orden_fabricacion, id_articulo, id_etapa_produccion],
       );
     }
   },
@@ -853,7 +879,7 @@ module.exports = {
   getEtapaFinalCliente: async (
     id_orden_fabricacion,
     id_articulo,
-    connection = db
+    connection = db,
   ) => {
     const [rows] = await (connection || db).query(
       `
@@ -862,7 +888,7 @@ module.exports = {
       WHERE id_orden_fabricacion = ? AND id_articulo = ?
       LIMIT 1
     `,
-      [id_orden_fabricacion, id_articulo]
+      [id_orden_fabricacion, id_articulo],
     );
 
     return rows.length > 0 ? rows[0].id_etapa_final : null;

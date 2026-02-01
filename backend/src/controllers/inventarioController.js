@@ -41,7 +41,7 @@ module.exports = {
 
       const [articuloExiste] = await db.query(
         "SELECT 1 FROM articulos WHERE id_articulo = ?",
-        [id_articulo]
+        [id_articulo],
       );
       if (articuloExiste.length === 0) {
         return res.status(404).json({
@@ -83,7 +83,7 @@ module.exports = {
     } catch (error) {
       console.error(
         "Error al registrar movimiento y actualizar inventario:",
-        error
+        error,
       );
 
       res.status(500).json({
@@ -171,18 +171,17 @@ module.exports = {
   getById: async (req, res) => {
     console.log(
       `[InventarioController.getById] req.params recibido:`,
-      req.params
+      req.params,
     );
     const { id } = req.params;
     const id_articulo = id;
     console.log(
-      `[InventarioController.getById] Extracted id_articulo: ${id_articulo}`
+      `[InventarioController.getById] Extracted id_articulo: ${id_articulo}`,
     );
 
     try {
-      const articulo = await InventarioModel.obtenerInventarioPorArticulo(
-        id_articulo
-      );
+      const articulo =
+        await InventarioModel.obtenerInventarioPorArticulo(id_articulo);
 
       if (!articulo) {
         return res
@@ -236,7 +235,7 @@ module.exports = {
       ) {
         await db.query(
           `UPDATE inventario SET stock_minimo = ?, ultima_actualizacion = ? WHERE id_articulo = ?`,
-          [Number(nuevoStockMinimo), new Date(), id]
+          [Number(nuevoStockMinimo), new Date(), id],
         );
         return res.json({
           message:
@@ -253,7 +252,7 @@ module.exports = {
         observaciones: `Ajuste manual de stock. Stock anterior: ${
           inventarioActual.stock
         }, Nuevo stock: ${Number(nuevoStockTotal)}. Stock mínimo: ${Number(
-          nuevoStockMinimo
+          nuevoStockMinimo,
         )}`,
         stock_minimo_inicial: Number(nuevoStockMinimo),
       });
@@ -289,9 +288,8 @@ module.exports = {
         });
       }
 
-      const eliminado = await InventarioModel.eliminarDelInventario(
-        id_articulo
-      );
+      const eliminado =
+        await InventarioModel.eliminarDelInventario(id_articulo);
 
       if (eliminado) {
         res.status(200).json({ mensaje: "Artículo eliminado del inventario" });
@@ -317,11 +315,20 @@ module.exports = {
   inicializarArticuloEnInventario: async (req, res) => {
     let connection;
     try {
-      const { id_articulo } = req.body; // El frontend enviará el ID del artículo
+      const { id_articulo, stock_inicial = 0, stock_minimo = 2 } = req.body;
 
       if (!id_articulo) {
         return res.status(400).json({
           message: "ID de artículo es obligatorio para la inicialización.",
+        });
+      }
+
+      // Validar que el stock inicial sea un número válido
+      const stockInicialNum = parseFloat(stock_inicial);
+      if (isNaN(stockInicialNum) || stockInicialNum < 0) {
+        return res.status(400).json({
+          message:
+            "El stock inicial debe ser un número válido mayor o igual a 0.",
         });
       }
 
@@ -342,7 +349,7 @@ module.exports = {
       const inventarioExistente =
         await InventarioModel.obtenerInventarioPorArticulo(
           id_articulo,
-          connection
+          connection,
         );
       if (inventarioExistente) {
         await connection.rollback();
@@ -353,29 +360,35 @@ module.exports = {
       }
 
       console.log(
-        `[inventarioController] Inicializando artículo ${id_articulo} en inventario con stock 0.`
+        `[inventarioController] Inicializando artículo ${id_articulo} en inventario con stock ${stockInicialNum}.`,
       );
 
       // Llamar a tu función processInventoryMovement para insertar el registro inicial
       await InventarioModel.processInventoryMovement(
         {
           id_articulo: Number(id_articulo),
-          cantidad_movida: 0, // Stock inicial de 0
-          tipo_movimiento: InventarioModel.TIPOS_MOVIMIENTO.ENTRADA, // Es una "entrada" al sistema de inventario
+          cantidad_movida: stockInicialNum,
+          tipo_movimiento: InventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
           tipo_origen_movimiento:
-            InventarioModel.TIPOS_ORIGEN_MOVIMIENTO.INICIAL, // Origen "inicial"
-          observaciones: `Inicialización de artículo en inventario a petición del usuario.`,
+            InventarioModel.TIPOS_ORIGEN_MOVIMIENTO.INICIAL,
+          observaciones: `Inicialización de artículo en inventario con stock inicial de ${stockInicialNum}.`,
           referencia_documento_id: null,
           referencia_documento_tipo: "inicializacion_manual",
-          stock_minimo_inicial: 2, // Tu modelo requiere un stock_minimo_inicial para la inserción
+          stock_minimo_inicial: stock_minimo,
         },
-        connection
-      ); // Pasamos la conexión para que sea parte de la transacción
+        connection,
+      );
 
       await connection.commit();
       connection.release();
       res.status(200).json({
-        message: `Artículo "${articuloInfo.descripcion}" inicializado en inventario con stock 0 correctamente.`,
+        success: true,
+        message: `Artículo "${articuloInfo.descripcion}" inicializado en inventario con stock ${stockInicialNum} correctamente.`,
+        data: {
+          id_articulo,
+          descripcion: articuloInfo.descripcion,
+          stock_disponible: stockInicialNum,
+        },
       });
     } catch (error) {
       if (connection) {

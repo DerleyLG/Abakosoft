@@ -27,7 +27,7 @@ const CrearOrdenCompra = () => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
       2,
-      "0"
+      "0",
     )}-${String(hoy.getDate()).padStart(2, "0")}`;
   };
 
@@ -65,7 +65,7 @@ const CrearOrdenCompra = () => {
           error.response?.data?.message ||
           error.message;
         toast.error(
-          `Error al cargar datos iniciales (proveedores, métodos de pago): ${msg}`
+          `Error al cargar datos iniciales (proveedores, métodos de pago): ${msg}`,
         );
       } finally {
         setLoading(false);
@@ -145,7 +145,7 @@ const CrearOrdenCompra = () => {
           (art) =>
             art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
             art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
+            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
         );
 
         // Guardar en caché
@@ -153,12 +153,12 @@ const CrearOrdenCompra = () => {
         callback(filtered);
       }, 300); // 300ms de delay
     },
-    [todosLosArticulos]
+    [todosLosArticulos],
   );
 
   const verificarYAgregarAlInventario = async (
     idArticulo,
-    descripcionArticulo
+    descripcionArticulo,
   ) => {
     setLoading(true);
     try {
@@ -180,13 +180,13 @@ const CrearOrdenCompra = () => {
                       id_articulo: Number(idArticulo),
                     });
                     toast.success(
-                      "Artículo agregado al inventario con stock 0"
+                      "Artículo agregado al inventario con stock 0",
                     );
                     seAceptoAgregar = true;
                   } catch (err) {
                     toast.error(
                       "Error al agregar al inventario: " +
-                        (err.response?.data?.message || err.message)
+                        (err.response?.data?.message || err.message),
                     );
                   }
                   resolve();
@@ -196,7 +196,7 @@ const CrearOrdenCompra = () => {
                 label: "No",
                 onClick: () => {
                   toast.error(
-                    "Operación cancelada. El artículo no fue inicializado."
+                    "Operación cancelada. El artículo no fue inicializado.",
                   );
                   resolve();
                 },
@@ -210,7 +210,7 @@ const CrearOrdenCompra = () => {
       } else {
         toast.error(
           "Error al verificar el inventario: " +
-            (error.response?.data?.message || error.message)
+            (error.response?.data?.message || error.message),
         );
         return false;
       }
@@ -221,7 +221,7 @@ const CrearOrdenCompra = () => {
 
   const agregarArticulo = async (articulo) => {
     const yaExiste = articulosSeleccionados.some(
-      (a) => a.id_articulo === articulo.id_articulo
+      (a) => a.id_articulo === articulo.id_articulo,
     );
     if (yaExiste) {
       toast.error("Este artículo ya ha sido añadido a la orden de compra.");
@@ -231,7 +231,7 @@ const CrearOrdenCompra = () => {
 
     const puedeAgregar = await verificarYAgregarAlInventario(
       articulo.value,
-      articulo.label
+      articulo.label,
     );
 
     if (!puedeAgregar) {
@@ -245,6 +245,8 @@ const CrearOrdenCompra = () => {
         id_articulo: articulo.value,
         descripcion: articulo.label,
         cantidad: 1,
+        abreviatura_unidad:
+          articulo.abreviatura_unidad || articulo.nombre_unidad || "ud",
         precio_unitario: articulo.precio_costo || 0,
       },
     ]);
@@ -253,20 +255,20 @@ const CrearOrdenCompra = () => {
 
   const eliminarArticulo = (id_articulo) => {
     setArticulosSeleccionados((prev) =>
-      prev.filter((a) => a.id_articulo !== id_articulo)
+      prev.filter((a) => a.id_articulo !== id_articulo),
     );
   };
 
   const cambiarCantidad = (id_articulo, cantidad) => {
-    const numCantidad = parseInt(cantidad, 10);
-    if (isNaN(numCantidad) || numCantidad < 1) {
+    const numCantidad = parseFloat(cantidad);
+    if (isNaN(numCantidad) || numCantidad <= 0) {
       toast.error("La cantidad debe ser un número positivo.");
       return;
     }
     setArticulosSeleccionados((prev) =>
       prev.map((a) =>
-        a.id_articulo === id_articulo ? { ...a, cantidad: numCantidad } : a
-      )
+        a.id_articulo === id_articulo ? { ...a, cantidad: numCantidad } : a,
+      ),
     );
   };
 
@@ -278,8 +280,10 @@ const CrearOrdenCompra = () => {
     }
     setArticulosSeleccionados((prev) =>
       prev.map((a) =>
-        a.id_articulo === id_articulo ? { ...a, precio_unitario: numPrecio } : a
-      )
+        a.id_articulo === id_articulo
+          ? { ...a, precio_unitario: numPrecio }
+          : a,
+      ),
     );
   };
   const validarFormulario = () => {
@@ -419,11 +423,11 @@ const CrearOrdenCompra = () => {
     } catch (error) {
       console.error(
         "Error creando orden de compra",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       toast.error(
         error.response?.data?.message ||
-          "Error interno al crear la orden de compra"
+          "Error interno al crear la orden de compra",
       );
     } finally {
       setLoading(false);
@@ -717,6 +721,7 @@ const CrearOrdenCompra = () => {
                 <tr className="bg-slate-200">
                   <th className="px-4 py-2 text-left">Descripción</th>
                   <th className="px-4 py-2 text-right">Cantidad</th>
+                  <th className="px-4 py-2 text-left">Unidad</th>
                   <th className="px-4 py-2 text-right">Precio Unitario</th>
                   <th className="px-4 py-2 text-center">Eliminar</th>
                 </tr>
@@ -741,7 +746,8 @@ const CrearOrdenCompra = () => {
                       <td className="px-4 py-2 text-right">
                         <input
                           type="number"
-                          min="1"
+                          min="0.001"
+                          step="any"
                           value={art.cantidad}
                           onChange={(e) =>
                             cambiarCantidad(art.id_articulo, e.target.value)
@@ -749,6 +755,9 @@ const CrearOrdenCompra = () => {
                           className="w-20 border border-gray-300 rounded-md px-2 py-1 text-right disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={loading}
                         />
+                      </td>
+                      <td className="px-4 py-2 text-left">
+                        {art.abreviatura_unidad || "ud"}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <input
@@ -758,7 +767,7 @@ const CrearOrdenCompra = () => {
                           onChange={(e) =>
                             cambiarPrecioUnitario(
                               art.id_articulo,
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"

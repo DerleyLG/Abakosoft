@@ -44,12 +44,17 @@ const kanbanRoutes = require("./src/routes/kanbanRoutes.js");
 const cierresCajaRoutes = require("./src/routes/cierresCajaRoutes.js");
 const progresoFabricacionRoutes = require("./src/routes/progresoFabricacionRoutes.js");
 const seguimientoArticuloRoutes = require("./src/routes/seguimientoArticulo.js");
+const consumoMateriaPrimaRoutes = require("./src/routes/consumoMateriaPrimaRoutes.js");
+const unidadesRoutes = require("./src/routes/unidadesRoutes.js");
+
+// Inicializar tabla de consumos de materia prima
+const consumoMateriaPrimaController = require("./src/controllers/consumoMateriaPrimaController.js");
 
 const app = express();
 app.use(
   cors({
     origin: "*",
-  })
+  }),
 );
 app.use(express.json());
 
@@ -81,7 +86,7 @@ app.use("/api/costos-indirectos", costosIndirectosRoutes);
 app.use("/api/costos-indirectos-asignados", costosIndirectosAsignadosRoutes);
 
 // Montaje del modulo avanceEtapasDeProduccion
-app.use("/api/avances-etapa", avanceEtapaRoutes);
+app.use("/api/avance-etapas", avanceEtapaRoutes);
 
 // Montaje del modulo OrdenesFabricacion
 app.use("/api/ordenes-fabricacion", ordenesFabricacionRoutes);
@@ -113,7 +118,7 @@ app.use("/api/servicios-tercerizados", serviciosTercerizadosRoutes);
 // Montaje del modulo serviciosTercerizadosAsignados
 app.use(
   "/api/servicios-tercerizados-asignados",
-  serviciosTercerizadosAsignadosRoutes
+  serviciosTercerizadosAsignadosRoutes,
 );
 
 //Montaje del modulo reportes
@@ -154,6 +159,8 @@ app.use("/api/kanban", kanbanRoutes);
 app.use("/api/cierres-caja", cierresCajaRoutes);
 app.use("/api/progreso-fabricacion", progresoFabricacionRoutes);
 app.use("/api/seguimiento-articulo", seguimientoArticuloRoutes);
+app.use("/api/consumos-materia-prima", consumoMateriaPrimaRoutes);
+app.use("/api/unidades", unidadesRoutes);
 
 const PORT = process.env.PORT;
 app.listen(PORT, "0.0.0.0", () => {

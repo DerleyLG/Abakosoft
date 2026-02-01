@@ -11,6 +11,8 @@ const CrearArticulo = () => {
   const [precioCosto, setPrecioCosto] = useState("");
   const [categorias, setCategorias] = useState([]);
   const [idCategoria, setIdCategoria] = useState("");
+  const [unidades, setUnidades] = useState([]);
+  const [idUnidad, setIdUnidad] = useState("");
 
   //  Estado para artículos compuestos
   const [esCompuesto, setEsCompuesto] = useState(false);
@@ -29,7 +31,7 @@ const CrearArticulo = () => {
         });
         const total = resTotal.data.total || 10000;
 
-        const [resCategorias, resArticulos] = await Promise.all([
+        const [resCategorias, resArticulos, resUnidades] = await Promise.all([
           api.get("/categorias"),
           api.get("/articulos", {
             params: {
@@ -39,10 +41,12 @@ const CrearArticulo = () => {
               sortDir: "asc",
             },
           }),
+          api.get("/unidades"),
         ]);
         setCategorias(
-          Array.isArray(resCategorias.data) ? resCategorias.data : []
+          Array.isArray(resCategorias.data) ? resCategorias.data : [],
         );
+        setUnidades(Array.isArray(resUnidades.data) ? resUnidades.data : []);
         const lista = Array.isArray(resArticulos.data?.data)
           ? resArticulos.data.data
           : [];
@@ -83,18 +87,19 @@ const CrearArticulo = () => {
         if (
           componentes.length === 0 ||
           componentes.some(
-            (comp) => !comp.id || !comp.cantidad || parseInt(comp.cantidad) <= 0
+            (comp) =>
+              !comp.id || !comp.cantidad || parseInt(comp.cantidad) <= 0,
           )
         ) {
           return toast.error(
-            "Un artículo compuesto debe tener al menos un componente válido y una cantidad mayor a 0."
+            "Un artículo compuesto debe tener al menos un componente válido y una cantidad mayor a 0.",
           );
         }
         // Evitar IDs de componentes duplicados
         const idsUnicos = new Set(componentes.map((c) => c.id));
         if (idsUnicos.size !== componentes.length) {
           return toast.error(
-            "No se pueden seleccionar componentes duplicados."
+            "No se pueden seleccionar componentes duplicados.",
           );
         }
       }
@@ -105,6 +110,7 @@ const CrearArticulo = () => {
         precio_venta: parseInt(precioVenta),
         precio_costo: parseInt(precioCosto),
         id_categoria: idCategoria ? parseInt(idCategoria) : null,
+        id_unidad: idUnidad ? parseInt(idUnidad) : 1,
         es_compuesto: esCompuesto, // Enviamos el estado del checkbox
         componentes: esCompuesto
           ? componentes.map((c) => ({
@@ -235,6 +241,28 @@ const CrearArticulo = () => {
             </select>
           </div>
 
+          <div className="md:col-span-2">
+            <label
+              htmlFor="unidad"
+              className="block text-sm font-semibold text-gray-700 mb-1"
+            >
+              Unidad de medida
+            </label>
+            <select
+              id="unidad"
+              value={idUnidad}
+              onChange={(e) => setIdUnidad(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+            >
+              <option value="">-- Seleccione una unidad --</option>
+              {unidades.map((u) => (
+                <option key={u.id_unidad} value={u.id_unidad}>
+                  {u.nombre} ({u.abreviatura})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="md:col-span-2 flex items-center gap-2 mt-4">
             <input
               type="checkbox"
@@ -301,7 +329,7 @@ const CrearArticulo = () => {
                         handleComponenteChange(
                           index,
                           "cantidad",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                       required

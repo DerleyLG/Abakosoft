@@ -28,7 +28,7 @@ const ListaAvances = () => {
 
     if (isSelected) {
       setSeleccionados(
-        seleccionados.filter((id) => id !== avance.id_avance_etapa)
+        seleccionados.filter((id) => id !== avance.id_avance_etapa),
       );
       return;
     }
@@ -52,7 +52,7 @@ const ListaAvances = () => {
     setAvancesGlobal((prev) => {
       // Si la página trae avances nuevos, los fusionamos sin duplicados
       const nuevos = avances.filter(
-        (a) => !prev.some((p) => p.id_avance_etapa === a.id_avance_etapa)
+        (a) => !prev.some((p) => p.id_avance_etapa === a.id_avance_etapa),
       );
       return [...prev, ...nuevos];
     });
@@ -61,7 +61,7 @@ const ListaAvances = () => {
   const avancesSeleccionados = useMemo(() => {
     // Buscar los ids seleccionados en el array global
     return avancesGlobal.filter((av) =>
-      seleccionados.includes(av.id_avance_etapa)
+      seleccionados.includes(av.id_avance_etapa),
     );
   }, [avancesGlobal, seleccionados]); // Subtotal de costo de fabricación (costo unitario x cantidad) de los seleccionados
 
@@ -105,8 +105,8 @@ const ListaAvances = () => {
         if (buscar && buscar.trim()) params.buscar = buscar.trim();
 
         const endpoint = mostrarPagados
-          ? "/avances-etapa/pagados"
-          : "/avances-etapa";
+          ? "/avance-etapas/pagados"
+          : "/avance-etapas";
         const res = await api.get(endpoint, { params });
         const payload = res.data || {};
         setAvances(payload.data || []);
@@ -153,9 +153,7 @@ const ListaAvances = () => {
 
   return (
     <div className="p-6">
-    {" "}
       <div className="flex justify-between items-center mb-4">
-      {" "}
         <h2 className="text-4xl font-bold text-gray-800">
           Avances de Producción
         </h2>
@@ -178,11 +176,9 @@ const ListaAvances = () => {
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
           >
-           <FiArrowLeft /> Volve{" "}
+            <FiArrowLeft /> Volver
           </button>
-        {" "}
         </div>
-      {" "}
       </div>
       <div className="mb-4 flex flex-col gap-3">
         <label
@@ -209,50 +205,44 @@ const ListaAvances = () => {
           ))}
         </select>
       </div>
-    {" "}
+
       <div className="overflow-x-auto shadow rounded-lg mt-4">
-      {" "}
         <table className="min-w-full table-auto border border-slate-300 bg-white">
-        {" "}
           <thead className="bg-slate-200 text-slate-700">
-          {" "}
             <tr>
-            {" "}
               {!mostrarPagados && (
                 <th className="px-4 py-2 text-left">
-                {" "}
                   <div className="flex items-center gap-2">
-                  {" "}
                     <input
                       type="checkbox"
                       title="Seleccionar todos los avances de esta página"
                       checked={
                         avances.length > 0 &&
                         avances.every((a) =>
-                          seleccionados.includes(a.id_avance_etapa)
+                          seleccionados.includes(a.id_avance_etapa),
                         )
                       }
                       onChange={(e) => {
                         // Si desmarca: quitar de la selección todos los visibles
                         if (!e.target.checked) {
                           const idsPagina = new Set(
-                            avances.map((a) => a.id_avance_etapa)
+                            avances.map((a) => a.id_avance_etapa),
                           );
                           setSeleccionados((prev) =>
-                            prev.filter((id) => !idsPagina.has(id))
+                            prev.filter((id) => !idsPagina.has(id)),
                           );
                           return;
                         } // Si marca: intentar seleccionar todos los visibles respetando la regla de mismo trabajador
                         if (avances.length === 0) return;
                         const trabajadoresEnPagina = Array.from(
-                          new Set(avances.map((a) => a.id_trabajador))
+                          new Set(avances.map((a) => a.id_trabajador)),
                         );
                         if (
                           !idTrabajadorSeleccionado &&
                           trabajadoresEnPagina.length > 1
                         ) {
                           toast.error(
-                            "Para seleccionar todos, filtra por un trabajador primero."
+                            "Para seleccionar todos, filtra por un trabajador primero.",
                           );
                           return;
                         } // Si ya filtraste por trabajador, permite seleccionar todos sin validar el trabajador
@@ -262,22 +252,22 @@ const ListaAvances = () => {
                               new Set([
                                 ...seleccionados,
                                 ...avances.map((a) => a.id_avance_etapa),
-                              ])
-                            )
+                              ]),
+                            ),
                           );
                           return;
                         } // Si no hay filtro, validar que todos los avances sean del mismo trabajador
                         if (seleccionados.length > 0) {
                           const primeraSel = avances.find(
-                            (a) => a.id_avance_etapa === seleccionados[0]
+                            (a) => a.id_avance_etapa === seleccionados[0],
                           );
                           const trabajadorSel = primeraSel?.id_trabajador;
                           const todosMismo = avances.every(
-                            (a) => a.id_trabajador === trabajadorSel
+                            (a) => a.id_trabajador === trabajadorSel,
                           );
                           if (!todosMismo) {
                             toast.error(
-                              "Solo puedes seleccionar avances del mismo trabajador."
+                              "Solo puedes seleccionar avances del mismo trabajador.",
                             );
                             return;
                           }
@@ -287,122 +277,106 @@ const ListaAvances = () => {
                             new Set([
                               ...seleccionados,
                               ...avances.map((a) => a.id_avance_etapa),
-                            ])
-                          )
+                            ]),
+                          ),
                         );
                       }}
                     />
-                   <span>Seleccionar</span>
-                  {" "}
+                    <span>Seleccionar</span>
                   </div>
-                {" "}
                 </th>
               )}
-             <th className="px-4 py-2 text-left">Orden</th>
-             <th className="px-4 py-2 text-left">Artículo</th>
-             <th className="px-4 py-2 text-left">Etapa</th>{" "}
-              <th className="px-4 py-2 text-left">Trabajador</th>{" "}
-              <th className="px-4 py-2 text-left">Cantidad</th>{" "}
+              <th className="px-4 py-2 text-left">Orden</th>
+              <th className="px-4 py-2 text-left">Artículo</th>
+              <th className="px-4 py-2 text-left">Etapa</th>
+              <th className="px-4 py-2 text-left">Trabajador</th>
+              <th className="px-4 py-2 text-left">Cantidad</th>
               <th className="px-4 py-2 text-left">Costo unitario</th>
-             <th className="px-4 py-2 text-left">Subtotal</th>
-              <th className="px-4 py-2 text-left">Anticipo</th>{" "}
-              <th className="px-4 py-2 text-left">Fecha</th>{" "}
-              <th className="px-4 py-2 text-left">Estado</th>{" "}
-              <th className="px-4 py-2 text-left">Estado de pago</th>{" "}
+              <th className="px-4 py-2 text-left">Subtotal</th>
+              <th className="px-4 py-2 text-left">Anticipo</th>
+              <th className="px-4 py-2 text-left">Fecha</th>
+              <th className="px-4 py-2 text-left">Estado</th>
+              <th className="px-4 py-2 text-left">Estado de pago</th>
             </tr>
-          {" "}
           </thead>
-        {" "}
+
           <tbody>
-          {" "}
             {loading && (
               <tr>
-              {" "}
                 <td
                   colSpan={mostrarPagados ? 11 : 12}
                   className="px-4 py-4 text-center text-slate-500"
                 >
-                 Cargando..{" "}
+                  Cargando..
                 </td>
-              {" "}
               </tr>
             )}
-          {" "}
+
             {!loading &&
               avances.map((avance) => (
                 <tr
                   key={avance.id_avance_etapa}
                   className="border-t border-slate-300 hover:bg-slate-50"
                 >
-                {" "}
                   {!mostrarPagados && (
                     <td className="px-4 py-2">
-                    {" "}
                       <input
                         type="checkbox"
                         checked={seleccionados.includes(avance.id_avance_etapa)}
                         onChange={() => handleToggle(avance)}
                       />
-                    {" "}
                     </td>
                   )}
-                {" "}
+
                   <td className="px-4 py-2">
-                   #{avance.id_orden_fabricacion} -{" "}
-                    {avance.nombre_cliente}{" "}
+                    #{avance.id_orden_fabricacion} -{avance.nombre_cliente}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2">
                     {avance.descripcion || avance.id_articulo}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2">
                     {avance.nombre_etapa || avance.id_etapa_produccion}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2">
                     {avance.nombre_trabajador || avance.id_trabajador}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2">{avance.cantidad}</td>
-                {" "}
+
                   <td className="px-4 py-2">{`$${(
                     avance.costo_fabricacion ?? 0
                   ).toLocaleString()}`}</td>
-                {" "}
+
                   <td className="px-4 py-2 font-semibold text-slate-700">
                     {`$${(
                       (avance.costo_fabricacion ?? 0) * (avance.cantidad ?? 0)
                     ).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-2">
-                  {" "}
                     {avance.monto_anticipo > 0 &&
                     avance.estado_anticipo !== "saldado" ? (
                       <span className="text-red-600 font-semibold">
-                       Si, $
-                        {avance.monto_anticipo.toLocaleString()}
-                      {" "}
+                        Si, ${avance.monto_anticipo.toLocaleString()}
                       </span>
                     ) : avance.monto_anticipo > 0 &&
                       avance.estado_anticipo === "saldado" ? (
                       <span className="text-green-600 italic text-sm">
-                       Saldad{" "}
+                        Saldado
                       </span>
                     ) : (
                       <span className="text-gray-500 italic text-sm">
-                       Sin anticip{" "}
+                        Sin anticipo
                       </span>
                     )}
-                  {" "}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2">
-                  {" "}
                     {new Date(avance.fecha_registro).toLocaleDateString()}
-                  {" "}
                   </td>
-                {" "}
+
                   <td className="px-4 py-2 capitalize">{avance.estado}</td>
                   <td className="px-4 py-2">
                     {mostrarPagados ? (
@@ -415,30 +389,25 @@ const ListaAvances = () => {
                       </span>
                     )}
                   </td>
-                {" "}
                 </tr>
               ))}
-          {" "}
+
             {!loading && avances.length === 0 && (
               <tr>
-              {" "}
                 <td
                   colSpan={mostrarPagados ? 11 : 12}
                   className="px-4 py-4 text-center text-slate-500"
                 >
-                 No hay avances registrados{" "}
+                  No hay avances registrados
                 </td>
-              {" "}
               </tr>
             )}
-          {" "}
           </tbody>
-        {" "}
         </table>
         {!mostrarPagados && seleccionados.length > 0 && (
           <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4">
             <div className="text-base text-slate-700">
-              Subtotal seleccionado:{" "}
+              Subtotal seleccionado:
               <span className="text-green-700 font-extrabold">
                 ${subtotalSeleccionados.toLocaleString()}
               </span>
@@ -451,12 +420,10 @@ const ListaAvances = () => {
             </button>
           </div>
         )}
-      {" "}
       </div>
       <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 ">
-      {" "}
         <div className="text-sm text-gray-600">
-         Página {page} de {totalPages} — {total} avance{" "}
+          Página {page} de {totalPages} — {total} avance
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -487,7 +454,6 @@ const ListaAvances = () => {
           </select>
         </div>
       </div>
-      {" "}
     </div>
   );
 };

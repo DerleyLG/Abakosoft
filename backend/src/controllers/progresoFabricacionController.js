@@ -2,6 +2,36 @@ const progresoFabricacionModel = require("../models/progresoFabricacionModel");
 
 const progresoFabricacionController = {
   /**
+   * GET /api/progreso-fabricacion/costos-por-articulo/:id_orden_fabricacion
+   * Devuelve el prorrateo y costo total por artículo avanzado en la orden
+   */
+  getCostosPorArticulo: async (req, res) => {
+    try {
+      const { id_orden_fabricacion } = req.params;
+      if (!id_orden_fabricacion) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "Falta el id de la orden de fabricación",
+          });
+      }
+      const resultado =
+        await progresoFabricacionModel.calcularCostosPorArticulo(
+          id_orden_fabricacion,
+        );
+      res.json({ success: true, data: resultado });
+    } catch (error) {
+      console.error("Error obteniendo costos por artículo:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          error: "Error al obtener los costos por artículo",
+        });
+    }
+  },
+  /**
    * GET /api/progreso-fabricacion
    * Obtiene el progreso detallado de todas las órdenes de fabricación
    */
@@ -105,7 +135,7 @@ const progresoFabricacionController = {
       const resumen =
         await progresoFabricacionModel.getResumenMateriaPrimaPeriodo(
           inicio,
-          fin
+          fin,
         );
 
       res.json({

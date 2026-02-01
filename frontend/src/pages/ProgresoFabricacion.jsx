@@ -82,9 +82,8 @@ const ProgresoFabricacion = () => {
         params.estado = filtros.estado;
       }
 
-      const progresoData = await progresoFabricacionService.getResumenPorOrden(
-        params
-      );
+      const progresoData =
+        await progresoFabricacionService.getResumenPorOrden(params);
 
       setProgreso(progresoData.data || []);
       setPaginacion((prev) => ({
@@ -335,8 +334,8 @@ const ProgresoFabricacion = () => {
                             orden.estado_orden === "Completada"
                               ? "bg-green-100 text-green-700"
                               : orden.estado_orden === "En proceso"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {orden.estado_orden}
@@ -363,8 +362,8 @@ const ProgresoFabricacion = () => {
                             progresoGeneral >= 100
                               ? "bg-green-500"
                               : progresoGeneral >= 50
-                              ? "bg-blue-500"
-                              : "bg-yellow-500"
+                                ? "bg-blue-500"
+                                : "bg-yellow-500"
                           }`}
                           style={{
                             width: `${Math.min(progresoGeneral, 100)}%`,
@@ -402,7 +401,7 @@ const ProgresoFabricacion = () => {
                             <div className="text-right">
                               <p className="text-lg font-bold text-gray-800">
                                 {parseFloat(
-                                  articulo.porcentaje_avance || 0
+                                  articulo.porcentaje_avance || 0,
                                 ).toFixed(1)}
                                 %
                               </p>
@@ -417,7 +416,7 @@ const ProgresoFabricacion = () => {
                           {/* Barra de progreso general del artículo */}
                           <BarraProgreso
                             porcentaje={parseFloat(
-                              articulo.porcentaje_avance || 0
+                              articulo.porcentaje_avance || 0,
                             )}
                             etapa="Progreso Total"
                           />
@@ -438,7 +437,7 @@ const ProgresoFabricacion = () => {
                                     .filter(
                                       (etapa) =>
                                         etapa.orden_etapa <=
-                                        (articulo.orden_etapa_final || 999)
+                                        (articulo.orden_etapa_final || 999),
                                     )
                                     .map((etapa, etapaIdx) => {
                                       const cantidad = etapa.cantidad || 0;
@@ -456,7 +455,11 @@ const ProgresoFabricacion = () => {
                                         <div
                                           key={etapaIdx}
                                           className={`px-3 py-2 flex items-center justify-between ${
-                                            esEtapaFinal ? "bg-blue-50" : ""
+                                            esEtapaFinal
+                                              ? "bg-blue-50 border-l-2 border-blue-500"
+                                              : etapa.estado === "pendiente"
+                                                ? "bg-orange-50/50"
+                                                : ""
                                           }`}
                                         >
                                           <div className="flex items-center gap-2">
@@ -465,16 +468,21 @@ const ProgresoFabricacion = () => {
                                                 etapa.estado === "completado"
                                                   ? "bg-green-500"
                                                   : etapa.estado ===
-                                                    "en proceso"
-                                                  ? "bg-blue-500"
-                                                  : "bg-gray-300"
+                                                      "en proceso"
+                                                    ? "bg-blue-500"
+                                                    : etapa.estado ===
+                                                        "pendiente"
+                                                      ? "bg-orange-400"
+                                                      : "bg-gray-300"
                                               }`}
                                             ></span>
                                             <span
                                               className={`text-sm ${
                                                 esEtapaFinal
                                                   ? "font-medium text-blue-700"
-                                                  : "text-gray-700"
+                                                  : etapa.estado === "pendiente"
+                                                    ? "text-orange-600"
+                                                    : "text-gray-700"
                                               }`}
                                             >
                                               {etapa.nombre_etapa}
@@ -488,18 +496,24 @@ const ProgresoFabricacion = () => {
                                                   etapa.estado === "completado"
                                                     ? "text-green-600"
                                                     : etapa.estado ===
-                                                      "en proceso"
-                                                    ? "text-blue-600"
-                                                    : "text-gray-400"
+                                                        "en proceso"
+                                                      ? "text-blue-600"
+                                                      : etapa.estado ===
+                                                          "pendiente"
+                                                        ? "text-orange-500"
+                                                        : "text-gray-400"
                                                 }`}
                                               >
                                                 →{" "}
                                                 {etapa.estado === "completado"
-                                                  ? "completo"
+                                                  ? "✓ completo"
                                                   : etapa.estado ===
-                                                    "en proceso"
-                                                  ? "en proceso"
-                                                  : "sin iniciar"}
+                                                      "en proceso"
+                                                    ? " en proceso"
+                                                    : etapa.estado ===
+                                                        "pendiente"
+                                                      ? "pendiente"
+                                                      : "sin iniciar"}
                                               </span>
                                             </span>
                                           </div>
@@ -510,14 +524,17 @@ const ProgresoFabricacion = () => {
                                                   etapa.estado === "completado"
                                                     ? "bg-green-500"
                                                     : etapa.estado ===
-                                                      "en proceso"
-                                                    ? "bg-blue-500"
-                                                    : "bg-gray-300"
+                                                        "en proceso"
+                                                      ? "bg-blue-500"
+                                                      : etapa.estado ===
+                                                          "pendiente"
+                                                        ? "bg-orange-300"
+                                                        : "bg-gray-300"
                                                 }`}
                                                 style={{
                                                   width: `${Math.min(
                                                     porcentajeEtapa,
-                                                    100
+                                                    100,
                                                   )}%`,
                                                 }}
                                               ></div>
@@ -527,8 +544,11 @@ const ProgresoFabricacion = () => {
                                                 porcentajeEtapa >= 100
                                                   ? "text-green-600"
                                                   : porcentajeEtapa > 0
-                                                  ? "text-blue-600"
-                                                  : "text-gray-400"
+                                                    ? "text-blue-600"
+                                                    : etapa.estado ===
+                                                        "pendiente"
+                                                      ? "text-orange-500"
+                                                      : "text-gray-400"
                                               }`}
                                             >
                                               {porcentajeEtapa.toFixed(0)}%
@@ -540,7 +560,9 @@ const ProgresoFabricacion = () => {
                                                     "completado"
                                                     ? "text-green-600"
                                                     : "text-blue-600"
-                                                  : "text-gray-400"
+                                                  : etapa.estado === "pendiente"
+                                                    ? "text-orange-500"
+                                                    : "text-gray-400"
                                               }`}
                                             >
                                               {cantidad}/
@@ -612,7 +634,7 @@ const ProgresoFabricacion = () => {
                     {pageNum}
                   </button>
                 );
-              }
+              },
             )}
 
             <button

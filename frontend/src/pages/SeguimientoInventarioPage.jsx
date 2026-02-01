@@ -25,6 +25,7 @@ import {
 } from "react-icons/fi";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import formateaCantidad from "../utils/formateaCantidad";
 
 const MESES = [
   { value: "", label: "Todos los meses" },
@@ -472,7 +473,7 @@ const SeguimientoInventarioPage = () => {
         {/* Leyenda informativa */}
         <div className="mt-4 pt-4 border-t border-slate-100">
           <p className="text-xs text-slate-500 flex items-center gap-2">
-            <span className="font-medium">ℹ️ Columna "Entidad":</span>
+            <span className="font-medium"> Columna "Entidad":</span>
             <span className="text-slate-400">
               Venta → Cliente final | Compra → Proveedor | Fabricación → Cliente
               del pedido | Ajuste/Inicial → No aplica
@@ -642,7 +643,7 @@ const SeguimientoInventarioPage = () => {
                               : "text-slate-700"
                           }`}
                         >
-                          {mov.stock_antes}
+                          {formateaCantidad(mov.stock_antes)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -654,7 +655,7 @@ const SeguimientoInventarioPage = () => {
                           }`}
                         >
                           {esEntrada ? "+" : "-"}
-                          {cantidadAbsoluta}
+                          {formateaCantidad(cantidadAbsoluta)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -665,7 +666,7 @@ const SeguimientoInventarioPage = () => {
                               : "text-slate-700"
                           }`}
                         >
-                          {mov.stock_despues}
+                          {formateaCantidad(mov.stock_despues)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -687,8 +688,8 @@ const SeguimientoInventarioPage = () => {
                               const colorClass = esDineroEntra
                                 ? "text-emerald-700"
                                 : esDineroSale
-                                ? "text-red-600"
-                                : "text-slate-600";
+                                  ? "text-red-600"
+                                  : "text-slate-600";
 
                               return (
                                 <span className={`font-medium ${colorClass}`}>
@@ -710,7 +711,7 @@ const SeguimientoInventarioPage = () => {
                         <button
                           onClick={() =>
                             navigate(
-                              `/inventario/movimientos/${mov.id_articulo}`
+                              `/inventario/movimientos/${mov.id_articulo}`,
                             )
                           }
                           className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"

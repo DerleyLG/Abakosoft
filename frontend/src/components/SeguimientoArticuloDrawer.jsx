@@ -23,6 +23,7 @@ import {
   FiExternalLink,
 } from "react-icons/fi";
 import api from "../services/api";
+import formateaCantidad from "../utils/formateaCantidad";
 
 const MESES = [
   { value: "", label: "Todos" },
@@ -86,7 +87,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
       "anulacion_compra",
     ];
     const primerTipoConDatos = tiposDisponibles.find((tipo) =>
-      movimientos.some((m) => m.tipo_origen_movimiento === tipo)
+      movimientos.some((m) => m.tipo_origen_movimiento === tipo),
     );
     if (primerTipoConDatos) {
       setTipoMovimientoFiltro(primerTipoConDatos);
@@ -96,7 +97,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
   const fetchSeguimiento = async () => {
     console.log(
       "[SeguimientoDrawer] Iniciando fetchSeguimiento para artículo:",
-      idArticulo
+      idArticulo,
     );
     setLoading(true);
     setError(null);
@@ -117,7 +118,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
       const res = await api.get(url);
       console.log(
         "[SeguimientoDrawer] Respuesta recibida:",
-        res.data ? "OK" : "SIN DATA"
+        res.data ? "OK" : "SIN DATA",
       );
       setData(res.data);
     } catch (err) {
@@ -187,13 +188,13 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-slate-50 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-slate-800">
-              {articulo?.stock_disponible || 0}
+              {formateaCantidad(articulo?.stock_disponible || 0)}
             </div>
             <div className="text-xs text-slate-500 mt-1">Stock Disponible</div>
           </div>
           <div className="bg-blue-50 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-blue-700">
-              {articulo?.stock_fabricado || 0}
+              {formateaCantidad(articulo?.stock_fabricado || 0)}
             </div>
             <div className="text-xs text-blue-500 mt-1">Fabricado</div>
           </div>
@@ -212,7 +213,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                   : "text-green-700"
               }`}
             >
-              {articulo?.stock_minimo || 0}
+              {formateaCantidad(articulo?.stock_minimo || 0)}
             </div>
             <div
               className={`text-xs mt-1 ${
@@ -249,7 +250,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               <div className="text-right">
                 <div className="text-sm opacity-80">Total vendido</div>
                 <div className="font-semibold">
-                  {ventas?.total_cantidad || 0} uds
+                  {formateaCantidad(ventas?.total_cantidad || 0)} uds
                 </div>
                 <div className="text-xs opacity-70">
                   {formatCurrency(ventas?.total_monto)}
@@ -278,7 +279,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               <div className="text-right">
                 <div className="text-sm opacity-80">Cantidad pedida</div>
                 <div className="font-semibold">
-                  {pedidos?.total_cantidad || 0} uds
+                  {formateaCantidad(pedidos?.total_cantidad || 0)} uds
                 </div>
               </div>
             </div>
@@ -333,7 +334,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               <div className="text-right">
                 <div className="text-sm opacity-80">Total comprado</div>
                 <div className="font-semibold">
-                  {compras?.total_cantidad || 0} uds
+                  {formateaCantidad(compras?.total_cantidad || 0)} uds
                 </div>
                 <div className="text-xs opacity-70">
                   {formatCurrency(compras?.total_monto)}
@@ -375,7 +376,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                       }`}
                     >
                       {mov.tipo_movimiento === "entrada" ? "+" : "-"}
-                      {mov.cantidad_movida}
+                      {formateaCantidad(mov.cantidad_movida)}
                     </span>
                     <span className="text-xs text-slate-400">
                       {formatDate(mov.fecha)}
@@ -416,7 +417,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
-                  orden.estado
+                  orden.estado,
                 )}`}
               >
                 {orden.estado}
@@ -433,7 +434,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <div className="flex items-center gap-2 text-slate-600">
                 <FiPackage size={14} className="text-slate-400" />
-                {orden.cantidad} unidades
+                {formateaCantidad(orden.cantidad)} unidades
               </div>
               <div className="flex items-center gap-2 text-slate-600">
                 <FiDollarSign size={14} className="text-slate-400" />
@@ -472,7 +473,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
-                  orden.estado
+                  orden.estado,
                 )}`}
               >
                 {orden.estado}
@@ -489,7 +490,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <div className="flex items-center gap-2 text-slate-600">
                 <FiPackage size={14} className="text-slate-400" />
-                {orden.cantidad} unidades
+                {formateaCantidad(orden.cantidad)} unidades
               </div>
               <div className="flex items-center gap-2 text-slate-600">
                 <FiDollarSign size={14} className="text-slate-400" />
@@ -533,7 +534,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                 </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
-                    orden.estado
+                    orden.estado,
                   )}`}
                 >
                   {orden.estado}
@@ -603,7 +604,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
               </div>
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(
-                  orden.estado
+                  orden.estado,
                 )}`}
               >
                 {orden.estado}
@@ -747,20 +748,20 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
     // Contar movimientos por tipo
     const conteosPorTipo = tiposDisponibles.reduce((acc, tipo) => {
       acc[tipo] = todosMovimientos.filter(
-        (m) => m.tipo_origen_movimiento === tipo
+        (m) => m.tipo_origen_movimiento === tipo,
       ).length;
       return acc;
     }, {});
 
     // Solo mostrar tipos que tengan movimientos
     const tiposConDatos = tiposDisponibles.filter(
-      (tipo) => conteosPorTipo[tipo] > 0
+      (tipo) => conteosPorTipo[tipo] > 0,
     );
 
     // Filtrar movimientos según el tipo seleccionado
     const movimientos = tipoMovimientoFiltro
       ? todosMovimientos.filter(
-          (m) => m.tipo_origen_movimiento === tipoMovimientoFiltro
+          (m) => m.tipo_origen_movimiento === tipoMovimientoFiltro,
         )
       : [];
 
@@ -869,11 +870,11 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                               {mov.referencia_documento_tipo === "orden_venta"
                                 ? "OV"
                                 : mov.referencia_documento_tipo ===
-                                  "orden_compra"
-                                ? "OC"
-                                : mov.referencia_documento_tipo === "lote"
-                                ? "Lote"
-                                : ""}
+                                    "orden_compra"
+                                  ? "OC"
+                                  : mov.referencia_documento_tipo === "lote"
+                                    ? "Lote"
+                                    : ""}
                               -{mov.referencia_documento_id}
                             </span>
                           )}
@@ -930,7 +931,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                                 : "text-slate-700"
                             }`}
                           >
-                            {mov.stock_antes}
+                            {formateaCantidad(mov.stock_antes)}
                           </div>
                         </div>
 
@@ -947,7 +948,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                               }`}
                             >
                               {esEntrada ? "+" : "-"}
-                              {cantidadAbsoluta}
+                              {formateaCantidad(cantidadAbsoluta)}
                             </div>
                             <FiArrowRight
                               size={16}
@@ -967,7 +968,7 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
                                 : "text-slate-700"
                             }`}
                           >
-                            {mov.stock_despues}
+                            {formateaCantidad(mov.stock_despues)}
                           </div>
                         </div>
                       </div>

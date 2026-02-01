@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import formateaCantidad from "../utils/formateaCantidad";
 import api from "../services/api";
 import { FiLoader, FiArrowLeft, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
@@ -81,7 +82,7 @@ const ReporteBase = ({
       toast.error(
         `Error al cargar los datos: ${
           error.response?.data?.message || error.message
-        }`
+        }`,
       );
       try {
         onDataChange && onDataChange([]);
@@ -99,7 +100,7 @@ const ReporteBase = ({
     debounce((newFiltros) => {
       setFiltrosParaAPI(newFiltros);
     }, 1000),
-    []
+    [],
   );
 
   const handleChangeFiltro = (name, value) => {
@@ -158,7 +159,7 @@ const ReporteBase = ({
               : Number(item?.value);
           const valueStr = item?.isCurrency
             ? formatCurrencyCOP(valueNum)
-            : item?.value ?? "";
+            : (item?.value ?? "");
           doc.text(`${label}: ${valueStr}`, 40, y);
           y += 16;
         });
@@ -176,7 +177,7 @@ const ReporteBase = ({
 
       const fileName = `${(titulo || "reporte").replace(
         /\s+/g,
-        "_"
+        "_",
       )}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
       toast.success("PDF generado");
@@ -192,7 +193,8 @@ const ReporteBase = ({
         return toast.error("No hay datos para exportar");
 
       const headers = columnas.map(
-        (c) => c.header || (typeof c.accessor === "string" ? c.accessor : "col")
+        (c) =>
+          c.header || (typeof c.accessor === "string" ? c.accessor : "col"),
       );
       const rows = datos.map((row) => {
         return columnas.map((col) => {
@@ -237,7 +239,7 @@ const ReporteBase = ({
             ? isNaN(valueNum)
               ? ""
               : valueNum
-            : item?.value ?? "";
+            : (item?.value ?? "");
           aoa.push([label, valueCell]);
         });
         aoa.push([]);
@@ -293,7 +295,7 @@ const ReporteBase = ({
       XLSX.utils.book_append_sheet(wb, ws, "Reporte");
       const fileName = `${(titulo || "reporte").replace(
         /\s+/g,
-        "_"
+        "_",
       )}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(wb, fileName);
       toast.success("Excel descargado");
@@ -351,7 +353,8 @@ const ReporteBase = ({
             className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
             disabled={cargando}
           >
-                        <FiArrowLeft />            <span>Volver</span>         {" "}
+                        <FiArrowLeft />            <span>Volver</span>       
+             {" "}
           </button>
                  {" "}
         </div>
@@ -382,7 +385,7 @@ const ReporteBase = ({
                         const formattedDate = formatInTimeZone(
                           date,
                           timezone,
-                          "yyyy-MM-dd"
+                          "yyyy-MM-dd",
                         );
                         handleChangeFiltro(filtro.name, formattedDate);
                       } else {
@@ -441,7 +444,7 @@ const ReporteBase = ({
                     <div className="font-bold text-emerald-600">
                       {item?.isCurrency
                         ? formatCurrencyCOP(item?.value)
-                        : item?.value ?? ""}
+                        : (item?.value ?? "")}
                     </div>
                   </div>
                 ))}
@@ -462,7 +465,7 @@ const ReporteBase = ({
                     <span className="pl-5 text-green-600 font-bold">
                       {primary?.isCurrency
                         ? formatCurrencyCOP(primary?.value)
-                        : primary?.value ?? ""}
+                        : (primary?.value ?? "")}
                     </span>
                   </div>
                   {others.length > 0 && (
@@ -475,7 +478,7 @@ const ReporteBase = ({
                           <span className="font-semibold text-slate-900">
                             {item?.isCurrency
                               ? formatCurrencyCOP(item?.value)
-                              : item?.value ?? ""}
+                              : (item?.value ?? "")}
                           </span>
                         </div>
                       ))}
@@ -561,6 +564,12 @@ const ReporteBase = ({
                           if (col.isCurrency) {
                             return formatCurrencyCOP(value);
                           }
+
+                          // Formatear cantidades para columnas marcadas como esCantidad
+                          if (col.esCantidad) {
+                            return formateaCantidad(value);
+                          }
+
                           return value;
                         })()}
                              {" "}

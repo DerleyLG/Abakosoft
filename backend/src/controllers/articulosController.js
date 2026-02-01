@@ -5,7 +5,7 @@ const db = require("../database/db");
 const categoriaExiste = async (id_categoria) => {
   const [rows] = await db.query(
     "SELECT 1 FROM categorias WHERE id_categoria = ?",
-    [id_categoria]
+    [id_categoria],
   );
   return rows.length > 0;
 };
@@ -74,6 +74,7 @@ const createArticulo = async (req, res) => {
     precio_costo,
     es_compuesto = false,
     componentes,
+    id_unidad = 1,
   } = req.body;
 
   let connection;
@@ -88,7 +89,7 @@ const createArticulo = async (req, res) => {
 
     const [referenciaRows] = await db.query(
       "SELECT id_articulo FROM articulos WHERE referencia = ?",
-      [referencia]
+      [referencia],
     );
     if (referenciaRows.length > 0) {
       return res
@@ -112,7 +113,7 @@ const createArticulo = async (req, res) => {
         ) {
           return res.status(400).json({
             error: `Formato de componente inválido: ${JSON.stringify(
-              comp
+              comp,
             )}. Se requieren 'id' y 'cantidad' (número positivo).`,
           });
         }
@@ -121,7 +122,7 @@ const createArticulo = async (req, res) => {
 
         const [componenteArticuloRows] = await db.query(
           "SELECT id_articulo FROM articulos WHERE id_articulo = ?",
-          [comp.id]
+          [comp.id],
         );
         if (componenteArticuloRows.length === 0) {
           return res.status(400).json({
@@ -146,8 +147,9 @@ const createArticulo = async (req, res) => {
         precio_costo,
         id_categoria,
         es_compuesto: esCompuestoParaDB,
+        id_unidad,
       },
-      connection
+      connection,
     );
 
     if (es_compuesto) {
@@ -163,7 +165,7 @@ const createArticulo = async (req, res) => {
       await ArticuloComponente.CreateComponentesEnLote(
         articuloId,
         componentes,
-        connection
+        connection,
       );
     }
 
@@ -218,7 +220,7 @@ const getComponentesParaOrdenFabricacion = async (req, res) => {
   } catch (error) {
     console.error(
       "Error al obtener componentes para orden de fabricación:",
-      error
+      error,
     );
     res.status(500).json({
       error: "Error interno del servidor al obtener los componentes.",
@@ -228,23 +230,27 @@ const getComponentesParaOrdenFabricacion = async (req, res) => {
 
 const updateArticulo = async (req, res) => {
   const { id } = req.params;
-  const { id_categoria, referencia } = req.body;
   const idArticulo = parseInt(id);
-  const [rows] = await db.query(
-    "SELECT * FROM articulos WHERE referencia = ?  AND id_articulo != ?",
-    [referencia, idArticulo]
-  );
-  if (rows.length > 0) {
-    return res
-      .status(400)
-      .json({ error: "Ya existe un artículo con esa referencia" });
+  // Validar referencia solo si viene en el body
+  if (req.body.referencia !== undefined) {
+    const [rows] = await db.query(
+      "SELECT * FROM articulos WHERE referencia = ?  AND id_articulo != ?",
+      [req.body.referencia, idArticulo],
+    );
+    if (rows.length > 0) {
+      return res
+        .status(400)
+        .json({ error: "Ya existe un artículo con esa referencia" });
+    }
   }
-  // Validar existencia de la categoría
-  const categoriaValida = await categoriaExiste(id_categoria);
-  if (!categoriaValida) {
-    return res
-      .status(400)
-      .json({ error: "La categoría especificada no existe" });
+  // Validar existencia de la categoría solo si viene en el body
+  if (req.body.id_categoria !== undefined) {
+    const categoriaValida = await categoriaExiste(req.body.id_categoria);
+    if (!categoriaValida) {
+      return res
+        .status(400)
+        .json({ error: "La categoría especificada no existe" });
+    }
   }
   try {
     const result = await Articulo.update(id, req.body);
@@ -264,7 +270,7 @@ const deleteArticulo = async (req, res) => {
   try {
     const [movimientos] = await db.query(
       "SELECT * FROM movimientos_inventario WHERE id_articulo = ?",
-      [id]
+      [id],
     );
 
     if (movimientos.length > 0) {

@@ -1,12 +1,16 @@
+/**
+ * GET /api/progreso-fabricacion/costos-por-articulo/:id_orden_fabricacion
+ * Devuelve el prorrateo y costo total por artículo avanzado en la orden
+ */
+
 const express = require("express");
 const router = express.Router();
 const progresoFabricacionController = require("../controllers/progresoFabricacionController");
 
-/**
- * GET /api/progreso-fabricacion
- * Obtiene el progreso detallado de todas las órdenes de fabricación
- * Query params: fecha_inicio, fecha_fin, id_orden_fabricacion, estado
- */
+router.get(
+  "/costos-por-articulo/:id_orden_fabricacion",
+  progresoFabricacionController.getCostosPorArticulo,
+);
 router.get("/", progresoFabricacionController.getProgresoDetallado);
 
 /**
@@ -23,7 +27,7 @@ router.get("/resumen", progresoFabricacionController.getResumenPorOrden);
  */
 router.get(
   "/materia-prima",
-  progresoFabricacionController.getResumenMateriaPrima
+  progresoFabricacionController.getResumenMateriaPrima,
 );
 
 /**

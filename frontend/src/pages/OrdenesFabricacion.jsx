@@ -14,11 +14,17 @@ import {
   FiEdit,
   FiX,
   FiTrendingUp,
+  FiBox,
+  FiEye,
+  FiEyeOff,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import ProrrateoButton from "../components/ProrrateoButton";
 import { can, ACTIONS } from "../utils/permissions";
+import ConsumoMateriaPrimaDrawer from "../components/ConsumoMateriaPrimaDrawer";
 
 const ListaOrdenesFabricacion = () => {
+  const [showModalConsumo, setShowModalConsumo] = useState(false);
   const formatCOP = (number) => {
     const n = Number(number) || 0;
     return new Intl.NumberFormat("es-CO", {
@@ -66,8 +72,9 @@ const ListaOrdenesFabricacion = () => {
   const [editandoCosto, setEditandoCosto] = useState({});
   const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({});
   const [editandoAvanceResponsable, setEditandoAvanceResponsable] = useState(
-    {}
+    {},
   );
+  const [drawerConsumo, setDrawerConsumo] = useState(false);
 
   const [articulosCatalogo, setArticulosCatalogo] = useState([]);
   const [articuloQuery, setArticuloQuery] = useState("");
@@ -110,7 +117,7 @@ const ListaOrdenesFabricacion = () => {
             value: trab.id_trabajador,
             label: trab.nombre,
             cargo: trab.cargo,
-          }))
+          })),
         );
         setEtapas(
           resEtapas.data.map((etp) => ({
@@ -118,7 +125,7 @@ const ListaOrdenesFabricacion = () => {
             label: etp.nombre,
             orden: etp.orden,
             cargo: etp.cargo,
-          }))
+          })),
         );
 
         const catalogoMapeado = articulosArr.map((a) => ({
@@ -154,7 +161,7 @@ const ListaOrdenesFabricacion = () => {
   useEffect(() => {
     if (mostrarFormularioAvance) {
       const ord = ordenes.find(
-        (o) => o.id_orden_fabricacion === mostrarFormularioAvance
+        (o) => o.id_orden_fabricacion === mostrarFormularioAvance,
       );
       if (ord && esOrdenCompletada(ord.estado)) {
         setMostrarFormularioAvance(null);
@@ -172,6 +179,10 @@ const ListaOrdenesFabricacion = () => {
         } else if (filtroEstadoActivas !== "todas") {
           params.estados = filtroEstadoActivas;
         }
+        // Si hay búsqueda por ID (empieza con #), enviarla al backend
+        if (searchTerm && searchTerm.startsWith("#")) {
+          params.buscar = searchTerm;
+        }
         const res = await api.get("/ordenes-fabricacion", { params });
         const payload = res.data || {};
         const rows = Array.isArray(payload.data) ? payload.data : [];
@@ -182,25 +193,25 @@ const ListaOrdenesFabricacion = () => {
           detalles: Array.isArray(orden.detalles)
             ? orden.detalles
             : typeof orden.detalles === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(orden.detalles);
-                } catch {
-                  return [];
-                }
-              })()
-            : [],
+              ? (() => {
+                  try {
+                    return JSON.parse(orden.detalles);
+                  } catch {
+                    return [];
+                  }
+                })()
+              : [],
           avances: Array.isArray(orden.avances)
             ? orden.avances
             : typeof orden.avances === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(orden.avances);
-                } catch {
-                  return [];
-                }
-              })()
-            : [],
+              ? (() => {
+                  try {
+                    return JSON.parse(orden.avances);
+                  } catch {
+                    return [];
+                  }
+                })()
+              : [],
         }));
 
         setOrdenes(ordenesProcesadas);
@@ -219,7 +230,7 @@ const ListaOrdenesFabricacion = () => {
               .filter(
                 (avance) =>
                   avance.id_articulo === articulo.id_articulo &&
-                  avance.id_etapa_produccion === articulo.id_etapa_final
+                  avance.id_etapa_produccion === articulo.id_etapa_final,
               )
               .reduce((sum, avance) => sum + avance.cantidad, 0);
             return cantidadAvanzadaEnEtapaFinal < articulo.cantidad;
@@ -242,7 +253,7 @@ const ListaOrdenesFabricacion = () => {
       }
     };
     fetchOrdenes();
-  }, [mostrarCanceladas, filtroEstadoActivas, page, pageSize]);
+  }, [mostrarCanceladas, filtroEstadoActivas, page, pageSize, searchTerm]);
 
   // Carga el costo de fabricación anterior cuando cambian los formularios
   useEffect(() => {
@@ -278,7 +289,7 @@ const ListaOrdenesFabricacion = () => {
 
         try {
           const res = await api.get(
-            `/avances-etapa/costo-anterior/${articulo}/${etapa}`
+            `/avance-etapas/costo-anterior/${articulo}/${etapa}`,
           );
           const costo = res.data?.costo_fabricacion ?? null;
           yaConsultadoCosto.current[clave] = true;
@@ -314,12 +325,12 @@ const ListaOrdenesFabricacion = () => {
 
     if (campo === "articulo") {
       const ordenSeleccionada = ordenes.find(
-        (o) => o.id_orden_fabricacion === idOrden
+        (o) => o.id_orden_fabricacion === idOrden,
       );
       if (!ordenSeleccionada) return;
 
       const articuloSeleccionado = ordenSeleccionada.detalles.find(
-        (art) => art.id_articulo === Number(valor)
+        (art) => art.id_articulo === Number(valor),
       );
       if (!articuloSeleccionado) return;
 
@@ -371,7 +382,7 @@ const ListaOrdenesFabricacion = () => {
           trab.cargo &&
           nombreCargoEtapa &&
           trab.cargo.toLowerCase().trim() ===
-            nombreCargoEtapa.toLowerCase().trim()
+            nombreCargoEtapa.toLowerCase().trim(),
       );
 
       setTrabajadoresDisponibles((prev) => ({
@@ -390,25 +401,25 @@ const ListaOrdenesFabricacion = () => {
       const cantidadIngresada = Number(valor);
       const { articulo, etapa } = formularios[idOrden] || {};
       const ordenSeleccionada = ordenes.find(
-        (o) => o.id_orden_fabricacion === idOrden
+        (o) => o.id_orden_fabricacion === idOrden,
       );
 
       if (ordenSeleccionada && articulo && etapa) {
         const cantidadTotalRequerida = ordenSeleccionada.detalles.find(
-          (art) => art.id_articulo === Number(articulo)
+          (art) => art.id_articulo === Number(articulo),
         )?.cantidad;
 
         const avancesExistentes = ordenSeleccionada.avances
           .filter(
             (avance) =>
               avance.id_articulo === Number(articulo) &&
-              avance.id_etapa_produccion === Number(etapa)
+              avance.id_etapa_produccion === Number(etapa),
           )
           .reduce((sum, avance) => sum + avance.cantidad, 0);
 
         if (avancesExistentes + cantidadIngresada > cantidadTotalRequerida) {
           toast.error(
-            `La cantidad total de esta etapa no puede exceder las ${cantidadTotalRequerida} unidades.`
+            `La cantidad total de esta etapa no puede exceder las ${cantidadTotalRequerida} unidades.`,
           );
           setFormularios((prev) => ({
             ...prev,
@@ -434,17 +445,17 @@ const ListaOrdenesFabricacion = () => {
               await api.delete(`/ordenes-fabricacion/${id}`);
               toast.success("Orden eliminada");
               setOrdenes((prev) =>
-                prev.filter((o) => o.id_orden_fabricacion !== id)
+                prev.filter((o) => o.id_orden_fabricacion !== id),
               );
             } catch (error) {
               console.error(
                 "Error al eliminar",
-                error.response?.data || error.message
+                error.response?.data || error.message,
               );
               toast.error(
                 error.response?.data?.error ||
                   error.response?.data?.message ||
-                  error.message
+                  error.message,
               );
             }
           },
@@ -485,7 +496,8 @@ const ListaOrdenesFabricacion = () => {
         })
       : "";
 
-    const term = searchTerm.toLowerCase();
+    // Si la búsqueda empieza con #, el filtrado se hace en el backend
+    const term = searchTerm.startsWith("#") ? "" : searchTerm.toLowerCase();
 
     const coincideBusqueda =
       estado.includes(term) || cliente.includes(term) || fecha.includes(term);
@@ -497,7 +509,7 @@ const ListaOrdenesFabricacion = () => {
 
     const coincideArticulo = articuloSeleccion
       ? o.detalles.some(
-          (d) => Number(d.id_articulo) === Number(articuloSeleccion.value)
+          (d) => Number(d.id_articulo) === Number(articuloSeleccion.value),
         )
       : true;
 
@@ -551,13 +563,13 @@ const ListaOrdenesFabricacion = () => {
     orden.avances.forEach((avance) => {
       // Intenta encontrar la descripción del artículo desde los detalles de la orden
       const articuloAsociado = orden.detalles.find(
-        (det) => det.id_articulo === avance.id_articulo
+        (det) => det.id_articulo === avance.id_articulo,
       );
       const nombreEtapa = etapas.find(
-        (etp) => String(etp.value) === String(avance.id_etapa_produccion)
+        (etp) => String(etp.value) === String(avance.id_etapa_produccion),
       )?.label;
       const nombreTrabajador = trabajadores.find(
-        (trab) => String(trab.value) === String(avance.id_trabajador)
+        (trab) => String(trab.value) === String(avance.id_trabajador),
       )?.label;
 
       if (!avancesPorArticulo[avance.id_articulo]) {
@@ -612,14 +624,14 @@ const ListaOrdenesFabricacion = () => {
                   {data.avances.map((avance, idx2) => {
                     const nombreCargoEtapa = etapas.find(
                       (et) =>
-                        String(et.value) === String(avance.id_etapa_produccion)
+                        String(et.value) === String(avance.id_etapa_produccion),
                     )?.cargo;
                     const trabajadoresFiltrados = nombreCargoEtapa
                       ? trabajadores.filter(
                           (t) =>
                             t.cargo &&
                             String(t.cargo).toLowerCase().trim() ===
-                              String(nombreCargoEtapa).toLowerCase().trim()
+                              String(nombreCargoEtapa).toLowerCase().trim(),
                         )
                       : trabajadores;
 
@@ -680,7 +692,7 @@ const ListaOrdenesFabricacion = () => {
                                     nuevoTrabajadorRaw === ""
                                   ) {
                                     toast.error(
-                                      "Selecciona un responsable válido"
+                                      "Selecciona un responsable válido",
                                     );
                                     return;
                                   }
@@ -691,14 +703,14 @@ const ListaOrdenesFabricacion = () => {
                                     idTrabajadorNum <= 0
                                   ) {
                                     toast.error(
-                                      "Selecciona un responsable válido"
+                                      "Selecciona un responsable válido",
                                     );
                                     return;
                                   }
                                   try {
                                     await api.put(
-                                      `/avances-etapa/${avance.id_avance_etapa}/responsable`,
-                                      { id_trabajador: idTrabajadorNum }
+                                      `/avance-etapas/${avance.id_avance_etapa}/responsable`,
+                                      { id_trabajador: idTrabajadorNum },
                                     );
                                     setOrdenes((prev) =>
                                       prev.map((o) => {
@@ -721,20 +733,20 @@ const ListaOrdenesFabricacion = () => {
                                                       (t) =>
                                                         String(t.value) ===
                                                         String(
-                                                          nuevoTrabajadorRaw
-                                                        )
+                                                          nuevoTrabajadorRaw,
+                                                        ),
                                                     ) || {}
                                                   ).label ||
                                                   av.nombre_trabajador ||
                                                   "N/A",
                                               }
-                                            : av
+                                            : av,
                                         );
                                         return {
                                           ...o,
                                           avances: avancesActualizados,
                                         };
-                                      })
+                                      }),
                                     );
                                     setEditandoAvanceResponsable((prev) => {
                                       const n = { ...prev };
@@ -784,7 +796,7 @@ const ListaOrdenesFabricacion = () => {
                                     setEditandoAvanceResponsable((prev) => ({
                                       ...prev,
                                       [avance.id_avance_etapa]: String(
-                                        avance.id_trabajador || ""
+                                        avance.id_trabajador || "",
                                       ),
                                     }))
                                   }
@@ -849,8 +861,8 @@ const ListaOrdenesFabricacion = () => {
                                   }
                                   try {
                                     await api.put(
-                                      `/avances-etapa/${avance.id_avance_etapa}/costo`,
-                                      { costo_fabricacion: num }
+                                      `/avance-etapas/${avance.id_avance_etapa}/costo`,
+                                      { costo_fabricacion: num },
                                     );
                                     // actualizar en memoria
                                     setOrdenes((prev) =>
@@ -866,13 +878,13 @@ const ListaOrdenesFabricacion = () => {
                                           av.id_avance_etapa ===
                                           avance.id_avance_etapa
                                             ? { ...av, costo_fabricacion: num }
-                                            : av
+                                            : av,
                                         );
                                         return {
                                           ...o,
                                           avances: avancesActualizados,
                                         };
-                                      })
+                                      }),
                                     );
                                     setEditandoAvanceCosto((prev) => {
                                       const n = { ...prev };
@@ -915,7 +927,7 @@ const ListaOrdenesFabricacion = () => {
                                   setEditandoAvanceCosto((prev) => ({
                                     ...prev,
                                     [avance.id_avance_etapa]: formatCOP(
-                                      Number(avance.costo_fabricacion) || 0
+                                      Number(avance.costo_fabricacion) || 0,
                                     ),
                                   }))
                                 }
@@ -979,19 +991,55 @@ const ListaOrdenesFabricacion = () => {
           : null,
       };
 
-      if (
-        !articulo ||
-        !etapa ||
-        !trabajador ||
-        !cantidad ||
-        !costo_fabricacion
-      ) {
+      // Validación de campos obligatorios
+      if (!articulo || !etapa || !trabajador || !cantidad) {
         toast.error("Por favor completa todos los campos obligatorios.");
         return;
       }
 
+      // Validar costo_fabricacion: solo permitir 0 si la etapa es 'mecanizado'
+      const etapaObj = etapas.find((e) => e.value === parseInt(etapa));
+      const esMecanizado =
+        etapaObj && etapaObj.label.toLowerCase().includes("mecanizado");
+      if (
+        typeof costo_fabricacion === "undefined" ||
+        (!esMecanizado &&
+          (!costo_fabricacion || parseFloat(costo_fabricacion) <= 0))
+      ) {
+        toast.error(
+          esMecanizado
+            ? "El costo de fabricación es obligatorio (puede ser 0 solo en mecanizado)."
+            : "El costo de fabricación debe ser mayor a 0 en esta etapa.",
+        );
+        return;
+      }
+
+      // Validar si es mecanizado y si hay consumo registrado en la semana
+      if (esMecanizado) {
+        // Consultar consumos de materia prima en la semana actual
+        const hoy = new Date();
+        const diaSemana = hoy.getDay();
+        const diffLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+        const lunes = new Date(hoy);
+        lunes.setDate(hoy.getDate() + diffLunes);
+        const domingo = new Date(lunes);
+        domingo.setDate(lunes.getDate() + 6);
+        const fechaInicio = lunes.toISOString().split("T")[0];
+        const fechaFin = domingo.toISOString().split("T")[0];
+        const resConsumos = await api.get(
+          "/consumos-materia-prima/resumen-semanal",
+          {
+            params: { fechaInicio, fechaFin },
+          },
+        );
+        const consumosSemana = resConsumos.data?.data || [];
+        if (!consumosSemana.length) {
+          setShowModalConsumo(true);
+        }
+      }
+
       // Envía el avance.
-      await api.post("/avances-etapa", datos);
+      await api.post("/avance-etapas", datos);
 
       // Obtiene los datos de la orden actualizada.
       const res = await api.get(`/ordenes-fabricacion/${idOrden}`);
@@ -1015,7 +1063,7 @@ const ListaOrdenesFabricacion = () => {
             .filter(
               (avance) =>
                 avance.id_articulo === articulo.id_articulo &&
-                avance.id_etapa_produccion === articulo.id_etapa_final
+                avance.id_etapa_produccion === articulo.id_etapa_final,
             )
             .reduce((sum, avance) => sum + avance.cantidad, 0);
           return cantidadAvanzadaEnEtapaFinal < articulo.cantidad;
@@ -1029,8 +1077,8 @@ const ListaOrdenesFabricacion = () => {
 
       setOrdenes((prevOrdenes) =>
         prevOrdenes.map((o) =>
-          o.id_orden_fabricacion === idOrden ? updatedOrden : o
-        )
+          o.id_orden_fabricacion === idOrden ? updatedOrden : o,
+        ),
       );
 
       setArticulosPendientesPorOrden((prev) => ({
@@ -1057,12 +1105,78 @@ const ListaOrdenesFabricacion = () => {
   };
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
+      {/* Modal para consumo de materia prima */}
+      {showModalConsumo && (
+        <div className="flex items-center justify-center fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-fade-in">
+            <div className="flex flex-col items-center mb-4">
+              <div className="bg-amber-100 rounded-full p-3 mb-2">
+                <FiTrendingUp className="text-amber-600" size={32} />
+              </div>
+              <h3 className="text-2xl font-bold text-amber-700 mb-1">
+                ¡Acción requerida!
+              </h3>
+              <p className="text-gray-700 text-base font-medium mb-2">
+                Registraste un avance en mecanizado, pero aún no has registrado
+                consumos de materia prima.
+              </p>
+              <p className="text-gray-500 text-sm mb-2">
+                ¿Deseas hacerlo ahora?
+              </p>
+            </div>
+            <div className="flex flex-row gap-3 justify-center mt-2">
+              <button
+                className="cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-5 py-2 rounded-xl font-semibold shadow-md transition-all duration-150"
+                onClick={() => {
+                  setShowModalConsumo(false);
+                  setDrawerConsumo(true);
+                }}
+              >
+                <FiBox size={20} /> Registrar consumo
+              </button>
+              <button
+                className="cursor-pointer flex items-center gap-2 bg-gray-100 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded-xl font-semibold shadow-md transition-all duration-150"
+                onClick={() => setShowModalConsumo(false)}
+              >
+                <FiX size={20} /> Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <h2 className="text-4xl font-bold text-gray-800">
             Órdenes de fabricación
           </h2>
           <div className="w-full md:flex-1 md:ml-100px md:justify-end flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+            {/* Filtro por ID de orden */}
+            <div className="w-full md:w-32">
+              <label className="block text-gray-700 font-semibold mb-1">
+                ID Orden
+              </label>
+              <input
+                type="text"
+                placeholder="#105"
+                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                value={searchTerm}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Asegurar que siempre tenga el prefijo #
+                  if (val && !val.startsWith("#")) {
+                    setSearchTerm("#" + val);
+                  } else {
+                    setSearchTerm(val);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setPage(1);
+                    fetchOrdenes();
+                  }
+                }}
+              />
+            </div>
             {/* Filtro por artículo */}
             <div
               className="w-full md:w-[28rem] lg:w-[32rem] relative"
@@ -1157,49 +1271,69 @@ const ListaOrdenesFabricacion = () => {
             </div>
           </div>
         </div>
-        {/* fila inferior: botones alineados a la izquierda y responsivos */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        {/* Botones de acción - grid simétrico 2x4 en desktop */}
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           {canCreate && (
             <button
               onClick={() => navigate("/ordenes_fabricacion/nuevo")}
-              className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
             >
-              <FiPlus size={20} /> Crear orden
+              <FiPlus size={16} /> Orden
             </button>
           )}
           <button
             onClick={() => navigate("/etapas_produccion")}
-            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
           >
-            <FiPlus size={20} /> Nueva etapa
+            <FiPlus size={16} /> Etapa
           </button>
           <button
             onClick={() => navigate("/lotes_fabricados")}
-            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
           >
-            <FiArrowRight /> Lotes fabricados
+            <FiBox size={16} /> Lotes
           </button>
           <button
             onClick={() => navigate("/avances_fabricacion")}
-            className="w-full bg-slate-700 hover:bg-slate-900 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
           >
-            <FiArrowRight /> Avances de fabricación
+            <FiArrowRight size={16} /> Avances
+          </button>
+          <button
+            onClick={() => setDrawerConsumo(true)}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+          >
+            <FiBox size={16} /> Consumo
+          </button>
+          <button
+            onClick={() => navigate("/progreso-fabricacion")}
+            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+          >
+            <FiArrowRight size={16} /> Progreso
           </button>
           <button
             onClick={toggleMostrarCanceladas}
-            className={`w-full h-[42px] flex items-center justify-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
+            className={`w-full h-[40px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-md font-medium text-sm transition cursor-pointer ${
               mostrarCanceladas
-                ? "bg-red-600 hover:bg-red-500 text-white"
-                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
+                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                : "bg-slate-200 hover:bg-slate-300 text-slate-700"
             }`}
           >
-            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
+            {mostrarCanceladas ? (
+              <>
+                <FiEye size={16} /> Activas
+              </>
+            ) : (
+              <>
+                <FiEyeOff size={16} /> Canceladas
+              </>
+            )}
           </button>
           <button
             onClick={() => navigate(-1)}
-            className="w-full bg-gray-300 hover:bg-gray-400 text-slate-800 px-4 py-2 rounded-md font-semibold h-[42px] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-gray-200 hover:bg-gray-300 text-slate-700 px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
           >
-            <FiArrowLeft /> Volver
+            <FiArrowLeft size={16} /> Volver
           </button>
         </div>
       </div>
@@ -1258,8 +1392,8 @@ const ListaOrdenesFabricacion = () => {
                       {orden.nombre_cliente
                         ? `#${orden.id_pedido} - ${orden.nombre_cliente}`
                         : orden.id_pedido
-                        ? `#${orden.id_pedido}`
-                        : "No asociada"}
+                          ? `#${orden.id_pedido}`
+                          : "No asociada"}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex items-center gap-4 justify-center">
@@ -1267,7 +1401,7 @@ const ListaOrdenesFabricacion = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
-                              `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                              `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
                             );
                           }}
                           className="text-blue-600 hover:text-blue-400 transition cursor-pointer"
@@ -1337,7 +1471,7 @@ const ListaOrdenesFabricacion = () => {
                                 <button
                                   onClick={() =>
                                     navigate(
-                                      `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                                      `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
                                     )
                                   }
                                   className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
@@ -1355,7 +1489,7 @@ const ListaOrdenesFabricacion = () => {
                                   setMostrarFormularioAvance((prev) =>
                                     prev === orden.id_orden_fabricacion
                                       ? null
-                                      : orden.id_orden_fabricacion
+                                      : orden.id_orden_fabricacion,
                                   )
                                 }
                                 className="text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
@@ -1379,7 +1513,7 @@ const ListaOrdenesFabricacion = () => {
                               <button
                                 onClick={() =>
                                   navigate(
-                                    `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`
+                                    `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
                                   )
                                 }
                                 className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
@@ -1399,7 +1533,7 @@ const ListaOrdenesFabricacion = () => {
                                   e.preventDefault();
                                   if (esOrdenCompletada(orden.estado)) {
                                     toast.error(
-                                      "La orden está completada. No se pueden registrar más avances."
+                                      "La orden está completada. No se pueden registrar más avances.",
                                     );
                                     setMostrarFormularioAvance(null);
                                     return;
@@ -1422,7 +1556,7 @@ const ListaOrdenesFabricacion = () => {
 
                                   manejarRegistroAvance(
                                     orden.id_orden_fabricacion,
-                                    formNormalizado
+                                    formNormalizado,
                                   );
                                 }}
                                 className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
@@ -1437,7 +1571,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "articulo",
-                                        Number(e.target.value)
+                                        Number(e.target.value),
                                       )
                                     }
                                     className="border rounded px-2 py-1 border-slate-300 p-5"
@@ -1464,7 +1598,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "etapa",
-                                        Number(e.target.value)
+                                        Number(e.target.value),
                                       )
                                     }
                                     className="border rounded px-2 py-1 border-slate-300 p-5"
@@ -1492,7 +1626,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "trabajador",
-                                        Number(e.target.value)
+                                        Number(e.target.value),
                                       )
                                     }
                                     className="border rounded px-2 py-1 border-slate-300 p-5"
@@ -1524,7 +1658,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "cantidad",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
@@ -1542,7 +1676,7 @@ const ListaOrdenesFabricacion = () => {
                                       if (enEdicion !== undefined)
                                         return enEdicion;
                                       const num = Number(
-                                        form?.costo_fabricacion
+                                        form?.costo_fabricacion,
                                       );
                                       return Number.isFinite(num) && num > 0
                                         ? formatCOP(num)
@@ -1563,7 +1697,7 @@ const ListaOrdenesFabricacion = () => {
                                         actualizarFormulario(
                                           orden.id_orden_fabricacion,
                                           "costo_fabricacion",
-                                          ""
+                                          "",
                                         );
                                         return;
                                       }
@@ -1576,7 +1710,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "costo_fabricacion",
-                                        num
+                                        num,
                                       );
                                     }}
                                     onFocus={() => {
@@ -1598,7 +1732,7 @@ const ListaOrdenesFabricacion = () => {
                                       actualizarFormulario(
                                         orden.id_orden_fabricacion,
                                         "observaciones",
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     className="border rounded px-2 py-1 border-slate-300 p-5"
@@ -1678,6 +1812,12 @@ const ListaOrdenesFabricacion = () => {
           </div>
         </div>
       </div>
+
+      {/* Drawer de consumo de materia prima */}
+      <ConsumoMateriaPrimaDrawer
+        isOpen={drawerConsumo}
+        onClose={() => setDrawerConsumo(false)}
+      />
     </div>
   );
 };

@@ -44,7 +44,7 @@ module.exports = {
       LEFT JOIN inventario i ON a.id_articulo = i.id_articulo
       WHERE a.id_articulo = ?
     `,
-      [idArticulo]
+      [idArticulo],
     );
     return rows[0] || null;
   },
@@ -69,7 +69,7 @@ module.exports = {
       ORDER BY ov.fecha DESC
       LIMIT ?
     `,
-      [idArticulo, ...dateFilter.params, limit]
+      [idArticulo, ...dateFilter.params, limit],
     );
     return rows;
   },
@@ -94,7 +94,7 @@ module.exports = {
       ORDER BY p.fecha_pedido DESC
       LIMIT ?
     `,
-      [idArticulo, ...dateFilter.params, limit]
+      [idArticulo, ...dateFilter.params, limit],
     );
     return rows;
   },
@@ -104,7 +104,7 @@ module.exports = {
     idArticulo,
     limit = 10,
     mes = null,
-    anio = null
+    anio = null,
   ) => {
     const dateFilter = buildDateFilter("ofa.fecha_inicio", mes, anio);
     const [rows] = await db.query(
@@ -130,7 +130,7 @@ module.exports = {
       ORDER BY ofa.fecha_inicio DESC
       LIMIT ?
     `,
-      [idArticulo, ...dateFilter.params, limit]
+      [idArticulo, ...dateFilter.params, limit],
     );
     return rows;
   },
@@ -155,7 +155,7 @@ module.exports = {
       ORDER BY oc.fecha DESC
       LIMIT ?
     `,
-      [idArticulo, ...dateFilter.params, limit]
+      [idArticulo, ...dateFilter.params, limit],
     );
     return rows;
   },
@@ -165,14 +165,14 @@ module.exports = {
     idArticulo,
     limit = 10,
     mes = null,
-    anio = null
+    anio = null,
   ) => {
     try {
       console.log(
         "[Model] getMovimientosInventario - idArticulo:",
         idArticulo,
         "limit:",
-        limit
+        limit,
       );
       const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
       console.log("[Model] dateFilter:", dateFilter);
@@ -206,7 +206,7 @@ module.exports = {
     idArticulo,
     limit = 50,
     mes = null,
-    anio = null
+    anio = null,
   ) => {
     const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
 
@@ -308,14 +308,14 @@ module.exports = {
       ORDER BY mi.fecha_movimiento DESC
       LIMIT ?
     `,
-      [idArticulo, ...dateFilter.params, limit]
+      [idArticulo, ...dateFilter.params, limit],
     );
 
     // Calcular stock antes y después para cada movimiento
     // Primero obtenemos el stock actual
     const [[stockActual]] = await db.query(
       `SELECT COALESCE(stock, 0) AS stock_actual FROM inventario WHERE id_articulo = ?`,
-      [idArticulo]
+      [idArticulo],
     );
 
     let stockActualNum = stockActual?.stock_actual || 0;
@@ -323,26 +323,22 @@ module.exports = {
     // Procesar los movimientos para agregar stock_antes y stock_despues
     // Los movimientos vienen ordenados DESC (más reciente primero)
     const movimientosConStock = rows.map((mov, index) => {
-      const stockDespues = stockActualNum;
+      // Forzar a número para evitar errores de concatenación o strings mal formateados
+      const cantidadMovida = Number(mov.cantidad_movida) || 0;
+      const stockDespues = Number(stockActualNum) || 0;
 
       // Calcular stock antes según el tipo de movimiento
       let stockAntes;
       if (mov.tipo_movimiento === "entrada") {
-        // Entrada: el stock aumentó, antes tenía menos
-        stockAntes = stockDespues - mov.cantidad_movida;
+        stockAntes = stockDespues - cantidadMovida;
       } else if (mov.tipo_movimiento === "salida") {
-        // Salida: el stock disminuyó, antes tenía más
-        stockAntes = stockDespues + mov.cantidad_movida;
+        stockAntes = stockDespues + cantidadMovida;
       } else if (mov.tipo_movimiento === "ajuste") {
-        // Ajuste: cantidad_movida ya tiene el signo correcto (+/-)
-        // Si cantidad es +5, el stock aumentó 5, antes tenía menos
-        // Si cantidad es -3, el stock disminuyó 3, antes tenía más
-        stockAntes = stockDespues - mov.cantidad_movida;
+        stockAntes = stockDespues - cantidadMovida;
       } else {
         stockAntes = stockDespues;
       }
 
-      // Actualizar el stockActual para el próximo movimiento (más antiguo)
       stockActualNum = stockAntes;
 
       return {
@@ -386,7 +382,7 @@ module.exports = {
       JOIN ordenes_venta ov ON dov.id_orden_venta = ov.id_orden_venta
       WHERE dov.id_articulo = ? AND ov.estado = 'completada'${ventasFilter.where}
     `,
-      [idArticulo, ...ventasFilter.params]
+      [idArticulo, ...ventasFilter.params],
     );
 
     const pedidosFilter = buildDateFilter("p.fecha_pedido", mes, anio);
@@ -399,7 +395,7 @@ module.exports = {
       JOIN pedidos p ON dp.id_pedido = p.id_pedido
       WHERE dp.id_articulo = ? AND p.estado NOT IN ('cancelado')${pedidosFilter.where}
     `,
-      [idArticulo, ...pedidosFilter.params]
+      [idArticulo, ...pedidosFilter.params],
     );
 
     const fabFilter = buildDateFilter("ofa.fecha_inicio", mes, anio);
@@ -412,7 +408,7 @@ module.exports = {
       JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
       WHERE dof.id_articulo = ?${fabFilter.where}
     `,
-      [idArticulo, ...fabFilter.params]
+      [idArticulo, ...fabFilter.params],
     );
 
     const loteFilter = buildDateFilter("lf.fecha", mes, anio);
@@ -423,7 +419,7 @@ module.exports = {
       FROM lotes_fabricados lf
       WHERE lf.id_articulo = ?${loteFilter.where}
     `,
-      [idArticulo, ...loteFilter.params]
+      [idArticulo, ...loteFilter.params],
     );
 
     const comprasFilter = buildDateFilter("oc.fecha", mes, anio);
@@ -437,7 +433,7 @@ module.exports = {
       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
       WHERE doc.id_articulo = ? AND oc.estado = 'completada'${comprasFilter.where}
     `,
-      [idArticulo, ...comprasFilter.params]
+      [idArticulo, ...comprasFilter.params],
     );
 
     return {
@@ -460,7 +456,7 @@ module.exports = {
     anio = null,
     tipoOrigen = null,
     idArticulo = null,
-    buscar = null
+    buscar = null,
   ) => {
     const offset = (page - 1) * pageSize;
 
@@ -499,7 +495,7 @@ module.exports = {
       `SELECT COUNT(*) AS total FROM movimientos_inventario mi
        JOIN articulos a ON mi.id_articulo = a.id_articulo
        ${whereClause}`,
-      params
+      params,
     );
     const total = countResult.total;
 
@@ -592,7 +588,7 @@ module.exports = {
       ORDER BY mi.fecha_movimiento DESC
       LIMIT ? OFFSET ?
     `,
-      [...params, pageSize, offset]
+      [...params, pageSize, offset],
     );
 
     // Para calcular stock_antes y stock_despues correctamente,
@@ -610,7 +606,7 @@ module.exports = {
       // Obtener el stock actual del artículo
       const [[stockActual]] = await db.query(
         `SELECT COALESCE(stock, 0) AS stock FROM inventario WHERE id_articulo = ?`,
-        [idArticulo]
+        [idArticulo],
       );
       stockPorArticulo[idArticulo] = {
         stockActual: stockActual?.stock || 0,
@@ -631,7 +627,7 @@ module.exports = {
          FROM movimientos_inventario
          WHERE id_articulo = ? AND fecha_movimiento >= ?
          ORDER BY fecha_movimiento DESC, id_movimiento DESC`,
-        [idArticulo, movMasAntiguo.fecha]
+        [idArticulo, movMasAntiguo.fecha],
       );
 
       // Calcular stock para cada movimiento de este artículo
@@ -659,7 +655,7 @@ module.exports = {
           {
             stock_antes: stockAntes,
             stock_despues: stockDespues,
-          }
+          },
         );
 
         stockTemporal = stockAntes;
@@ -717,7 +713,7 @@ module.exports = {
     const filter = buildDateFilter("fecha_movimiento", mes, anio);
     const [rows] = await db.query(
       `SELECT tipo_movimiento, cantidad_movida FROM movimientos_inventario WHERE id_articulo = ?${filter.where}`,
-      [idArticulo, ...filter.params]
+      [idArticulo, ...filter.params],
     );
     let entradas = 0;
     let salidas = 0;
