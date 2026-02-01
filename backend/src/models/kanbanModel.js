@@ -18,7 +18,7 @@ const kanbanModel = {
         c.nombre as nombre_cliente,
         c.telefono as telefono_cliente,
         
-        GROUP_CONCAT(DISTINCT CONCAT(a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos,
+        GROUP_CONCAT(DISTINCT CONCAT(a.referencia, ' - ', a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos,
         
         -- Etapa actualmente en proceso (de avances registrados)
         MAX(CASE WHEN aep.estado = 'en proceso' THEN aep.id_etapa_produccion ELSE NULL END) as etapa_en_proceso_id,
@@ -81,68 +81,115 @@ const kanbanModel = {
     `;
 
     const [rows] = await db.query(query);
+    // Importar el modelo de detalles para obtener todas las etapas finales requeridas
+    const detalleOrdenFabricacionModel = require("./detalleOrdenFabricacionModel");
 
-    // Calcular la columna (etapa/estado) donde debe aparecer cada OF
+    // Obtener todas las etapas finales requeridas para cada orden
+    const detallesPorOrden = {};
+    for (const orden of rows) {
+      if (!detallesPorOrden[orden.id_orden_fabricacion]) {
+        detallesPorOrden[orden.id_orden_fabricacion] =
+          await detalleOrdenFabricacionModel.getById(
+            orden.id_orden_fabricacion,
+          );
+      }
+    }
+
+    // Obtener etapas de producción desde la BD ordenadas por su campo 'orden'
+    const [etapasDB] = await db.query(
+      `SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC`,
+    );
+
+    // Crear mapa de id_etapa -> orden (posición en el flujo)
+    const etapaOrdenMap = {};
+    etapasDB.forEach((e) => {
+      etapaOrdenMap[e.id_etapa] = e.orden;
+    });
+
+    // Crear mapa de siguiente etapa basado en el orden
+    const siguienteMap = {};
+    for (let i = 0; i < etapasDB.length - 1; i++) {
+      siguienteMap[etapasDB[i].id_etapa] = etapasDB[i + 1].id_etapa;
+    }
+    siguienteMap[etapasDB[etapasDB.length - 1].id_etapa] = null; // Última etapa no tiene siguiente
+
+    // Primera etapa del flujo
+    const primeraEtapaId = etapasDB.length > 0 ? etapasDB[0].id_etapa : null;
+
     const ordenes = rows.map((orden) => {
-      let columna = "sin_iniciar"; // Por defecto
-      let estado_etapa = null; // Para mostrar si está pendiente por iniciar o en proceso
-
-      // Mapa de siguiente etapa después de completar una
-      const siguienteMap = {
-        11: 12, // Después de Carpintería → Pulido
-        12: 3, // Después de Pulido → Pintura
-        3: 13, // Después de Pintura → Tapizado
-        13: null, // Después de Tapizado → Completado
-      };
-
-      // Determinar cuántas etapas necesita esta orden
+      let columna = "sin_iniciar";
+      let estado_etapa = null;
       let total_etapas_requeridas = 0;
       const etapa_final = orden.id_etapa_final_requerida;
 
-      // Contar cuántas etapas hay hasta la etapa final (según el mapa)
-      if (etapa_final) {
-        const etapasOrdenadas = [11, 12, 3, 13]; // Carpintería, Pulido, Pintura, Tapizado
-        const indice_final = etapasOrdenadas.indexOf(etapa_final);
-        if (indice_final >= 0) {
-          total_etapas_requeridas = indice_final + 1; // +1 porque el índice es 0-based
-        }
+      // Calcular total de etapas requeridas usando el campo orden de la BD
+      const orden_etapa_final = etapaOrdenMap[etapa_final];
+      if (orden_etapa_final) {
+        total_etapas_requeridas = orden_etapa_final;
       }
-
-      // Si no hay etapa final definida, asumir las 4 etapas estándar
       if (total_etapas_requeridas === 0) {
-        total_etapas_requeridas = 4;
+        total_etapas_requeridas = etapasDB.length;
       }
 
-      // Prioridad 1: Si estado es 'entregada', va a la columna final
+      // Obtener todas las etapas finales requeridas para esta orden
+      const detalles = detallesPorOrden[orden.id_orden_fabricacion] || [];
+      const etapasFinalesRequeridas = detalles.map((d) => d.id_etapa_final);
+
+      // Obtener el orden más alto de etapa final requerida (la última etapa que debe completarse)
+      const ordenesFinales = etapasFinalesRequeridas
+        .map((e) => etapaOrdenMap[e])
+        .filter((o) => o !== undefined);
+      const maxOrdenEtapaFinal =
+        ordenesFinales.length > 0 ? Math.max(...ordenesFinales) : -1;
+
+      // Encontrar el id de la etapa con el máximo orden
+      const maxEtapaFinal =
+        etapasDB.find((e) => e.orden === maxOrdenEtapaFinal)?.id_etapa || null;
+
+      // Orden de la última etapa completada
+      const orden_ultima_completada = orden.ultima_etapa_id
+        ? etapaOrdenMap[orden.ultima_etapa_id]
+        : -1;
+
+      // Solo es finalizada si la última etapa completada alcanzó o superó la etapa final máxima requerida
+      const todasFinalizadas =
+        maxOrdenEtapaFinal >= 0 &&
+        orden_ultima_completada >= 0 &&
+        orden_ultima_completada >= maxOrdenEtapaFinal;
+
+      // Prioridad 1: Si estado es 'entregada', va a la columna entregada
       if (orden.estado_orden === "entregada") {
         columna = "entregada";
       }
-      // Prioridad 2: Si completó la etapa final requerida, va a "Finalizado"
-      else if (orden.ultima_etapa_id && orden.ultima_etapa_id === etapa_final) {
+      // Prioridad 2: Si estado es 'completada', va a la columna finalizada (respetar estado de BD)
+      else if (orden.estado_orden === "completada") {
         columna = "finalizada";
       }
-      // Prioridad 3: Si hay una etapa EN PROCESO, va a esa columna
-      else if (orden.etapa_en_proceso_id) {
+      // Prioridad 3: Si todas las etapas requeridas fueron completadas
+      else if (todasFinalizadas) {
+        columna = "finalizada";
+      } else if (orden.etapa_en_proceso_id) {
         columna = `etapa_${orden.etapa_en_proceso_id}`;
         estado_etapa = "en_proceso";
-      }
-      // Prioridad 4: Si no hay en proceso, determinar la siguiente etapa lógica
-      else {
+      } else {
         if (orden.ultima_etapa_id) {
-          // Si ya completó alguna etapa, ir a la siguiente
           const proxima = siguienteMap[orden.ultima_etapa_id];
-
-          if (proxima && proxima <= etapa_final) {
-            // Hay siguiente etapa y está dentro del rango requerido
+          const orden_proxima = proxima ? etapaOrdenMap[proxima] : -1;
+          // Verificar si la próxima etapa está dentro del rango requerido (usando campo orden)
+          if (
+            proxima &&
+            orden_proxima >= 0 &&
+            orden_proxima <= maxOrdenEtapaFinal
+          ) {
             columna = `etapa_${proxima}`;
             estado_etapa = "pendiente_iniciar";
           } else {
-            // Ya completó la última etapa requerida
+            // Ya completó todas las etapas requeridas
             columna = "finalizada";
           }
         } else {
-          // No ha completado ninguna etapa, empieza en Carpintería (etapa 11)
-          columna = "etapa_11";
+          // No ha completado ninguna etapa, empieza en la primera etapa
+          columna = primeraEtapaId ? `etapa_${primeraEtapaId}` : "sin_iniciar";
           estado_etapa = "pendiente_iniciar";
         }
       }
@@ -164,9 +211,9 @@ const kanbanModel = {
 
       return {
         ...orden,
-        total_etapas_requeridas, // Agregar el total calculado
+        total_etapas_requeridas,
         columna,
-        estado_etapa, // Nuevo campo: 'en_proceso', 'pendiente_iniciar', o null
+        estado_etapa,
         dias_restantes: diasRestantes,
         prioridad,
       };
@@ -194,7 +241,7 @@ const kanbanModel = {
         ofa.id_pedido,
         c.nombre as nombre_cliente,
         c.telefono as telefono_cliente,
-        GROUP_CONCAT(DISTINCT CONCAT(a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos
+        GROUP_CONCAT(DISTINCT CONCAT(a.referencia, ' - ', a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos
       FROM ordenes_fabricacion ofa
       LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
       LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
@@ -221,7 +268,7 @@ const kanbanModel = {
       `UPDATE ordenes_fabricacion 
        SET estado = 'entregada', fecha_entrega = NOW() 
        WHERE id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
 
     // Retornar la orden actualizada con su fecha
@@ -229,19 +276,18 @@ const kanbanModel = {
       `SELECT id_orden_fabricacion, fecha_fin_estimada, fecha_entrega
        FROM ordenes_fabricacion 
        WHERE id_orden_fabricacion = ?`,
-      [id_orden_fabricacion]
+      [id_orden_fabricacion],
     );
 
     return rows[0];
-  }
+  },
   /**
    * Obtiene las etapas de producción ordenadas
-   */,
-  getEtapasProduccion: async () => {
+   */ getEtapasProduccion: async () => {
     const [rows] = await db.query(
       `SELECT id_etapa, nombre, orden, cargo 
        FROM etapas_produccion 
-       ORDER BY orden ASC`
+       ORDER BY orden ASC`,
     );
     return rows;
   },

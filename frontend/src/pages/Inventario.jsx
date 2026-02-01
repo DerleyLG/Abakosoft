@@ -1,3 +1,11 @@
+// Formatea cantidades: sin decimales si es entero, con decimales si los tiene
+function formateaCantidad(valor) {
+  if (valor === null || valor === undefined) return 0;
+  const num = Number(valor);
+  if (Number.isNaN(num)) return 0;
+  if (Number.isInteger(num)) return num;
+  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
@@ -19,6 +27,7 @@ import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
 import EditarStockModal from "../components/EditarStockModal";
 import SeguimientoArticuloDrawer from "../components/SeguimientoArticuloDrawer";
+import ConsumoMateriaPrimaDrawer from "../components/ConsumoMateriaPrimaDrawer";
 
 const Inventario = () => {
   const [inventario, setInventario] = useState([]);
@@ -37,6 +46,7 @@ const Inventario = () => {
   const [itemSeleccionado, setItemSeleccionado] = useState(null);
   const [drawerSeguimiento, setDrawerSeguimiento] = useState(false);
   const [articuloSeguimiento, setArticuloSeguimiento] = useState(null);
+  const [drawerConsumo, setDrawerConsumo] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.rol;
@@ -177,7 +187,7 @@ const Inventario = () => {
     } catch (error) {
       console.error(
         "Error al actualizar inventario",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       const mensajeBackend =
         error.response?.data?.error ||
@@ -225,6 +235,13 @@ const Inventario = () => {
           <h2 className="text-4xl font-bold text-gray-800">Inventario</h2>
           <div className="flex gap-2">
             <button
+              onClick={() => setDrawerConsumo(true)}
+              className="h-[42px] inline-flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
+            >
+              <FiBox size={20} />
+              Consumo
+            </button>
+            <button
               onClick={() => navigate("/inventario/seguimiento")}
               className="h-[42px] inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
             >
@@ -270,8 +287,8 @@ const Inventario = () => {
         <div className="w-full bg-white p-4 rounded-b-xl shadow">
           {/* Primera fila: Búsqueda y Categoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <div className="sm:col-span-2 lg:col-span-2">
-              <label className="block text-gray-700 font-semibold mb-1">
+            <div className="sm:col-span-2 lg:col-span-2 ">
+              <label className="block text-gray-700 font-semibold mb-1 ">
                 Buscar
               </label>
               <input
@@ -282,7 +299,7 @@ const Inventario = () => {
                   setSearchTerm(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
+                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
               />
             </div>
             <div>
@@ -295,7 +312,7 @@ const Inventario = () => {
                   setCategoriaSeleccionada(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar por categoría"
               >
                 <option value="">Todas las categorías</option>
@@ -320,7 +337,7 @@ const Inventario = () => {
                   setStockFabricadoFilter(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock fabricado"
               >
                 <option value="">Todos</option>
@@ -338,7 +355,7 @@ const Inventario = () => {
                   setStockProcesoFilter(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock en proceso"
               >
                 <option value="">Todos</option>
@@ -356,7 +373,7 @@ const Inventario = () => {
                   setStockDisponibleFilter(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 h-[42px]"
                 title="Filtrar stock disponible"
               >
                 <option value="">Todos</option>
@@ -393,6 +410,7 @@ const Inventario = () => {
             <tr>
               <th className="px-4 py-3">Referencia</th>
               <th className="px-4 py-3">Artículo</th>
+              <th className="px-4 py-3">Unidad</th>
               <th className="px-4 py-3">Stock disponible</th>
               <th className="px-4 py-3">Stock fabricado</th>
               <th className="px-4 py-3">Stock en proceso</th>
@@ -421,10 +439,15 @@ const Inventario = () => {
                   >
                     {item.descripcion}
                   </td>
-                  <td className="px-4 py-3">{item.stock_disponible ?? 0}</td>
-                  <td className="px-4 py-3">{item.stock_fabricado ?? 0}</td>
-                  <td className="px-4 py-3">{item.stock_en_proceso ?? 0}</td>
-                  <td className="px-4 py-3">{item.stock_minimo ?? 0}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {item.abreviatura_unidad || item.nombre_unidad || "ud"}
+                  </td>
+                  <td className="px-4 py-3">{formateaCantidad(item.stock_disponible)}</td>
+                  <td className="px-4 py-3">{formateaCantidad(item.stock_fabricado)}</td>
+                  <td className="px-4 py-3">{formateaCantidad(item.stock_en_proceso)}</td>
+                  <td className="px-4 py-3">{formateaCantidad(item.stock_minimo)}</td>
+
+                 
                   <td className="px-4 py-3">
                     {item.ultima_actualizacion
                       ? new Date(item.ultima_actualizacion).toLocaleString()
@@ -471,7 +494,7 @@ const Inventario = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="text-center py-6 text-gray-500">
+                <td colSpan="9" className="text-center py-6 text-gray-500">
                   No se encontraron artículos en inventario.
                 </td>
               </tr>
@@ -523,6 +546,13 @@ const Inventario = () => {
           setArticuloSeguimiento(null);
         }}
         idArticulo={articuloSeguimiento}
+      />
+
+      {/* Drawer para registrar consumo de materia prima */}
+      <ConsumoMateriaPrimaDrawer
+        isOpen={drawerConsumo}
+        onClose={() => setDrawerConsumo(false)}
+        onSuccess={cargarInventario}
       />
     </div>
   );

@@ -1,7 +1,23 @@
 const db = require("../database/db");
 const LoteModel = require("../models/lotesFabricadosModel");
 
+// Obtiene varias órdenes por un array de IDs
+async function getByIds(ids) {
+  if (!ids || ids.length === 0) return [];
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await db.query(
+    `SELECT ofab.*, p.id_pedido, cli.nombre AS nombre_cliente
+     FROM ordenes_fabricacion ofab
+     LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
+     LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
+     WHERE ofab.id_orden_fabricacion IN (${placeholders})`,
+    ids,
+  );
+  return rows;
+}
+
 module.exports = {
+  getByIds,
   getAll: async (estados = ["pendiente", "en proceso", "completada"]) => {
     const placeholders = estados.map(() => "?").join(",");
 
@@ -17,7 +33,7 @@ module.exports = {
     WHERE ofab.estado IN (${placeholders})
     ORDER BY ofab.id_orden_fabricacion DESC;
   `,
-      estados
+      estados,
     );
     return rows;
   },
@@ -46,8 +62,23 @@ module.exports = {
     const whereParts = [`ofab.estado IN (${estadoPlaceholders})`];
     const params = [...estados];
     if (buscar) {
-      whereParts.push("cli.nombre LIKE ?");
-      params.push(`%${buscar}%`);
+      // Si empieza con #, buscar por ID de orden de fabricación
+      if (buscar.startsWith("#")) {
+        const idBuscar = buscar.substring(1).trim();
+        if (idBuscar) {
+          whereParts.push("ofab.id_orden_fabricacion = ?");
+          params.push(idBuscar);
+        }
+      } else {
+        // Búsqueda normal por artículo
+        whereParts.push(`ofab.id_orden_fabricacion IN (
+          SELECT dof.id_orden_fabricacion 
+          FROM detalle_orden_fabricacion dof
+          JOIN articulos a ON dof.id_articulo = a.id_articulo
+          WHERE a.descripcion LIKE ?
+        )`);
+        params.push(`%${buscar}%`);
+      }
     }
     const whereSQL = whereParts.length
       ? `WHERE ${whereParts.join(" AND ")}`
@@ -68,12 +99,12 @@ module.exports = {
        ${base}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
-      [...params, ps, offset]
+      [...params, ps, offset],
     );
 
     const [countRows] = await db.query(
       `SELECT COUNT(*) AS total ${base}`,
-      params
+      params,
     );
     const total = countRows[0]?.total || 0;
 
@@ -82,7 +113,7 @@ module.exports = {
   checkIfExistsByPedidoId: async (idPedido) => {
     const [rows] = await db.query(
       `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ?`,
-      [idPedido]
+      [idPedido],
     );
     return rows[0].count > 0;
   },
@@ -98,7 +129,7 @@ module.exports = {
         LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
         WHERE ofab.id_orden_fabricacion = ?
  `,
-      [id]
+      [id],
     );
 
     return rows[0] || null;
@@ -108,7 +139,7 @@ module.exports = {
     try {
       const [rows] = await db.query(
         `SELECT id_pedido FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-        [idOrdenFabricacion]
+        [idOrdenFabricacion],
       );
       return rows.length > 0 ? rows[0].id_pedido : null;
     } catch (error) {
@@ -127,20 +158,20 @@ module.exports = {
     const [result] = await db.query(
       `INSERT INTO ordenes_fabricacion (id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id_pedido)
        VALUES (?, ?, ?, ?,?)`,
-      [id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id_pedido]
+      [id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id_pedido],
     );
     return result.insertId;
   },
 
   update: async (
     id,
-    { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado }
+    { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado },
   ) => {
     await db.query(
       `UPDATE ordenes_fabricacion 
        SET id_orden_venta = ?, fecha_inicio = ?, fecha_fin_estimada = ?, estado = ? 
        WHERE id_orden_fabricacion = ?`,
-      [id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id]
+      [id_orden_venta, fecha_inicio, fecha_fin_estimada, estado, id],
     );
   },
 
@@ -156,12 +187,12 @@ module.exports = {
     try {
       await LoteModel.deleteByOrdenId(id);
       console.log(
-        `Lotes fabricados asociados a la orden ${id} eliminados físicamente.`
+        `Lotes fabricados asociados a la orden ${id} eliminados físicamente.`,
       );
     } catch (error) {
       console.error(
         `Error al eliminar lotes fabricados para la orden ${id}:`,
-        error
+        error,
       );
     }
   },
@@ -170,7 +201,7 @@ module.exports = {
     try {
       const [rows] = await db.query(
         `SELECT id_pedido FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-        [idOrdenFabricacion]
+        [idOrdenFabricacion],
       );
       return rows.length > 0 ? rows[0].id_pedido : null;
     } catch (error) {
@@ -186,7 +217,7 @@ module.exports = {
        WHERE id_pedido = ? 
        ORDER BY id_orden_fabricacion DESC 
        LIMIT 1`,
-      [id_pedido]
+      [id_pedido],
     );
 
     if (rows.length === 0) {

@@ -34,10 +34,12 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: masterkey
       MYSQL_DATABASE: gestion_abako
+      TZ: America/Bogota
      # MYSQL_USER: root
      # MYSQL_PASSWORD: masterkey
     ports:
       - "3307:3306"
+    command: --default-time-zone=America/Bogota
     volumes:
       - db_data:/var/lib/mysql
       - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql

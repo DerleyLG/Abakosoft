@@ -10,7 +10,7 @@ const ReporteMovimientosInventario = () => {
         { header: "Artículo", accessor: "articulo" },
         { header: "Categoría", accessor: "categoria" },
         { header: "Tipo", accessor: "tipo_movimiento" },
-        { header: "Cantidad", accessor: "cantidad" },
+        { header: "Cantidad", accessor: "cantidad", esCantidad: true },
         { header: "Observaciones", accessor: "observaciones" },
       ]}
       filtros={[

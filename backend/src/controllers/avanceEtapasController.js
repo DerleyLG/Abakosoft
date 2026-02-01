@@ -1,3 +1,62 @@
+// Devuelve las órdenes de fabricación con avances en un rango de fechas (por defecto, semana actual)
+async function getOrdenesConAvancesSemana(req, res) {
+  try {
+    // Calcular semana actual si no se pasan fechas
+    const { desde, hasta } = req.query;
+    let desdeFinal = desde;
+    let hastaFinal = hasta;
+    if (!desde || !hasta) {
+      const hoy = new Date();
+      const diaSemana = hoy.getDay() === 0 ? 6 : hoy.getDay() - 1; // Lunes=0
+      const lunes = new Date(hoy);
+      lunes.setDate(hoy.getDate() - diaSemana);
+      const domingo = new Date(lunes);
+      domingo.setDate(lunes.getDate() + 6);
+      desdeFinal = lunes.toISOString().slice(0, 10);
+      hastaFinal = domingo.toISOString().slice(0, 10);
+    }
+    // Buscar avances en ese rango
+    const avances = await AvanceModel.getAvancesRealesPorFecha(
+      desdeFinal,
+      hastaFinal,
+    );
+    // Agrupar por id_orden_fabricacion
+    const ordenesSet = new Set();
+    avances.forEach((a) => ordenesSet.add(a.id_orden_fabricacion));
+    const ids = Array.from(ordenesSet);
+    // Obtener info básica de las órdenes
+    let ordenes = [];
+    if (ids.length > 0) {
+      ordenes = await ordenesFabricacionModel.getByIds(ids);
+    }
+    res.json({ data: ordenes, desde: desdeFinal, hasta: hastaFinal });
+  } catch (error) {
+    console.error("Error en getOrdenesConAvancesSemana:", error);
+    res
+      .status(500)
+      .json({ error: "Error al consultar órdenes con avances en la semana" });
+  }
+}
+// Avances agrupados por orden y etapa para frontend
+async function getAvancesAgrupadosPorOrdenEtapa(req, res) {
+  try {
+    const { desde, hasta } = req.query;
+    if (!desde || !hasta) {
+      return res.status(400).json({
+        error: "Debe indicar 'desde' y 'hasta' en formato YYYY-MM-DD",
+      });
+    }
+    const avances = await AvanceModel.getAvancesAgrupadosPorOrdenEtapa(
+      desde,
+      hasta,
+    );
+    res.json({ data: avances });
+  } catch (error) {
+    console.error("Error en getAvancesAgrupadosPorOrdenEtapa:", error);
+    res.status(500).json({ error: "Error al consultar avances agrupados" });
+  }
+}
+
 const AvanceModel = require("../models/avanceEtapasModel");
 const db = require("../database/db");
 const inventarioModel = require("../models/inventarioModel");
@@ -6,13 +65,32 @@ const LoteModel = require("../models/lotesFabricadosModel");
 const ordenesFabricacionModel = require("../models/ordenesFabricacionModel");
 const detalleOrdenesFabricacionModel = require("../models/detalleOrdenFabricacionModel");
 
+// Avances reales agrupados por fecha de avance
+
+// Avances reales agrupados por fecha de avance
+async function getAvancesRealesPorFecha(req, res) {
+  try {
+    const { desde, hasta } = req.query;
+    if (!desde || !hasta) {
+      return res.status(400).json({
+        error: "Debe indicar 'desde' y 'hasta' en formato YYYY-MM-DD",
+      });
+    }
+    const avances = await AvanceModel.getAvancesRealesPorFecha(desde, hasta);
+    res.json({ data: avances });
+  } catch (error) {
+    console.error("Error en getAvancesRealesPorFecha:", error);
+    res.status(500).json({ error: "Error al consultar avances reales" });
+  }
+}
+
 async function exists(table, key, id) {
   if (typeof id === "undefined") {
     throw new Error(`ID indefinido para la tabla ${table}`);
   }
   const [rows] = await db.execute(
     `SELECT 1 FROM ${table} WHERE ${key} = ? LIMIT 1`,
-    [id]
+    [id],
   );
   return rows.length > 0;
 }
@@ -23,6 +101,9 @@ function validarEstado(estado) {
 }
 
 module.exports = {
+  getAvancesAgrupadosPorOrdenEtapa,
+  getAvancesRealesPorFecha,
+  getOrdenesConAvancesSemana,
   create: async (req, res) => {
     let connection;
     try {
@@ -46,9 +127,22 @@ module.exports = {
           error: "Faltan campos obligatorios o la cantidad es inválida.",
         });
       }
-      if (typeof costo_fabricacion === "undefined" || costo_fabricacion <= 0) {
+
+      // Validar costo_fabricacion: solo permitir 0 si la etapa es 'mecanizado'
+      const etapasProduccionModel = require("../models/etapasProduccionModel");
+      const etapa = await etapasProduccionModel.getById(id_etapa_produccion);
+      const esMecanizado =
+        etapa &&
+        etapa.nombre &&
+        etapa.nombre.trim().toLowerCase() === "mecanizado";
+      if (
+        typeof costo_fabricacion === "undefined" ||
+        (!esMecanizado && costo_fabricacion <= 0)
+      ) {
         return res.status(400).json({
-          error: "Se esperaba un valor válido para costo de fabricación.",
+          error: esMecanizado
+            ? "El costo de fabricación es obligatorio (puede ser 0 solo en mecanizado)."
+            : "Se esperaba un valor válido para costo de fabricación (debe ser mayor a 0 en esta etapa).",
         });
       }
 
@@ -57,7 +151,7 @@ module.exports = {
         `
         SELECT estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?
       `,
-        [id_orden_fabricacion]
+        [id_orden_fabricacion],
       );
 
       if (estadoOrden.length === 0) {
@@ -76,22 +170,22 @@ module.exports = {
       const ordenExiste = await exists(
         "ordenes_fabricacion",
         "id_orden_fabricacion",
-        id_orden_fabricacion
+        id_orden_fabricacion,
       );
       const articuloExiste = await exists(
         "articulos",
         "id_articulo",
-        id_articulo
+        id_articulo,
       );
       const etapaExiste = await exists(
         "etapas_produccion",
         "id_etapa",
-        id_etapa_produccion
+        id_etapa_produccion,
       );
       const trabajadorExiste = await exists(
         "trabajadores",
         "id_trabajador",
-        id_trabajador
+        id_trabajador,
       );
 
       if (
@@ -110,7 +204,7 @@ module.exports = {
         id_orden_fabricacion,
         id_articulo,
         id_etapa_produccion,
-        cantidad
+        cantidad,
       );
 
       if (validacion?.permitido !== true) {
@@ -123,14 +217,14 @@ module.exports = {
 
       const cantidadTotalEsperada = await AvanceModel.getCantidadTotalArticulo(
         id_orden_fabricacion,
-        id_articulo
+        id_articulo,
       );
 
       const cantidadRegistradaAntes =
         await AvanceModel.getCantidadRegistradaEtapa(
           id_orden_fabricacion,
           id_articulo,
-          id_etapa_produccion
+          id_etapa_produccion,
         );
 
       const totalAcumulado = cantidadRegistradaAntes + cantidad;
@@ -141,7 +235,7 @@ module.exports = {
       // Obtener la etapa final del cliente para este artículo en esta orden
       const etapaFinalCliente = await AvanceModel.getEtapaFinalCliente(
         id_orden_fabricacion,
-        id_articulo
+        id_articulo,
       );
 
       connection = await db.getConnection();
@@ -159,7 +253,7 @@ module.exports = {
           observaciones,
           costo_fabricacion,
         },
-        connection
+        connection,
       );
 
       // Si el avance actual completa la etapa, actualizar el estado de los avances de esa etapa
@@ -168,7 +262,7 @@ module.exports = {
           id_orden_fabricacion,
           id_articulo,
           id_etapa_produccion,
-          connection
+          connection,
         );
       }
 
@@ -176,16 +270,16 @@ module.exports = {
       if (id_etapa_produccion === etapaFinalCliente) {
         const esCompuesto =
           await detalleOrdenesFabricacionModel.esArticuloCompuesto(
-            id_orden_fabricacion
+            id_orden_fabricacion,
           );
 
         if (esCompuesto) {
           console.log(
-            `Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`
+            `Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`,
           );
         } else {
           console.log(
-            `Avance final para un artículo simple. Generando lote y actualizando inventario.`
+            `Avance final para un artículo simple. Generando lote y actualizando inventario.`,
           );
           try {
             // Registrar el lote
@@ -197,7 +291,7 @@ module.exports = {
                 cantidad,
                 observaciones: observaciones || null,
               },
-              connection
+              connection,
             );
 
             // Actualizar el inventario
@@ -214,7 +308,7 @@ module.exports = {
           } catch (inventoryError) {
             console.error(
               `Error crítico al actualizar inventario para artículo ${id_articulo} al crear lote:`,
-              inventoryError.message
+              inventoryError.message,
             );
             await connection.rollback();
             connection.release();
@@ -227,21 +321,20 @@ module.exports = {
       }
 
       // Cambiar estado de la orden si es necesario
-      const estadoActualOrden = await AvanceModel.getEstadoOrden(
-        id_orden_fabricacion
-      );
+      const estadoActualOrden =
+        await AvanceModel.getEstadoOrden(id_orden_fabricacion);
       if (estadoActualOrden === "pendiente") {
         await AvanceModel.actualizarEstadoOrden(
           id_orden_fabricacion,
           "en proceso",
-          connection
+          connection,
         );
       }
 
       //  Verificar si la orden de fabricación está completamente terminada
       await AvanceModel.checkearSiOrdenCompleta(
         id_orden_fabricacion,
-        connection
+        connection,
       );
 
       await connection.commit();
@@ -268,9 +361,13 @@ module.exports = {
     try {
       const costo = await AvanceModel.obtenerUltimoCosto(
         parseInt(id_articulo),
-        parseInt(id_etapa_produccion)
+        parseInt(id_etapa_produccion),
       );
 
+      if (typeof costo === "undefined" || costo === null) {
+        // No retornar nada si no hay costo anterior registrado
+        return res.json({});
+      }
       return res.json({ costo_fabricacion: costo });
     } catch (error) {
       console.error(" Error al obtener costo anterior:", error);
@@ -421,17 +518,17 @@ module.exports = {
       const ordenExiste = await exists(
         "ordenes_fabricacion",
         "id_orden_fabricacion",
-        id_orden_fabricacion
+        id_orden_fabricacion,
       );
       const etapaExiste = await exists(
         "etapas_produccion",
         "id_etapa",
-        id_etapa_produccion
+        id_etapa_produccion,
       );
       const trabajadorExiste = await exists(
         "trabajadores",
         "id_trabajador",
-        id_trabajador
+        id_trabajador,
       );
 
       if (!ordenExiste || !etapaExiste || !trabajadorExiste) {
@@ -486,7 +583,7 @@ module.exports = {
       const { idOrden, idArticulo } = req.params;
       const etapas = await AvanceModel.getEtapasTotalmenteCompletadas(
         idOrden,
-        idArticulo
+        idArticulo,
       );
       res.json(etapas);
     } catch (error) {
@@ -514,7 +611,7 @@ module.exports = {
 
       // Verificar si la orden tiene pagos vinculados
       const tienePagos = await AvanceModel.tienePagosVinculadosAOrden(
-        avance.id_orden_fabricacion
+        avance.id_orden_fabricacion,
       );
       if (tienePagos) {
         return res.status(409).json({
@@ -544,7 +641,7 @@ module.exports = {
       const existe = await exists(
         "avance_etapas_produccion",
         "id_avance_etapa",
-        id
+        id,
       );
       if (!existe) {
         return res.status(404).json({ error: "Avance no encontrado" });
@@ -553,7 +650,7 @@ module.exports = {
       const existeTrab = await exists(
         "trabajadores",
         "id_trabajador",
-        id_trabajador
+        id_trabajador,
       );
       if (!existeTrab) {
         return res.status(404).json({ error: "Trabajador no encontrado" });
@@ -561,7 +658,7 @@ module.exports = {
       // Actualiza el responsable
       await db.execute(
         "UPDATE avance_etapas_produccion SET id_trabajador = ? WHERE id_avance_etapa = ?",
-        [id_trabajador, id]
+        [id_trabajador, id],
       );
       return res.json({ success: true });
     } catch (error) {

@@ -57,7 +57,7 @@ const CrearOrdenFabricacion = () => {
           (art) =>
             art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
             art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase())
+            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
         );
 
         // Guardar en caché
@@ -65,13 +65,13 @@ const CrearOrdenFabricacion = () => {
         callback(filtered);
       }, 300);
     },
-    [articulosOptions]
+    [articulosOptions],
   );
 
   useEffect(() => {
     if (etapasProduccion.length > 0) {
       const tapizado = etapasProduccion.find(
-        (e) => e.nombre.toLowerCase() === "tapizado"
+        (e) => e.nombre.toLowerCase() === "tapizado",
       );
       if (tapizado) {
         setIdEtapaDefault(tapizado.id_etapa);
@@ -97,13 +97,13 @@ const CrearOrdenFabricacion = () => {
         const rows = Array.isArray(payload.data)
           ? payload.data
           : Array.isArray(payload)
-          ? payload
-          : [];
+            ? payload
+            : [];
         setOrdenesPedido(rows);
 
         if (idPedidoSeleccionado) {
           const seleccionada = rows.find(
-            (p) => p.id_pedido === idPedidoSeleccionado
+            (p) => p.id_pedido === idPedidoSeleccionado,
           );
           if (seleccionada) {
             setOrdenPedido(seleccionada);
@@ -135,8 +135,8 @@ const CrearOrdenFabricacion = () => {
         const rows = Array.isArray(payload.data)
           ? payload.data
           : Array.isArray(payload)
-          ? payload
-          : [];
+            ? payload
+            : [];
 
         // Obtener categorías para filtrar solo artículos fabricables
         const resCategorias = await api.get("/categorias");
@@ -150,7 +150,7 @@ const CrearOrdenFabricacion = () => {
 
         // Filtrar solo artículos fabricables
         const articulosFabricables = rows.filter(
-          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable"
+          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable",
         );
 
         setArticulos(articulosFabricables);
@@ -178,8 +178,8 @@ const CrearOrdenFabricacion = () => {
         const rows = Array.isArray(payload.data)
           ? payload.data
           : Array.isArray(payload)
-          ? payload
-          : [];
+            ? payload
+            : [];
         setEtapasProduccion(rows);
       } catch (error) {
         toast.error("Error al cargar etapas de producción");
@@ -195,20 +195,20 @@ const CrearOrdenFabricacion = () => {
     const cargarArticulosDelPedido = async () => {
       try {
         const res = await api.get(
-          `/detalle-orden-pedido/${idPedidoSeleccionado}`
+          `/detalle-orden-pedido/${idPedidoSeleccionado}`,
         );
         const detallesPedido = res.data || [];
 
         // manejar artículos compuestos y no compuestos
         const nuevosDetallesPromises = detallesPedido.map(async (item) => {
           const articuloOriginal = articulos.find(
-            (a) => a.id_articulo === item.id_articulo
+            (a) => a.id_articulo === item.id_articulo,
           );
 
           // Si el artículo es compuesto, hace una llamada para obtener sus componentes
           if (articuloOriginal?.es_compuesto) {
             const componentesRes = await api.get(
-              `/articulos/componentes/${articuloOriginal.id_articulo}?cantidad_padre=${item.cantidad}`
+              `/articulos/componentes/${articuloOriginal.id_articulo}?cantidad_padre=${item.cantidad}`,
             );
             return componentesRes.data.map((comp) => ({
               id: Date.now() + Math.random(),
@@ -260,7 +260,7 @@ const CrearOrdenFabricacion = () => {
 
     setDetalles(nuevosDetalles);
     const tieneCompuesto = nuevosDetalles.some(
-      (d) => d.articulo?.es_compuesto === 1
+      (d) => d.articulo?.es_compuesto === 1,
     );
     setHayArticuloCompuesto(tieneCompuesto);
   };
@@ -351,7 +351,7 @@ const CrearOrdenFabricacion = () => {
                         ordenPedido.cliente_nombre || "Sin cliente"
                       } - ${format(
                         new Date(ordenPedido.fecha_pedido),
-                        "dd/MM/yyyy"
+                        "dd/MM/yyyy",
                       )}`
                     : "Selecciona una orden"}
                 </Listbox.Button>
@@ -438,9 +438,9 @@ const CrearOrdenFabricacion = () => {
             {detalles.map((detalle, index) => (
               <div
                 key={detalle.id}
-                className="grid grid-cols-5 md:grid-cols-5 gap-6 mb-4 items-end relative"
+                className="grid grid-cols-6 md:grid-cols-6 gap-4 mb-4 items-end relative"
               >
-                <div>
+                <div className="col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Artículo <span className="text-red-500">*</span>
                   </label>
@@ -450,7 +450,7 @@ const CrearOrdenFabricacion = () => {
                     defaultOptions={articulosOptions}
                     value={
                       articulosOptions.find(
-                        (opt) => opt.value === detalle.articulo?.id_articulo
+                        (opt) => opt.value === detalle.articulo?.id_articulo,
                       ) || null
                     }
                     onChange={(option) => {
@@ -460,7 +460,7 @@ const CrearOrdenFabricacion = () => {
                       handleDetalleChange(
                         index,
                         "articulo",
-                        articuloSeleccionado
+                        articuloSeleccionado,
                       );
                     }}
                     placeholder="Busca o selecciona un artículo..."
@@ -510,7 +510,7 @@ const CrearOrdenFabricacion = () => {
                       handleDetalleChange(
                         index,
                         "id_etapa_final",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                   >
@@ -523,7 +523,7 @@ const CrearOrdenFabricacion = () => {
                   </select>
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Observaciones
                   </label>
@@ -539,7 +539,7 @@ const CrearOrdenFabricacion = () => {
                 </div>
                 {detalle.mensajeError && (
                   <div
-                    className="md:col-span-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+                    className="col-span-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
                     role="alert"
                   >
                     <span className="block sm:inline">

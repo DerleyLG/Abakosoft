@@ -1,19 +1,59 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "../components/Card";
-import { FiBarChart2, FiDollarSign, FiPackage, FiClipboard, FiSettings } from 'react-icons/fi';
+import {
+  FiBarChart2,
+  FiDollarSign,
+  FiPackage,
+  FiClipboard,
+  FiSettings,
+} from "react-icons/fi";
 
 const reportes = [
-  { titulo: "Reporte de Inventario", ruta: "/reportes/inventario", icono: <FiPackage /> },
-  { titulo: "Avance de Fabricación", ruta: "/reportes/avances_fabricacion", icono: <FiClipboard /> },
-  { titulo: "Ventas por Período", ruta: "/reportes/ventas_por_periodo", icono: <FiDollarSign /> },
-  { titulo: "Compras por Período", ruta: "/reportes/ordenes_compra", icono: <FiClipboard /> },
-  { titulo: "Pagos a trabajadores", ruta: "/reportes/pagos_trabajadores_dia", icono: <FiDollarSign /> },
-  { titulo: "Costos de Producción", ruta: "/reportes/costos_fabricacion", icono: <FiBarChart2 /> },
-  { titulo: "Utilidad por Orden", ruta: "/reportes/utilidad_por_orden", icono: <FiBarChart2 /> },
-  { titulo: "Movimientos de inventario", ruta: "/reportes/movimientos_inventario", icono: <FiSettings /> },
-  { titulo: "Tesorería: Ventas y Cobros", ruta: "/reportes/tesoreria_ventas", icono: <FiDollarSign /> },
-
-
+  {
+    titulo: "Reporte de Inventario",
+    ruta: "/reportes/inventario",
+    icono: <FiPackage />,
+  },
+  {
+    titulo: "Avance de Fabricación",
+    ruta: "/reportes/avances_fabricacion",
+    icono: <FiClipboard />,
+  },
+  {
+    titulo: "Ventas por Período",
+    ruta: "/reportes/ventas_por_periodo",
+    icono: <FiDollarSign />,
+  },
+  {
+    titulo: "Compras por Período",
+    ruta: "/reportes/ordenes_compra",
+    icono: <FiClipboard />,
+  },
+  {
+    titulo: "Pagos a trabajadores",
+    ruta: "/reportes/pagos_trabajadores_dia",
+    icono: <FiDollarSign />,
+  },
+  {
+    titulo: "Costos de Producción",
+    ruta: "/reportes/costos_fabricacion",
+    icono: <FiBarChart2 />,
+  },
+  {
+    titulo: "Utilidad por Orden",
+    ruta: "/reportes/utilidad_por_orden",
+    icono: <FiBarChart2 />,
+  },
+  {
+    titulo: "Movimientos de inventario",
+    ruta: "/reportes/movimientos_inventario",
+    icono: <FiSettings />,
+  },
+  {
+    titulo: "Tesorería: Ventas y Cobros",
+    ruta: "/reportes/tesoreria_ventas",
+    icono: <FiDollarSign />,
+  },
 ];
 
 const VistaReportes = () => {
@@ -21,7 +61,9 @@ const VistaReportes = () => {
 
   return (
     <div className="p-6 select-none">
-      <h1 className="text-4xl font-bold mb-6 text-gray-800">Panel de reportes</h1>
+      <h1 className="text-4xl font-bold mb-6 text-gray-800">
+        Panel de reportes
+      </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {reportes.map((reporte, idx) => (
           <Card

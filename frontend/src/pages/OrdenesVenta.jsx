@@ -88,7 +88,7 @@ const OrdenesVenta = () => {
               await api.delete(`/ordenes-venta/${id}`);
               toast.success("Registro eliminado");
               setOrdenes((prev) =>
-                prev.filter((item) => item.id_orden_venta !== id)
+                prev.filter((item) => item.id_orden_venta !== id),
               );
             } catch (error) {
               const mensajeBackend =
@@ -120,8 +120,8 @@ const OrdenesVenta = () => {
         const res = await api.get(`/detalle-orden-venta/${id}`);
         setOrdenes((prev) =>
           prev.map((o) =>
-            o.id_orden_venta === id ? { ...o, detalles: res.data } : o
-          )
+            o.id_orden_venta === id ? { ...o, detalles: res.data } : o,
+          ),
         );
       } catch (error) {
         console.error("Error al cargar detalles:", error);
@@ -159,7 +159,7 @@ const OrdenesVenta = () => {
         <div className="flex w-full md:w-280 items-center gap-4">
           <input
             type="text"
-            placeholder="Buscar por cliente"
+            placeholder="Buscar por cliente o #ID"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -292,8 +292,8 @@ const OrdenesVenta = () => {
                                 estadoDerivado === "pendiente"
                                   ? "text-red-800"
                                   : estadoDerivado === "parcial"
-                                  ? "text-slate-800"
-                                  : "text-green-800";
+                                    ? "text-slate-800"
+                                    : "text-green-800";
 
                               return (
                                 <span
@@ -303,8 +303,8 @@ const OrdenesVenta = () => {
                                   {estadoDerivado === "pendiente"
                                     ? "(PENDIENTE)"
                                     : estadoDerivado === "parcial"
-                                    ? "(PARCIAL)"
-                                    : "(PAGADO)"}
+                                      ? "(PARCIAL)"
+                                      : "(PAGADO)"}
                                 </span>
                               );
                             })()
@@ -326,7 +326,7 @@ const OrdenesVenta = () => {
                             >
                               $
                               {Number(
-                                orden.saldo_pendiente || 0
+                                orden.saldo_pendiente || 0,
                               ).toLocaleString()}
                             </span>
                           ) : (
@@ -425,7 +425,7 @@ const OrdenesVenta = () => {
                                         <td className="px-2 py-2 border-b border-gray-300">
                                           $
                                           {Number(
-                                            d.precio_unitario
+                                            d.precio_unitario,
                                           ).toLocaleString()}
                                         </td>
                                         <td className="px-2 py-2 border-b border-gray-300">

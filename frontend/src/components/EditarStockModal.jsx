@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import formateaCantidad from "../utils/formateaCantidad";
 import { FiX, FiPackage, FiAlertTriangle } from "react-icons/fi";
 
 const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
@@ -9,7 +10,20 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
 
   useEffect(() => {
     if (item) {
-      setStockDisponible(item.stock_disponible || 0);
+      // Limpiar valor inicial: solo número o string numérico limpio
+      let stockInit = item.stock_disponible;
+      if (typeof stockInit === "string") {
+        stockInit = stockInit.replace(/[^0-9.]/g, "");
+        const parts = stockInit.split(".");
+        if (parts.length > 2) {
+          stockInit = parts[0] + "." + parts.slice(1).join("");
+        }
+      }
+      if (stockInit === undefined || stockInit === null || stockInit === "")
+        stockInit = 0;
+      // Mostrar como entero si es entero, como decimal si es decimal
+      const num = Number(stockInit);
+      setStockDisponible(Number.isInteger(num) ? String(num) : String(num));
       setStockMinimo(item.stock_minimo || 0);
       setErrors({});
     }
@@ -43,10 +57,16 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
 
     setLoading(true);
     try {
+      // Limpiar y validar valores
+      let stockValue = parseFloat(stockDisponible);
+      if (isNaN(stockValue) || stockValue < 0) stockValue = 0;
+      let stockMinValue = parseInt(stockMinimo, 10);
+      if (isNaN(stockMinValue) || stockMinValue < 0) stockMinValue = 0;
+
       await onSave({
         id_articulo: item.id_articulo,
-        stock: parseInt(stockDisponible, 10),
-        stock_minimo: parseInt(stockMinimo, 10),
+        stock: stockValue,
+        stock_minimo: stockMinValue,
       });
       onClose();
     } catch (error) {
@@ -119,10 +139,22 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
               Stock Disponible
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               min="0"
-              value={stockDisponible}
-              onChange={(e) => setStockDisponible(e.target.value)}
+              value={
+                stockDisponible === "" ? "" : formateaCantidad(stockDisponible)
+              }
+              onChange={(e) => {
+                // Permitir solo números y un solo punto decimal
+                let val = e.target.value.replace(/[^0-9.]/g, "");
+                // Evitar más de un punto decimal
+                const parts = val.split(".");
+                if (parts.length > 2) {
+                  val = parts[0] + "." + parts.slice(1).join("");
+                }
+                setStockDisponible(val);
+              }}
               className={`w-full px-4 py-3 border rounded-lg text-lg font-medium transition-colors focus:outline-none focus:ring-2 ${
                 errors.stockDisponible
                   ? "border-red-300 focus:ring-red-500 focus:border-red-500"
@@ -147,10 +179,19 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
               </span>
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               min="0"
-              value={stockMinimo}
-              onChange={(e) => setStockMinimo(e.target.value)}
+              value={stockMinimo === "" ? "" : formateaCantidad(stockMinimo)}
+              onChange={(e) => {
+                // Permitir solo números y un solo punto decimal
+                let val = e.target.value.replace(/[^0-9.]/g, "");
+                const parts = val.split(".");
+                if (parts.length > 2) {
+                  val = parts[0] + "." + parts.slice(1).join("");
+                }
+                setStockMinimo(val);
+              }}
               className={`w-full px-4 py-3 border rounded-lg text-lg font-medium transition-colors focus:outline-none focus:ring-2 ${
                 errors.stockMinimo
                   ? "border-red-300 focus:ring-red-500 focus:border-red-500"

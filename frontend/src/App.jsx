@@ -70,6 +70,7 @@ import CierresCajaCerrar from "./pages/CierresCajaCerrar";
 import ProgresoFabricacion from "./pages/ProgresoFabricacion";
 import MovimientosArticuloPage from "./pages/MovimientosArticuloPage";
 import SeguimientoInventarioPage from "./pages/SeguimientoInventarioPage";
+import HistorialConsumoMP from "./pages/HistorialConsumoMP";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -158,6 +159,7 @@ const AppLogic = () => {
           path="inventario/movimientos/:id"
           element={<MovimientosArticuloPage />}
         />
+        <Route path="inventario/consumo-mp" element={<HistorialConsumoMP />} />
         <Route path="ordenes" element={<Ordenes />} />
         <Route path="ordenes_compra" element={<OrdenesCompra />} />
         <Route

@@ -990,7 +990,7 @@ const MovimientosArticuloPage = () => {
                     <button
                       onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
                       disabled={paginaActual === 1}
-                      className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="cursor-pointer p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <FiChevronLeft size={18} />
                     </button>
@@ -1030,7 +1030,7 @@ const MovimientosArticuloPage = () => {
                         setPaginaActual((p) => Math.min(totalPaginas, p + 1))
                       }
                       disabled={paginaActual === totalPaginas}
-                      className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="cursor-pointer p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <FiChevronRight size={18} />
                     </button>

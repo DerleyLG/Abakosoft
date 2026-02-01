@@ -26,6 +26,14 @@ const progresoFabricacionService = {
     const response = await api.get(`/progreso-fabricacion/orden/${idOrden}`);
     return response.data;
   },
+
+  // Obtener costos prorrateados y totales por artículo en una orden
+  getCostosPorArticulo: async (idOrden) => {
+    const response = await api.get(
+      `/progreso-fabricacion/costos-por-articulo/${idOrden}`,
+    );
+    return response.data;
+  },
 };
 
 export default progresoFabricacionService;
