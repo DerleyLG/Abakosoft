@@ -30,12 +30,12 @@ const proveedorExiste = async (id_proveedor, connection = db) => {
 
 const ordenFabricacionExiste = async (
   id_orden_fabricacion,
-  connection = db
+  connection = db,
 ) => {
   if (!id_orden_fabricacion) return true;
   const [rows] = await (connection || db).query(
     "SELECT 1 FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?",
-    [id_orden_fabricacion]
+    [id_orden_fabricacion],
   );
   return rows.length > 0;
 };
@@ -102,13 +102,13 @@ const getOrdenCompraById = async (req, res) => {
     const tesoreriaModel = require("../models/tesoreriaModel");
     const movimiento = await tesoreriaModel.getByDocumentoIdAndTipo(
       id,
-      "orden_compra"
+      "orden_compra",
     );
     let metodo_pago = null;
     if (movimiento && movimiento.id_metodo_pago) {
       const [metodos] = await require("../database/db").query(
         "SELECT * FROM metodos_pago WHERE id_metodo_pago = ?",
-        [movimiento.id_metodo_pago]
+        [movimiento.id_metodo_pago],
       );
       metodo_pago = metodos[0] || null;
     }
@@ -217,27 +217,27 @@ async function createOrdenCompra(req, res) {
         precio_unitario < 0
       ) {
         throw new Error(
-          "Cada item requiere un id_articulo, cantidad positiva y precio_unitario válido."
+          "Cada item requiere un id_articulo, cantidad positiva y precio_unitario válido.",
         );
       }
 
       const articuloInfo = await articuloModel.getById(id_articulo, connection);
       if (!articuloInfo) {
         throw new Error(
-          `El artículo con ID ${id_articulo} no existe en la base de datos de artículos.`
+          `El artículo con ID ${id_articulo} no existe en la base de datos de artículos.`,
         );
       }
 
       const inventarioArticulo =
         await inventarioModel.obtenerInventarioPorArticulo(
           id_articulo,
-          connection
+          connection,
         );
       if (!inventarioArticulo) {
         await connection.rollback();
         connection.release();
         console.log(
-          `[OrdenCompraController] Artículo ${id_articulo} no inicializado en inventario. Enviando 409.`
+          `[OrdenCompraController] Artículo ${id_articulo} no inicializado en inventario. Enviando 409.`,
         );
         return res.status(409).json({
           message: `El artículo "${articuloInfo.descripcion}" (ID: ${id_articulo}) no está inicializado en el inventario.`,
@@ -267,11 +267,11 @@ async function createOrdenCompra(req, res) {
       id_orden_fabricacion || null,
       estadoFinal,
       comprobante,
-      connection
+      connection,
     );
     if (!ordenId) {
       throw new Error(
-        "Error desconocido al crear la cabecera de la orden de compra."
+        "Error desconocido al crear la cabecera de la orden de compra.",
       );
     }
 
@@ -285,7 +285,7 @@ async function createOrdenCompra(req, res) {
           cantidad: cantidad,
           precio_unitario: precio_unitario,
         },
-        connection
+        connection,
       );
     }
     const movimientoData = {
@@ -309,12 +309,12 @@ async function createOrdenCompra(req, res) {
   } catch (error) {
     if (connection) {
       console.log(
-        "[OrdenCompraController] Error detectado. Intentando ROLLBACK de la transacción..."
+        "[OrdenCompraController] Error detectado. Intentando ROLLBACK de la transacción...",
       );
       await connection.rollback();
       connection.release();
       console.log(
-        "[OrdenCompraController] Transacción ROLLEADA y conexión liberada."
+        "[OrdenCompraController] Transacción ROLLEADA y conexión liberada.",
       );
     }
     console.error("Error creando orden de compra:", error);
@@ -341,19 +341,19 @@ async function confirmarRecepcion(req, res) {
     }
     if (orden.estado !== "pendiente") {
       throw new Error(
-        `La orden de compra #${id} no está en estado 'pendiente'. Estado actual: ${orden.estado}.`
+        `La orden de compra #${id} no está en estado 'pendiente'. Estado actual: ${orden.estado}.`,
       );
     }
 
     // Evitar duplicados: solo sumar stock y tesorería si no se ha hecho antes
     if (orden.stock_actualizado) {
       throw new Error(
-        "El stock ya fue sumado para esta orden. No se puede duplicar la operación."
+        "El stock ya fue sumado para esta orden. No se puede duplicar la operación.",
       );
     }
     if (orden.tesoreria_actualizada) {
       throw new Error(
-        "El movimiento de tesorería ya fue registrado para esta orden. No se puede duplicar la operación."
+        "El movimiento de tesorería ya fue registrado para esta orden. No se puede duplicar la operación.",
       );
     }
 
@@ -374,10 +374,10 @@ async function confirmarRecepcion(req, res) {
           referencia_documento_id: id,
           referencia_documento_tipo: "orden_compra",
         },
-        connection
+        connection,
       );
       console.log(
-        `[OrdenCompraController] Stock sumado para artículo ${detalle.id_articulo}.`
+        `[OrdenCompraController] Stock sumado para artículo ${detalle.id_articulo}.`,
       );
     }
 
@@ -401,7 +401,7 @@ async function confirmarRecepcion(req, res) {
       };
       await require("../models/tesoreriaModel").updateOrCreateMovimiento(
         movimientoData,
-        connection
+        connection,
       );
       movimientoTesoreriaCreado = true;
     }
@@ -413,7 +413,7 @@ async function confirmarRecepcion(req, res) {
         stock_actualizado: true,
         tesoreria_actualizada: movimientoTesoreriaCreado,
       },
-      connection
+      connection,
     );
 
     await connection.commit();
@@ -490,7 +490,7 @@ async function updateOrdenCompra(req, res) {
 
     // Validar que la fecha actual de la orden no esté en un período cerrado
     const fechaActualCerrada = await cierresCajaModel.validarFechaCerrada(
-      ordenActual.fecha
+      ordenActual.fecha,
     );
     if (fechaActualCerrada) {
       return res.status(400).json({
@@ -501,9 +501,8 @@ async function updateOrdenCompra(req, res) {
 
     // Si se está cambiando la fecha, validar que la nueva fecha tampoco esté cerrada
     if (fecha && fecha !== ordenActual.fecha) {
-      const nuevaFechaCerrada = await cierresCajaModel.validarFechaCerrada(
-        fecha
-      );
+      const nuevaFechaCerrada =
+        await cierresCajaModel.validarFechaCerrada(fecha);
       if (nuevaFechaCerrada) {
         return res.status(400).json({
           error:
@@ -514,13 +513,13 @@ async function updateOrdenCompra(req, res) {
 
     if (ordenActual.estado !== "pendiente") {
       throw new Error(
-        `Solo se pueden actualizar órdenes de compra en estado 'pendiente'. Estado actual: ${ordenActual.estado}.`
+        `Solo se pueden actualizar órdenes de compra en estado 'pendiente'. Estado actual: ${ordenActual.estado}.`,
       );
     }
 
     if (!Array.isArray(detalles) || detalles.length === 0) {
       throw new Error(
-        "Debe proporcionar al menos un detalle de orden de compra."
+        "Debe proporcionar al menos un detalle de orden de compra.",
       );
     }
 
@@ -538,7 +537,7 @@ async function updateOrdenCompra(req, res) {
         precio_unitario < 0
       ) {
         throw new Error(
-          "Cada detalle requiere un artículo, cantidad positiva y precio unitario válido."
+          "Cada detalle requiere un artículo, cantidad positiva y precio unitario válido.",
         );
       }
 
@@ -550,7 +549,7 @@ async function updateOrdenCompra(req, res) {
       const inventarioArticulo =
         await inventarioModel.obtenerInventarioPorArticulo(
           id_articulo,
-          connection
+          connection,
         );
       if (!inventarioArticulo) {
         await connection.rollback();
@@ -616,7 +615,7 @@ async function updateOrdenCompra(req, res) {
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
         },
-        connection
+        connection,
       );
     }
 
@@ -633,7 +632,7 @@ async function updateOrdenCompra(req, res) {
       await tesoreriaModel.updateOrCreateMovimiento(movimientoData, connection);
     } else {
       console.log(
-        `[OrdenCompraController] No se actualizó el pago para OC #${id_orden_compra} porque no se proporcionó id_metodo_pago.`
+        `[OrdenCompraController] No se actualizó el pago para OC #${id_orden_compra} porque no se proporcionó id_metodo_pago.`,
       );
     }
 
@@ -673,16 +672,17 @@ const deleteOrdenCompra = async (req, res) => {
 
     let mensajeRespuesta = "";
 
-    if (ordenExistente.estado === "pendiente") {
-      await ordenCompras.update(id, { estado: "cancelada" }, connection);
-      console.log(
-        `Orden de compra #${id} marcada como 'cancelada' (estaba pendiente).`
+    if (ordenExistente.estado === "cancelada") {
+      throw new Error(
+        `La orden de compra #${id} ya está cancelada y no puede ser modificada.`,
       );
-      mensajeRespuesta = `Orden de compra #${id} cancelada. No se generó movimiento de inventario porque la orden estaba pendiente (el stock ya fue revertido previamente o nunca se recibió).`;
-    } else if (ordenExistente.estado === "completada") {
+    }
+
+    // Revertir stock solo si la orden estaba completada
+    if (ordenExistente.estado === "completada") {
       const detalles = await detalleOrdenCompra.getByOrdenCompra(
         id,
-        connection
+        connection,
       );
       for (const detalle of detalles) {
         await inventarioModel.processInventoryMovement(
@@ -696,21 +696,79 @@ const deleteOrdenCompra = async (req, res) => {
             referencia_documento_id: id,
             referencia_documento_tipo: "cancelacion_orden_compra",
           },
-          connection
+          connection,
         );
         console.log(
-          `Stock revertido para artículo ${detalle.id_articulo} por cancelación de orden de compra ${id}: -${detalle.cantidad}`
+          `Stock revertido para artículo ${detalle.id_articulo} por cancelación de orden de compra ${id}: -${detalle.cantidad}`,
         );
       }
-      await ordenCompras.update(id, { estado: "cancelada" }, connection);
+    }
+
+    // Revertir movimiento de tesorería si existe (sin importar el estado actual)
+    // Esto cubre el caso donde la orden fue completada, luego pasó a pendiente, y ahora se cancela
+    const movimientoExistente = await tesoreriaModel.getByDocumentoIdAndTipo(
+      id,
+      "orden_compra",
+      connection,
+    );
+
+    // Verificar si ya existe una reversión para no duplicar (puede ser por cancelación o por cambio a pendiente)
+    const reversionCancelacion = await tesoreriaModel.getByDocumentoIdAndTipo(
+      id,
+      "cancelacion_orden_compra",
+      connection,
+    );
+    const reversionPendiente = await tesoreriaModel.getByDocumentoIdAndTipo(
+      id,
+      "reversion_orden_compra",
+      connection,
+    );
+
+    let tesoreriaRevertida = false;
+    if (movimientoExistente && !reversionCancelacion && !reversionPendiente) {
+      // Crear movimiento inverso (el original es negativo, este será positivo)
+      const montoReversion = Math.abs(Number(movimientoExistente.monto));
+      await tesoreriaModel.insertarMovimiento(
+        {
+          id_documento: id,
+          tipo_documento: "cancelacion_orden_compra",
+          monto: montoReversion, // Positivo para revertir el egreso
+          id_metodo_pago: movimientoExistente.id_metodo_pago,
+          referencia: `Reversión OC #${id}`,
+          observaciones: `Reversión por cancelación de orden de compra #${id}`,
+          fecha_movimiento: new Date(),
+        },
+        connection,
+      );
       console.log(
-        `Orden de compra #${id} marcada como 'cancelada' y stock revertido (estaba completada).`
+        `Movimiento de tesorería revertido para orden de compra #${id}: +${montoReversion}`,
       );
-      mensajeRespuesta = `Orden de compra #${id} cancelada y stock revertido correctamente.`;
-    } else if (ordenExistente.estado === "cancelada") {
-      throw new Error(
-        `La orden de compra #${id} ya está cancelada y no puede ser modificada.`
+      tesoreriaRevertida = true;
+    }
+
+    // Determinar si la tesorería ya estaba revertida previamente
+    const tesoreriaYaRevertida =
+      movimientoExistente && (reversionCancelacion || reversionPendiente);
+
+    await ordenCompras.update(id, { estado: "cancelada" }, connection);
+
+    if (ordenExistente.estado === "completada") {
+      console.log(
+        `Orden de compra #${id} marcada como 'cancelada' y stock revertido (estaba completada).`,
       );
+      mensajeRespuesta = `Orden de compra #${id} cancelada, stock revertido${tesoreriaRevertida ? " y movimiento de tesorería revertido" : ""} correctamente.`;
+    } else {
+      console.log(
+        `Orden de compra #${id} marcada como 'cancelada' (estaba ${ordenExistente.estado}).`,
+      );
+      let tesoreriaMsg = "";
+      if (tesoreriaRevertida) {
+        tesoreriaMsg = " y movimiento de tesorería revertido";
+      } else if (tesoreriaYaRevertida) {
+        tesoreriaMsg =
+          " (tesorería ya había sido revertida al pasar a pendiente)";
+      }
+      mensajeRespuesta = `Orden de compra #${id} cancelada${tesoreriaMsg}.`;
     }
 
     await connection.commit();
@@ -747,7 +805,7 @@ async function updateEstadoOrdenCompra(req, res) {
     // Obtener la orden actual
     const [ordenRows] = await connection.query(
       "SELECT * FROM ordenes_compra WHERE id_orden_compra = ?",
-      [id]
+      [id],
     );
     if (!ordenRows.length) {
       await connection.rollback();
@@ -761,7 +819,7 @@ async function updateEstadoOrdenCompra(req, res) {
       if (orden.stock_actualizado) {
         const detalles = await connection.query(
           "SELECT * FROM detalle_orden_compra WHERE id_orden_compra = ?",
-          [id]
+          [id],
         );
         for (const detalle of detalles[0]) {
           try {
@@ -777,7 +835,7 @@ async function updateEstadoOrdenCompra(req, res) {
                 referencia_documento_id: id,
                 referencia_documento_tipo: "reversion_orden_compra",
               },
-              connection
+              connection,
             );
           } catch (err) {
             await connection.rollback();
@@ -788,13 +846,29 @@ async function updateEstadoOrdenCompra(req, res) {
           }
         }
       }
-      // Revertir tesorería solo si estaba actualizada
-      if (orden.tesoreria_actualizada) {
-        // Eliminar el movimiento de tesorería asociado a la orden de compra
-        await require("../models/tesoreriaModel").deleteByDocumentoAndTipo(
-          id,
-          "orden_compra",
-          connection
+      // Revertir tesorería - verificar directamente si existe el movimiento (más confiable que la bandera)
+      const movimientoTesoreria = await tesoreriaModel.getByDocumentoIdAndTipo(
+        id,
+        "orden_compra",
+        connection,
+      );
+      if (movimientoTesoreria) {
+        // Crear movimiento de reversión (el original es negativo, este será positivo)
+        const montoReversion = Math.abs(Number(movimientoTesoreria.monto));
+        await tesoreriaModel.insertarMovimiento(
+          {
+            id_documento: id,
+            tipo_documento: "reversion_orden_compra",
+            monto: montoReversion, // Positivo para revertir el egreso
+            id_metodo_pago: movimientoTesoreria.id_metodo_pago,
+            referencia: `Reversión OC #${id}`,
+            observaciones: `Reversión por cambio de estado a pendiente en OC #${id}`,
+            fecha_movimiento: new Date(),
+          },
+          connection,
+        );
+        console.log(
+          `Tesorería revertida para orden de compra #${id} al cambiar a pendiente: +${montoReversion}`,
         );
       }
       // Actualizar estado y flags
@@ -805,7 +879,7 @@ async function updateEstadoOrdenCompra(req, res) {
           stock_actualizado: false,
           tesoreria_actualizada: false,
         },
-        connection
+        connection,
       );
     } else {
       // Cambio normal de estado
@@ -821,7 +895,7 @@ async function updateEstadoOrdenCompra(req, res) {
     }
     console.error(
       "Error al actualizar el estado de la orden de compra:",
-      error
+      error,
     );
     return res
       .status(500)

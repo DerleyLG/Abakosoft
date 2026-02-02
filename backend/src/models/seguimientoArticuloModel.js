@@ -151,7 +151,8 @@ module.exports = {
       FROM detalle_orden_compra doc
       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
       JOIN proveedores prov ON oc.id_proveedor = prov.id_proveedor
-      WHERE doc.id_articulo = ?${dateFilter.where}
+      WHERE doc.id_articulo = ?
+        AND oc.estado != 'cancelada'${dateFilter.where}
       ORDER BY oc.fecha DESC
       LIMIT ?
     `,

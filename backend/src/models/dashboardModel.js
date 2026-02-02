@@ -25,7 +25,7 @@ function _monthRange(offsetMonths = 0, tz = DEFAULT_TZ) {
   const startDate = new Date(y, m - 1 + offsetMonths, 1);
   const nextDate = new Date(y, m - 1 + offsetMonths + 1, 1);
   const start = `${startDate.getFullYear()}-${_pad2(
-    startDate.getMonth() + 1
+    startDate.getMonth() + 1,
   )}-01`;
   const next = `${nextDate.getFullYear()}-${_pad2(nextDate.getMonth() + 1)}-01`;
   return { start, next };
@@ -38,14 +38,14 @@ const getTotalArticulos = async () => {
 
 const getOrdenesPendientes = async () => {
   const [rows] = await db.query(
-    "SELECT COUNT(*) AS total FROM ordenes_venta WHERE estado = 'pendiente'"
+    "SELECT COUNT(*) AS total FROM ordenes_venta WHERE estado = 'pendiente'",
   );
   return rows[0].total;
 };
 
 const getTrabajadoresActivos = async () => {
   const [rows] = await db.query(
-    "SELECT COUNT(*) AS total FROM trabajadores WHERE activo = 1"
+    "SELECT COUNT(*) AS total FROM trabajadores WHERE activo = 1",
   );
   return rows[0].total;
 };
@@ -71,7 +71,7 @@ const getIngresosMes = async () => {
           OR TRIM(LOWER(mt.tipo_documento)) = 'abono_credito'
         )
     `,
-    [start, next]
+    [start, next],
   );
   return rows[0].total_ingresos;
 };
@@ -85,7 +85,7 @@ const getEgresosMes = async () => {
       FROM pagos_trabajadores
       WHERE fecha_pago >= ? AND fecha_pago < ?
     `,
-    [start, next]
+    [start, next],
   );
 
   const [[{ total_costos_indirectos }]] = await db.query(
@@ -94,7 +94,7 @@ const getEgresosMes = async () => {
       FROM costos_indirectos
       WHERE fecha >= ? AND fecha < ?
     `,
-    [start, next]
+    [start, next],
   );
 
   const [[{ total_servicios }]] = await db.query(
@@ -103,7 +103,7 @@ const getEgresosMes = async () => {
       FROM servicios_tercerizados
       WHERE fecha_inicio >= ? AND fecha_inicio < ?
     `,
-    [start, next]
+    [start, next],
   );
 
   const [[{ total_compras }]] = await db.query(
@@ -112,8 +112,9 @@ const getEgresosMes = async () => {
       FROM detalle_orden_compra doc
       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
       WHERE oc.fecha >= ? AND oc.fecha < ?
+        AND oc.estado != 'cancelada'
     `,
-    [start, next]
+    [start, next],
   );
 
   const [[{ total_materia_prima }]] = await db.query(
@@ -122,7 +123,7 @@ const getEgresosMes = async () => {
       FROM compras_materia_prima
       WHERE fecha_compra >= ? AND fecha_compra < ?
     `,
-    [start, next]
+    [start, next],
   );
 
   const egresos =
@@ -136,7 +137,7 @@ const getEgresosMes = async () => {
 
 const getPagosTrabajadoresSemana = async () => {
   const [rows] = await db.query(
-    "SELECT IFNULL(SUM(monto_total), 0) AS total_semana FROM pagos_trabajadores WHERE YEARWEEK(fecha_pago, 1) = YEARWEEK(CURDATE(), 1)"
+    "SELECT IFNULL(SUM(monto_total), 0) AS total_semana FROM pagos_trabajadores WHERE YEARWEEK(fecha_pago, 1) = YEARWEEK(CURDATE(), 1)",
   );
   return rows[0].total_semana;
 };
@@ -164,7 +165,7 @@ const getComprasSemana = async () => {
       SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
       FROM pagos_trabajadores
       WHERE YEARWEEK(fecha_pago, 1) = YEARWEEK(CURDATE(), 1)
-    `
+    `,
   );
 
   const [[{ total_costos_indirectos }]] = await db.query(
@@ -172,7 +173,7 @@ const getComprasSemana = async () => {
       SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
       FROM costos_indirectos
       WHERE YEARWEEK(fecha, 1) = YEARWEEK(CURDATE(), 1)
-    `
+    `,
   );
 
   const [[{ total_servicios }]] = await db.query(
@@ -180,7 +181,7 @@ const getComprasSemana = async () => {
       SELECT IFNULL(SUM(costo), 0) AS total_servicios
       FROM servicios_tercerizados
       WHERE YEARWEEK(fecha_inicio, 1) = YEARWEEK(CURDATE(), 1)
-    `
+    `,
   );
 
   const [[{ total_compras }]] = await db.query(
@@ -189,7 +190,8 @@ const getComprasSemana = async () => {
       FROM detalle_orden_compra doc
       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
       WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
-    `
+        AND oc.estado != 'cancelada'
+    `,
   );
 
   const [[{ total_materia_prima }]] = await db.query(
@@ -197,7 +199,7 @@ const getComprasSemana = async () => {
       SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
       FROM compras_materia_prima
       WHERE YEARWEEK(fecha_compra, 1) = YEARWEEK(CURDATE(), 1)
-    `
+    `,
   );
 
   const compras =
@@ -213,7 +215,7 @@ const getAnticiposSemana = async () => {
   const [rows] = await db.query(
     `SELECT IFNULL(SUM(monto), 0) AS total_anticipos
      FROM anticipos_trabajadores
-     WHERE YEARWEEK(fecha, 1) = YEARWEEK(CURDATE(), 1)`
+     WHERE YEARWEEK(fecha, 1) = YEARWEEK(CURDATE(), 1)`,
   );
   return rows[0].total_anticipos;
 };
@@ -224,7 +226,7 @@ const getDescuentosSemana = async () => {
      FROM detalle_pago_trabajador d
      JOIN pagos_trabajadores p ON p.id_pago = d.id_pago
      WHERE d.es_descuento = 1
-       AND YEARWEEK(p.fecha_pago, 1) = YEARWEEK(CURDATE(), 1)`
+       AND YEARWEEK(p.fecha_pago, 1) = YEARWEEK(CURDATE(), 1)`,
   );
   return rows[0].total_descuentos;
 };
@@ -244,7 +246,7 @@ const getProduccionMensual = async (year = null) => {
       ORDER BY 
         MONTH(fecha_registro) ASC
     `,
-    [y]
+    [y],
   );
   return rows;
 };
@@ -258,7 +260,7 @@ const getProduccionAnual = async (yearsBack = 5) => {
       GROUP BY YEAR(fecha_registro)
       ORDER BY YEAR(fecha_registro) ASC
     `,
-    [yearsBack]
+    [yearsBack],
   );
   return rows;
 };
@@ -278,7 +280,7 @@ const getArticulosBajoStock = async (limit = 4) => {
         i.stock <= i.stock_minimo
         LIMIT ?
     `,
-    [limit]
+    [limit],
   );
   return rows;
 };
@@ -297,7 +299,7 @@ const getOrdenesEnProceso = async (limit = 3) => {
         fecha_inicio DESC
       LIMIT ?
     `,
-    [limit]
+    [limit],
   );
   return rows;
 };
@@ -318,7 +320,7 @@ const getIngresosMesAnterior = async () => {
           OR TRIM(LOWER(mt.tipo_documento)) = 'abono_credito'
         )
     `,
-    [start, next]
+    [start, next],
   );
   return rows[0].total_ingresos;
 };
@@ -331,7 +333,7 @@ const getEgresosMesAnterior = async () => {
       FROM pagos_trabajadores
       WHERE fecha_pago >= ? AND fecha_pago < ?
     `,
-    [start, next]
+    [start, next],
   );
   const [[{ total_costos_indirectos }]] = await db.query(
     `
@@ -339,7 +341,7 @@ const getEgresosMesAnterior = async () => {
       FROM costos_indirectos
       WHERE fecha >= ? AND fecha < ?
     `,
-    [start, next]
+    [start, next],
   );
   const [[{ total_servicios }]] = await db.query(
     `
@@ -347,7 +349,7 @@ const getEgresosMesAnterior = async () => {
       FROM servicios_tercerizados
       WHERE fecha_inicio >= ? AND fecha_inicio < ?
     `,
-    [start, next]
+    [start, next],
   );
   return (
     parseFloat(total_pagos) +
@@ -367,7 +369,7 @@ const getPagosTrabajadoresSemanaAnterior = async () => {
 
 const getTopVendidosMes = async (
   limit = 5,
-  { year = null, month = null } = {}
+  { year = null, month = null } = {},
 ) => {
   const y = year || new Date().getFullYear();
   const params = [y];
@@ -388,14 +390,14 @@ const getTopVendidosMes = async (
       ORDER BY total DESC
       LIMIT ?
     `,
-    params
+    params,
   );
   return rows;
 };
 
 const getTopFabricadosMes = async (
   limit = 5,
-  { year = null, month = null } = {}
+  { year = null, month = null } = {},
 ) => {
   const y = year || new Date().getFullYear();
   const params = [y];
@@ -415,7 +417,7 @@ const getTopFabricadosMes = async (
       ORDER BY total DESC
       LIMIT ?
     `,
-    params
+    params,
   );
   return rows;
 };
