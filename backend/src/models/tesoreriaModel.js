@@ -21,12 +21,12 @@ const TesoreriaModel = {
   deleteByDocumentoAndTipo: async (
     id_documento,
     tipo_documento,
-    connection = db
+    connection = db,
   ) => {
     const conn = connection || db;
     const [result] = await conn.query(
       "DELETE FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
-      [id_documento, tipo_documento]
+      [id_documento, tipo_documento],
     );
     return result.affectedRows;
   },
@@ -48,7 +48,11 @@ const TesoreriaModel = {
     return rows;
   },
 
-  getByDocumentoIdAndTipo: async (idDocumento, tipoDocumento) => {
+  getByDocumentoIdAndTipo: async (
+    idDocumento,
+    tipoDocumento,
+    connection = null,
+  ) => {
     if (!idDocumento || !tipoDocumento) {
       throw new Error("Se requiere idDocumento y tipoDocumento.");
     }
@@ -69,7 +73,8 @@ const TesoreriaModel = {
         LIMIT 1
     `;
 
-    const [rows] = await db.query(query, [idDocumento, tipoDocumento]);
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(query, [idDocumento, tipoDocumento]);
 
     return rows.length > 0 ? rows[0] : null;
   },
@@ -86,7 +91,7 @@ const TesoreriaModel = {
     } = movimientoData;
     if (!tipo_documento) {
       throw new Error(
-        "El tipo_documento es obligatorio para registrar un movimiento de tesorería."
+        "El tipo_documento es obligatorio para registrar un movimiento de tesorería.",
       );
     }
 
@@ -172,6 +177,7 @@ const TesoreriaModel = {
         FROM detalle_orden_compra doc
         JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
         WHERE DATE_FORMAT(oc.fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+          AND oc.estado != 'cancelada'
       `);
 
       const [costosIndirectos] = await db.query(`
@@ -194,12 +200,12 @@ const TesoreriaModel = {
 
       const summary = {
         totalPagosTrabajadores: Number(
-          pagosTrabajadores[0].totalPagosTrabajadores || 0
+          pagosTrabajadores[0].totalPagosTrabajadores || 0,
         ),
         totalOrdenesCompra: Number(ordenesCompra[0].totalOrdenesCompra || 0),
         totalCostos: Number(costosIndirectos[0].totalCostos || 0),
         totalMateriaPrima: Number(
-          comprasMateriaPrima[0].totalMateriaPrima || 0
+          comprasMateriaPrima[0].totalMateriaPrima || 0,
         ),
         totalAnticipos: Number(anticipos[0].totalAnticipos || 0),
       };
@@ -221,7 +227,7 @@ const TesoreriaModel = {
   actualizarMovimiento: async (
     id_movimiento,
     movimientoData,
-    connection = db
+    connection = db,
   ) => {
     const conn = connection || db;
     const {
@@ -265,13 +271,13 @@ const TesoreriaModel = {
 
     if (!id_documento || !tipo_documento) {
       throw new Error(
-        "Se requiere id_documento y tipo_documento para buscar el movimiento asociado."
+        "Se requiere id_documento y tipo_documento para buscar el movimiento asociado.",
       );
     }
 
     const [existingRows] = await conn.query(
       "SELECT id_movimiento FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
-      [id_documento, tipo_documento]
+      [id_documento, tipo_documento],
     );
 
     if (existingRows.length > 0) {
@@ -281,14 +287,14 @@ const TesoreriaModel = {
 
       if (typeof monto === "undefined" || monto === null) {
         throw new Error(
-          "El monto es obligatorio para actualizar el movimiento."
+          "El monto es obligatorio para actualizar el movimiento.",
         );
       }
 
       const affected = await TesoreriaModel.actualizarMovimiento(
         id_movimiento,
         updatedData,
-        conn
+        conn,
       );
       return id_movimiento;
     } else {
@@ -331,7 +337,7 @@ const TesoreriaModel = {
   getAnticiposCount: async () => {
     const [result] = await db.query(
       `SELECT COUNT(*) as count FROM anticipos_trabajadores
-       WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`
+       WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`,
     );
     return result[0].count;
   },
@@ -464,7 +470,7 @@ const TesoreriaModel = {
       return rows.filter(
         (r) =>
           String(r.estado_pago).toLowerCase() ===
-          String(estado_pago).toLowerCase()
+          String(estado_pago).toLowerCase(),
       );
     }
     return rows;
