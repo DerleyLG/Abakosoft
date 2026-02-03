@@ -1,6 +1,7 @@
 const ordenesFabricacionModel = require("../models/ordenesFabricacionModel");
 const detalleOrdenFabricacionModel = require("../models/detalleOrdenFabricacionModel");
 const avanceEtapasModel = require("../models/avanceEtapasModel");
+const etapasDetalleFabricacionModel = require("../models/etapasDetalleFabricacionModel");
 
 module.exports = {
   getAll: async (req, res) => {
@@ -51,12 +52,32 @@ module.exports = {
         avanceEtapasModel.getByOrdenes(idOrdenes),
       ]);
 
+      // Obtener etapas personalizadas para todos los detalles
+      const idsDetalles = allDetalles.map((d) => d.id_detalle_fabricacion);
+      const todasEtapasPersonalizadas =
+        await etapasDetalleFabricacionModel.getByDetalles(idsDetalles);
+
+      // Agrupar etapas por detalle
+      const etapasPorDetalle = {};
+      todasEtapasPersonalizadas.forEach((ep) => {
+        if (!etapasPorDetalle[ep.id_detalle_fabricacion]) {
+          etapasPorDetalle[ep.id_detalle_fabricacion] = [];
+        }
+        etapasPorDetalle[ep.id_detalle_fabricacion].push(ep);
+      });
+
+      // Agregar etapas personalizadas a cada detalle
+      const allDetallesConEtapas = allDetalles.map((d) => ({
+        ...d,
+        etapas_personalizadas: etapasPorDetalle[d.id_detalle_fabricacion] || [],
+      }));
+
       const ordenesConTodo = data.map((orden) => {
-        const detalles = allDetalles.filter(
-          (d) => d.id_orden_fabricacion === orden.id_orden_fabricacion
+        const detalles = allDetallesConEtapas.filter(
+          (d) => d.id_orden_fabricacion === orden.id_orden_fabricacion,
         );
         const avances = allAvances.filter(
-          (a) => a.id_orden_fabricacion === orden.id_orden_fabricacion
+          (a) => a.id_orden_fabricacion === orden.id_orden_fabricacion,
         );
 
         return {
@@ -83,12 +104,9 @@ module.exports = {
       });
     } catch (error) {
       console.error("Error al obtener órdenes de fabricación:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            "Error interno del servidor al obtener órdenes de fabricación.",
-        });
+      res.status(500).json({
+        error: "Error interno del servidor al obtener órdenes de fabricación.",
+      });
     }
   },
 
@@ -106,7 +124,28 @@ module.exports = {
           .status(404)
           .json({ error: "Orden de fabricación no encontrada." });
       }
-      res.json({ ...orden, detalles, avances });
+
+      // Obtener etapas personalizadas para cada detalle
+      const idsDetalles = detalles.map((d) => d.id_detalle_fabricacion);
+      const etapasPersonalizadas =
+        await etapasDetalleFabricacionModel.getByDetalles(idsDetalles);
+
+      // Agrupar etapas por detalle
+      const etapasPorDetalle = {};
+      etapasPersonalizadas.forEach((ep) => {
+        if (!etapasPorDetalle[ep.id_detalle_fabricacion]) {
+          etapasPorDetalle[ep.id_detalle_fabricacion] = [];
+        }
+        etapasPorDetalle[ep.id_detalle_fabricacion].push(ep);
+      });
+
+      // Agregar etapas personalizadas a cada detalle
+      const detallesConEtapas = detalles.map((d) => ({
+        ...d,
+        etapas_personalizadas: etapasPorDetalle[d.id_detalle_fabricacion] || [],
+      }));
+
+      res.json({ ...orden, detalles: detallesConEtapas, avances });
     } catch (error) {
       console.error("Error en getById:", error);
       res
@@ -120,12 +159,9 @@ module.exports = {
       const { orden, detalles } = req.body;
 
       if (!orden || !Array.isArray(detalles) || detalles.length === 0) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Datos incompletos: se requiere orden y al menos un detalle.",
-          });
+        return res.status(400).json({
+          error: "Datos incompletos: se requiere orden y al menos un detalle.",
+        });
       }
 
       const {
@@ -152,19 +188,29 @@ module.exports = {
       });
 
       for (const detalle of detalles) {
-        const { id_articulo, cantidad, id_etapa_final } = detalle;
+        const { id_articulo, cantidad, id_etapa_final, etapas_personalizadas } =
+          detalle;
 
         if (!id_etapa_final || !id_articulo || !cantidad) {
           return res
             .status(400)
             .json({ error: "Faltan campos en uno o más detalles." });
         }
-        await detalleOrdenFabricacionModel.create({
-          id_orden_fabricacion,
-          id_articulo,
-          cantidad,
-          id_etapa_final,
-        });
+        const id_detalle_fabricacion =
+          await detalleOrdenFabricacionModel.create({
+            id_orden_fabricacion,
+            id_articulo,
+            cantidad,
+            id_etapa_final,
+          });
+
+        // Si tiene etapas personalizadas, guardarlas
+        if (etapas_personalizadas && etapas_personalizadas.length > 0) {
+          await etapasDetalleFabricacionModel.createMultiple(
+            id_detalle_fabricacion,
+            etapas_personalizadas,
+          );
+        }
       }
       res.status(201).json({
         message: "Orden de fabricación y detalles creados correctamente.",
@@ -225,9 +271,8 @@ module.exports = {
   existe: async (req, res) => {
     try {
       const { id_pedido } = req.params;
-      const existe = await ordenesFabricacionModel.checkIfExistsByPedidoId(
-        id_pedido
-      );
+      const existe =
+        await ordenesFabricacionModel.checkIfExistsByPedidoId(id_pedido);
       res.json({ existe });
     } catch (error) {
       console.error("Error al verificar la orden de fabricación:", error);
@@ -245,17 +290,14 @@ module.exports = {
     }
 
     try {
-      const estado = await ordenesFabricacionModel.getEstadoByPedidoId(
-        id_pedido
-      );
+      const estado =
+        await ordenesFabricacionModel.getEstadoByPedidoId(id_pedido);
 
       if (estado === "no existe") {
-        return res
-          .status(200)
-          .json({
-            estado: "no existe",
-            message: "No existe Orden de Fabricación asociada.",
-          });
+        return res.status(200).json({
+          estado: "no existe",
+          message: "No existe Orden de Fabricación asociada.",
+        });
       }
 
       res.status(200).json({ estado: estado });

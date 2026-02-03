@@ -248,6 +248,7 @@ const CrearOrdenCompra = () => {
         abreviatura_unidad:
           articulo.abreviatura_unidad || articulo.nombre_unidad || "ud",
         precio_unitario: articulo.precio_costo || 0,
+        precio_costo_original: articulo.precio_costo || 0, // Guardar precio original para comparar
       },
     ]);
     setArticuloSeleccionado(null);
@@ -760,19 +761,30 @@ const CrearOrdenCompra = () => {
                         {art.abreviatura_unidad || "ud"}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <input
-                          type="text"
-                          min="0"
-                          value={formatCOP(art.precio_unitario)}
-                          onChange={(e) =>
-                            cambiarPrecioUnitario(
-                              art.id_articulo,
-                              e.target.value,
-                            )
-                          }
-                          className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={loading}
-                        />
+                        <div className="flex flex-col items-end gap-1">
+                          <input
+                            type="text"
+                            min="0"
+                            value={formatCOP(art.precio_unitario)}
+                            onChange={(e) =>
+                              cambiarPrecioUnitario(
+                                art.id_articulo,
+                                e.target.value,
+                              )
+                            }
+                            className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading}
+                          />
+                          {art.precio_unitario !==
+                            art.precio_costo_original && (
+                            <span
+                              className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full"
+                              title={`Precio original: ${formatCOP(art.precio_costo_original)}`}
+                            >
+                              ⚠️ Actualiza costo
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button

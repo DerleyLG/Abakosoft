@@ -365,6 +365,7 @@ const progresoFabricacionModel = {
           id_orden: item.id_orden_fabricacion,
           id_articulo: item.id_articulo,
           orden_etapa_final: item.orden_etapa_final || todasEtapas.length,
+          id_etapa_final: item.id_etapa_final, // Incluir id de la etapa final
         });
       }
     });
@@ -380,19 +381,66 @@ const progresoFabricacionModel = {
       const key = `${art.id_orden}_${art.id_articulo}`;
       const etapasConAvance = detallesPorArticuloDB[key] || [];
 
-      // Crear mapa de etapas con avance
+      // Crear mapa de etapas con avance usando id_etapa como clave (no orden_etapa)
+      // para evitar conflictos cuando dos etapas tienen el mismo orden
       const etapasConAvanceMap = {};
       etapasConAvance.forEach((e) => {
-        etapasConAvanceMap[e.orden_etapa] = e;
+        const etapaKey = e.id_etapa; // Usar id_etapa en lugar de orden_etapa
+        // IMPORTANTE: Convertir cantidad a número porque MySQL puede devolverlo como string
+        const cantidadNum = Number(e.cantidad) || 0;
+
+        if (!etapasConAvanceMap[etapaKey]) {
+          // Primera vez que vemos esta etapa
+          etapasConAvanceMap[etapaKey] = {
+            ...e,
+            cantidad: cantidadNum,
+            cantidad_completada: e.estado === "completado" ? cantidadNum : 0,
+            cantidad_en_proceso: e.estado === "en proceso" ? cantidadNum : 0,
+          };
+        } else {
+          // Ya existe, sumar cantidades según estado
+          if (e.estado === "completado") {
+            etapasConAvanceMap[etapaKey].cantidad_completada += cantidadNum;
+          } else if (e.estado === "en proceso") {
+            etapasConAvanceMap[etapaKey].cantidad_en_proceso += cantidadNum;
+          }
+          // Actualizar fecha si es más reciente
+          if (e.ultima_fecha > etapasConAvanceMap[etapaKey].ultima_fecha) {
+            etapasConAvanceMap[etapaKey].ultima_fecha = e.ultima_fecha;
+          }
+        }
       });
 
+      // Calcular cantidad total y estado final para cada etapa
+      Object.values(etapasConAvanceMap).forEach((etapa) => {
+        etapa.cantidad =
+          Number(etapa.cantidad_completada) + Number(etapa.cantidad_en_proceso);
+        // El estado refleja la situación: si hay algo completado y algo en proceso, está "en proceso"
+        if (etapa.cantidad_completada > 0 && etapa.cantidad_en_proceso > 0) {
+          etapa.estado = "en proceso";
+        } else if (etapa.cantidad_completada > 0) {
+          etapa.estado = "completado";
+        } else if (etapa.cantidad_en_proceso > 0) {
+          etapa.estado = "en proceso";
+        }
+      });
+
+      // Obtener la etapa final específica para este artículo
+      const etapaFinalInfo = todasEtapas.find(
+        (e) => e.orden === art.orden_etapa_final,
+      );
+      const idEtapaFinal =
+        art.id_etapa_final || (etapaFinalInfo ? etapaFinalInfo.id_etapa : null);
+
       // Construir lista completa de etapas hasta la etapa final
+      // Incluir etapas pendientes (sin avances) para mostrar el progreso completo
       const etapasCompletas = [];
       todasEtapas.forEach((etapa) => {
+        // Solo incluir etapas hasta el orden de la etapa final
         if (etapa.orden <= art.orden_etapa_final) {
-          if (etapasConAvanceMap[etapa.orden]) {
-            // Tiene avance registrado
-            etapasCompletas.push(etapasConAvanceMap[etapa.orden]);
+          if (etapasConAvanceMap[etapa.id_etapa]) {
+            // Tiene avance registrado - usar los datos calculados
+            etapasCompletas.push(etapasConAvanceMap[etapa.id_etapa]);
           } else {
             // No tiene avance - etapa pendiente
             etapasCompletas.push({
@@ -401,13 +449,19 @@ const progresoFabricacionModel = {
               orden_etapa: etapa.orden,
               estado: "pendiente",
               cantidad: 0,
+              cantidad_completada: 0,
+              cantidad_en_proceso: 0,
               ultima_fecha: null,
             });
           }
         }
       });
 
-      detallesPorArticulo[key] = etapasCompletas;
+      detallesPorArticulo[key] = {
+        etapas: etapasCompletas,
+        id_etapa_final: idEtapaFinal,
+        orden_etapa_final: art.orden_etapa_final,
+      };
     });
 
     progreso.forEach((item) => {
@@ -447,18 +501,19 @@ const progresoFabricacionModel = {
         etapas_completadas_nombres: item.etapas_completadas_nombres || "",
         // Detalle de cada etapa con su cantidad
         detalle_etapas:
-          detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [],
+          (detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || {})
+            .etapas || [],
         estado: item.estado_progreso,
         costo_materia_prima: item.costo_materia_prima || 0,
         materia_usada_estimada: item.materia_usada_estimada || 0,
       });
 
-      // Recalcular el porcentaje de avance basado en el promedio de etapas
-      const detalleEtapas =
-        detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || [];
-      const etapasHastaFinal = detalleEtapas.filter(
-        (e) => e.orden_etapa <= (item.orden_etapa_final || 999),
-      );
+      // Recalcular el porcentaje de avance basado en las etapas completadas
+      const detalleInfo =
+        detallesPorArticulo[`${idOrden}_${item.id_articulo}`] || {};
+      const etapasDelArticulo = detalleInfo.etapas || [];
+      const ordenEtapaFinal =
+        item.orden_etapa_final || detalleInfo.orden_etapa_final || 1;
 
       // Obtener referencia al artículo recién agregado
       const articuloActual =
@@ -466,24 +521,50 @@ const progresoFabricacionModel = {
           resumenPorOrden[idOrden].articulos.length - 1
         ];
 
-      // Calcular porcentaje dividiendo entre el número de etapas REQUERIDAS (orden_etapa_final),
-      // no entre el número de etapas con registros
-      const totalEtapasRequeridas = item.orden_etapa_final || 1;
+      // El porcentaje se calcula basado en las etapas que REALMENTE tiene el artículo
+      // (las que tienen avances registrados), no todas las etapas del sistema
+      // Esto excluye etapas como "Mecanizado" que no forman parte del flujo normal
+      const etapasConAvanceReal = etapasDelArticulo.filter(
+        (e) =>
+          (e.cantidad_completada > 0 || e.cantidad_en_proceso > 0) &&
+          e.orden_etapa <= ordenEtapaFinal,
+      );
 
-      if (etapasHastaFinal.length > 0) {
-        const cantidadSolicitada = item.cantidad_solicitada || 1;
-        const sumaPorcentajes = etapasHastaFinal.reduce((sum, etapa) => {
-          const porcentajeEtapa = (etapa.cantidad / cantidadSolicitada) * 100;
-          return sum + Math.min(porcentajeEtapa, 100);
-        }, 0);
-        // Dividir entre etapas REQUERIDAS, no entre etapas con registros
-        const promedioReal = sumaPorcentajes / totalEtapasRequeridas;
+      // El total de etapas requeridas es el orden de la etapa final
+      // Pero solo contamos las etapas que realmente existen en el flujo de este artículo
+      const cantidadSolicitada = item.cantidad_solicitada || 1;
+      const totalEtapasRequeridas = ordenEtapaFinal;
+      const porcentajePorEtapa = 100 / totalEtapasRequeridas;
 
-        articuloActual.porcentaje_avance = parseFloat(promedioReal.toFixed(1));
-      } else {
-        // Si no hay etapas registradas, el porcentaje es 0
-        articuloActual.porcentaje_avance = 0;
-      }
+      let porcentajeTotal = 0;
+      etapasConAvanceReal.forEach((etapa) => {
+        const cantidadCompletada = etapa.cantidad_completada || 0;
+        const cantidadEnProceso = etapa.cantidad_en_proceso || 0;
+
+        // Calcular qué proporción de la cantidad solicitada se ha completado en esta etapa
+        const proporcionCompletada = Math.min(
+          cantidadCompletada / cantidadSolicitada,
+          1,
+        );
+        const proporcionEnProceso = Math.min(
+          cantidadEnProceso / cantidadSolicitada,
+          1,
+        );
+
+        // La etapa aporta su porcentaje proporcional
+        // Completado aporta 100%, en proceso aporta 50%
+        const aporteDelta =
+          porcentajePorEtapa *
+          (proporcionCompletada + proporcionEnProceso * 0.5);
+        porcentajeTotal += aporteDelta;
+      });
+
+      // Formatear sin decimal innecesario (100 en vez de 100.0)
+      const porcentajeFinal = Math.min(porcentajeTotal, 100);
+      articuloActual.porcentaje_avance =
+        porcentajeFinal % 1 === 0
+          ? porcentajeFinal
+          : parseFloat(porcentajeFinal.toFixed(1));
 
       resumenPorOrden[idOrden].total_articulos++;
       resumenPorOrden[idOrden].costo_materia_total += item.costo_total_estimado;
@@ -509,20 +590,29 @@ const progresoFabricacionModel = {
           (sum, art) => sum + (parseFloat(art.porcentaje_avance) || 0),
           0,
         );
-        orden.porcentaje_general = (sumaAvances / totalArticulos).toFixed(1);
+        const promedioGeneral = sumaAvances / totalArticulos;
+        // Formatear sin decimal innecesario
+        orden.porcentaje_general =
+          promedioGeneral % 1 === 0
+            ? promedioGeneral
+            : parseFloat(promedioGeneral.toFixed(1));
 
         // También mantener el porcentaje de artículos completados 100%
-        orden.porcentaje_completado = (
-          (orden.articulos_completados / totalArticulos) *
-          100
-        ).toFixed(1);
-        orden.porcentaje_materia_consumida =
+        const porcCompletado =
+          (orden.articulos_completados / totalArticulos) * 100;
+        orden.porcentaje_completado =
+          porcCompletado % 1 === 0
+            ? porcCompletado
+            : parseFloat(porcCompletado.toFixed(1));
+
+        const porcMateria =
           orden.costo_materia_total > 0
-            ? (
-                (orden.materia_usada_total / orden.costo_materia_total) *
-                100
-              ).toFixed(1)
+            ? (orden.materia_usada_total / orden.costo_materia_total) * 100
             : 0;
+        orden.porcentaje_materia_consumida =
+          porcMateria % 1 === 0
+            ? porcMateria
+            : parseFloat(porcMateria.toFixed(1));
       }
     });
 
