@@ -4,7 +4,10 @@ function formateaCantidad(valor) {
   const num = Number(valor);
   if (Number.isNaN(num)) return 0;
   if (Number.isInteger(num)) return num;
-  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
 }
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -430,24 +433,33 @@ const Inventario = () => {
                     setDrawerSeguimiento(true);
                   }}
                 >
-                  <td className="px-4 py-3 font-medium text-slate-700">
+                  <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
                     {item.referencia || "-"}
                   </td>
-                  <td
-                    className="px-4 py-3 max-w-xs truncate"
-                    title={item.descripcion}
-                  >
-                    {item.descripcion}
+                  <td className="px-4 py-3">
+                    <div
+                      className="max-w-[200px] truncate"
+                      title={item.descripcion}
+                    >
+                      {item.descripcion}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {item.abreviatura_unidad || item.nombre_unidad || "ud"}
                   </td>
-                  <td className="px-4 py-3">{formateaCantidad(item.stock_disponible)}</td>
-                  <td className="px-4 py-3">{formateaCantidad(item.stock_fabricado)}</td>
-                  <td className="px-4 py-3">{formateaCantidad(item.stock_en_proceso)}</td>
-                  <td className="px-4 py-3">{formateaCantidad(item.stock_minimo)}</td>
+                  <td className="px-4 py-3">
+                    {formateaCantidad(item.stock_disponible)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {formateaCantidad(item.stock_fabricado)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {formateaCantidad(item.stock_en_proceso)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {formateaCantidad(item.stock_minimo)}
+                  </td>
 
-                 
                   <td className="px-4 py-3">
                     {item.ultima_actualizacion
                       ? new Date(item.ultima_actualizacion).toLocaleString()

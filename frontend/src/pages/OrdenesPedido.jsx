@@ -32,7 +32,7 @@ const Pedidos = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.rol;
-  const canCreate = can(role, ACTIONS.SALES_CREATE); // crear pedido no está definido como acción; usamos SALES_CREATE por coherencia general
+  const canCreate = can(role, ACTIONS.SALES_CREATE);
   const canEdit = can(role, ACTIONS.SALES_EDIT);
   const canDelete = can(role, ACTIONS.SALES_DELETE);
 
@@ -150,7 +150,7 @@ const Pedidos = () => {
     setMostrarCancelados((prev) => !prev);
     setExpandedId(null);
     setPage(1);
-  }; // El backend filtra por cliente (buscar); no aplicamos filtros adicionales en cliente para mantener el formato.
+  };
 
   const handleCrearOrdenFabricacion = async (e, id_pedido) => {
     e.stopPropagation();
@@ -182,6 +182,7 @@ const Pedidos = () => {
       toast.error("Error al validar la orden. Inténtalo de nuevo.");
     }
   };
+
   const handleCrearOrdenVenta = async (e, id_pedido) => {
     e.stopPropagation();
 
@@ -225,15 +226,11 @@ const Pedidos = () => {
 
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-           {" "}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-               {" "}
         <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">
           Pedidos
         </h2>
-               {" "}
         <div className="flex w-full md:w-280 items-center gap-4">
-                   {" "}
           <input
             type="text"
             placeholder="Buscar por cliente o #ID"
@@ -244,17 +241,15 @@ const Pedidos = () => {
             }}
             className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
           />
-                   {" "}
           {canCreate && (
             <button
               onClick={handleCrear}
               className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
             >
-                            <FiPlus size={20} />              Nuevo pedido      
-                   {" "}
+              <FiPlus size={20} />
+              Nuevo pedido
             </button>
           )}
-                   {" "}
           <button
             onClick={toggleMostrarCancelados}
             className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
@@ -263,54 +258,41 @@ const Pedidos = () => {
                 : "bg-gray-300 hover:bg-gray-400 text-gray-800"
             }`}
           >
-                        {mostrarCancelados ? "Ver activos" : "Ver Cancelados"} 
-                   {" "}
+            {mostrarCancelados ? "Ver activos" : "Ver Cancelados"}
           </button>
-                   {" "}
           <button
             onClick={() => navigate(-1)}
             className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
           >
-                        <FiArrowLeft />            Volver          {" "}
+            <FiArrowLeft />
+            Volver
           </button>
-                 {" "}
         </div>
-             {" "}
       </div>
-           {" "}
+
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-               {" "}
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-                   {" "}
           <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-                       {" "}
             <tr>
-              <th className="px-4 py-3">ID</th>             {" "}
-              <th className="px-4 py-3">Cliente</th>             {" "}
-              <th className="px-4 py-3">Fecha</th>             {" "}
-              <th className="px-4 py-3">Monto Total</th>             {" "}
-              <th className="px-4 py-3">Estado</th>             {" "}
-              <th className="px-4 py-3">Acciones</th>           {" "}
+              <th className="px-4 py-3">ID</th>
+              <th className="px-4 py-3">Cliente</th>
+              <th className="px-4 py-3">Fecha</th>
+              <th className="px-4 py-3">Monto Total</th>
+              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Acciones</th>
             </tr>
-                     {" "}
           </thead>
-                   {" "}
           <tbody>
-                       {" "}
             {loading && (
               <tr>
-                               {" "}
                 <td colSpan="6" className="text-center py-6 text-gray-500">
                   Cargando...
                 </td>
-                             {" "}
               </tr>
             )}
-                       {" "}
             {!loading && pedidos.length > 0
               ? pedidos.map((pedido) => (
                   <React.Fragment key={pedido.id_pedido}>
-                                     {" "}
                     <tr
                       onClick={() => toggleExpand(pedido.id_pedido)}
                       className={`cursor-pointer ${
@@ -319,13 +301,9 @@ const Pedidos = () => {
                           : "hover:bg-gray-200"
                       } transition`}
                     >
-                                         {" "}
-                      <td className="px-4 py-3">{pedido.id_pedido}</td>         
-                               {" "}
-                      <td className="px-4 py-3">{pedido.cliente_nombre}</td>   
-                                     {" "}
+                      <td className="px-4 py-3">{pedido.id_pedido}</td>
+                      <td className="px-4 py-3">{pedido.cliente_nombre}</td>
                       <td className="px-4 py-3">
-                                                                     {" "}
                         {new Date(pedido.fecha_pedido).toLocaleDateString(
                           "es-ES",
                           {
@@ -334,19 +312,12 @@ const Pedidos = () => {
                             year: "numeric",
                           },
                         )}
-                                           {" "}
                       </td>
-                                         {" "}
                       <td className="px-4 py-3">
-                                              $
-                        {Number(pedido.monto_total || 0).toLocaleString()}     
-                                     {" "}
+                        ${Number(pedido.monto_total || 0).toLocaleString()}
                       </td>
-                                         {" "}
-                      <td className="px-4 py-3">{pedido.estado}</td>           
-                             {" "}
-                      <td className="pl-3 py-3 text-center flex gap-4">
-                                   
+                      <td className="px-4 py-3">{pedido.estado}</td>
+                      <td className="px-4 py-3 text-center flex gap-4">
                         {!mostrarCancelados && pedido.estado == "pendiente" && (
                           <button
                             onClick={(e) =>
@@ -355,11 +326,9 @@ const Pedidos = () => {
                             className="text-green-600 hover:text-green-400 cursor-pointer"
                             title="Crear orden de fabricación"
                           >
-                                                      <FiPackage size={18} />   
-                                               {" "}
+                            <FiPackage size={18} />
                           </button>
                         )}
-                         
                         {!mostrarCancelados &&
                           pedido.estado == "listo para entrega" && (
                             <button
@@ -369,12 +338,9 @@ const Pedidos = () => {
                               className="text-blue-600 hover:text-blue-400 cursor-pointer"
                               title="Crear orden de venta"
                             >
-                                                       {" "}
-                              <FiDollarSign size={18} />                     
-                               {" "}
+                              <FiDollarSign size={18} />
                             </button>
                           )}
-                         {" "}
                         {canEdit &&
                           !mostrarCancelados &&
                           pedido.estado == "pendiente" && (
@@ -383,11 +349,9 @@ const Pedidos = () => {
                               className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
                               title="Editar pedido"
                             >
-                                                        <FiEdit size={18} />   
-                                                 {" "}
+                              <FiEdit size={18} />
                             </button>
                           )}
-                                             {" "}
                         {canDelete && !mostrarCancelados && (
                           <button
                             onClick={(e) => {
@@ -397,19 +361,15 @@ const Pedidos = () => {
                             className="text-red-600 hover:text-red-400 cursor-pointer"
                             title="Eliminar"
                           >
-                                                      <FiTrash2 size={18} />   
-                                               {" "}
+                            <FiTrash2 size={18} />
                           </button>
                         )}
-                                             {" "}
                         {!canEdit && !canDelete && (
                           <span className="text-gray-400 italic select-none">
                             Sin permisos
                           </span>
                         )}
-                                           {" "}
                       </td>
-                                       {" "}
                     </tr>
                     {expandedId === pedido.id_pedido && (
                       <tr>
@@ -417,115 +377,79 @@ const Pedidos = () => {
                           colSpan="6"
                           className="bg-gray-100 px-6 py-4 border-b"
                         >
-                                                 {" "}
                           <div className="mt-3">
-                                                     {" "}
                             <table className="w-full text-sm">
-                                                         {" "}
                               <thead className="bg-gray-200 text-gray-700">
-                                                             {" "}
-                                <tr className="">
-                                                                 {" "}
+                                <tr>
                                   <th className="px-2 py-2 border-b border-gray-300">
                                     Artículo
                                   </th>
-                                                                 {" "}
                                   <th className="px-2 py-2 border-b border-gray-300">
                                     Cantidad
                                   </th>
-                                                                 {" "}
                                   <th className="px-2 py-2 border-b border-gray-300">
                                     Precio Unitario
                                   </th>
-                                                                 {" "}
                                   <th className="px-2 py-2 border-b border-gray-300">
                                     Subtotal
                                   </th>
-                                                               {" "}
                                 </tr>
-                                                           {" "}
                               </thead>
-                                                         {" "}
                               <tbody className="hover:bg-gray-100">
-                                                             {" "}
                                 {pedido.detalles?.length > 0 ? (
                                   pedido.detalles.map((d, i) => (
                                     <tr key={i}>
-                                                                         {" "}
-                                      <td className="px-2 py-2 border-b border-gray-300 ">
+                                      <td className="px-2 py-2 border-b border-gray-300">
                                         {d.descripcion}
                                       </td>
-                                                                         {" "}
                                       <td className="px-2 py-2 border-b border-gray-300">
                                         {d.cantidad}
                                       </td>
-                                                                         {" "}
                                       <td className="px-2 py-2 border-b border-gray-300">
                                         $
                                         {Number(
                                           d.precio_unitario,
                                         ).toLocaleString()}
                                       </td>
-                                                                         {" "}
                                       <td className="px-2 py-2 border-b border-gray-300">
                                         ${Number(d.subtotal).toLocaleString()}
                                       </td>
-                                                                       {" "}
                                     </tr>
                                   ))
                                 ) : (
                                   <tr>
-                                                                     {" "}
                                     <td
                                       colSpan="4"
                                       className="text-center py-2 text-gray-500"
                                     >
-                                                                          No hay
-                                      detalles disponibles.                    
-                                                   {" "}
+                                      No hay detalles disponibles.
                                     </td>
-                                                                   {" "}
                                   </tr>
                                 )}
-                                                           {" "}
                               </tbody>
-                                                       {" "}
                             </table>
-                                                   {" "}
                           </div>
-                                               {" "}
                         </td>
-                                           {" "}
                       </tr>
                     )}
-                                   {" "}
                   </React.Fragment>
                 ))
               : !loading && (
                   <tr>
-                                   {" "}
                     <td colSpan="6" className="text-center py-6 text-gray-500">
-                                        No se encontraron pedidos.              
-                       {" "}
+                      No se encontraron pedidos.
                     </td>
-                                 {" "}
                   </tr>
                 )}
-                     {" "}
           </tbody>
-                 {" "}
         </table>
-                {/* Paginación */}       {" "}
+        {/* Paginación */}
         <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
-                   {" "}
           <div className="text-sm text-gray-600">
             Página {page} de {totalPages} {total ? `(total: ${total})` : ""}
           </div>
-                   {" "}
           <div className="flex items-center gap-2">
-                       {" "}
-            <label className="text-sm text-gray-700">Filas por página</label>   
-                   {" "}
+            <label className="text-sm text-gray-700">Filas por página</label>
             <select
               value={pageSize}
               onChange={(e) => {
@@ -534,34 +458,28 @@ const Pedidos = () => {
               }}
               className="border border-gray-300 rounded-md px-2 py-1 h-[36px]"
             >
-                            <option value={10}>10</option>             {" "}
-              <option value={20}>20</option>             {" "}
-              <option value={50}>50</option>             {" "}
-              <option value={100}>100</option>           {" "}
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
-                       {" "}
             <button
               onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
               disabled={!hasPrev || loading}
               className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? "bg-white hover:bg-slate-100 cursor-pointer" : "bg-gray-100 cursor-not-allowed"}`}
             >
-                            Anterior            {" "}
+              Anterior
             </button>
-                       {" "}
             <button
               onClick={() => hasNext && setPage((p) => p + 1)}
               disabled={!hasNext || loading}
               className={`px-3 py-2 rounded-md border ${hasNext && !loading ? "bg-white hover:bg-slate-100 cursor-pointer" : "bg-gray-100 cursor-not-allowed"}`}
             >
-                            Siguiente            {" "}
+              Siguiente
             </button>
-                     {" "}
           </div>
-                 {" "}
         </div>
-             {" "}
       </div>
-         {" "}
     </div>
   );
 };

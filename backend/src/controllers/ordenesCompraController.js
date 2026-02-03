@@ -379,6 +379,19 @@ async function confirmarRecepcion(req, res) {
       console.log(
         `[OrdenCompraController] Stock sumado para artículo ${detalle.id_articulo}.`,
       );
+
+      // Actualizar precio de costo del artículo si difiere del precio de compra
+      const precioCompra = Number(detalle.precio_unitario) || 0;
+      const precioCostoActual = Number(detalle.precio_costo_articulo) || 0;
+      if (precioCompra > 0 && precioCompra !== precioCostoActual) {
+        await connection.query(
+          "UPDATE articulos SET precio_costo = ? WHERE id_articulo = ?",
+          [precioCompra, detalle.id_articulo],
+        );
+        console.log(
+          `[OrdenCompraController] Precio de costo actualizado para artículo ${detalle.id_articulo}: ${precioCostoActual} → ${precioCompra}`,
+        );
+      }
     }
 
     // Crear movimiento de tesorería si se envía método de pago

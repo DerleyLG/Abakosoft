@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Listbox } from "@headlessui/react";
 import { format } from "date-fns";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AsyncSelect from "react-select/async";
@@ -14,8 +14,19 @@ const CrearOrdenFabricacion = () => {
   const navigate = useNavigate();
   const [ordenesPedido, setOrdenesPedido] = useState([]);
   const [ordenPedido, setOrdenPedido] = useState(null);
-  const [fechaInicio, setFechaInicio] = useState("");
-  const [fechaFinEstimada, setFechaFinEstimada] = useState("");
+
+  // Calcular fecha actual y fecha +1 mes
+  const obtenerFechaActual = () => format(new Date(), "yyyy-MM-dd");
+  const obtenerFechaMasMes = (fechaBase) => {
+    const fecha = new Date(fechaBase);
+    fecha.setMonth(fecha.getMonth() + 1);
+    return format(fecha, "yyyy-MM-dd");
+  };
+
+  const [fechaInicio, setFechaInicio] = useState(obtenerFechaActual());
+  const [fechaFinEstimada, setFechaFinEstimada] = useState(
+    obtenerFechaMasMes(new Date()),
+  );
   const [estado, setEstado] = useState("pendiente");
   const [articulos, setArticulos] = useState([]);
   const [articulosOptions, setArticulosOptions] = useState([]);
@@ -278,8 +289,94 @@ const CrearOrdenFabricacion = () => {
         cantidad: 1,
         descripcion: "",
         id_etapa_final: idEtapaDefault || "",
+        personalizarFlujo: false,
+        etapasPersonalizadas: {},
+        mostrarConfigEtapas: false,
       },
     ]);
+  };
+
+  // Toggle para personalizar flujo de etapas
+  const togglePersonalizarFlujo = (index) => {
+    const nuevosDetalles = [...detalles];
+    const activando = !nuevosDetalles[index].personalizarFlujo;
+    nuevosDetalles[index].personalizarFlujo = activando;
+
+    // Si se activa, inicializar con todas las etapas hasta la etapa final Y mostrar el panel
+    if (activando) {
+      nuevosDetalles[index].mostrarConfigEtapas = true; // Auto-expandir el panel
+
+      if (
+        Object.keys(nuevosDetalles[index].etapasPersonalizadas || {}).length ===
+        0
+      ) {
+        const etapaFinalOrden =
+          etapasProduccion.find(
+            (e) =>
+              e.id_etapa === parseInt(nuevosDetalles[index].id_etapa_final),
+          )?.orden || 999;
+        const etapasIniciales = {};
+        etapasProduccion
+          .filter((e) => e.orden <= etapaFinalOrden)
+          .forEach((e, idx) => {
+            etapasIniciales[e.id_etapa] = { orden: idx + 1, activa: true };
+          });
+        nuevosDetalles[index].etapasPersonalizadas = etapasIniciales;
+      }
+    }
+
+    setDetalles(nuevosDetalles);
+  };
+
+  // Toggle etapa individual
+  const toggleEtapaPersonalizada = (detalleIndex, idEtapa) => {
+    const nuevosDetalles = [...detalles];
+    const etapas = nuevosDetalles[detalleIndex].etapasPersonalizadas || {};
+
+    if (etapas[idEtapa]?.activa) {
+      etapas[idEtapa] = { ...etapas[idEtapa], activa: false };
+    } else {
+      const ordenesActivos = Object.values(etapas)
+        .filter((e) => e.activa)
+        .map((e) => e.orden);
+      const siguienteOrden =
+        ordenesActivos.length > 0 ? Math.max(...ordenesActivos) + 1 : 1;
+      etapas[idEtapa] = { orden: siguienteOrden, activa: true };
+    }
+
+    nuevosDetalles[detalleIndex].etapasPersonalizadas = { ...etapas };
+    setDetalles(nuevosDetalles);
+  };
+
+  // Cambiar orden de etapa
+  const cambiarOrdenEtapa = (detalleIndex, idEtapa, nuevoOrden) => {
+    const nuevosDetalles = [...detalles];
+    const etapas = nuevosDetalles[detalleIndex].etapasPersonalizadas || {};
+    if (etapas[idEtapa]) {
+      etapas[idEtapa] = {
+        ...etapas[idEtapa],
+        orden: parseInt(nuevoOrden) || 1,
+      };
+    }
+    nuevosDetalles[detalleIndex].etapasPersonalizadas = { ...etapas };
+    setDetalles(nuevosDetalles);
+  };
+
+  // Obtener flujo visual de etapas
+  const obtenerFlujoEtapas = (detalleIndex) => {
+    const detalle = detalles[detalleIndex];
+    if (!detalle.personalizarFlujo || !detalle.etapasPersonalizadas) return [];
+
+    return Object.entries(detalle.etapasPersonalizadas)
+      .filter(([_, data]) => data.activa)
+      .sort((a, b) => a[1].orden - b[1].orden)
+      .map(([idEtapa, data]) => ({
+        id_etapa: parseInt(idEtapa),
+        nombre:
+          etapasProduccion.find((e) => e.id_etapa === parseInt(idEtapa))
+            ?.nombre || "Desconocida",
+        orden: data.orden,
+      }));
   };
 
   const validarFormulario = () => {
@@ -310,12 +407,34 @@ const CrearOrdenFabricacion = () => {
           fecha_fin_estimada: fechaFinEstimada || null,
           estado,
         },
-        detalles: detalles.map((d) => ({
-          id_articulo: d.articulo.id_articulo,
-          cantidad: d.cantidad,
-          descripcion: d.descripcion || "Sin descripción",
-          id_etapa_final: parseInt(d.id_etapa_final),
-        })),
+        detalles: detalles.map((d) => {
+          const detalle = {
+            id_articulo: d.articulo.id_articulo,
+            cantidad: d.cantidad,
+            descripcion: d.descripcion || "Sin descripción",
+            id_etapa_final: parseInt(d.id_etapa_final),
+          };
+
+          // Si tiene flujo personalizado, incluir las etapas
+          if (d.personalizarFlujo && d.etapasPersonalizadas) {
+            const etapasActivas = Object.entries(d.etapasPersonalizadas)
+              .filter(([_, data]) => data.activa)
+              .map(([idEtapa, data]) => ({
+                id_etapa: parseInt(idEtapa),
+                orden: data.orden,
+              }))
+              .sort((a, b) => a.orden - b.orden);
+
+            if (etapasActivas.length > 0) {
+              detalle.etapas_personalizadas = etapasActivas;
+              // La etapa final es la última del flujo personalizado
+              detalle.id_etapa_final =
+                etapasActivas[etapasActivas.length - 1].id_etapa;
+            }
+          }
+
+          return detalle;
+        }),
       };
 
       await api.post("/ordenes-fabricacion", payload);
@@ -502,9 +621,18 @@ const CrearOrdenFabricacion = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Etapa final
+                    {detalle.personalizarFlujo && (
+                      <span className="text-xs text-amber-600 ml-2">
+                        (usando flujo personalizado)
+                      </span>
+                    )}
                   </label>
                   <select
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                    className={`w-full border rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
+                      detalle.personalizarFlujo
+                        ? "border-amber-300 bg-amber-50 text-gray-500 line-through cursor-not-allowed"
+                        : "border-gray-300"
+                    }`}
                     value={detalle.id_etapa_final || ""}
                     onChange={(e) =>
                       handleDetalleChange(
@@ -512,6 +640,12 @@ const CrearOrdenFabricacion = () => {
                         "id_etapa_final",
                         e.target.value,
                       )
+                    }
+                    disabled={detalle.personalizarFlujo}
+                    title={
+                      detalle.personalizarFlujo
+                        ? "El flujo se define en la configuración personalizada"
+                        : ""
                     }
                   >
                     <option value="">Seleccionar etapa final</option>
@@ -537,6 +671,138 @@ const CrearOrdenFabricacion = () => {
                     className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
                   />
                 </div>
+
+                {/* Configuración de flujo de etapas */}
+                <div className="col-span-6 mt-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`personalizar-flujo-${index}`}
+                      checked={detalle.personalizarFlujo || false}
+                      onChange={() => togglePersonalizarFlujo(index)}
+                      className="w-4 h-4 text-slate-600 rounded border-gray-300 focus:ring-slate-500"
+                    />
+                    <label
+                      htmlFor={`personalizar-flujo-${index}`}
+                      className="text-sm font-medium text-gray-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Settings size={16} className="text-slate-500" />
+                      Personalizar flujo de etapas
+                    </label>
+                    {detalle.personalizarFlujo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nuevosDetalles = [...detalles];
+                          nuevosDetalles[index].mostrarConfigEtapas =
+                            !nuevosDetalles[index].mostrarConfigEtapas;
+                          setDetalles(nuevosDetalles);
+                        }}
+                        className="ml-2 text-slate-500 hover:text-slate-700"
+                      >
+                        {detalle.mostrarConfigEtapas ? (
+                          <ChevronUp size={18} />
+                        ) : (
+                          <ChevronDown size={18} />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Panel de configuración expandible */}
+                  {detalle.personalizarFlujo && detalle.mostrarConfigEtapas && (
+                    <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-sm text-gray-600 mb-3">
+                        Selecciona las etapas que aplican para este artículo y
+                        asigna el orden:
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {etapasProduccion.map((etapa) => {
+                          const etapaConfig =
+                            detalle.etapasPersonalizadas?.[etapa.id_etapa];
+                          const isActiva = etapaConfig?.activa || false;
+                          return (
+                            <div
+                              key={etapa.id_etapa}
+                              className={`p-3 rounded-lg border-2 transition-all ${
+                                isActiva
+                                  ? "border-slate-500 bg-white shadow-sm"
+                                  : "border-gray-200 bg-gray-50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isActiva}
+                                  onChange={() =>
+                                    toggleEtapaPersonalizada(
+                                      index,
+                                      etapa.id_etapa,
+                                    )
+                                  }
+                                  className="w-4 h-4 text-slate-600 rounded"
+                                />
+                                <span
+                                  className={`text-sm font-medium ${isActiva ? "text-slate-700" : "text-gray-400"}`}
+                                >
+                                  {etapa.nombre}
+                                </span>
+                              </div>
+                              {isActiva && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-gray-500">
+                                    Orden:
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={etapaConfig?.orden || 1}
+                                    onChange={(e) =>
+                                      cambiarOrdenEtapa(
+                                        index,
+                                        etapa.id_etapa,
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-14 text-center border border-gray-300 rounded px-2 py-1 text-sm"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Previsualización del flujo */}
+                  {detalle.personalizarFlujo &&
+                    obtenerFlujoEtapas(index).length > 0 && (
+                      <div className="mt-3 p-3 bg-gradient-to-r from-slate-100 to-slate-50 rounded-lg border border-slate-200">
+                        <p className="text-xs text-gray-500 mb-2 font-medium">
+                          Flujo de producción:
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {obtenerFlujoEtapas(index).map((etapa, idx, arr) => (
+                            <div
+                              key={etapa.id_etapa}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="px-3 py-1.5 bg-white border border-slate-300 rounded-full text-sm font-medium text-slate-700 shadow-sm">
+                                {idx + 1}. {etapa.nombre}
+                              </span>
+                              {idx < arr.length - 1 && (
+                                <span className="text-slate-400 font-bold">
+                                  →
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                </div>
+
                 {detalle.mensajeError && (
                   <div
                     className="col-span-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"

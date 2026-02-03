@@ -594,25 +594,116 @@ module.exports = {
     cantidadSolicitada,
     connection = db,
   ) => {
-    const [etapaActual] = await (connection || db).query(
-      `SELECT orden FROM etapas_produccion WHERE id_etapa = ?`,
-      [id_etapa],
+    const conn = connection || db;
+
+    // Obtener el detalle de fabricación para este artículo y orden
+    const [[detalleInfo]] = await conn.query(
+      `SELECT id_detalle_fabricacion, cantidad 
+       FROM detalle_orden_fabricacion
+       WHERE id_orden_fabricacion = ? AND id_articulo = ?`,
+      [id_orden_fabricacion, id_articulo],
     );
 
-    if (!etapaActual.length || etapaActual[0].orden === 1) {
-      const [[detalle]] = await (connection || db).query(
-        `SELECT cantidad FROM detalle_orden_fabricacion
-         WHERE id_orden_fabricacion = ? AND id_articulo = ?`,
-        [id_orden_fabricacion, id_articulo],
+    if (!detalleInfo) {
+      return { permitido: false, disponible: 0 };
+    }
+
+    // Verificar si tiene flujo de etapas personalizado
+    const [etapasPersonalizadas] = await conn.query(
+      `SELECT id_etapa, orden 
+       FROM etapas_detalle_fabricacion 
+       WHERE id_detalle_fabricacion = ? 
+       ORDER BY orden ASC`,
+      [detalleInfo.id_detalle_fabricacion],
+    );
+
+    // Si tiene flujo personalizado, usarlo
+    if (etapasPersonalizadas.length > 0) {
+      // Encontrar la etapa actual en el flujo personalizado
+      const etapaEnFlujo = etapasPersonalizadas.find(
+        (e) => e.id_etapa === id_etapa,
       );
 
-      const [[sumaActual]] = await (connection || db).query(
+      if (!etapaEnFlujo) {
+        // La etapa no está en el flujo personalizado
+        return { permitido: false, disponible: 0 };
+      }
+
+      // Encontrar el orden mínimo (primera etapa) del flujo personalizado
+      const ordenMinimo = Math.min(...etapasPersonalizadas.map((e) => e.orden));
+
+      // Si es la primera etapa del flujo personalizado (tiene el orden mínimo)
+      if (etapaEnFlujo.orden === ordenMinimo) {
+        const [[sumaActual]] = await conn.query(
+          `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
+           WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
+          [id_orden_fabricacion, id_articulo, id_etapa],
+        );
+
+        const totalDisponible = detalleInfo.cantidad - (sumaActual.total || 0);
+
+        return {
+          permitido: cantidadSolicitada <= totalDisponible,
+          disponible: totalDisponible,
+        };
+      }
+
+      // Buscar la etapa anterior en el flujo personalizado
+      // (la que tenga el orden inmediatamente menor al de la etapa actual)
+      const ordenesAnteriores = etapasPersonalizadas
+        .filter((e) => e.orden < etapaEnFlujo.orden)
+        .map((e) => e.orden);
+
+      if (ordenesAnteriores.length === 0) {
+        // No hay etapa anterior, esto no debería pasar si el ordenMinimo funciona bien
+        return { permitido: false, disponible: 0 };
+      }
+
+      const ordenAnterior = Math.max(...ordenesAnteriores);
+      const etapaAnteriorEnFlujo = etapasPersonalizadas.find(
+        (e) => e.orden === ordenAnterior,
+      );
+
+      if (!etapaAnteriorEnFlujo) {
+        return { permitido: false, disponible: 0 };
+      }
+
+      const id_etapa_anterior = etapaAnteriorEnFlujo.id_etapa;
+
+      const [[completadas]] = await conn.query(
+        `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
+         WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
+        [id_orden_fabricacion, id_articulo, id_etapa_anterior],
+      );
+
+      const [[usadas]] = await conn.query(
         `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
          WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
         [id_orden_fabricacion, id_articulo, id_etapa],
       );
 
-      const totalDisponible = detalle.cantidad - (sumaActual.total || 0);
+      const disponibles = (completadas.total || 0) - (usadas.total || 0);
+
+      return {
+        permitido: cantidadSolicitada <= disponibles,
+        disponible: disponibles,
+      };
+    }
+
+    // Flujo estándar (sin personalización)
+    const [etapaActual] = await conn.query(
+      `SELECT orden FROM etapas_produccion WHERE id_etapa = ?`,
+      [id_etapa],
+    );
+
+    if (!etapaActual.length || etapaActual[0].orden === 1) {
+      const [[sumaActual]] = await conn.query(
+        `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
+         WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
+        [id_orden_fabricacion, id_articulo, id_etapa],
+      );
+
+      const totalDisponible = detalleInfo.cantidad - (sumaActual.total || 0);
 
       return {
         permitido: cantidadSolicitada <= totalDisponible,
@@ -620,20 +711,20 @@ module.exports = {
       };
     }
 
-    const [[etapaAnterior]] = await (connection || db).query(
+    const [[etapaAnterior]] = await conn.query(
       `SELECT id_etapa FROM etapas_produccion WHERE orden = ?`,
       [etapaActual[0].orden - 1],
     );
 
     const id_etapa_anterior = etapaAnterior.id_etapa;
 
-    const [[completadas]] = await (connection || db).query(
+    const [[completadas]] = await conn.query(
       `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
       [id_orden_fabricacion, id_articulo, id_etapa_anterior],
     );
 
-    const [[usadas]] = await (connection || db).query(
+    const [[usadas]] = await conn.query(
       `SELECT SUM(cantidad) as total FROM avance_etapas_produccion
        WHERE id_orden_fabricacion = ? AND id_articulo = ? AND id_etapa_produccion = ?`,
       [id_orden_fabricacion, id_articulo, id_etapa],

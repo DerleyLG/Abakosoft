@@ -68,6 +68,7 @@ const ListaOrdenesFabricacion = () => {
   const canDelete = can(role, ACTIONS.FABRICATION_DELETE);
   const yaConsultadoCosto = useRef({});
   const historialCostos = useRef({});
+  const formularioAvanceRef = useRef(null);
   const costoManualEditado = useRef({});
   const [editandoCosto, setEditandoCosto] = useState({});
   const [editandoAvanceCosto, setEditandoAvanceCosto] = useState({});
@@ -168,6 +169,22 @@ const ListaOrdenesFabricacion = () => {
       }
     }
   }, [ordenes, mostrarFormularioAvance]);
+
+  // Scroll y focus al formulario de avance cuando se abre
+  useEffect(() => {
+    if (mostrarFormularioAvance && formularioAvanceRef.current) {
+      setTimeout(() => {
+        formularioAvanceRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        // Focus en el primer select del formulario
+        const primerSelect =
+          formularioAvanceRef.current?.querySelector("select");
+        if (primerSelect) primerSelect.focus();
+      }, 100);
+    }
+  }, [mostrarFormularioAvance]);
 
   useEffect(() => {
     const fetchOrdenes = async () => {
@@ -345,21 +362,47 @@ const ListaOrdenesFabricacion = () => {
         }, {});
 
       const etapasDisponiblesParaArticulo = [];
-      const etapasOrdenadas = etapas.sort((a, b) => a.orden - b.orden);
 
-      for (const etapa of etapasOrdenadas) {
-        // Verifica si la etapa está en el proceso de producción del artículo
-        if (
-          etapa.orden <= etapas.find((e) => e.value === idEtapaFinal)?.orden
-        ) {
-          const cantidadAvanzadaEnEstaEtapa = avancesPorEtapa[etapa.value] || 0;
-          // Si la cantidad avanzada en esta etapa es MENOR que la cantidad total
-          // requerida, la etapa está disponible.
-          if (cantidadAvanzadaEnEstaEtapa < cantidadTotalRequerida) {
-            etapasDisponiblesParaArticulo.push(etapa);
+      // Verificar si el artículo tiene etapas personalizadas
+      const tieneEtapasPersonalizadas =
+        articuloSeleccionado.etapas_personalizadas &&
+        articuloSeleccionado.etapas_personalizadas.length > 0;
+
+      if (tieneEtapasPersonalizadas) {
+        // Usar solo las etapas personalizadas del artículo
+        const etapasPersonalizadasOrdenadas = [
+          ...articuloSeleccionado.etapas_personalizadas,
+        ].sort((a, b) => a.orden - b.orden);
+
+        for (const etapaPersonalizada of etapasPersonalizadasOrdenadas) {
+          const etapaInfo = etapas.find(
+            (e) => e.value === etapaPersonalizada.id_etapa,
+          );
+          if (etapaInfo) {
+            const cantidadAvanzadaEnEstaEtapa =
+              avancesPorEtapa[etapaInfo.value] || 0;
+            if (cantidadAvanzadaEnEstaEtapa < cantidadTotalRequerida) {
+              etapasDisponiblesParaArticulo.push(etapaInfo);
+            }
+          }
+        }
+      } else {
+        // Usar el flujo estándar basado en orden de etapas
+        const etapasOrdenadas = [...etapas].sort((a, b) => a.orden - b.orden);
+
+        for (const etapa of etapasOrdenadas) {
+          if (
+            etapa.orden <= etapas.find((e) => e.value === idEtapaFinal)?.orden
+          ) {
+            const cantidadAvanzadaEnEstaEtapa =
+              avancesPorEtapa[etapa.value] || 0;
+            if (cantidadAvanzadaEnEstaEtapa < cantidadTotalRequerida) {
+              etapasDisponiblesParaArticulo.push(etapa);
+            }
           }
         }
       }
+
       setEtapasDisponibles((prev) => ({
         ...prev,
         [idOrden]: etapasDisponiblesParaArticulo,
@@ -1527,7 +1570,10 @@ const ListaOrdenesFabricacion = () => {
                         {mostrarFormularioAvance ===
                           orden.id_orden_fabricacion &&
                           !esOrdenCompletada(orden.estado) && (
-                            <div className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200">
+                            <div
+                              ref={formularioAvanceRef}
+                              className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200 animate-fade-in-up"
+                            >
                               <form
                                 onSubmit={(e) => {
                                   e.preventDefault();
