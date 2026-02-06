@@ -743,7 +743,20 @@ const CrearOrdenCompra = () => {
                       key={art.id_articulo}
                       className="border-t border-gray-200"
                     >
-                      <td className="px-4 py-2">{art.descripcion}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <span>{art.descripcion}</span>
+                          {art.precio_unitario !==
+                            art.precio_costo_original && (
+                            <span
+                              className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 pointer-events-none shadow-sm"
+                              title={`Precio original: ${formatCOP(art.precio_costo_original)}`}
+                            >
+                              se actualizará costo
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2 text-right">
                         <input
                           type="number"
@@ -761,30 +774,19 @@ const CrearOrdenCompra = () => {
                         {art.abreviatura_unidad || "ud"}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <input
-                            type="text"
-                            min="0"
-                            value={formatCOP(art.precio_unitario)}
-                            onChange={(e) =>
-                              cambiarPrecioUnitario(
-                                art.id_articulo,
-                                e.target.value,
-                              )
-                            }
-                            className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={loading}
-                          />
-                          {art.precio_unitario !==
-                            art.precio_costo_original && (
-                            <span
-                              className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full"
-                              title={`Precio original: ${formatCOP(art.precio_costo_original)}`}
-                            >
-                              se actualizará costo
-                            </span>
-                          )}
-                        </div>
+                        <input
+                          type="text"
+                          min="0"
+                          value={formatCOP(art.precio_unitario)}
+                          onChange={(e) =>
+                            cambiarPrecioUnitario(
+                              art.id_articulo,
+                              e.target.value,
+                            )
+                          }
+                          className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={loading}
+                        />
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button

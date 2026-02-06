@@ -829,43 +829,54 @@ const EditarOrdenCompra = () => {
                 <label className="mb-1 font-medium text-sm text-slate-700">
                   Artículo
                 </label>
-                <AsyncSelect
-                  cacheOptions
-                  loadOptions={loadArticulosOptions}
-                  defaultOptions={articulosOptions}
-                  value={
-                    articulosOptions.find(
-                      (opt) => opt.value === detalle.id_articulo,
-                    ) || null
-                  }
-                  onChange={(option) => {
-                    const syntheticEvent = {
-                      target: {
-                        name: "id_articulo",
-                        value: option ? option.value : "",
-                      },
-                    };
-                    handleDetalleChange(index, syntheticEvent);
-                  }}
-                  placeholder="Busca o selecciona un artículo..."
-                  isClearable
-                  isDisabled={!isEditable}
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderColor: "#d1d5db",
-                      boxShadow: "none",
-                      "&:hover": { borderColor: "#64748b" },
-                      borderRadius: "0.5rem",
-                    }),
-                    menuList: (base) => ({
-                      ...base,
-                      maxHeight: "250px",
-                    }),
-                  }}
-                  noOptionsMessage={() => "No se encontraron artículos"}
-                  loadingMessage={() => "Cargando artículos..."}
-                />
+                <div className="flex items-center gap-2">
+                  <AsyncSelect
+                    cacheOptions
+                    loadOptions={loadArticulosOptions}
+                    defaultOptions={articulosOptions}
+                    value={
+                      articulosOptions.find(
+                        (opt) => opt.value === detalle.id_articulo,
+                      ) || null
+                    }
+                    onChange={(option) => {
+                      const syntheticEvent = {
+                        target: {
+                          name: "id_articulo",
+                          value: option ? option.value : "",
+                        },
+                      };
+                      handleDetalleChange(index, syntheticEvent);
+                    }}
+                    placeholder="Busca o selecciona un artículo..."
+                    isClearable
+                    isDisabled={!isEditable}
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderColor: "#d1d5db",
+                        boxShadow: "none",
+                        "&:hover": { borderColor: "#64748b" },
+                        borderRadius: "0.5rem",
+                      }),
+                      menuList: (base) => ({
+                        ...base,
+                        maxHeight: "250px",
+                      }),
+                    }}
+                    noOptionsMessage={() => "No se encontraron artículos"}
+                    loadingMessage={() => "Cargando artículos..."}
+                  />
+                  {detalle.precio_unitario !== detalle.precio_costo_original &&
+                    detalle.precio_costo_original !== undefined && (
+                      <span
+                        className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 pointer-events-none shadow-sm"
+                        title={`Precio costo actual: ${formatCurrency(detalle.precio_costo_original)}`}
+                      >
+                        se actualizará costo
+                      </span>
+                    )}
+                </div>
               </div>
 
               {/* Cantidad */}
@@ -906,15 +917,6 @@ const EditarOrdenCompra = () => {
                       className="border border-gray-300 rounded-lg pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full h-[44px] min-w-[250px]"
                     />
                   </div>
-                  {detalle.precio_unitario !== detalle.precio_costo_original &&
-                    detalle.precio_costo_original !== undefined && (
-                      <span
-                        className="mt-1 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full w-fit"
-                        title={`Precio costo actual: ${formatCurrency(detalle.precio_costo_original)}`}
-                      >
-                        ⚠️ Se actualizará el costo del artículo
-                      </span>
-                    )}
                 </div>
                 <div className="flex flex-col flex-1 justify-end">
                   <label className="mb-1 font-medium text-sm text-slate-700">
