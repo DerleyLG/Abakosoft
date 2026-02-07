@@ -426,10 +426,12 @@ const CrearOrdenCompra = () => {
         "Error creando orden de compra",
         error.response?.data || error.message,
       );
-      toast.error(
+      // Mostrar mensaje específico si viene del backend (error o message)
+      const msg =
+        error.response?.data?.error ||
         error.response?.data?.message ||
-          "Error interno al crear la orden de compra",
-      );
+        "Error interno al crear la orden de compra";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
