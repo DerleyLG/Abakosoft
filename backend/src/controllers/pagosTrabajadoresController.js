@@ -1,9 +1,11 @@
 const db = require("../database/db");
-const pagosModel = require("../models/pagosTrabajadoresModel"); // Tu modelo de pagos
-const detalleModel = require("../models/detallePagoTrabajadorModel"); // Tu modelo de detalles de pago
-const trabajadorModel = require("../models/trabajadoresModel"); // Tu modelo de trabajadores
-const avanceEtapasModel = require("../models/avanceEtapasModel"); // Tu modelo de avances de etapa
-const AnticiposModel = require("../models/anticiposModel"); // Tu modelo de anticipos
+const pagosModel = require("../models/pagosTrabajadoresModel");
+const detalleModel = require("../models/detallePagoTrabajadorModel");
+const trabajadorModel = require("../models/trabajadoresModel");
+const avanceEtapasModel = require("../models/avanceEtapasModel");
+const AnticiposModel = require("../models/anticiposModel");
+const tesoreriaModel = require("../models/tesoreriaModel");
+
 const {
   validarFechaNoEnPeriodoCerrado,
 } = require("../utils/validacionCierres");
@@ -81,7 +83,6 @@ module.exports = {
         referencia,
         observaciones_pago,
         detalles,
-        appliedAnticipos = [], // [{ id_anticipo, id_orden_fabricacion, monto_aplicado }]
       } = req.body;
 
       // Validar que la fecha no esté en un período cerrado
@@ -122,10 +123,10 @@ module.exports = {
       const avancesIds = detalles
         .filter((d) => !d.es_descuento)
         .map((d) => d.id_avance_etapa);
-      if (avancesIds.length === 0 && appliedAnticipos.length === 0) {
+      if (avancesIds.length === 0 && !detalles.some((d) => d.es_descuento)) {
         await connection.rollback();
         return res.status(400).json({
-          error: "Debe incluir al menos un avance o un anticipo aplicado.",
+          error: "Debe incluir al menos un avance o un descuento por anticipo.",
         });
       }
       if (avancesIds.length) {
@@ -134,7 +135,7 @@ module.exports = {
           `SELECT id_avance_etapa, id_trabajador, id_orden_fabricacion, pagado
            FROM avance_etapas_produccion
            WHERE id_avance_etapa IN (${placeholders})`,
-          avancesIds
+          avancesIds,
         );
         if (avances.length !== avancesIds.length) {
           await connection.rollback();
@@ -150,7 +151,7 @@ module.exports = {
             .json({ error: "Uno o más avances ya fueron pagados." });
         }
         const mismoTrabajador = avances.every(
-          (a) => a.id_trabajador === id_trabajador
+          (a) => a.id_trabajador === id_trabajador,
         );
         if (!mismoTrabajador) {
           await connection.rollback();
@@ -169,11 +170,11 @@ module.exports = {
         fecha_pago,
       });
 
-      // Insertar detalles de avances y marcar pagados
+      // Insertar detalles (avances y descuentos) y aplicar descuentos de anticipos desde detalles
       for (const d of detalles) {
         const esDescuento = d.es_descuento === true;
         if (!esDescuento) {
-          // Validar la fila específica del avance (opcional redundante por el batch de arriba)
+          // Validar la fila específica del avance
           const avance = await avanceEtapasModel.getById(d.id_avance_etapa);
           if (!avance) {
             await connection.rollback();
@@ -194,49 +195,71 @@ module.exports = {
             });
           }
 
-          await connection.query(
-            `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento)
-             VALUES (?, ?, ?, ?, 0)`,
-            [id_pago, d.id_avance_etapa, d.cantidad, d.pago_unitario]
+          const idDetalle = await detalleModel.create(
+            {
+              id_pago,
+              id_avance_etapa: d.id_avance_etapa,
+              cantidad: d.cantidad,
+              pago_unitario: d.pago_unitario,
+              es_descuento: 0,
+            },
+            connection,
           );
+          console.log("Insert detalle avance, id generado:", idDetalle);
           await avanceEtapasModel.updatePagado(
             d.id_avance_etapa,
             1,
-            connection
+            connection,
+          );
+        } else {
+          // Descuento por anticipo: validar orden y descontar el anticipo
+          if (!d.id_orden_fabricacion) {
+            await connection.rollback();
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Falta id_orden_fabricacion en el descuento por anticipo.",
+              });
+          }
+          const anticipo = await AnticiposModel.getActivo(
+            id_trabajador,
+            d.id_orden_fabricacion,
+          );
+          if (!anticipo) {
+            await connection.rollback();
+            return res
+              .status(400)
+              .json({
+                error: `No hay anticipo activo para la orden ${d.id_orden_fabricacion}.`,
+              });
+          }
+          const disponible =
+            Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
+          if (Math.abs(d.pago_unitario) > disponible) {
+            await connection.rollback();
+            return res
+              .status(400)
+              .json({
+                error: `El descuento supera el saldo disponible del anticipo para la orden ${d.id_orden_fabricacion}.`,
+              });
+          }
+          const idDetalle = await detalleModel.create(
+            {
+              id_pago,
+              id_avance_etapa: null,
+              cantidad: d.cantidad,
+              pago_unitario: d.pago_unitario,
+              es_descuento: 1,
+            },
+            connection,
+          );
+          console.log("Insert detalle descuento, id generado:", idDetalle);
+          await AnticiposModel.descontar(
+            anticipo.id_anticipo,
+            Math.abs(d.pago_unitario),
           );
         }
-      }
-
-      // Aplicar anticipos por orden de forma segura
-      for (const a of appliedAnticipos) {
-        const anticipo = await AnticiposModel.getActivo(
-          id_trabajador,
-          a.id_orden_fabricacion
-        );
-        if (!anticipo) {
-          await connection.rollback();
-          return res.status(400).json({
-            error: `No hay anticipo activo para la orden ${a.id_orden_fabricacion}.`,
-          });
-        }
-        const disponible =
-          Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
-        if (a.monto_aplicado <= 0 || a.monto_aplicado > disponible) {
-          await connection.rollback();
-          return res.status(400).json({
-            error: `Monto de anticipo inválido para la orden ${a.id_orden_fabricacion}.`,
-          });
-        }
-        // Insertar detalle de descuento por anticipo (subtotal negativo)
-        await connection.query(
-          `INSERT INTO detalle_pago_trabajador (id_pago, id_avance_etapa, cantidad, pago_unitario, es_descuento)
-           VALUES (?, NULL, 1, ?, 1)`,
-          [id_pago, -Math.abs(a.monto_aplicado)]
-        );
-        await AnticiposModel.descontar(
-          anticipo.id_anticipo,
-          Math.abs(a.monto_aplicado)
-        );
       }
 
       // Recalcular total
@@ -245,12 +268,12 @@ module.exports = {
       // Obtener el monto total calculado
       const [pagoResult] = await connection.query(
         "SELECT monto_total FROM pagos_trabajadores WHERE id_pago = ?",
-        [id_pago]
+        [id_pago],
       );
       const montoTotal = pagoResult[0]?.monto_total || 0;
 
       // Crear movimiento de tesorería
-      const tesoreriaModel = require("../models/tesoreriaModel");
+
       await tesoreriaModel.insertarMovimiento(
         {
           id_documento: id_pago,
@@ -261,7 +284,7 @@ module.exports = {
           observaciones: observaciones_pago || null,
           fecha_movimiento: fecha_pago,
         },
-        connection
+        connection,
       );
 
       await connection.commit();
@@ -316,7 +339,7 @@ module.exports = {
         if (detalle.es_descuento !== true) {
           // Asegurarse de no validar id_avance_etapa para descuentos
           const avance = await avanceEtapasModel.getById(
-            detalle.id_avance_etapa
+            detalle.id_avance_etapa,
           );
           if (!avance) {
             return res.status(400).json({
@@ -329,7 +352,7 @@ module.exports = {
       // Calcular monto_total sumando subtotal de detalles
       const monto_total = detalles.reduce(
         (acc, item) => acc + item.cantidad * item.pago_unitario,
-        0
+        0,
       );
 
       // Actualizar pago principal
@@ -358,13 +381,13 @@ module.exports = {
         // Si no es un descuento, y el avance no estaba ya pagado, marcarlo como pagado
         if (!esDescuento) {
           const avanceActual = await avanceEtapasModel.getById(
-            detalle.id_avance_etapa
+            detalle.id_avance_etapa,
           );
           if (avanceActual && avanceActual.pagado !== 1) {
             // Solo actualiza si no está ya pagado
             await avanceEtapasModel.updatePagado(detalle.id_avance_etapa, 1);
             console.log(
-              `Avance de etapa ${detalle.id_avance_etapa} marcado como pagado durante la actualización del pago.`
+              `Avance de etapa ${detalle.id_avance_etapa} marcado como pagado durante la actualización del pago.`,
             );
           }
         }
@@ -409,7 +432,7 @@ module.exports = {
           // Si es un avance de etapa y no un descuento
           await avanceEtapasModel.updatePagado(detalle.id_avance_etapa, 0); // 0 para false/no pagado
           console.log(
-            `Avance de etapa ${detalle.id_avance_etapa} desmarcado como pagado.`
+            `Avance de etapa ${detalle.id_avance_etapa} desmarcado como pagado.`,
           );
         }
       }
@@ -499,7 +522,7 @@ module.exports = {
           observaciones: observaciones_pago || null,
           fecha_movimiento: fecha,
         },
-        connection
+        connection,
       );
 
       await connection.commit();
