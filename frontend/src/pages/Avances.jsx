@@ -73,9 +73,19 @@ const ListaAvances = () => {
     }, 0);
   }, [avancesSeleccionados]); // Verifica si al menos uno de los avances seleccionados tiene un anticipo
 
-  const hayAnticipoVinculado = useMemo(() => {
-    return avancesSeleccionados.some((av) => av.monto_anticipo > 0);
-  }, [avancesSeleccionados]);
+  // Detecta si el trabajador seleccionado tiene anticipo pendiente/parcial
+  const trabajadorConAnticipo = useMemo(() => {
+    if (avancesSeleccionados.length === 0) return null;
+    const trabajadorId = avancesSeleccionados[0].id_trabajador;
+    // Buscar en todos los avances globales si hay anticipo para ese trabajador
+    const anticipo = avancesGlobal.find(
+      (av) =>
+        av.id_trabajador === trabajadorId &&
+        av.monto_anticipo > 0 &&
+        av.estado_anticipo !== "saldado",
+    );
+    return anticipo || null;
+  }, [avancesSeleccionados, avancesGlobal]);
 
   useEffect(() => {
     const fetchTrabajadores = async () => {
@@ -216,6 +226,7 @@ const ListaAvances = () => {
                     <input
                       type="checkbox"
                       title="Seleccionar todos los avances de esta página"
+                      className="cursor-pointer"
                       checked={
                         avances.length > 0 &&
                         avances.every((a) =>
@@ -223,7 +234,6 @@ const ListaAvances = () => {
                         )
                       }
                       onChange={(e) => {
-                        // Si desmarca: quitar de la selección todos los visibles
                         if (!e.target.checked) {
                           const idsPagina = new Set(
                             avances.map((a) => a.id_avance_etapa),
@@ -319,9 +329,10 @@ const ListaAvances = () => {
                   className="border-t border-slate-300 hover:bg-slate-50"
                 >
                   {!mostrarPagados && (
-                    <td className="px-4 py-2">
-                      <input
+                    <td className="px-4 py-2 ">
+                      <input 
                         type="checkbox"
+                        className="cursor-pointer"
                         checked={seleccionados.includes(avance.id_avance_etapa)}
                         onChange={() => handleToggle(avance)}
                       />

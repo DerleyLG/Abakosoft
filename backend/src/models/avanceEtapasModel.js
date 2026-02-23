@@ -205,9 +205,7 @@ module.exports = {
     }
   },
 
-  /**
-   * Paginated list of paid advances with optional search and worker filter.
-   */
+  
   getAllPagadosPaginated: async ({
     id_trabajador = null,
     buscar = "",
