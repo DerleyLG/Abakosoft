@@ -1,32 +1,33 @@
-import React from 'react';
-import ReporteBase from '../components/ReporteBase'; 
+import React from "react";
+import ReporteBase from "../components/ReporteBase";
 const ReportePagosTrabajadores = () => {
-
   const titulo = "Reporte de Pagos a Trabajadores";
 
-  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/pagos-trabajadores`; 
+  const endpoint = `${import.meta.env.VITE_API_URL}/reportes/pagos-trabajadores`;
 
   const columnas = [
     { header: "ID Pago", accessor: "id_pago" },
     { header: "Fecha Pago", accessor: "fecha_pago" },
     { header: "Monto Total", accessor: "monto_total", isCurrency: true },
-    { header: "Trabajador", accessor: "trabajador" }, // 'AS trabajador' en SQL
-
+    {
+      header: "Total Anticipado",
+      accessor: "total_anticipado",
+      isCurrency: true,
+    },
+    { header: "Trabajador", accessor: "trabajador" },
   ];
-
 
   const filtros = [
     {
-      name: "desde", 
+      name: "desde",
       label: "Fecha Desde",
       type: "datepicker",
     },
     {
-      name: "hasta", 
+      name: "hasta",
       label: "Fecha Hasta",
       type: "datepicker",
     },
-   
   ];
 
   return (

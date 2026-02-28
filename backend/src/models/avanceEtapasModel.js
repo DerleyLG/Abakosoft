@@ -46,14 +46,22 @@ module.exports = {
         t.nombre AS nombre_trabajador,
         art.descripcion,
         c.nombre AS nombre_cliente,
-        COALESCE(ant.monto, 0) AS monto_anticipo,
-        ant.estado AS estado_anticipo
+        COALESCE(ant.total_disponible, 0) AS monto_anticipo,
+        ant.estado_agg AS estado_anticipo
       FROM avance_etapas_produccion a
       JOIN articulos art ON a.id_articulo = art.id_articulo
       JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
       JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
       JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
-          LEFT JOIN anticipos_trabajadores ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
+          LEFT JOIN (
+            SELECT
+              id_orden_fabricacion,
+              id_trabajador,
+              SUM(monto - COALESCE(monto_usado,0)) AS total_disponible,
+              MAX(CASE WHEN estado != 'saldado' THEN estado ELSE NULL END) AS estado_agg
+            FROM anticipos_trabajadores
+            GROUP BY id_orden_fabricacion, id_trabajador
+          ) ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
       LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
       LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
       WHERE a.pagado = 0 AND ofa.estado NOT IN ('cancelada')
@@ -128,14 +136,22 @@ module.exports = {
         t.nombre AS nombre_trabajador,
         art.descripcion,
         c.nombre AS nombre_cliente,
-        COALESCE(ant.monto, 0) AS monto_anticipo,
-        ant.estado AS estado_anticipo
+        COALESCE(ant.total_disponible, 0) AS monto_anticipo,
+        ant.estado_agg AS estado_anticipo
       FROM avance_etapas_produccion a
       JOIN articulos art ON a.id_articulo = art.id_articulo
       JOIN etapas_produccion e ON a.id_etapa_produccion = e.id_etapa
       JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
       JOIN ordenes_fabricacion ofa ON a.id_orden_fabricacion = ofa.id_orden_fabricacion
-      LEFT JOIN anticipos_trabajadores ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
+      LEFT JOIN (
+        SELECT
+          id_orden_fabricacion,
+          id_trabajador,
+          SUM(monto - COALESCE(monto_usado,0)) AS total_disponible,
+          MAX(CASE WHEN estado != 'saldado' THEN estado ELSE NULL END) AS estado_agg
+        FROM anticipos_trabajadores
+        GROUP BY id_orden_fabricacion, id_trabajador
+      ) ant ON ant.id_orden_fabricacion = a.id_orden_fabricacion AND ant.id_trabajador = a.id_trabajador
       LEFT JOIN pedidos p ON ofa.id_pedido = p.id_pedido
       LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
       ${whereClause}
@@ -205,7 +221,6 @@ module.exports = {
     }
   },
 
-  
   getAllPagadosPaginated: async ({
     id_trabajador = null,
     buscar = "",

@@ -326,54 +326,42 @@ const ReporteBase = ({
 
   return (
     <div className={containerClassName}>
-           {" "}
       <div className="flex justify-between items-center mb-4">
-                <h1 className="text-3xl font-bold text-slate-700">{titulo}</h1> 
-             {" "}
+        <h1 className="text-3xl font-bold text-slate-700">{titulo}</h1> 
         <div className="flex gap-2">
-                   {" "}
           <button
             onClick={handleDownloadExcel}
             className="bg-green-800 hover:bg-green-900 text-white px-4 py-2 rounded-md cursor-pointer"
             disabled={cargando || datos.length === 0}
           >
-                        Exportar Excel          {" "}
+            Exportar Excel
           </button>
-                   {" "}
           <button
             onClick={generarPDF}
             className="bg-slate-600 hover:bg-slate-800 text-white px-4 py-2 rounded-md cursor-pointer"
             disabled={cargando || datos.length === 0}
           >
-                        Exportar PDF          {" "}
+            Exportar PDF
           </button>
-                   {" "}
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
             disabled={cargando}
           >
-                        <FiArrowLeft />            <span>Volver</span>       
-             {" "}
+            <FiArrowLeft />
+            <span>Volver</span> 
           </button>
-                 {" "}
         </div>
-             {" "}
       </div>
-           {" "}
       {filtros.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-6 gap-10 mb-4">
-                   {" "}
           {filtros.map((filtro) => (
             <div key={filtro.name} className="flex flex-col">
-                           {" "}
               <label className="text-sm mb-1 text-slate-600">
                 {filtro.label}
               </label>
-                           {" "}
               {filtro.type === "datepicker" ? (
                 <div className="relative">
-                                   {" "}
                   <DatePicker
                     selected={
                       filtrosActivos[filtro.name]
@@ -397,18 +385,15 @@ const ReporteBase = ({
                     disabled={cargando}
                     placeholderText={filtro.label}
                   />
-                                                   {" "}
                   {filtrosActivos[filtro.name] && (
                     <button
                       type="button"
                       onClick={() => handleChangeFiltro(filtro.name, null)}
                       className="absolute top-1/2 right-1 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
-                                            <FiX className="h-5 w-5" />         
-                               {" "}
+                      <FiX className="h-5 w-5" /> 
                     </button>
                   )}
-                                 {" "}
                 </div>
               ) : (
                 <input
@@ -423,10 +408,8 @@ const ReporteBase = ({
                   disabled={cargando}
                 />
               )}
-                         {" "}
             </div>
           ))}
-                 {" "}
         </div>
       )}
       {showSummary &&
@@ -474,7 +457,7 @@ const ReporteBase = ({
                         <div key={idx}>
                           <span className="font-medium text-slate-600">
                             {item?.label ?? ""}:
-                          </span>{" "}
+                          </span>
                           <span className="font-semibold text-slate-900">
                             {item?.isCurrency
                               ? formatCurrencyCOP(item?.value)
@@ -489,58 +472,43 @@ const ReporteBase = ({
             );
           })()
         ))}
-           {" "}
       <div className="overflow-x-auto bg-white rounded-lg shadow border border-slate-200">
-               {" "}
         {cargando ? (
           <div className="text-center p-8 text-slate-500 flex justify-center items-center gap-2">
-                        <FiLoader className="animate-spin" /> Cargando datos...
-                     {" "}
+            <FiLoader className="animate-spin" /> Cargando datos...
           </div>
         ) : (
           <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-                       {" "}
             <thead className="bg-slate-100">
-                           {" "}
               <tr>
-                               {" "}
                 {columnas.map((col) => (
                   <th
                     key={col.accessor}
                     className="text-left px-4 py-2 font-medium border-b border-gray-300"
                   >
-                                        {col.header}                 {" "}
+                    {col.header} 
                   </th>
                 ))}
-                             {" "}
               </tr>
-                         {" "}
             </thead>
-                       {" "}
             <tbody>
-                           {" "}
               {datos.length === 0 ? (
                 <tr>
-                                   {" "}
                   <td
                     colSpan={columnas.length}
                     className="text-center text-slate-400 py-6"
                   >
-                                        No hay datos para mostrar.              
-                       {" "}
+                    No hay datos para mostrar.
                   </td>
-                                 {" "}
                 </tr>
               ) : (
                 datos.map((fila, i) => (
                   <tr key={i} className="hover:bg-slate-50">
-                       {" "}
                     {columnas.map((col) => (
                       <td
                         key={col.accessor}
                         className="px-2 py-2 border-b border-gray-300"
                       >
-                               {" "}
                         {(() => {
                           let value;
                           if (typeof col.accessor === "function") {
@@ -557,6 +525,10 @@ const ReporteBase = ({
                             "fecha_inicio",
                           ].includes(col.accessor);
 
+                          if (value == null || value === "") {
+                            return <span className="text-slate-400">--</span>;
+                          }
+
                           if (isDateColumn && value) {
                             return formatDateCell(value);
                           }
@@ -572,21 +544,15 @@ const ReporteBase = ({
 
                           return value;
                         })()}
-                             {" "}
                       </td>
                     ))}
-                     {" "}
                   </tr>
                 ))
               )}
-                         {" "}
             </tbody>
-                     {" "}
           </table>
         )}
-             {" "}
       </div>
-         {" "}
     </div>
   );
 };

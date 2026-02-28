@@ -12,6 +12,10 @@ const ListaAvances = () => {
   const [mostrarPagados, setMostrarPagados] = useState(false);
   const [trabajadores, setTrabajadores] = useState([]);
   const [idTrabajadorSeleccionado, setIdTrabajadorSeleccionado] = useState("");
+  const [anticipoPendienteInfo, setAnticipoPendienteInfo] = useState(null);
+  const [anticiposDetallePorTrabajador, setAnticiposDetallePorTrabajador] =
+    useState({});
+  const [pendientesPorTrabajador, setPendientesPorTrabajador] = useState({});
   const [seleccionados, setSeleccionados] = useState([]);
   const [buscar, setBuscar] = useState("");
   const [page, setPage] = useState(1);
@@ -120,6 +124,39 @@ const ListaAvances = () => {
         const res = await api.get(endpoint, { params });
         const payload = res.data || {};
         setAvances(payload.data || []);
+        // Después de cargar avances en la página, consultar resumen de anticipos por trabajador (para mostrar indicación incluso si el anticipo no está ligado a la orden)
+        try {
+          const workerIds = Array.from(
+            new Set(
+              (payload.data || []).map((a) => a.id_trabajador).filter(Boolean),
+            ),
+          );
+          const map = {};
+          await Promise.all(
+            workerIds.map(async (wid) => {
+              try {
+                const r = await api.get("/anticipos/pendientes", {
+                  params: { trabajadorId: wid },
+                });
+                map[wid] = r.data || {
+                  hasPendiente: false,
+                  totalDisponible: 0,
+                  count: 0,
+                };
+              } catch (e) {
+                map[wid] = {
+                  hasPendiente: false,
+                  totalDisponible: 0,
+                  count: 0,
+                };
+              }
+            }),
+          );
+          setPendientesPorTrabajador(map);
+        } catch (e) {
+          console.warn("No se pudieron cargar pendientes por trabajador", e);
+          setPendientesPorTrabajador({});
+        }
         setTotal(payload.total || 0);
         setTotalPages(payload.totalPages || 1);
         setHasNext(!!payload.hasNext);
@@ -138,23 +175,55 @@ const ListaAvances = () => {
     };
     fetchAvances();
   }, [idTrabajadorSeleccionado, mostrarPagados, page, pageSize, buscar]);
-  const confirmarPago = (avance) => {
-    confirmAlert({
-      title: "¿Registrar pago?",
-      message: `¿Deseas registrar un pago para el avance de '${avance.nombre_etapa}' del artículo '${avance.descripcion}' realizado por el trabajador '${avance.nombre_trabajador}'?`,
-      buttons: [
-        {
-          label: "Sí, registrar",
-          onClick: () =>
-            navigate("/pagos/nuevo", {
-              state: { avances: [avance] },
-            }),
-        },
-        { label: "Cancelar" },
-      ],
-    });
-  };
 
+  // Consultar anticipos pendientes por trabajador cuando cambie el filtro
+  useEffect(() => {
+    const fetchPendiente = async () => {
+      if (!idTrabajadorSeleccionado) {
+        setAnticipoPendienteInfo(null);
+        return;
+      }
+      try {
+        const res = await api.get("/anticipos/pendientes", {
+          params: { trabajadorId: idTrabajadorSeleccionado },
+        });
+        const summary = res.data || null;
+        setAnticipoPendienteInfo(summary);
+        // also fetch detailed list so we can show associated orders
+        if (summary?.hasPendiente) {
+          try {
+            const det = await api.get("/anticipos/por-trabajador", {
+              params: { trabajadorId: idTrabajadorSeleccionado },
+            });
+            setAnticiposDetallePorTrabajador((prev) => ({
+              ...prev,
+              [idTrabajadorSeleccionado]: Array.isArray(det.data)
+                ? det.data
+                : [],
+            }));
+          } catch (e) {
+            console.warn(
+              "No se pudo cargar detalle de anticipos por trabajador",
+              e,
+            );
+            setAnticiposDetallePorTrabajador((prev) => ({
+              ...prev,
+              [idTrabajadorSeleccionado]: [],
+            }));
+          }
+        } else {
+          setAnticiposDetallePorTrabajador((prev) => ({
+            ...prev,
+            [idTrabajadorSeleccionado]: [],
+          }));
+        }
+      } catch (err) {
+        console.error("Error verificando anticipos pendientes:", err);
+        setAnticipoPendienteInfo(null);
+      }
+    };
+    fetchPendiente();
+  }, [idTrabajadorSeleccionado]);
   const manejarPagoMultiple = () => {
     navigate("/pagos/nuevo", {
       state: { avances: avancesSeleccionados },
@@ -168,6 +237,18 @@ const ListaAvances = () => {
           Avances de Producción
         </h2>
         <div className="flex items-center gap-3">
+           <button
+            onClick={() => navigate("/trabajadores/pagos")}
+            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+          >
+            Pagos
+          </button> 
+          <button
+            onClick={() => navigate("/pagos_anticipados")}
+            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+          >
+            Anticipos
+          </button>
           <button
             onClick={() => {
               setMostrarPagados(!mostrarPagados);
@@ -182,6 +263,7 @@ const ListaAvances = () => {
           >
             {mostrarPagados ? "Ver no pagados" : "Ver pagados"}
           </button>
+
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
@@ -214,6 +296,34 @@ const ListaAvances = () => {
             </option>
           ))}
         </select>
+        {anticipoPendienteInfo && anticipoPendienteInfo.hasPendiente && (
+          <div className="mt-2 text-sm text-sky-700 font-medium">
+            Trabajador:{" "}
+            {trabajadores.find(
+              (t) =>
+                String(t.id_trabajador) === String(idTrabajadorSeleccionado),
+            )?.nombre || ""}{" "}
+            — Anticipo pendiente detectado (${" "}
+            {Number(
+              anticipoPendienteInfo.totalDisponible || 0,
+            ).toLocaleString()}
+            )
+            {Array.isArray(
+              anticiposDetallePorTrabajador[idTrabajadorSeleccionado],
+            ) &&
+              anticiposDetallePorTrabajador[idTrabajadorSeleccionado].length >
+                0 && (
+                <span className="block text-sm text-slate-500 mt-1">
+                  Orden(es):{" "}
+                  {anticiposDetallePorTrabajador[idTrabajadorSeleccionado]
+                    .map((a) => a.id_orden_fabricacion)
+                    .filter(Boolean)
+                    .map((o) => `#${o}`)
+                    .join(", ") || "—"}
+                </span>
+              )}
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto shadow rounded-lg mt-4">
@@ -303,7 +413,7 @@ const ListaAvances = () => {
               <th className="px-4 py-2 text-left">Cantidad</th>
               <th className="px-4 py-2 text-left">Costo unitario</th>
               <th className="px-4 py-2 text-left">Subtotal</th>
-              <th className="px-4 py-2 text-left">Anticipo</th>
+              <th className="px-4 py-2 text-left">Anticipo (saldo)</th>
               <th className="px-4 py-2 text-left">Fecha</th>
               <th className="px-4 py-2 text-left">Estado</th>
               <th className="px-4 py-2 text-left">Estado de pago</th>
@@ -323,14 +433,14 @@ const ListaAvances = () => {
             )}
 
             {!loading &&
-              avances.map((avance) => (
+              avances.map((avance, index) => (
                 <tr
                   key={avance.id_avance_etapa}
                   className="border-t border-slate-300 hover:bg-slate-50"
                 >
                   {!mostrarPagados && (
                     <td className="px-4 py-2 ">
-                      <input 
+                      <input
                         type="checkbox"
                         className="cursor-pointer"
                         checked={seleccionados.includes(avance.id_avance_etapa)}
@@ -367,25 +477,82 @@ const ListaAvances = () => {
                     ).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-2">
-                    {avance.monto_anticipo > 0 &&
-                    avance.estado_anticipo !== "saldado" ? (
-                      <span className="text-red-600 font-semibold">
-                        Si, ${avance.monto_anticipo.toLocaleString()}
-                      </span>
-                    ) : avance.monto_anticipo > 0 &&
-                      avance.estado_anticipo === "saldado" ? (
-                      <span className="text-green-600 italic text-sm">
-                        Saldado
-                      </span>
-                    ) : (
-                      <span className="text-gray-500 italic text-sm">
-                        Sin anticipo
-                      </span>
-                    )}
+                    {(() => {
+                      const saldo = Number(avance.monto_anticipo || 0);
+                      const estado = avance.estado_anticipo || null;
+                      // Considerar tanto el anticipo ligado a la orden (monto_anticipo) como el pendiente a nivel trabajador
+                      const pendingInfo =
+                        pendientesPorTrabajador[avance.id_trabajador];
+                      const workerSaldo = pendingInfo?.totalDisponible || 0;
+                      const tieneAnticipo = saldo > 0 || workerSaldo > 0;
+                      const yaMostrado = avances.slice(0, index).some((a) => {
+                        const prevPending =
+                          pendientesPorTrabajador[a.id_trabajador];
+                        const prevSaldo =
+                          Number(a.monto_anticipo || 0) +
+                          (prevPending?.totalDisponible || 0);
+                        return (
+                          a.id_trabajador === avance.id_trabajador &&
+                          prevSaldo > 0
+                        );
+                      });
+
+                      if (tieneAnticipo && !yaMostrado) {
+                        const displaySaldo = saldo > 0 ? saldo : workerSaldo;
+                        const displayEstado =
+                          estado ||
+                          (pendingInfo?.hasPendiente ? "pendiente" : null);
+                        return (
+                          <div className="flex items-center gap-3">
+                            <button
+                              title={`Aplicar anticipo: $${displaySaldo.toLocaleString()}`}
+                              onClick={() =>
+                                navigate("/pagos/nuevo", {
+                                  state: { avances: [avance] },
+                                })
+                              }
+                              className="text-sky-700 font-semibold hover:underline cursor-pointer"
+                            >
+                              ${displaySaldo.toLocaleString()}
+                            </button>
+                            {displayEstado && displayEstado !== "saldado" && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
+                                {displayEstado}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (
+                        (saldo > 0 || workerSaldo > 0) &&
+                        estado === "saldado"
+                      ) {
+                        const displaySaldo = saldo > 0 ? saldo : workerSaldo;
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-700 font-semibold">
+                              ${displaySaldo.toLocaleString()}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                              Saldado
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <span className="text-slate-400 italic text-sm">
+                          Sin anticipo
+                        </span>
+                      );
+                    })()}
                   </td>
 
                   <td className="px-4 py-2">
-                    {new Date(avance.fecha_registro).toLocaleDateString()}
+                    {new Date(avance.fecha_registro).toLocaleDateString(
+                      "es-CO",
+                    )}
                   </td>
 
                   <td className="px-4 py-2 capitalize">{avance.estado}</td>

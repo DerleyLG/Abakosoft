@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import React, { useEffect, useState } from "react";
+import api from "../services/api";
 import { FiArrowLeft } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
 const ListaAnticipos = () => {
   const [anticipos, setAnticipos] = useState([]);
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchAnticipos = async () => {
       try {
-        const res = await api.get('/anticipos');
+        const res = await api.get("/anticipos");
         setAnticipos(res.data);
       } catch (error) {
-        console.error('Error al cargar anticipos:', error);
+        console.error("Error al cargar anticipos:", error);
       }
     };
     fetchAnticipos();
@@ -22,18 +22,17 @@ const ListaAnticipos = () => {
   return (
     <div className="px-20 py-8 max-w-8xl mx-auto">
       <div className="flex justify-between items-center mb-8 border-b border-slate-300 p-5">
-              <h2 className="text-4xl font-bold text-slate-700">Anticipos</h2>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
-                >
-                  <FiArrowLeft />
-                  <span>Volver</span>
-                </button>
-                
-              </div>
-            </div>
+        <h2 className="text-4xl font-bold text-slate-700">Anticipos</h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
+          >
+            <FiArrowLeft />
+            <span>Volver</span>
+          </button>
+        </div>
+      </div>
       <div className="bg-white p-4 rounded-2xl shadow-md overflow-x-auto border border-slate-200">
         <table className="min-w-full text-sm text-left">
           <thead className="bg-slate-100 text-slate-700 uppercase text-xs font-semibold">
@@ -51,29 +50,48 @@ const ListaAnticipos = () => {
           <tbody className="text-slate-600">
             {anticipos.length > 0 ? (
               anticipos.map((a) => (
-                <tr key={a.id_anticipo} className="hover:bg-slate-50 border-t border-slate-100">
+                <tr
+                  key={a.id_anticipo}
+                  className="hover:bg-slate-50 border-t border-slate-100"
+                >
                   <td className="px-4 py-2">{a.trabajador}</td>
-                  <td className="px-4 py-2 font-mono">#{a.id_orden_fabricacion}</td>
-                  <td className="px-4 py-2">{a.cliente || 'N/D'}</td>
-                  <td className="px-4 py-2">
-                    {a.fecha ? new Date(a.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                  <td className="px-4 py-2 font-mono">
+                    #{a.id_orden_fabricacion}
                   </td>
-                  <td className="px-4 py-2">${Number(a.monto).toLocaleString()}</td>
-                  <td className="px-4 py-2">${Number(a.monto_usado).toLocaleString()}</td>
+                  <td className="px-4 py-2">{a.cliente || "N/D"}</td>
+                  <td className="px-4 py-2">
+                    {a.fecha
+                      ? (() => {
+                          // Evitar parseo con Date para no introducir desplazamientos por zona horaria.
+                          const raw = String(a.fecha).split("T")[0];
+                          const parts = raw.split("-");
+                          if (parts.length === 3) {
+                            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                          }
+                          return raw;
+                        })()
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    ${Number(a.monto).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2">
+                    ${Number(a.monto_usado).toLocaleString()}
+                  </td>
                   <td className="px-4 py-2">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        a.estado === 'pendiente'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : a.estado === 'parcial'
-                          ? 'bg-orange-100 text-orange-800'
-                          : 'bg-green-100 text-green-800'
+                        a.estado === "pendiente"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : a.estado === "parcial"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-green-100 text-green-800"
                       }`}
                     >
                       {a.estado}
                     </span>
                   </td>
-                  <td className="px-4 py-2">{a.observaciones || '—'}</td>
+                  <td className="px-4 py-2">{a.observaciones || "—"}</td>
                 </tr>
               ))
             ) : (
