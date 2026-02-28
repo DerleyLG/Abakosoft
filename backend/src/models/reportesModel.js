@@ -379,33 +379,43 @@ module.exports = {
   },
 
   async getPagosTrabajadores({ id_trabajador, desde, hasta }) {
-    let sql = `
-    SELECT 
-      pt.id_pago,
-      pt.fecha_pago,
-      pt.monto_total,
-      t.nombre AS trabajador
-    FROM pagos_trabajadores pt
-    JOIN trabajadores t ON pt.id_trabajador = t.id_trabajador
-    JOIN detalle_pago_trabajador dpt ON pt.id_pago = dpt.id_pago
-  `;
-
+    // Construir condiciones para filtrar pagos
+    const conditions = [];
     const params = [];
-
     if (id_trabajador) {
-      sql += " AND pt.id_trabajador = ?";
+      conditions.push("pt.id_trabajador = ?");
       params.push(id_trabajador);
     }
     if (desde) {
-      sql += " AND pt.fecha_pago >= ?";
+      conditions.push("pt.fecha_pago >= ?");
       params.push(desde);
     }
     if (hasta) {
-      sql += " AND pt.fecha_pago <= ?";
+      conditions.push("pt.fecha_pago <= ?");
       params.push(hasta);
     }
 
-    sql += " ORDER BY pt.fecha_pago DESC";
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const sql = `
+    SELECT
+      pt.id_pago,
+      pt.fecha_pago,
+      pt.monto_total,
+      t.nombre AS trabajador,
+      COALESCE((
+        SELECT SUM(a.monto - COALESCE(a.monto_usado,0))
+        FROM anticipos_trabajadores a
+        WHERE a.id_trabajador = pt.id_trabajador
+          AND DATE(a.fecha) = DATE(pt.fecha_pago)
+      ), 0) AS total_anticipado
+    FROM pagos_trabajadores pt
+    JOIN trabajadores t ON pt.id_trabajador = t.id_trabajador
+    LEFT JOIN detalle_pago_trabajador dpt ON pt.id_pago = dpt.id_pago
+    ${where}
+    GROUP BY pt.id_pago
+    ORDER BY pt.fecha_pago DESC
+  `;
 
     const [rows] = await db.query(sql, params);
     return rows;
@@ -484,25 +494,106 @@ module.exports = {
 
     const where = `WHERE ${filtros.join(" AND ")}`;
 
-    const sql = `
+    // Condiciones específicas para pagos (filtran por pt.fecha_pago)
+    const payConds = [];
+    const payParams = [];
+    if (id_trabajador) {
+      payConds.push("pt.id_trabajador = ?");
+      payParams.push(id_trabajador);
+    }
+    if (dDesde && dHasta) {
+      if (mismoDia) {
+        payConds.push("DATE(pt.fecha_pago) = ?");
+        payParams.push(dDesde);
+      } else {
+        payConds.push("DATE(pt.fecha_pago) BETWEEN ? AND ?");
+        payParams.push(dDesde, dHasta);
+      }
+    } else {
+      if (desdeNorm) {
+        payConds.push("pt.fecha_pago >= ?");
+        payParams.push(desdeNorm);
+      }
+      if (hastaNorm) {
+        payConds.push("pt.fecha_pago <= ?");
+        payParams.push(hastaNorm);
+      }
+    }
+
+    const payWhere = payConds.length ? `WHERE ${payConds.join(" AND ")}` : "";
+
+    const pagosSql = `
     SELECT
       DATE(pt.fecha_pago) AS fecha,
       pt.id_trabajador,
       t.nombre AS trabajador,
       COALESCE(SUM(CASE WHEN d.es_descuento = 0 THEN (d.cantidad * d.pago_unitario) ELSE 0 END), 0) AS total_bruto,
       COALESCE(SUM(CASE WHEN d.es_descuento = 1 THEN (d.cantidad * d.pago_unitario) ELSE 0 END), 0) AS total_descuentos,
-      COALESCE(SUM(d.cantidad * d.pago_unitario), 0) AS total_neto
+      0 AS total_anticipado,
+      COALESCE(SUM(d.cantidad * d.pago_unitario), 0) AS total_neto,
+      'pago' AS tipo
     FROM pagos_trabajadores pt
     JOIN trabajadores t ON t.id_trabajador = pt.id_trabajador
     LEFT JOIN detalle_pago_trabajador d ON d.id_pago = pt.id_pago
     LEFT JOIN avance_etapas_produccion a ON a.id_avance_etapa = d.id_avance_etapa
-    ${where}
-    GROUP BY DATE(pt.fecha_pago), pt.id_trabajador
-    ORDER BY fecha DESC, trabajador ASC
-  `;
+    ${payWhere}
+    GROUP BY DATE(pt.fecha_pago), pt.id_trabajador, t.nombre
+    `;
+
+    // Condiciones para anticipos (filtran por a.fecha)
+    const antConds = [];
+    const antParams = [];
+    if (id_trabajador) {
+      antConds.push("a.id_trabajador = ?");
+      antParams.push(id_trabajador);
+    }
+    if (dDesde && dHasta) {
+      if (mismoDia) {
+        antConds.push("DATE(a.fecha) = ?");
+        antParams.push(dDesde);
+      } else {
+        antConds.push("DATE(a.fecha) BETWEEN ? AND ?");
+        antParams.push(dDesde, dHasta);
+      }
+    } else {
+      if (desdeNorm) {
+        antConds.push("a.fecha >= ?");
+        antParams.push(desdeNorm);
+      }
+      if (hastaNorm) {
+        antConds.push("a.fecha <= ?");
+        antParams.push(hastaNorm);
+      }
+    }
+
+    const antWhere = antConds.length ? `WHERE ${antConds.join(" AND ")}` : "";
+
+    const anticiposSql = `
+    SELECT
+      DATE(a.fecha) AS fecha,
+      a.id_trabajador,
+      t.nombre AS trabajador,
+      NULL AS total_bruto,
+      NULL AS total_descuentos,
+      a.monto AS total_anticipado,
+      a.monto AS total_neto,
+      'anticipo' AS tipo
+    FROM anticipos_trabajadores a
+    JOIN trabajadores t ON t.id_trabajador = a.id_trabajador
+    ${antWhere}
+    `;
+
+    const sql = `
+      (${pagosSql})
+      UNION ALL
+      (${anticiposSql})
+      ORDER BY fecha DESC, trabajador ASC, tipo DESC
+    `;
+
+    const paramsAll = [...payParams, ...antParams];
 
     try {
-      const [rows] = await db.query(sql, params);
+      const [rows] = await db.query(sql, paramsAll);
       return rows;
     } catch (error) {
       console.error("Error en getPagosTrabajadoresPorDia:", error);
@@ -659,7 +750,7 @@ module.exports = {
     } catch (error) {
       console.error(
         "Error en la consulta SQL de getMovimientosInventario:",
-        error
+        error,
       );
       throw error;
     }

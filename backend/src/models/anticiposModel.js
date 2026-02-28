@@ -38,7 +38,7 @@ module.exports = {
       `INSERT INTO anticipos_trabajadores
       (id_trabajador,  id_orden_fabricacion,fecha, monto,  observaciones)
       VALUES (?, ?, ?, ?, ?)`,
-      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones]
+      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones],
     );
     return result.insertId;
   },
@@ -54,41 +54,66 @@ module.exports = {
       `INSERT INTO anticipos_trabajadores
       (id_trabajador,  id_orden_fabricacion,fecha, monto,  observaciones)
       VALUES (?, ?, ?, ?, ?)`,
-      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones]
+      [id_trabajador, id_orden_fabricacion, fecha, monto, observaciones],
     );
     return result.insertId;
   },
 
   getActivo: async (id_trabajador, id_orden_fabricacion) => {
+    if (id_orden_fabricacion) {
+      const [rows] = await db.query(
+        `SELECT * FROM anticipos_trabajadores
+         WHERE id_trabajador = ? AND id_orden_fabricacion = ? AND estado != 'saldado'
+         LIMIT 1`,
+        [id_trabajador, id_orden_fabricacion],
+      );
+      return rows[0];
+    }
     const [rows] = await db.query(
       `SELECT * FROM anticipos_trabajadores
-       WHERE id_trabajador = ? AND id_orden_fabricacion = ? AND estado != 'saldado'
+       WHERE id_trabajador = ? AND estado != 'saldado'
+       ORDER BY fecha ASC
        LIMIT 1`,
-      [id_trabajador, id_orden_fabricacion]
+      [id_trabajador],
     );
     return rows[0];
   },
 
-  descontar: async (id_anticipo, montoAplicado) => {
+  getDisponiblesByTrabajador: async (
+    id_trabajador,
+    preferOrderId = null,
+    connection = null,
+  ) => {
+    const conn = connection || db;
+    const sql = `SELECT * FROM anticipos_trabajadores
+                 WHERE id_trabajador = ? AND estado != 'saldado'
+                 ORDER BY (id_orden_fabricacion = ?) DESC, fecha ASC`;
+    const params = [id_trabajador, preferOrderId];
+    const [rows] = await conn.query(sql, params);
+    return rows;
+  },
+
+  descontar: async (id_anticipo, montoAplicado, connection = null) => {
+    const conn = connection || db;
     // Obtener anticipo actual
-    const [rows] = await db.query(
+    const [rows] = await conn.query(
       `SELECT monto, monto_usado FROM anticipos_trabajadores WHERE id_anticipo = ?`,
-      [id_anticipo]
+      [id_anticipo],
     );
     const anticipo = rows[0];
     const nuevoMontoUsado =
-      Number(anticipo.monto_usado) + Number(montoAplicado);
+      Number(anticipo.monto_usado || 0) + Number(montoAplicado);
 
     let nuevoEstado = "parcial";
     if (nuevoMontoUsado >= Number(anticipo.monto)) {
       nuevoEstado = "saldado";
     }
 
-    await db.query(
+    await conn.query(
       `UPDATE anticipos_trabajadores
        SET monto_usado = ?, estado = ?
        WHERE id_anticipo = ?`,
-      [nuevoMontoUsado, nuevoEstado, id_anticipo]
+      [nuevoMontoUsado, nuevoEstado, id_anticipo],
     );
   },
 };

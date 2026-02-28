@@ -17,7 +17,7 @@ const FormularioPagoAvances = () => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
       2,
-      "0"
+      "0",
     )}-${String(hoy.getDate()).padStart(2, "0")}`;
   };
 
@@ -33,6 +33,8 @@ const FormularioPagoAvances = () => {
   const [trabajadores, setTrabajadores] = useState([]);
 
   const [mostrarAlertaAnticipo, setMostrarAlertaAnticipo] = useState(false);
+  const [ultimoDescuentoTempId, setUltimoDescuentoTempId] = useState(null);
+  const submitBtnRef = React.useRef(null);
 
   // Estados para datos de pago
   const [metodosPago, setMetodosPago] = useState([]);
@@ -40,67 +42,70 @@ const FormularioPagoAvances = () => {
   const [referencia, setReferencia] = useState("");
   const [observacionesPago, setObservacionesPago] = useState("");
 
+  // DEBUG: logs temporales para depurar modal de anticipo
+  React.useEffect(() => {
+    try {
+      console.log(
+        "DEBUG: mostrarAlertaAnticipo=",
+        mostrarAlertaAnticipo,
+        "avances[0]=",
+        avances[0],
+      );
+    } catch (e) {
+      console.log("DEBUG: error leyendo avances", e);
+    }
+  }, [mostrarAlertaAnticipo, avances]);
+
   useEffect(() => {
-    // Solo si estamos en modo "pago normal" y tenemos avances cargados
-    if (!esAnticipo && state?.avances && state.avances.length > 0) {
-      // Buscar el primer avance válido que tenga trabajador y orden y que no sea un descuento
-      const avanceInicial = state.avances.find(
-        (a) => a && a.id_trabajador && a.id_orden_fabricacion && !a.es_descuento
+    // Restauramos el flujo original: si hay anticipos, preguntar con modal y después mostrar el formulario para elegir monto
+    const checkYMostrarModal = async () => {
+      if (esAnticipo) {
+        setMostrarAlertaAnticipo(false);
+        return;
+      }
+      const avanceInicial = state.avances?.find(
+        (a) => a && a.id_trabajador && !a.es_descuento,
       );
       if (!avanceInicial) {
         setMostrarAlertaAnticipo(false);
         return;
       }
-
       const idTrabajador = avanceInicial.id_trabajador;
       const idOrdenFabricacion = avanceInicial.id_orden_fabricacion;
-
-      // Si no tenemos la info necesaria, no hacemos la llamada
-      if (!idTrabajador || !idOrdenFabricacion) {
-        setMostrarAlertaAnticipo(false);
-        return;
-      }
-
-      api
-        .get(`/anticipos/${idTrabajador}/${idOrdenFabricacion}`)
-        .then((res) => {
-          if (res.data) {
-            // Mostramos la alerta de confirmación
-            confirmAlert({
-              title: "Anticipo disponible",
-              message: `El trabajador ${
-                avanceInicial.nombre_trabajador || ""
-              } tiene un anticipo activo de $${res.data.monto.toLocaleString()}. ¿Deseas aplicar el descuento en este pago?`,
-              buttons: [
-                {
-                  label: "Sí, aplicar",
-                  onClick: () => {
-                    setMostrarAlertaAnticipo(true);
-                    toast.success("Puedes aplicar el descuento para este pago");
-                  },
-                },
-                {
-                  label: "No, dejarlo para después",
-                  onClick: () => {
-                    setMostrarAlertaAnticipo(false);
-                    toast("Descuento no aplicado");
-                  },
-                },
-              ],
-            });
-          } else {
-            setMostrarAlertaAnticipo(false);
-          }
-        })
-        .catch((err) => {
-          console.error("Error verificando anticipo:", err);
-          setMostrarAlertaAnticipo(false);
-          toast.error("Error al verificar anticipos disponibles.");
+      if (!idTrabajador) return;
+      try {
+        const res = await api.get("/anticipos/pendientes", {
+          params: { trabajadorId: idTrabajador },
         });
-    } else if (esAnticipo) {
-      // Si el modo es "registrar anticipo", no hay necesidad de mostrar la alerta de anticipo para pagos normales
-      setMostrarAlertaAnticipo(false);
-    }
+        if (res.data?.hasPendiente) {
+          confirmAlert({
+            title: "Anticipo disponible",
+            message: `El trabajador ${avanceInicial.nombre_trabajador || ""} tiene anticipos disponibles por $${Number(res.data.totalDisponible || 0).toLocaleString()}. ¿Deseas aplicar el descuento en este pago?`,
+            buttons: [
+              {
+                label: "Sí, aplicar",
+                onClick: () => {
+                  setMostrarAlertaAnticipo(true);
+                },
+              },
+              {
+                label: "No, dejarlo para después",
+                onClick: () => {
+                  setMostrarAlertaAnticipo(false);
+                  toast("Descuento no aplicado");
+                },
+              },
+            ],
+          });
+        } else {
+          setMostrarAlertaAnticipo(false);
+        }
+      } catch (err) {
+        console.error("Error verificando anticipos pendientes:", err);
+        setMostrarAlertaAnticipo(false);
+      }
+    };
+    checkYMostrarModal();
   }, [state?.avances, esAnticipo]);
 
   useEffect(() => {
@@ -138,7 +143,7 @@ const FormularioPagoAvances = () => {
 
   const totalFinal = avances.reduce(
     (acc, a) => acc + a.cantidad * a.costo_fabricacion,
-    0
+    0,
   );
 
   useEffect(() => {
@@ -173,6 +178,24 @@ const FormularioPagoAvances = () => {
         });
     }
   }, [esAnticipo]);
+
+  // Scroll to and focus the recently added descuento row, then focus submit button
+  useEffect(() => {
+    if (!ultimoDescuentoTempId) return;
+    const el = document.querySelector(
+      `[data-temp-id="${ultimoDescuentoTempId}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // small delay to allow rendering
+    setTimeout(() => {
+      submitBtnRef.current?.focus?.();
+    }, 300);
+    // clear after action
+    const t = setTimeout(() => setUltimoDescuentoTempId(null), 1000);
+    return () => clearTimeout(t);
+  }, [ultimoDescuentoTempId]);
 
   const handleRegistrarPago = async () => {
     if (!esAnticipo && totalFinal < 0) {
@@ -238,14 +261,24 @@ const FormularioPagoAvances = () => {
     }
   };
 
-  const aplicarDescuentoDeAnticipo = (anticipo, valor) => {
+  const aplicarDescuentoDeAnticipo = (anticipoOrAsign, valor) => {
     const yaExiste = avances.some((a) => a.es_descuento);
     if (yaExiste) {
       toast.error("Ya se aplicó un descuento de anticipo.");
       return;
     }
 
-    if (valor > anticipo.monto - (anticipo.monto_usado || 0)) {
+    // aceptar dos formatos: (anticipo, valor) o ({ asignaciones, totalDisponible }, valor)
+    let totalDisponible = 0;
+    if (anticipoOrAsign && anticipoOrAsign.asignaciones) {
+      totalDisponible = Number(anticipoOrAsign.totalDisponible || 0);
+    } else if (anticipoOrAsign) {
+      totalDisponible =
+        Number(anticipoOrAsign.monto || 0) -
+        Number(anticipoOrAsign.monto_usado || 0);
+    }
+
+    if (valor > totalDisponible) {
       toast.error("El descuento supera el saldo disponible.");
       return;
     }
@@ -255,6 +288,7 @@ const FormularioPagoAvances = () => {
       return;
     }
 
+    const tempId = `desc-${Date.now()}`;
     const descuento = {
       id_avance_etapa: null,
       descripcion: "Descuento por anticipo",
@@ -262,10 +296,12 @@ const FormularioPagoAvances = () => {
       cantidad: 1,
       costo_fabricacion: -valor,
       es_descuento: true,
+      __temp_id: tempId,
     };
 
     setAvances([...avances, descuento]);
     setMostrarAlertaAnticipo(false);
+    setUltimoDescuentoTempId(tempId);
   };
 
   const quitarDescuentoDeAnticipo = () => {
@@ -274,7 +310,7 @@ const FormularioPagoAvances = () => {
   };
 
   const trabajadorActual = trabajadores.find(
-    (t) => t.id_trabajador === avances[0]?.id_trabajador
+    (t) => t.id_trabajador === avances[0]?.id_trabajador,
   );
   const nombreTrabajador = trabajadorActual?.nombre || "";
 
@@ -334,9 +370,6 @@ const FormularioPagoAvances = () => {
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-700 mb-1 ">
-          Registrar como anticipo
-        </label>
         <label className="inline-flex items-center gap-2 text-slate-600">
           <input
             type="checkbox"
@@ -350,7 +383,7 @@ const FormularioPagoAvances = () => {
 
       <div className="mb-6">
         <label className="block text-sm font-medium text-slate-700 mb-1">
-          Observaciones
+          Observaciones del anticipo (opcional)
         </label>
         <textarea
           value={observaciones}
@@ -373,7 +406,8 @@ const FormularioPagoAvances = () => {
                   setOrdenSeleccionada(e.target.value);
                   const orden = Array.isArray(ordenes)
                     ? ordenes.find(
-                        (o) => o.id_orden_fabricacion === Number(e.target.value)
+                        (o) =>
+                          o.id_orden_fabricacion === Number(e.target.value),
                       )
                     : null;
                   if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
@@ -471,37 +505,35 @@ const FormularioPagoAvances = () => {
         </>
       ) : (
         <>
-          {avances.length > 0 &&
-            avances[0]?.id_trabajador &&
-            avances[0]?.id_orden_fabricacion && (
-              <>
-                {/* Solo se muestra AnticipoAlert si mostrarAlertaAnticipo es true */}
-                {mostrarAlertaAnticipo && (
-                  <AnticipoAlert
-                    idTrabajador={avances[0].id_trabajador}
-                    idOrdenFabricacion={avances[0].id_orden_fabricacion}
-                    nombreTrabajador={nombreTrabajador}
-                    totalAvance={totalFinal}
-                    onAplicarDescuento={aplicarDescuentoDeAnticipo}
-                    onQuitarDescuento={() => setMostrarAlertaAnticipo(true)} // Esto hace que la alerta reaparezca si se quita el descuento
-                  />
-                )}
+          {avances.length > 0 && avances[0]?.id_trabajador && (
+            <>
+              {/* Solo se muestra AnticipoAlert si mostrarAlertaAnticipo es true */}
+              {mostrarAlertaAnticipo && (
+                <AnticipoAlert
+                  idTrabajador={avances[0].id_trabajador}
+                  idOrdenFabricacion={avances[0].id_orden_fabricacion}
+                  nombreTrabajador={nombreTrabajador}
+                  totalAvance={totalFinal}
+                  onAplicarDescuento={aplicarDescuentoDeAnticipo}
+                  onQuitarDescuento={() => setMostrarAlertaAnticipo(true)} // Esto hace que la alerta reaparezca si se quita el descuento
+                />
+              )}
 
-                {/* Este botón se muestra si NO hay alerta activa Y ya se aplicó un descuento */}
-                {!mostrarAlertaAnticipo &&
-                  avances.some((a) => a.es_descuento) && (
-                    <div className="my-4">
-                      <button
-                        onClick={quitarDescuentoDeAnticipo}
-                        className="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 border border-red-600 px-3 py-1 rounded-md"
-                      >
-                        <FiX className="w-4 h-4" />
-                        Quitar descuento por anticipo
-                      </button>
-                    </div>
-                  )}
-              </>
-            )}
+              {/* Este botón se muestra si NO hay alerta activa Y ya se aplicó un descuento */}
+              {!mostrarAlertaAnticipo &&
+                avances.some((a) => a.es_descuento) && (
+                  <div className="my-4">
+                    <button
+                      onClick={quitarDescuentoDeAnticipo}
+                      className="flex items-center gap-2 text-sm text-red-600 hover:text-red-800 border border-red-600 px-3 py-1 rounded-md"
+                    >
+                      <FiX className="w-4 h-4" />
+                      Quitar descuento por anticipo
+                    </button>
+                  </div>
+                )}
+            </>
+          )}
 
           <div className="mb-6">
             <h4 className="text-lg font-bold text-slate-700 mb-2">
@@ -521,7 +553,11 @@ const FormularioPagoAvances = () => {
                 </thead>
                 <tbody>
                   {avances.map((a, index) => (
-                    <tr key={index} className="border-t border-slate-300">
+                    <tr
+                      key={index}
+                      data-temp-id={a.__temp_id || ""}
+                      className="border-t border-slate-300"
+                    >
                       <td className="px-4 py-2">
                         {a.es_descuento
                           ? "—"
@@ -583,6 +619,7 @@ const FormularioPagoAvances = () => {
 
       <div className="mt-8 flex justify-end">
         <button
+          ref={submitBtnRef}
           onClick={handleRegistrarPago}
           disabled={
             guardando ||

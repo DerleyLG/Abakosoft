@@ -212,38 +212,30 @@ module.exports = {
             connection,
           );
         } else {
-          // Descuento por anticipo: validar orden y descontar el anticipo
-          if (!d.id_orden_fabricacion) {
+          // Descuento por anticipo: buscar anticipos del trabajador (prefiere la orden si viene)
+          const preferOrder = d.id_orden_fabricacion || null;
+          const montoAAplicar = Math.abs(d.pago_unitario);
+
+          // Obtener anticipos disponibles del trabajador en el mismo orden de preferencia
+          const anticiposDisponibles =
+            await AnticiposModel.getDisponiblesByTrabajador(
+              id_trabajador,
+              preferOrder,
+              connection,
+            );
+
+          const totalDisponible = anticiposDisponibles.reduce((s, a) => {
+            return s + (Number(a.monto) - Number(a.monto_usado || 0));
+          }, 0);
+
+          if (totalDisponible < montoAAplicar) {
             await connection.rollback();
-            return res
-              .status(400)
-              .json({
-                error:
-                  "Falta id_orden_fabricacion en el descuento por anticipo.",
-              });
+            return res.status(400).json({
+              error: `El trabajador no tiene suficiente saldo en anticipos para cubrir el descuento solicitado. Disponible: ${totalDisponible}`,
+            });
           }
-          const anticipo = await AnticiposModel.getActivo(
-            id_trabajador,
-            d.id_orden_fabricacion,
-          );
-          if (!anticipo) {
-            await connection.rollback();
-            return res
-              .status(400)
-              .json({
-                error: `No hay anticipo activo para la orden ${d.id_orden_fabricacion}.`,
-              });
-          }
-          const disponible =
-            Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
-          if (Math.abs(d.pago_unitario) > disponible) {
-            await connection.rollback();
-            return res
-              .status(400)
-              .json({
-                error: `El descuento supera el saldo disponible del anticipo para la orden ${d.id_orden_fabricacion}.`,
-              });
-          }
+
+          // Insertar un único detalle de descuento (registro del descuento en el pago)
           const idDetalle = await detalleModel.create(
             {
               id_pago,
@@ -255,10 +247,22 @@ module.exports = {
             connection,
           );
           console.log("Insert detalle descuento, id generado:", idDetalle);
-          await AnticiposModel.descontar(
-            anticipo.id_anticipo,
-            Math.abs(d.pago_unitario),
-          );
+
+          // Aplicar el descuento a uno o varios anticipos del trabajador hasta cubrir el monto
+          let restante = montoAAplicar;
+          for (const anticipo of anticiposDisponibles) {
+            const disponible =
+              Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
+            if (disponible <= 0) continue;
+            const aplicar = Math.min(disponible, restante);
+            await AnticiposModel.descontar(
+              anticipo.id_anticipo,
+              aplicar,
+              connection,
+            );
+            restante -= aplicar;
+            if (restante <= 0) break;
+          }
         }
       }
 
