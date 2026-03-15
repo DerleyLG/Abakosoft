@@ -20,7 +20,7 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
   }, [cierre]);
 
   const handleChange = (id_metodo_pago, valor) => {
-    ñ; // Permitir signo negativo y números
+    // Permitir signo negativo y números
     const esNegativo = valor.startsWith("-") || valor.includes("-");
     const valorLimpio = valor.replace(/[^\d]/g, "");
     const valorNumerico = parseFloat(valorLimpio) || 0;
