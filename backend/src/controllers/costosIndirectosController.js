@@ -26,7 +26,7 @@ exports.getAll = async (req, res) => {
 
     // Obtener total de registros
     const [countResult] = await db.query(
-      "SELECT COUNT(*) as total FROM costos_indirectos"
+      "SELECT COUNT(*) as total FROM costos_indirectos",
     );
     const total = countResult[0].total;
 
@@ -35,7 +35,7 @@ exports.getAll = async (req, res) => {
       `SELECT * FROM costos_indirectos 
        ORDER BY ${validSortBy} ${validSortDir} 
        LIMIT ? OFFSET ?`,
-      [pageSize, offset]
+      [pageSize, offset],
     );
 
     res.json({
@@ -135,7 +135,7 @@ exports.createCostoIndirecto = async (req, res) => {
           monto: -Math.abs(Number(valor)),
           id_metodo_pago,
           referencia: referencia || null,
-          observaciones: observaciones_pago || null,
+          observaciones: observaciones_pago || tipo_costo || null,
           fecha_movimiento: fecha,
         });
         created.movimiento_tesoreria = true;
@@ -155,7 +155,7 @@ exports.createCostoIndirecto = async (req, res) => {
       const montos = asignaciones.map((a) => Number(a?.valor_asignado || 0));
       const suma = montos.reduce(
         (acc, n) => acc + (Number.isFinite(n) ? n : 0),
-        0
+        0,
       );
       if (suma !== Number(valor)) {
         return res.status(400).json({
@@ -182,10 +182,10 @@ exports.createCostoIndirecto = async (req, res) => {
       const placeholders = idsOF.map(() => "?").join(",");
       const [estadoRows] = await db.query(
         `SELECT id_orden_fabricacion, estado FROM ordenes_fabricacion WHERE id_orden_fabricacion IN (${placeholders})`,
-        idsOF
+        idsOF,
       );
       const estadoMap = new Map(
-        estadoRows.map((r) => [Number(r.id_orden_fabricacion), r.estado])
+        estadoRows.map((r) => [Number(r.id_orden_fabricacion), r.estado]),
       );
       for (const a of asignaciones) {
         const estado = estadoMap.get(Number(a.id_orden_fabricacion));
@@ -219,7 +219,7 @@ exports.createCostoIndirecto = async (req, res) => {
         // Validar estado de la OF
         const [rows] = await db.query(
           `SELECT estado FROM ordenes_fabricacion WHERE id_orden_fabricacion = ?`,
-          [Number(id_orden_fabricacion)]
+          [Number(id_orden_fabricacion)],
         );
         if (!rows.length) {
           return res
@@ -244,7 +244,7 @@ exports.createCostoIndirecto = async (req, res) => {
         // No romper la creación del costo si falla la asignación; informar con warning
         console.error(
           "Fallo al crear asignación automática de costo indirecto:",
-          e
+          e,
         );
         created.asignacion_warning =
           "Costo creado, pero no se pudo asignar automáticamente a la OF.";
@@ -327,9 +327,28 @@ exports.delete = async (req, res) => {
       return res.status(404).json({ error: "Costo indirecto no encontrado" });
     }
 
+    // Eliminar movimiento de tesorería asociado
+    let tesoreriaEliminada = false;
+    try {
+      const tesoreriaModel = require("../models/tesoreriaModel");
+      const deleted = await tesoreriaModel.deleteByDocumentoAndTipo(
+        id,
+        "costo_indirecto",
+      );
+      tesoreriaEliminada = deleted > 0;
+    } catch (errTes) {
+      console.error(
+        "Error eliminando movimiento de tesorería del costo indirecto:",
+        errTes,
+      );
+    }
+
     res
       .status(200)
-      .json({ message: "Costo indirecto eliminado correctamente" });
+      .json({
+        message: "Costo indirecto eliminado correctamente",
+        tesoreriaEliminada,
+      });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

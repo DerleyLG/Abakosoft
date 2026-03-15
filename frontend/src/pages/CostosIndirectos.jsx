@@ -39,8 +39,8 @@ const CostosIndirectos = () => {
       const rows = Array.isArray(res.data?.data)
         ? res.data.data
         : Array.isArray(res.data)
-        ? res.data
-        : [];
+          ? res.data
+          : [];
       setCostos(rows);
       setTotal(res.data?.total || rows.length);
       setTotalPages(res.data?.totalPages || 1);
@@ -87,7 +87,7 @@ const CostosIndirectos = () => {
       if (!asignacionesDetalle[idCosto]) {
         try {
           const res = await api.get(
-            `/costos-indirectos-asignados/costo/${idCosto}`
+            `/costos-indirectos-asignados/costo/${idCosto}`,
           );
           const asignaciones = Array.isArray(res.data) ? res.data : [];
           setAsignacionesDetalle((prev) => ({
@@ -112,8 +112,11 @@ const CostosIndirectos = () => {
           label: "Sí",
           onClick: async () => {
             try {
-              await api.delete(`/costos-indirectos/${id}`);
+              const { data } = await api.delete(`/costos-indirectos/${id}`);
               toast.success("Costo indirecto eliminado");
+              if (data.tesoreriaEliminada) {
+                toast.success("Movimiento de tesorería asociado eliminado");
+              }
               fetchCostos();
               setCostos((prev) => prev.filter((c) => c.id !== id));
             } catch (error) {
@@ -289,7 +292,7 @@ const CostosIndirectos = () => {
                           <span className="text-gray-400 text-xs">-</span>
                         ) : costo.fecha ? (
                           new Date(
-                            costo.fecha.split("T")[0] + "T00:00:00"
+                            costo.fecha.split("T")[0] + "T00:00:00",
                           ).toLocaleDateString("es-CO")
                         ) : (
                           "-"
@@ -299,11 +302,11 @@ const CostosIndirectos = () => {
                         {costo.fecha_inicio && costo.fecha_fin ? (
                           <span className="text-sm">
                             {new Date(
-                              costo.fecha_inicio.split("T")[0] + "T00:00:00"
+                              costo.fecha_inicio.split("T")[0] + "T00:00:00",
                             ).toLocaleDateString("es-CO")}{" "}
                             -{" "}
                             {new Date(
-                              costo.fecha_fin.split("T")[0] + "T00:00:00"
+                              costo.fecha_fin.split("T")[0] + "T00:00:00",
                             ).toLocaleDateString("es-CO")}
                           </span>
                         ) : (
@@ -390,10 +393,10 @@ const CostosIndirectos = () => {
                                               asig.estado === "completada"
                                                 ? "bg-green-100 text-green-800"
                                                 : asig.estado === "en proceso"
-                                                ? "bg-blue-100 text-blue-800"
-                                                : asig.estado === "pendiente"
-                                                ? "bg-yellow-100 text-yellow-800"
-                                                : "bg-gray-100 text-gray-800"
+                                                  ? "bg-blue-100 text-blue-800"
+                                                  : asig.estado === "pendiente"
+                                                    ? "bg-yellow-100 text-yellow-800"
+                                                    : "bg-gray-100 text-gray-800"
                                             }`}
                                           >
                                             {asig.estado}
@@ -429,8 +432,8 @@ const CostosIndirectos = () => {
                                               <span className="ml-1 font-medium text-slate-700">
                                                 {new Date(
                                                   asig.fecha_inicio.split(
-                                                    "T"
-                                                  )[0] + "T00:00:00"
+                                                    "T",
+                                                  )[0] + "T00:00:00",
                                                 ).toLocaleDateString("es-CO")}
                                               </span>
                                             </div>
@@ -447,7 +450,7 @@ const CostosIndirectos = () => {
                                                   (
                                                     asig.fecha_entrega ||
                                                     asig.fecha_fin_estimada
-                                                  ).split("T")[0] + "T00:00:00"
+                                                  ).split("T")[0] + "T00:00:00",
                                                 ).toLocaleDateString("es-CO")}
                                               </span>
                                             </div>
@@ -464,7 +467,7 @@ const CostosIndirectos = () => {
                                               currency: "COP",
                                               maximumFractionDigits: 0,
                                             }).format(
-                                              Number(asig.valor_asignado) || 0
+                                              Number(asig.valor_asignado) || 0,
                                             )}
                                           </span>
                                         </div>

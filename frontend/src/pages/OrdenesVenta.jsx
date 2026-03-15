@@ -85,8 +85,11 @@ const OrdenesVenta = () => {
           label: "Sí",
           onClick: async () => {
             try {
-              await api.delete(`/ordenes-venta/${id}`);
+              const { data } = await api.delete(`/ordenes-venta/${id}`);
               toast.success("Registro eliminado");
+              if (data.tesoreriaEliminada) {
+                toast.success("Movimiento de tesorería asociado eliminado");
+              }
               setOrdenes((prev) =>
                 prev.filter((item) => item.id_orden_venta !== id),
               );

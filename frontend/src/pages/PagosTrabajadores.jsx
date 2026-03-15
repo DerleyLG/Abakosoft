@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { FiPlus, FiEye, FiArrowLeft, FiTrash2 } from 'react-icons/fi';
-import React from 'react';
-import Swal from 'sweetalert2';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+import { FiPlus, FiEye, FiArrowLeft, FiTrash2 } from "react-icons/fi";
+import React from "react";
+import Swal from "sweetalert2";
+import toast from "react-hot-toast";
 
 const PagosTrabajadores = () => {
   const [pagos, setPagos] = useState([]);
   const [trabajadores, setTrabajadores] = useState([]);
-  const [trabajadorFiltro, setTrabajadorFiltro] = useState('');
+  const [trabajadorFiltro, setTrabajadorFiltro] = useState("");
   const [expandedPago, setExpandedPago] = useState(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -23,10 +23,10 @@ const PagosTrabajadores = () => {
   useEffect(() => {
     const fetchInit = async () => {
       try {
-        const resTrabajadores = await api.get('/trabajadores');
+        const resTrabajadores = await api.get("/trabajadores");
         setTrabajadores(resTrabajadores.data || []);
       } catch (error) {
-        console.error('Error cargando trabajadores:', error);
+        console.error("Error cargando trabajadores:", error);
       }
     };
     fetchInit();
@@ -36,12 +36,12 @@ const PagosTrabajadores = () => {
     const fetchPagos = async () => {
       setLoading(true);
       try {
-        const resPagos = await api.get('/pagos', {
+        const resPagos = await api.get("/pagos", {
           params: {
             page,
             pageSize,
-            sortBy: 'fecha_pago',
-            sortDir: 'desc',
+            sortBy: "fecha_pago",
+            sortDir: "desc",
             trabajadorId: trabajadorFiltro || undefined,
           },
         });
@@ -52,7 +52,7 @@ const PagosTrabajadores = () => {
         setHasNext(Boolean(payload.hasNext));
         setHasPrev(Boolean(payload.hasPrev));
       } catch (error) {
-        console.error('Error cargando pagos:', error);
+        console.error("Error cargando pagos:", error);
       } finally {
         setLoading(false);
       }
@@ -70,14 +70,14 @@ const PagosTrabajadores = () => {
     if (!pago.detalles) {
       try {
         const res = await api.get(`/detalle-pago-trabajador/${id_pago}`);
-    
+
         setPagos((prev) =>
           prev.map((p) =>
-            p.id_pago === id_pago ? { ...p, detalles: res.data } : p
-          )
+            p.id_pago === id_pago ? { ...p, detalles: res.data } : p,
+          ),
         );
       } catch (error) {
-        console.error('Error al cargar detalles:', error);
+        console.error("Error al cargar detalles:", error);
         return;
       }
     }
@@ -86,27 +86,30 @@ const PagosTrabajadores = () => {
 
   const handleDeletePago = async (id_pago, trabajador) => {
     const result = await Swal.fire({
-      title: '¿Estás seguro?',
+      title: "¿Estás seguro?",
       html: `Esto eliminará el pago del trabajador <strong>${trabajador}</strong>.<br>Los avances volverán a estado "pendiente de pago".`,
-      icon: 'warning',
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
     });
 
     if (result.isConfirmed) {
       try {
-        await api.delete(`/pagos/${id_pago}`);
-        toast.success('Pago eliminado correctamente');
-  
-        const resPagos = await api.get('/pagos', {
+        const { data } = await api.delete(`/pagos/${id_pago}`);
+        toast.success("Pago eliminado correctamente");
+        if (data.tesoreriaEliminada) {
+          toast.success("Movimiento de tesorería asociado eliminado");
+        }
+
+        const resPagos = await api.get("/pagos", {
           params: {
             page,
             pageSize,
-            sortBy: 'fecha_pago',
-            sortDir: 'desc',
+            sortBy: "fecha_pago",
+            sortDir: "desc",
             trabajadorId: trabajadorFiltro || undefined,
           },
         });
@@ -117,13 +120,12 @@ const PagosTrabajadores = () => {
         setHasNext(Boolean(payload.hasNext));
         setHasPrev(Boolean(payload.hasPrev));
       } catch (error) {
-        console.error('Error eliminando pago:', error);
-        toast.error('Error al eliminar el pago');
+        console.error("Error eliminando pago:", error);
+        toast.error("Error al eliminar el pago");
       }
     }
   };
 
- 
   const onTrabajadorChange = (e) => {
     setTrabajadorFiltro(e.target.value);
     setPage(1);
@@ -134,40 +136,37 @@ const PagosTrabajadores = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-gray-800">Pagos</h2>
         <div className="flex gap-4 items-center">
-      
-      <div className="">
-        <label className="text-gray-700 font-semibold mr-2">
-          Filtrar por trabajador:
-        </label>
-        <select
-          className="border border-gray-300 rounded-md px-4 py-2"
-          value={trabajadorFiltro}
-          onChange={onTrabajadorChange}
-        >
-          <option value="">Todos</option>
-          {trabajadores.map((t) => (
-            <option key={t.id_trabajador} value={t.id_trabajador}>
-              {t.nombre}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button
+          <div className="">
+            <label className="text-gray-700 font-semibold mr-2">
+              Filtrar por trabajador:
+            </label>
+            <select
+              className="border border-gray-300 rounded-md px-4 py-2"
+              value={trabajadorFiltro}
+              onChange={onTrabajadorChange}
+            >
+              <option value="">Todos</option>
+              {trabajadores.map((t) => (
+                <option key={t.id_trabajador} value={t.id_trabajador}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
             onClick={() => navigate("/avances_fabricacion")}
             className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            
             Avances de fabricacion
-          </button> 
+          </button>
           <button
             onClick={() => navigate("/pagos_anticipados")}
             className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
           >
-            
             Anticipos
           </button>
           <button
-            onClick={() => navigate('/pagos/nuevo')}
+            onClick={() => navigate("/pagos/nuevo")}
             className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
             title="Crear nuevo trabajador"
           >
@@ -175,7 +174,7 @@ const PagosTrabajadores = () => {
             Registrar pago
           </button>
           <button
-            onClick={() => navigate('/Trabajadores')}
+            onClick={() => navigate("/Trabajadores")}
             className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
           >
             <FiArrowLeft />
@@ -183,8 +182,6 @@ const PagosTrabajadores = () => {
           </button>
         </div>
       </div>
-
-      
 
       <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
         <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
@@ -199,116 +196,139 @@ const PagosTrabajadores = () => {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan="4" className="text-center py-6 text-gray-500">Cargando...</td>
+                <td colSpan="4" className="text-center py-6 text-gray-500">
+                  Cargando...
+                </td>
               </tr>
             )}
             {!loading && pagos.length === 0 && (
               <tr>
-                <td colSpan="4" className="text-center py-6 text-gray-500">No se encontraron pagos.</td>
+                <td colSpan="4" className="text-center py-6 text-gray-500">
+                  No se encontraron pagos.
+                </td>
               </tr>
             )}
-            {!loading && pagos.length > 0 && pagos.map((pago) => (
-              <React.Fragment key={pago.id_pago}>
-                <tr
-                  onClick={() => toggleExpand(pago.id_pago)}
-                  className={`cursor-pointer ${
-                    expandedPago === pago.id_pago ? 'bg-gray-200 hover:bg-gray-200' : 'hover:bg-gray-200'
-                  }`}
-                >
-                  <td className="px-4 py-3">{pago.trabajador}</td>
-                  <td className="px-4 py-3">
-                    {pago.fecha_pago 
-                      ? (() => {
-                          // Extraer solo la parte de fecha YYYY-MM-DD del string
-                          const fechaStr = String(pago.fecha_pago).split('T')[0].split(' ')[0];
-                          const [year, month, day] = fechaStr.split('-');
-                          return `${day}/${month}/${year}`;
-                        })()
-                      : 'N/A'
-                    }
-                  </td>
-                  <td className="px-4 py-3">
-                    ${Number(pago.total).toLocaleString("es-CO") || '0.00'}
-                  </td>
-  
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePago(pago.id_pago, pago.trabajador);
-                        }}
-                        className="text-red-600 hover:text-red-400 transition cursor-pointer"
-                        title="Eliminar pago"
-                      >
-                        <FiTrash2 size={20} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {expandedPago === pago.id_pago && (
-                  
-                  <tr>
-                    <td colSpan="5" className="px-2 py-2 border-b border-gray-300">
-                      <strong>Observaciones:</strong>{' '}
-                      {pago.observaciones || 'Ninguna'}
+            {!loading &&
+              pagos.length > 0 &&
+              pagos.map((pago) => (
+                <React.Fragment key={pago.id_pago}>
+                  <tr
+                    onClick={() => toggleExpand(pago.id_pago)}
+                    className={`cursor-pointer ${
+                      expandedPago === pago.id_pago
+                        ? "bg-gray-200 hover:bg-gray-200"
+                        : "hover:bg-gray-200"
+                    }`}
+                  >
+                    <td className="px-4 py-3">{pago.trabajador}</td>
+                    <td className="px-4 py-3">
+                      {pago.fecha_pago
+                        ? (() => {
+                            // Extraer solo la parte de fecha YYYY-MM-DD del string
+                            const fechaStr = String(pago.fecha_pago)
+                              .split("T")[0]
+                              .split(" ")[0];
+                            const [year, month, day] = fechaStr.split("-");
+                            return `${day}/${month}/${year}`;
+                          })()
+                        : "N/A"}
+                    </td>
+                    <td className="px-4 py-3">
+                      ${Number(pago.total).toLocaleString("es-CO") || "0.00"}
+                    </td>
 
-                      <div className="mt-3">
-                        <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
-                          <thead className='bg-gray-200 text-gray-700'>
-                            <tr className="px-2 py-2 border-b border-gray-300">
-                              <th className="px-2 py-2 border-b border-gray-300">
-                                Orden de fabricacion - etapa
-                              </th>
-                              <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
-                              <th className="px-2 py-2 border-b border-gray-300">Pago Unitario</th>
-                              <th className="ppx-2 py-2 border-b border-gray-300">Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody className="hover:bg-gray-50">
-                            {pago.detalles && pago.detalles.length > 0 ? (
-                              pago.detalles.map((d, index) => (
-                                <tr key={index}>
-                                  <td className="px-2 py-2 border-b border-gray-300">
-  {parseInt(d.es_descuento) === 1
-    ? "Descuento por anticipo"
-    : `#${d.id_orden_fabricacion}  -  ${d.nombre_cliente} --- ${d.nombre_etapa}`
-  }
-</td>
-                                  <td className="px-2 py-2 border-b border-gray-300">{d.cantidad}</td>
-                                  <td className="px-2 py-2 border-b border-gray-300">
-                                    ${Number(d.pago_unitario).toLocaleString()}
-                                  </td>
-                                  <td className="px-2 py-2 border-b border-gray-300">
-                                    ${Number(d.subtotal).toLocaleString()}
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td
-                                  colSpan="4"
-                                  className="text-center py-2 text-gray-500"
-                                >
-                                  No hay detalles disponibles.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePago(pago.id_pago, pago.trabajador);
+                          }}
+                          className="text-red-600 hover:text-red-400 transition cursor-pointer"
+                          title="Eliminar pago"
+                        >
+                          <FiTrash2 size={20} />
+                        </button>
                       </div>
                     </td>
                   </tr>
-                )}
-              </React.Fragment>
-            ))}
+                  {expandedPago === pago.id_pago && (
+                    <tr>
+                      <td
+                        colSpan="5"
+                        className="px-2 py-2 border-b border-gray-300"
+                      >
+                        <strong>Observaciones:</strong>{" "}
+                        {pago.observaciones || "Ninguna"}
+                        <div className="mt-3">
+                          <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
+                            <thead className="bg-gray-200 text-gray-700">
+                              <tr className="px-2 py-2 border-b border-gray-300">
+                                <th className="px-2 py-2 border-b border-gray-300">
+                                  Orden de fabricacion - etapa
+                                </th>
+                                <th className="px-2 py-2 border-b border-gray-300">
+                                  Cantidad
+                                </th>
+                                <th className="px-2 py-2 border-b border-gray-300">
+                                  Pago Unitario
+                                </th>
+                                <th className="ppx-2 py-2 border-b border-gray-300">
+                                  Subtotal
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="hover:bg-gray-50">
+                              {pago.detalles && pago.detalles.length > 0 ? (
+                                pago.detalles.map((d, index) => (
+                                  <tr key={index}>
+                                    <td className="px-2 py-2 border-b border-gray-300">
+                                      {parseInt(d.es_descuento) === 1
+                                        ? "Descuento por anticipo"
+                                        : `#${d.id_orden_fabricacion}  -  ${d.nombre_cliente} --- ${d.nombre_etapa}`}
+                                    </td>
+                                    <td className="px-2 py-2 border-b border-gray-300">
+                                      {d.cantidad}
+                                    </td>
+                                    <td className="px-2 py-2 border-b border-gray-300">
+                                      $
+                                      {Number(d.pago_unitario).toLocaleString()}
+                                    </td>
+                                    <td className="px-2 py-2 border-b border-gray-300">
+                                      ${Number(d.subtotal).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td
+                                    colSpan="4"
+                                    className="text-center py-2 text-gray-500"
+                                  >
+                                    No hay detalles disponibles.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
           </tbody>
         </table>
         {/* Paginación */}
         <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span> de <span className="font-semibold text-gray-800">{totalPages}</span> {total ? `— ` : ''}<span className="font-semibold text-gray-800">{total || ''}</span>{total ? ` pagos` : ''}
+              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
+              de{" "}
+              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
+              {total ? `— ` : ""}
+              <span className="font-semibold text-gray-800">{total || ""}</span>
+              {total ? ` pagos` : ""}
             </div>
             <div className="flex items-center gap-3">
               <button
