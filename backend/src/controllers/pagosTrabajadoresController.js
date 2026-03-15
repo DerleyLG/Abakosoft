@@ -442,7 +442,22 @@ module.exports = {
       }
       // --- FIN AÑADIDO ---
 
-      res.json({ message: "Pago eliminado correctamente" });
+      // Eliminar movimiento de tesorería asociado al pago
+      let tesoreriaEliminada = false;
+      try {
+        const deleted = await tesoreriaModel.deleteByDocumentoAndTipo(
+          id_pago,
+          "pago_trabajador",
+        );
+        tesoreriaEliminada = deleted > 0;
+      } catch (errTes) {
+        console.error(
+          "Error eliminando movimiento de tesorería del pago:",
+          errTes,
+        );
+      }
+
+      res.json({ message: "Pago eliminado correctamente", tesoreriaEliminada });
     } catch (error) {
       console.error("Error eliminando pago:", error);
       res.status(500).json({ error: "Error eliminando pago" });
@@ -516,6 +531,7 @@ module.exports = {
 
       // Crear movimiento de tesorería
       const tesoreriaModel = require("../models/tesoreriaModel");
+      const nombreTrabajador = trabajadorExistente.nombre || null;
       await tesoreriaModel.insertarMovimiento(
         {
           id_documento: id_anticipo,
@@ -523,7 +539,7 @@ module.exports = {
           monto: -Math.abs(Number(monto)),
           id_metodo_pago,
           referencia: referencia || null,
-          observaciones: observaciones_pago || null,
+          observaciones: observaciones_pago || nombreTrabajador || null,
           fecha_movimiento: fecha,
         },
         connection,

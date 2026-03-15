@@ -29,7 +29,7 @@ function getTodayYMDForTZ(timeZone) {
 async function clienteExists(id_cliente, connection = db) {
   const [rows] = await (connection || db).query(
     "SELECT 1 FROM clientes WHERE id_cliente = ? LIMIT 1",
-    [id_cliente]
+    [id_cliente],
   );
   return rows.length > 0;
 }
@@ -124,14 +124,14 @@ module.exports = {
 
       const clienteExistente = await clienteModel.getById(
         id_cliente,
-        connection
+        connection,
       );
       if (!clienteExistente) {
         throw new Error("El cliente especificado no existe.");
       }
       if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
         throw new Error(
-          `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`
+          `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}`,
         );
       }
       // Fecha de la OV: forzar fecha local del servidor según TZ configurable (por defecto America/Bogota)
@@ -147,7 +147,7 @@ module.exports = {
 
         const articuloExistente = await articuloModel.getById(
           id_articulo,
-          connection
+          connection,
         );
         if (!articuloExistente) {
           throw new Error(`El artículo con ID ${id_articulo} no existe.`);
@@ -159,7 +159,7 @@ module.exports = {
           precio_unitario <= 0
         ) {
           throw new Error(
-            `El precio para el artículo '${articuloExistente.descripcion}' debe ser un número válido mayor a cero.`
+            `El precio para el artículo '${articuloExistente.descripcion}' debe ser un número válido mayor a cero.`,
           );
         }
 
@@ -175,7 +175,7 @@ module.exports = {
           monto: totalVenta,
           id_pedido: id_pedido || null,
         },
-        connection
+        connection,
       );
 
       for (const detalle of detalles) {
@@ -190,7 +190,7 @@ module.exports = {
             referencia_documento_id: id_orden_venta,
             referencia_documento_tipo: "orden_venta",
           },
-          connection
+          connection,
         );
 
         await detalleOrdenModel.create(
@@ -201,7 +201,7 @@ module.exports = {
             observaciones: "",
             precio_unitario: detalle.precio_unitario,
           },
-          connection
+          connection,
         );
       }
       // Resolver id_metodo_pago por nombre si no se proporcionó
@@ -211,7 +211,7 @@ module.exports = {
         req.body.metodo_nombre
       ) {
         resolvedMetodoId = await metodosDePagoModel.getIdByName(
-          req.body.metodo_nombre
+          req.body.metodo_nombre,
         );
       }
 
@@ -231,13 +231,13 @@ module.exports = {
             estado: "pendiente",
             observaciones: observaciones_pago || null,
           },
-          connection
+          connection,
         );
         // Forzar id_metodo_pago a 4 (CREDITO)
         await ordenModel.update(
           id_orden_venta,
           { id_metodo_pago: creditoMetodoId },
-          connection
+          connection,
         );
       } else {
         // Movimiento real en tesorería
@@ -305,7 +305,7 @@ module.exports = {
 
       // Validar que la fecha de la orden no esté en un período cerrado
       const fechaCerrada = await cierresCajaModel.validarFechaCerrada(
-        ordenActual.fecha
+        ordenActual.fecha,
       );
       if (fechaCerrada) {
         return res.status(400).json({
@@ -322,7 +322,7 @@ module.exports = {
       }
       if (!ESTADOS_VALIDOS.includes(estado)) {
         throw new Error(
-          `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}.`
+          `Estado inválido. Debe ser uno de: ${ESTADOS_VALIDOS.join(", ")}.`,
         );
       }
 
@@ -340,10 +340,10 @@ module.exports = {
               referencia_documento_id: id,
               referencia_documento_tipo: "anulacion_orden_venta",
             },
-            connection
+            connection,
           );
           console.log(
-            `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`
+            `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`,
           );
         }
       }
@@ -362,7 +362,7 @@ module.exports = {
               cantidad: detalle.cantidad,
               precio_unitario: detalle.precio_unitario,
             },
-            connection
+            connection,
           );
         }
       }
@@ -387,7 +387,7 @@ module.exports = {
           estado,
           total: nuevoTotal,
         },
-        connection
+        connection,
       );
 
       console.log("Filas actualizadas:", updatedRows);
@@ -402,7 +402,7 @@ module.exports = {
             referencia: referencia || null,
             observaciones: observaciones_pago || null,
           },
-          connection
+          connection,
         );
       }
 
@@ -419,13 +419,13 @@ module.exports = {
       ) {
         const credito = await ventasCreditoModel.getByOrdenVentaId(
           id,
-          connection
+          connection,
         );
         if (credito) {
           // Buscar abonos realizados
           const AbonosCreditoModel = require("../models/AbonosCredito");
           const resumen = await AbonosCreditoModel.obtenerResumenCredito(
-            credito.id_venta_credito
+            credito.id_venta_credito,
           );
           const totalAbonado = resumen ? Number(resumen.total_abonado) : 0;
           let nuevoEstado;
@@ -442,13 +442,13 @@ module.exports = {
           }
           await connection.query(
             `UPDATE ventas_credito SET monto_total = ?, saldo_pendiente = ?, estado = ? WHERE id_orden_venta = ?`,
-            [nuevoTotal, nuevoSaldo, nuevoEstado, id]
+            [nuevoTotal, nuevoSaldo, nuevoEstado, id],
           );
           // Forzar id_metodo_pago a 4 (CREDITO) si hay crédito
           await ordenModel.update(
             id,
             { id_metodo_pago: creditoMetodoId },
-            connection
+            connection,
           );
         }
       }
@@ -498,17 +498,25 @@ module.exports = {
             referencia_documento_id: id,
             referencia_documento_tipo: "anulacion_orden_venta",
           },
-          connection
+          connection,
         );
         console.log(
-          `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`
+          `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`,
         );
       }
+
+      // Eliminar movimiento de tesorería asociado a la venta
+      const tesoreriaDeleted = await tesoreriaModel.deleteByDocumentoAndTipo(
+        id,
+        "orden_venta",
+        connection,
+      );
 
       await connection.commit();
       connection.release();
       res.json({
         message: "Orden de venta anulada y stock reintegrado correctamente.",
+        tesoreriaEliminada: tesoreriaDeleted > 0,
       });
     } catch (err) {
       if (connection) {

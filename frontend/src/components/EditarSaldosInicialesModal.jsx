@@ -29,8 +29,8 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
       prevSaldos.map((s) =>
         s.id_metodo_pago === id_metodo_pago
           ? { ...s, saldo_inicial: valorFinal }
-          : s
-      )
+          : s,
+      ),
     );
   };
 
@@ -59,7 +59,7 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
       console.error("Error actualizando saldos iniciales:", error);
       toast.error(
         error.response?.data?.error ||
-          "Error al actualizar los saldos iniciales"
+          "Error al actualizar los saldos iniciales",
       );
     } finally {
       setGuardando(false);
@@ -167,7 +167,7 @@ const EditarSaldosInicialesModal = ({ cierre, onClose, onActualizar }) => {
               </span>
               <span className="text-slate-900 font-bold text-2xl">
                 {formatMonto(
-                  saldos.reduce((sum, s) => sum + s.saldo_inicial, 0)
+                  saldos.reduce((sum, s) => sum + s.saldo_inicial, 0),
                 )}
               </span>
             </div>

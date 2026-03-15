@@ -113,10 +113,10 @@ const TesoreriaDashboard = () => {
     const currentYear = now.getFullYear();
 
     const efectivoId = metodos.find((m) =>
-      m.nombre.toLowerCase().includes("efectivo")
+      m.nombre.toLowerCase().includes("efectivo"),
     )?.id_metodo_pago;
     const transferenciaId = metodos.find((m) =>
-      m.nombre.toLowerCase().includes("transferencia")
+      m.nombre.toLowerCase().includes("transferencia"),
     )?.id_metodo_pago;
 
     movs.forEach((mov) => {
@@ -247,7 +247,7 @@ const TesoreriaDashboard = () => {
 
         const resumenCalculado = calcularResumenFinanciero(
           movimientosData,
-          metodosData
+          metodosData,
         );
         setResumenFinanciero(resumenCalculado);
       } catch (err) {
@@ -353,10 +353,10 @@ const TesoreriaDashboard = () => {
       new Set(
         movimientosFiltrados
           .filter(
-            (m) => getTipoMovimiento(m) === "abono_credito" && m.id_documento
+            (m) => getTipoMovimiento(m) === "abono_credito" && m.id_documento,
           )
-          .map((m) => m.id_documento)
-      )
+          .map((m) => m.id_documento),
+      ),
     );
 
     if (creditosIds.length === 0) return;
@@ -375,7 +375,7 @@ const TesoreriaDashboard = () => {
             } catch (e) {
               console.error("Error fetching credito", id, e);
             }
-          })
+          }),
         );
       } catch (e) {
         console.error("Error preloading creditos", e);
@@ -403,14 +403,14 @@ const TesoreriaDashboard = () => {
       setMovimientos(movimientosRes.data);
       const resumenCalculado = calcularResumenFinanciero(
         movimientosRes.data,
-        metodosPago
+        metodosPago,
       );
       setResumenFinanciero(resumenCalculado);
     } catch (error) {
       toast.dismiss(loadingToast);
       console.error("Error en transferencia:", error);
       toast.error(
-        error.response?.data?.error || "Error al procesar transferencia"
+        error.response?.data?.error || "Error al procesar transferencia",
       );
       throw error; // Re-lanzar para que el drawer lo maneje
     } finally {
@@ -672,14 +672,15 @@ const TesoreriaDashboard = () => {
               movimientosPaginados.map((mov) => {
                 const tipo = getTipoMovimiento(mov);
                 const idRef = getIdReferencia(mov);
-                // Color según símbolo '-' en el valor: si comienza con '-' -> rojo, si no -> verde
+                // Color según símbolo '-' en el valor: si comienza con '-'  rojo, si no  verde
                 const montoStr = String(mov.monto ?? "").trim();
                 const montoColor = montoStr.startsWith("-")
                   ? "text-red-700"
                   : "text-green-700";
-                const creditoInfo = mov.id_documento
-                  ? cacheCreditos[mov.id_documento]
-                  : null;
+                const creditoInfo =
+                  tipo === "abono_credito" && mov.id_documento
+                    ? cacheCreditos[mov.id_documento]
+                    : null;
                 const clienteNombre = creditoInfo
                   ? creditoInfo.cliente_nombre
                   : null;
@@ -705,8 +706,18 @@ const TesoreriaDashboard = () => {
                     <td className="px-4 py-3">
                       {getMetodoNombre(mov.id_metodo_pago)}
                     </td>
-                    <td className="px-4 py-3">{mov.referencia || "-"}</td>
-                    <td className="px-4 py-3">{mov.observaciones || "-"}</td>
+                    <td
+                      className="px-4 py-3 max-w-[150px] truncate"
+                      title={mov.referencia || ""}
+                    >
+                      {mov.referencia || "-"}
+                    </td>
+                    <td
+                      className="px-4 py-3 max-w-[200px] truncate"
+                      title={mov.observaciones || ""}
+                    >
+                      {mov.observaciones || "-"}
+                    </td>
                     <td className="px-4 py-3">
                       {tipo === "abono_credito" && mov.id_documento && (
                         <button
@@ -736,7 +747,6 @@ const TesoreriaDashboard = () => {
           </tbody>
         </table>
 
-        {/* Paginación */}
         <div className="mt-4 bg-white rounded-lg p-4 border-t border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-600 font-medium">
