@@ -179,6 +179,17 @@ module.exports = {
         return res.status(400).json({ error: "Estado inválido." });
       }
 
+      // Evitar órdenes duplicadas para el mismo pedido
+      if (id_pedido) {
+        const yaExiste =
+          await ordenesFabricacionModel.checkIfExistsByPedidoId(id_pedido);
+        if (yaExiste) {
+          return res.status(409).json({
+            error: `Ya existe una orden de fabricación para el pedido #${id_pedido}.`,
+          });
+        }
+      }
+
       const id_orden_fabricacion = await ordenesFabricacionModel.create({
         id_orden_venta,
         fecha_inicio,
@@ -226,15 +237,80 @@ module.exports = {
   update: async (req, res) => {
     try {
       const id = req.params.id;
-      const { id_orden_venta, fecha_inicio, fecha_fin_estimada, estado } =
-        req.body;
-
-      await ordenesFabricacionModel.update(id, {
+      const {
         id_orden_venta,
         fecha_inicio,
         fecha_fin_estimada,
         estado,
+        detalles,
+      } = req.body;
+
+      // Verificar que la orden exista
+      const orden = await ordenesFabricacionModel.getById(id);
+      if (!orden) {
+        return res
+          .status(404)
+          .json({ error: "Orden de fabricación no encontrada." });
+      }
+
+      // Verificar que la orden no tenga avances registrados
+      const avances = await avanceEtapasModel.getByOrden(id);
+      if (avances && avances.length > 0) {
+        return res.status(409).json({
+          error:
+            "No se puede editar la orden: ya tiene avances de producción registrados.",
+        });
+      }
+
+      // Actualizar datos de la orden
+      await ordenesFabricacionModel.update(id, {
+        id_orden_venta:
+          id_orden_venta !== undefined ? id_orden_venta : orden.id_orden_venta,
+        fecha_inicio: fecha_inicio || orden.fecha_inicio,
+        fecha_fin_estimada: fecha_fin_estimada || orden.fecha_fin_estimada,
+        estado: estado || orden.estado,
       });
+
+      // Si se envían detalles, reemplazar los existentes
+      if (Array.isArray(detalles) && detalles.length > 0) {
+        // Eliminar detalles actuales y sus etapas personalizadas
+        const detallesActuales = await detalleOrdenFabricacionModel.getById(id);
+        for (const det of detallesActuales) {
+          await etapasDetalleFabricacionModel.deleteByDetalle(
+            det.id_detalle_fabricacion,
+          );
+          await detalleOrdenFabricacionModel.delete(det.id_detalle_fabricacion);
+        }
+
+        // Crear nuevos detalles
+        for (const detalle of detalles) {
+          const {
+            id_articulo,
+            cantidad,
+            id_etapa_final,
+            etapas_personalizadas,
+          } = detalle;
+          if (!id_articulo || !cantidad) {
+            return res
+              .status(400)
+              .json({ error: "Faltan campos en uno o más detalles." });
+          }
+          const id_detalle_fabricacion =
+            await detalleOrdenFabricacionModel.create({
+              id_orden_fabricacion: Number(id),
+              id_articulo,
+              cantidad,
+              id_etapa_final,
+            });
+
+          if (etapas_personalizadas && etapas_personalizadas.length > 0) {
+            await etapasDetalleFabricacionModel.createMultiple(
+              id_detalle_fabricacion,
+              etapas_personalizadas,
+            );
+          }
+        }
+      }
 
       res.json({ message: "Orden de fabricación actualizada correctamente." });
     } catch (error) {

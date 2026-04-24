@@ -52,7 +52,7 @@ module.exports = {
       vc.saldo_pendiente
     ORDER BY ov.id_orden_venta DESC;
   `,
-      estados
+      estados,
     );
 
     return rows;
@@ -83,8 +83,10 @@ module.exports = {
     const whereParts = [`ov.estado IN (${estadoPlaceholders})`];
     const params = [...estados];
     if (buscar) {
-      whereParts.push("c.nombre LIKE ?");
-      params.push(`%${buscar}%`);
+      whereParts.push(
+        "(c.nombre LIKE ? OR CAST(ov.id_orden_venta AS CHAR) LIKE ?)",
+      );
+      params.push(`%${buscar}%`, `%${buscar}%`);
     }
     const whereSQL = whereParts.length
       ? `WHERE ${whereParts.join(" AND ")}`
@@ -127,14 +129,14 @@ module.exports = {
        ${base}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
-      [...params, ps, offset]
+      [...params, ps, offset],
     );
 
     const [countRows] = await db.query(
       `SELECT COUNT(*) AS total FROM (
          SELECT ov.id_orden_venta ${base}
        ) AS sub`,
-      params
+      params,
     );
     const total = countRows[0]?.total || 0;
 
@@ -154,8 +156,8 @@ module.exports = {
        FROM articulos AS a
        JOIN categorias AS c ON a.id_categoria = c.id_categoria
        LEFT JOIN inventario AS i ON a.id_articulo = i.id_articulo
-       WHERE c.tipo = 'articulo_fabricable'
-       ORDER BY a.descripcion ASC`
+       WHERE c.tipo IN ('articulo_fabricable', 'materia_prima')
+       ORDER BY a.descripcion ASC`,
     );
     return rows;
   },
@@ -163,19 +165,19 @@ module.exports = {
   getById: async (id, connection = db) => {
     const [rows] = await (connection || db).query(
       "SELECT * FROM ordenes_venta WHERE id_orden_venta = ?",
-      [id]
+      [id],
     );
     return rows[0];
   },
 
   create: async (
     { id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago } = {},
-    connection = db
+    connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `INSERT INTO ordenes_venta (id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago]
+      [id_cliente, estado, fecha, monto, total, id_pedido, id_metodo_pago],
     );
     return result.insertId;
   },
@@ -183,7 +185,7 @@ module.exports = {
   update: async (
     id,
     { id_cliente, estado, id_pedido, total, id_metodo_pago },
-    connection = db
+    connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `UPDATE ordenes_venta
@@ -193,7 +195,7 @@ module.exports = {
            total = COALESCE(?, total),
            id_metodo_pago = COALESCE(?, id_metodo_pago)
        WHERE id_orden_venta = ?`,
-      [id_cliente, estado, id_pedido, total, id_metodo_pago, id]
+      [id_cliente, estado, id_pedido, total, id_metodo_pago, id],
     );
     return result.affectedRows;
   },
@@ -201,12 +203,12 @@ module.exports = {
   delete: async (id, connection = db) => {
     await (connection || db).query(
       "DELETE FROM detalle_orden_venta WHERE id_orden_venta = ?",
-      [id]
+      [id],
     );
 
     const [result] = await (connection || db).query(
       "DELETE FROM ordenes_venta WHERE id_orden_venta = ?",
-      [id]
+      [id],
     );
     return result.affectedRows > 0;
   },

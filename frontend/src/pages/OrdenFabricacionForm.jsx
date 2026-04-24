@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Listbox } from "@headlessui/react";
 import { format } from "date-fns";
 import { Plus, X, Settings, ChevronDown, ChevronUp } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import AsyncSelect from "react-select/async";
 import api from "../services/api";
@@ -10,8 +10,11 @@ import { useLocation } from "react-router-dom";
 
 const CrearOrdenFabricacion = () => {
   const location = useLocation();
+  const { id: idEditar } = useParams();
+  const modoEdicion = !!idEditar;
   const idPedidoSeleccionado = location.state?.idPedidoSeleccionado || null;
   const navigate = useNavigate();
+  const [cargandoEdicion, setCargandoEdicion] = useState(false);
   const [ordenesPedido, setOrdenesPedido] = useState([]);
   const [ordenPedido, setOrdenPedido] = useState(null);
 
@@ -34,6 +37,7 @@ const CrearOrdenFabricacion = () => {
   const [idEtapaDefault, setIdEtapaDefault] = useState(null);
   const [hayArticuloCompuesto, setHayArticuloCompuesto] = useState(false);
   const [detalles, setDetalles] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   // Para AsyncSelect
   const cacheRef = useRef({});
@@ -258,6 +262,95 @@ const CrearOrdenFabricacion = () => {
     }
   }, [idPedidoSeleccionado, articulos, idEtapaDefault]);
 
+  // Cargar datos de la orden en modo edición
+  useEffect(() => {
+    if (
+      !modoEdicion ||
+      articulosOptions.length === 0 ||
+      etapasProduccion.length === 0
+    )
+      return;
+
+    const cargarOrden = async () => {
+      setCargandoEdicion(true);
+      try {
+        const res = await api.get(`/ordenes-fabricacion/${idEditar}`);
+        const orden = res.data;
+
+        setFechaInicio(
+          orden.fecha_inicio
+            ? String(orden.fecha_inicio).substring(0, 10)
+            : obtenerFechaActual(),
+        );
+        setFechaFinEstimada(
+          orden.fecha_fin_estimada
+            ? String(orden.fecha_fin_estimada).substring(0, 10)
+            : "",
+        );
+        setEstado(orden.estado || "pendiente");
+
+        // Buscar la orden de pedido asociada
+        if (orden.id_pedido) {
+          const pedido = ordenesPedido.find(
+            (p) => p.id_pedido === orden.id_pedido,
+          );
+          if (pedido) setOrdenPedido(pedido);
+        }
+
+        // Mapear detalles
+        if (orden.detalles && orden.detalles.length > 0) {
+          const detallesMapeados = orden.detalles.map((d) => {
+            const artOption = articulosOptions.find(
+              (a) => a.value === d.id_articulo,
+            );
+            const tieneEtapasPersonalizadas =
+              d.etapas_personalizadas && d.etapas_personalizadas.length > 0;
+
+            const etapasPersonalizadas = {};
+            if (tieneEtapasPersonalizadas) {
+              d.etapas_personalizadas.forEach((ep) => {
+                etapasPersonalizadas[ep.id_etapa] = {
+                  orden: ep.orden,
+                  activa: true,
+                };
+              });
+            }
+
+            return {
+              id: d.id_detalle_fabricacion || Date.now() + Math.random(),
+              articulo: artOption || {
+                id_articulo: d.id_articulo,
+                descripcion: d.descripcion || "Artículo",
+              },
+              cantidad: d.cantidad,
+              descripcion: "",
+              id_etapa_final: d.id_etapa_final || "",
+              personalizarFlujo: tieneEtapasPersonalizadas,
+              etapasPersonalizadas: tieneEtapasPersonalizadas
+                ? etapasPersonalizadas
+                : {},
+              mostrarConfigEtapas: false,
+            };
+          });
+          setDetalles(detallesMapeados);
+        }
+      } catch (error) {
+        toast.error("Error al cargar la orden para edición");
+        console.error(error);
+      } finally {
+        setCargandoEdicion(false);
+      }
+    };
+
+    cargarOrden();
+  }, [
+    modoEdicion,
+    idEditar,
+    articulosOptions,
+    etapasProduccion,
+    ordenesPedido,
+  ]);
+
   const handleDetalleChange = (index, campo, valor) => {
     const nuevosDetalles = [...detalles];
     nuevosDetalles[index][campo] = campo === "cantidad" ? Number(valor) : valor;
@@ -398,7 +491,9 @@ const CrearOrdenFabricacion = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validarFormulario()) return;
+    if (submitting) return;
 
+    setSubmitting(true);
     try {
       const payload = {
         orden: {
@@ -437,9 +532,13 @@ const CrearOrdenFabricacion = () => {
         }),
       };
 
-      await api.post("/ordenes-fabricacion", payload);
-
-      toast.success("Orden de fabricación creada");
+      if (modoEdicion) {
+        await api.put(`/ordenes-fabricacion/${idEditar}`, payload);
+        toast.success("Orden de fabricación actualizada");
+      } else {
+        await api.post("/ordenes-fabricacion", payload);
+        toast.success("Orden de fabricación creada");
+      }
       navigate("/ordenes_fabricacion");
     } catch (error) {
       const mensajeBackend =
@@ -447,6 +546,8 @@ const CrearOrdenFabricacion = () => {
         error.response?.data?.message ||
         error.message;
       toast.error(mensajeBackend);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -454,7 +555,9 @@ const CrearOrdenFabricacion = () => {
     <div className="w-full px-4 md:px-12 lg:px-20 py-10">
       <div className="bg-white p-8 rounded-xl shadow-lg">
         <h2 className="text-4xl font-bold mb-8 text-gray-800 border-b pb-4">
-          Nueva orden de fabricación
+          {modoEdicion
+            ? "Editar orden de fabricación"
+            : "Nueva orden de fabricación"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -837,10 +940,12 @@ const CrearOrdenFabricacion = () => {
             </button>
             <button
               type="submit"
-              disabled={hayArticuloCompuesto}
+              disabled={hayArticuloCompuesto || submitting}
               className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Crear orden de fabricación
+              {submitting
+                ? modoEdicion ? "Guardando..." : "Creando..."
+                : modoEdicion ? "Guardar cambios" : "Crear orden de fabricación"}
             </button>
           </div>
         </form>
