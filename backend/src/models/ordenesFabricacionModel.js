@@ -112,7 +112,7 @@ module.exports = {
   },
   checkIfExistsByPedidoId: async (idPedido) => {
     const [rows] = await db.query(
-      `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ?`,
+      `SELECT COUNT(*) AS count FROM ordenes_fabricacion WHERE id_pedido = ? AND estado != 'cancelada'`,
       [idPedido],
     );
     return rows[0].count > 0;
