@@ -30,10 +30,7 @@ async function main() {
     // ────────────────────────────────────────────
     // 1. Ejecutar master_schema.sql (solo si la BD no existe aún)
     // ────────────────────────────────────────────
-    const schemaPath = path.join(
-      __dirname,
-      "../../../database/master_schema.sql",
-    );
+    const schemaPath = path.join(__dirname, "../../database/master_schema.sql");
     if (!fs.existsSync(schemaPath)) {
       throw new Error(`No se encontró master_schema.sql en: ${schemaPath}`);
     }
