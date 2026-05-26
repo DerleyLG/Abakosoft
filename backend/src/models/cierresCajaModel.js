@@ -190,7 +190,7 @@ const cierresCajaModel = {
       const [result] = await connection.query(
         `INSERT INTO cierres_caja (fecha_inicio, estado) 
          VALUES (?, 'abierto')`,
-        [fecha_inicio]
+        [fecha_inicio],
       );
 
       const id_cierre = result.insertId;
@@ -202,7 +202,7 @@ const cierresCajaModel = {
             `INSERT INTO detalle_cierre_caja 
              (id_cierre, id_metodo_pago, saldo_inicial) 
              VALUES (?, ?, ?)`,
-            [id_cierre, saldo.id_metodo_pago, saldo.saldo_inicial]
+            [id_cierre, saldo.id_metodo_pago, saldo.saldo_inicial],
           );
         }
       }
@@ -236,7 +236,7 @@ const cierresCajaModel = {
       WHERE cc.id_cierre = ?
         AND LOWER(mp.nombre) NOT LIKE '%credito%'
       GROUP BY mt.id_metodo_pago, mp.nombre`,
-      [id_cierre]
+      [id_cierre],
     );
     return totales;
   },
@@ -264,7 +264,7 @@ const cierresCajaModel = {
       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
       WHERE cc.id_cierre = ?
       ORDER BY mt.fecha_movimiento DESC, tipo_movimiento`,
-      [id_cierre]
+      [id_cierre],
     );
     return movimientos;
   },
@@ -277,7 +277,7 @@ const cierresCajaModel = {
     fecha_fin,
     id_usuario_cierre,
     observaciones,
-    totales_calculados
+    totales_calculados,
   ) => {
     const connection = await db.getConnection();
 
@@ -295,7 +295,7 @@ const cierresCajaModel = {
             total.total_egresos,
             id_cierre,
             total.id_metodo_pago,
-          ]
+          ],
         );
       }
 
@@ -308,7 +308,7 @@ const cierresCajaModel = {
              id_usuario_cierre = ?,
              observaciones = ?
          WHERE id_cierre = ?`,
-        [fecha_fin, id_usuario_cierre, observaciones, id_cierre]
+        [fecha_fin, id_usuario_cierre, observaciones, id_cierre],
       );
 
       // 3. Crear siguiente período automáticamente
@@ -325,7 +325,7 @@ const cierresCajaModel = {
          JOIN metodos_pago mp ON d.id_metodo_pago = mp.id_metodo_pago
          WHERE d.id_cierre = ?
            AND LOWER(mp.nombre) NOT LIKE '%credito%'`,
-        [id_cierre]
+        [id_cierre],
       );
 
       // Calcular fecha inicio del siguiente período (día siguiente)
@@ -337,7 +337,7 @@ const cierresCajaModel = {
       const [resultNuevo] = await connection.query(
         `INSERT INTO cierres_caja (fecha_inicio, estado) 
          VALUES (?, 'abierto')`,
-        [fechaSiguienteStr]
+        [fechaSiguienteStr],
       );
 
       const id_nuevo_cierre = resultNuevo.insertId;
@@ -348,7 +348,7 @@ const cierresCajaModel = {
           `INSERT INTO detalle_cierre_caja 
            (id_cierre, id_metodo_pago, saldo_inicial) 
            VALUES (?, ?, ?)`,
-          [id_nuevo_cierre, saldo.id_metodo_pago, saldo.saldo_final]
+          [id_nuevo_cierre, saldo.id_metodo_pago, saldo.saldo_final],
         );
       }
 
@@ -500,7 +500,7 @@ const cierresCajaModel = {
 
       console.log(
         "[validarCierrePeriodo] Saldos calculados:",
-        JSON.stringify(rowsSaldos, null, 2)
+        JSON.stringify(rowsSaldos, null, 2),
       );
 
       // Verificar cada método de pago
@@ -512,7 +512,7 @@ const cierresCajaModel = {
           parseFloat(metodo.total_ingresos) -
           parseFloat(metodo.total_egresos);
         const diferencia = Math.abs(
-          parseFloat(metodo.saldo_calculado) - saldoEsperado
+          parseFloat(metodo.saldo_calculado) - saldoEsperado,
         );
 
         console.log(`[validarCierrePeriodo] ${metodo.nombre_metodo}:`, {

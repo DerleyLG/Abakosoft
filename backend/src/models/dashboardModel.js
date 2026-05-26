@@ -153,23 +153,21 @@ const getVentasSemana = async () => {
 
 const getComprasSemana = async () => {
   // Comprado de la semana: órdenes de compra + compras de materia prima
-  const [
-    [[{ total_compras }]],
-    [[{ total_materia_prima }]],
-  ] = await Promise.all([
-    db.query(
-      `SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
+  const [[[{ total_compras }]], [[{ total_materia_prima }]]] =
+    await Promise.all([
+      db.query(
+        `SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
        FROM detalle_orden_compra doc
        JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
        WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
          AND oc.estado != 'cancelada'`,
-    ),
-    db.query(
-      `SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
+      ),
+      db.query(
+        `SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
        FROM compras_materia_prima
        WHERE YEARWEEK(fecha_compra, 1) = YEARWEEK(CURDATE(), 1)`,
-    ),
-  ]);
+      ),
+    ]);
 
   const compras = parseFloat(total_compras) + parseFloat(total_materia_prima);
   return compras;
