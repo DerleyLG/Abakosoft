@@ -4,6 +4,7 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
+import { generateUUID } from "../utils/uuid";
 import {
   FiPlus,
   FiTrash2,
@@ -721,7 +722,7 @@ const GestionRoles = () => {
         <button
           onClick={() => {
             setCreando(true);
-            setCrearRolKey(crypto.randomUUID());
+            setCrearRolKey(generateUUID());
           }}
           className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-white shadow-sm transition-colors cursor-pointer"
         >
@@ -865,7 +866,7 @@ const GestionRoles = () => {
           <button
             onClick={() => {
               setCreando(true);
-              setCrearRolKey(crypto.randomUUID());
+              setCrearRolKey(generateUUID());
             }}
             className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold transition cursor-pointer"
           >

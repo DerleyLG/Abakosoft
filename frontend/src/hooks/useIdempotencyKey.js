@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { generateUUID } from "../utils/uuid";
 
 /**
  * Genera un UUID estable por montaje del componente.
@@ -9,6 +10,6 @@ import { useState } from "react";
  *   await api.post("/endpoint", data, { headers: { "X-Idempotency-Key": idempotencyKey } });
  */
 export function useIdempotencyKey() {
-  const [key] = useState(() => crypto.randomUUID());
+  const [key] = useState(() => generateUUID());
   return key;
 }

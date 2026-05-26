@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
+import { generateUUID } from "../utils/uuid";
 import {
   FiDollarSign,
   FiCreditCard,
@@ -547,7 +548,7 @@ const TesoreriaDashboard = () => {
           <button
             onClick={() => {
               setDrawerOpen(true);
-              setTransferenciaKey(crypto.randomUUID());
+              setTransferenciaKey(generateUUID());
             }}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >

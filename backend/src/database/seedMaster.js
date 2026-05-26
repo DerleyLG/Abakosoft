@@ -132,7 +132,7 @@ async function main() {
       await conn.query(`
         INSERT INTO planes (nombre, precio_mensual, max_usuarios, activo) VALUES
           ('Básico', 80000,  3,  1),
-          ('Pro',    250000, 50, 1)
+          ('Pro',    200000, 50, 1)
       `);
       console.log("✓ Planes insertados: Básico y Pro");
     } else {

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import formateaCantidad from "../utils/formateaCantidad";
+import { generateUUID } from "../utils/uuid";
 import { FiX, FiPackage, FiAlertTriangle } from "react-icons/fi";
 
 const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
   const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    crypto.randomUUID(),
+    generateUUID(),
   );
   const [stockDisponible, setStockDisponible] = useState(0);
   const [stockMinimo, setStockMinimo] = useState(0);
@@ -13,7 +14,7 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setIdempotencyKey(crypto.randomUUID());
+      setIdempotencyKey(generateUUID());
     }
   }, [isOpen]);
 

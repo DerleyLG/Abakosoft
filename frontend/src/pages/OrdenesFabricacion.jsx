@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
+import { generateUUID } from "../utils/uuid";
 import "../styles/confirmAlert.css";
 import {
   FiTrash2,
@@ -1842,7 +1843,7 @@ const ListaOrdenesFabricacion = () => {
                                               : orden.id_orden_fabricacion;
                                           setMostrarFormularioAvance(next);
                                           if (next)
-                                            setAvanceKey(crypto.randomUUID());
+                                            setAvanceKey(generateUUID());
                                         }}
                                         className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                                       >

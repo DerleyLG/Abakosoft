@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { generateUUID } from "../utils/uuid";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
@@ -113,7 +114,7 @@ const ListaArticulos = () => {
           label: "Sí",
           onClick: async () => {
             try {
-              const idempotencyKey = crypto.randomUUID();
+              const idempotencyKey = generateUUID();
               await api.delete(`/articulos/${id}`, { headers: { "X-Idempotency-Key": idempotencyKey } });
               toast.success(" Artículo eliminado");
               setArticulos((prev) => prev.filter((a) => a.id_articulo !== id));

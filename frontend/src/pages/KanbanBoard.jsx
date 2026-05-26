@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { generateUUID } from "../utils/uuid";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import {
@@ -108,7 +109,7 @@ const KanbanBoard = () => {
         const response = await api.post(
           `/kanban/marcar-entregada/${id_orden}`,
           {},
-          { headers: { "X-Idempotency-Key": crypto.randomUUID() } },
+          { headers: { "X-Idempotency-Key": generateUUID() } },
         );
         toast.success("Orden marcada como entregada exitosamente");
 
