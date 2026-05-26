@@ -62,14 +62,26 @@ const kanbanModel = {
 
     const [rows] = await db.query(query);
 
-    // Obtener avances individuales por orden para determinar la etapa actual correctamente
-    const [todosAvances] = await db.query(`
-      SELECT aep.id_orden_fabricacion, aep.id_etapa_produccion, aep.estado, aep.fecha_registro,
-             ep.orden as orden_etapa
-      FROM avance_etapas_produccion aep
-      JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
-      ORDER BY ep.orden DESC, aep.fecha_registro DESC
-    `);
+    // Importar el modelo de detalles para obtener todas las etapas finales requeridas
+    const detalleOrdenFabricacionModel = require("./detalleOrdenFabricacionModel");
+
+    // Lanzar las 3 consultas independientes en paralelo + bulk fetch de detalles (evita N+1)
+    const ids = rows.map((o) => o.id_orden_fabricacion);
+    const [[todosAvances], allDetallesRaw, [etapasDB]] = await Promise.all([
+      db.query(`
+        SELECT aep.id_orden_fabricacion, aep.id_etapa_produccion, aep.estado, aep.fecha_registro,
+               ep.orden as orden_etapa
+        FROM avance_etapas_produccion aep
+        JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+        ORDER BY ep.orden DESC, aep.fecha_registro DESC
+      `),
+      ids.length > 0
+        ? detalleOrdenFabricacionModel.getByOrdenes(ids)
+        : Promise.resolve([]),
+      db.query(
+        `SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC`,
+      ),
+    ]);
 
     // Agrupar avances por orden de fabricación
     const avancesPorOrden = {};
@@ -80,24 +92,14 @@ const kanbanModel = {
       avancesPorOrden[av.id_orden_fabricacion].push(av);
     });
 
-    // Importar el modelo de detalles para obtener todas las etapas finales requeridas
-    const detalleOrdenFabricacionModel = require("./detalleOrdenFabricacionModel");
-
-    // Obtener todas las etapas finales requeridas para cada orden
+    // Agrupar detalles por orden de fabricación
     const detallesPorOrden = {};
-    for (const orden of rows) {
-      if (!detallesPorOrden[orden.id_orden_fabricacion]) {
-        detallesPorOrden[orden.id_orden_fabricacion] =
-          await detalleOrdenFabricacionModel.getById(
-            orden.id_orden_fabricacion,
-          );
+    allDetallesRaw.forEach((d) => {
+      if (!detallesPorOrden[d.id_orden_fabricacion]) {
+        detallesPorOrden[d.id_orden_fabricacion] = [];
       }
-    }
-
-    // Obtener etapas de producción desde la BD ordenadas por su campo 'orden'
-    const [etapasDB] = await db.query(
-      `SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC`,
-    );
+      detallesPorOrden[d.id_orden_fabricacion].push(d);
+    });
 
     // Crear mapa de id_etapa -> orden (posición en el flujo)
     const etapaOrdenMap = {};

@@ -131,8 +131,9 @@ const TesoreriaModel = {
   },
 
   getIngresosSummary: async (connection = db) => {
-    const [totalMesResult] = await connection.query(`
-      SELECT SUM(mt.monto) AS total
+    // Una sola query obtiene SUM y COUNT al mismo tiempo
+    const [result] = await connection.query(`
+      SELECT SUM(mt.monto) AS total, COUNT(*) AS cantidad
       FROM movimientos_tesoreria mt
       JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
       WHERE mt.fecha_movimiento >= DATE_FORMAT(NOW(), '%Y-%m-01')
@@ -140,59 +141,56 @@ const TesoreriaModel = {
         AND TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%'
         AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
     `);
-
-    const [ventasMensualResult] = await connection.query(`
-      SELECT COUNT(*) AS total
-      FROM movimientos_tesoreria mt
-      JOIN ordenes_venta ov ON mt.id_documento = ov.id_orden_venta
-      WHERE mt.fecha_movimiento >= DATE_FORMAT(NOW(), '%Y-%m-01')
-        AND mt.fecha_movimiento <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
-        AND TRIM(LOWER(mt.tipo_documento)) LIKE '%venta%'
-        AND (ov.estado IS NULL OR LOWER(TRIM(ov.estado)) <> 'anulada')
-    `);
-
-    const totalMes = totalMesResult[0].total || 0;
-    const ventasMensual = ventasMensualResult[0].total || 0;
 
     return {
-      totalMes: totalMes,
-      ventasMensual: ventasMensual,
+      totalMes: result[0].total || 0,
+      ventasMensual: result[0].cantidad || 0,
     };
   },
 
   getEgresosSummary: async () => {
     try {
-      const [pagosTrabajadores] = await db.query(`
-        SELECT SUM(monto_total) AS totalPagosTrabajadores
-        FROM pagos_trabajadores
-        WHERE DATE_FORMAT(fecha_pago, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      `);
-
-      const [ordenesCompra] = await db.query(`
-        SELECT SUM(doc.cantidad * doc.precio_unitario) AS totalOrdenesCompra
-        FROM detalle_orden_compra doc
-        JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
-        WHERE DATE_FORMAT(oc.fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-          AND oc.estado != 'cancelada'
-      `);
-
-      const [costosIndirectos] = await db.query(`
-        SELECT SUM(valor) AS totalCostos
-        FROM costos_indirectos
-        WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      `);
-
-      const [comprasMateriaPrima] = await db.query(`
-        SELECT SUM(cantidad * precio_unitario) AS totalMateriaPrima
-        FROM compras_materia_prima
-        WHERE DATE_FORMAT(fecha_compra, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      `);
-
-      const [anticipos] = await db.query(`
-        SELECT SUM(monto) AS totalAnticipos
-        FROM anticipos_trabajadores
-        WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
-      `);
+      // 5 queries independientes en paralelo + rango de mes para usar índices
+      const [
+        [pagosTrabajadores],
+        [ordenesCompra],
+        [costosIndirectos],
+        [comprasMateriaPrima],
+        [anticipos],
+      ] = await Promise.all([
+        db.query(`
+          SELECT SUM(monto_total) AS totalPagosTrabajadores
+          FROM pagos_trabajadores
+          WHERE fecha_pago >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            AND fecha_pago <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        `),
+        db.query(`
+          SELECT SUM(doc.cantidad * doc.precio_unitario) AS totalOrdenesCompra
+          FROM detalle_orden_compra doc
+          JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
+          WHERE oc.fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            AND oc.fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+            AND oc.estado != 'cancelada'
+        `),
+        db.query(`
+          SELECT SUM(valor) AS totalCostos
+          FROM costos_indirectos
+          WHERE fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            AND fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        `),
+        db.query(`
+          SELECT SUM(cantidad * precio_unitario) AS totalMateriaPrima
+          FROM compras_materia_prima
+          WHERE fecha_compra >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            AND fecha_compra <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        `),
+        db.query(`
+          SELECT SUM(monto) AS totalAnticipos
+          FROM anticipos_trabajadores
+          WHERE fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            AND fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
+        `),
+      ]);
 
       const summary = {
         totalPagosTrabajadores: Number(
@@ -301,7 +299,8 @@ const TesoreriaModel = {
   getPagosTrabajadoresCount: async () => {
     const [result] = await db.query(`
       SELECT COUNT(*) as count FROM pagos_trabajadores
-      WHERE DATE_FORMAT(fecha_pago, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      WHERE fecha_pago >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND fecha_pago <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
     `);
     return result[0].count;
   },
@@ -309,7 +308,8 @@ const TesoreriaModel = {
   getOrdenesCompraCount: async () => {
     const [result] = await db.query(`
       SELECT COUNT(*) as count FROM ordenes_compra
-      WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      WHERE fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
     `);
     return result[0].count;
   },
@@ -317,7 +317,8 @@ const TesoreriaModel = {
   getCostosIndirectosCount: async () => {
     const [result] = await db.query(`
       SELECT COUNT(*) as count FROM costos_indirectos
-      WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      WHERE fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
     `);
     return result[0].count;
   },
@@ -325,14 +326,16 @@ const TesoreriaModel = {
   getMateriaPrimaCount: async () => {
     const [result] = await db.query(`
       SELECT COUNT(*) as count FROM compras_materia_prima
-      WHERE DATE_FORMAT(fecha_compra, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      WHERE fecha_compra >= DATE_FORMAT(NOW(), '%Y-%m-01')
+        AND fecha_compra <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')
     `);
     return result[0].count;
   },
   getAnticiposCount: async () => {
     const [result] = await db.query(
       `SELECT COUNT(*) as count FROM anticipos_trabajadores
-       WHERE DATE_FORMAT(fecha, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`,
+       WHERE fecha >= DATE_FORMAT(NOW(), '%Y-%m-01')
+         AND fecha <  DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 1 MONTH), '%Y-%m-01')`,
     );
     return result[0].count;
   },

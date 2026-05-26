@@ -48,25 +48,7 @@ module.exports = {
                 i.stock_fabricado,
                 i.stock_minimo,
                 i.ultima_actualizacion,
-                -- Cálculo del stock_en_proceso:
-                -- Suma la cantidad total requerida de este artículo en órdenes 'pendiente' o 'en proceso'
-                COALESCE(
-                    (SELECT SUM(dof.cantidad)
-                     FROM detalle_orden_fabricacion dof
-                     JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
-                     WHERE dof.id_articulo = i.id_articulo
-                       AND ofa.estado IN ('pendiente', 'en proceso')),
-                    0
-                ) -
-                -- Resta la cantidad de este artículo ya producida (lotes) para esas mismas órdenes
-                COALESCE(
-                    (SELECT SUM(lf.cantidad)
-                     FROM lotes_fabricados lf
-                     JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
-                     WHERE lf.id_articulo = i.id_articulo
-                       AND ofa.estado IN ('pendiente', 'en proceso')),
-                    0
-                ) AS stock_en_proceso
+                COALESCE(dof_agg.total_solicitado, 0) - COALESCE(lf_agg.total_fabricado, 0) AS stock_en_proceso
             FROM
                 inventario i
             JOIN
@@ -75,14 +57,24 @@ module.exports = {
                 categorias c ON a.id_categoria = c.id_categoria
             LEFT JOIN
                 unidades u ON a.id_unidad = u.id_unidad
+            LEFT JOIN (
+                SELECT dof.id_articulo, SUM(dof.cantidad) AS total_solicitado
+                FROM detalle_orden_fabricacion dof
+                JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
+                WHERE ofa.estado IN ('pendiente', 'en proceso')
+                GROUP BY dof.id_articulo
+            ) dof_agg ON dof_agg.id_articulo = i.id_articulo
+            LEFT JOIN (
+                SELECT lf.id_articulo, SUM(lf.cantidad) AS total_fabricado
+                FROM lotes_fabricados lf
+                JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
+                WHERE ofa.estado IN ('pendiente', 'en proceso')
+                GROUP BY lf.id_articulo
+            ) lf_agg ON lf_agg.id_articulo = i.id_articulo
             ORDER BY
                 a.descripcion ASC;
         `;
     const [rows] = await db.query(sql);
-    console.log(
-      "Datos obtenidos de la DB en InventarioModel.obtenerTodo:",
-      rows,
-    );
     return rows;
   },
 
@@ -176,26 +168,26 @@ module.exports = {
                 i.stock_fabricado,
                 i.stock_minimo,
                 i.ultima_actualizacion,
-                COALESCE(
-                    (SELECT SUM(dof.cantidad)
-                     FROM detalle_orden_fabricacion dof
-                     JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
-                     WHERE dof.id_articulo = i.id_articulo
-                       AND ofa.estado IN ('pendiente', 'en proceso')),
-                    0
-                ) - COALESCE(
-                    (SELECT SUM(lf.cantidad)
-                     FROM lotes_fabricados lf
-                     JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
-                     WHERE lf.id_articulo = i.id_articulo
-                       AND ofa.estado IN ('pendiente', 'en proceso')),
-                    0
-                ) AS stock_en_proceso
+                COALESCE(dof_agg.total_solicitado, 0) - COALESCE(lf_agg.total_fabricado, 0) AS stock_en_proceso
             FROM inventario i
             JOIN articulos a ON i.id_articulo = a.id_articulo
             LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
             LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
             LEFT JOIN etapas_produccion e ON a.id_etapa = e.id_etapa
+            LEFT JOIN (
+                SELECT dof.id_articulo, SUM(dof.cantidad) AS total_solicitado
+                FROM detalle_orden_fabricacion dof
+                JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
+                WHERE ofa.estado IN ('pendiente', 'en proceso')
+                GROUP BY dof.id_articulo
+            ) dof_agg ON dof_agg.id_articulo = i.id_articulo
+            LEFT JOIN (
+                SELECT lf.id_articulo, SUM(lf.cantidad) AS total_fabricado
+                FROM lotes_fabricados lf
+                JOIN ordenes_fabricacion ofa ON lf.id_orden_fabricacion = ofa.id_orden_fabricacion
+                WHERE ofa.estado IN ('pendiente', 'en proceso')
+                GROUP BY lf.id_articulo
+            ) lf_agg ON lf_agg.id_articulo = i.id_articulo
             ${whereClause}
         `;
 

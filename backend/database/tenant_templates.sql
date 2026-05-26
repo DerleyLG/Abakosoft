@@ -57,6 +57,7 @@ CREATE TABLE `anticipos_trabajadores` (
   PRIMARY KEY (`id_anticipo`),
   KEY `id_trabajador` (`id_trabajador`),
   KEY `id_orden_fabricacion` (`id_orden_fabricacion`),
+  KEY `idx_anticipo_fecha` (`fecha`),
   CONSTRAINT `anticipos_trabajadores_ibfk_1` FOREIGN KEY (`id_trabajador`) REFERENCES `trabajadores` (`id_trabajador`),
   CONSTRAINT `anticipos_trabajadores_ibfk_2` FOREIGN KEY (`id_orden_fabricacion`) REFERENCES `ordenes_fabricacion` (`id_orden_fabricacion`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -300,7 +301,8 @@ CREATE TABLE `costos_indirectos` (
   `fecha_inicio` date DEFAULT NULL,
   `fecha_fin` date DEFAULT NULL,
   PRIMARY KEY (`id_costo_indirecto`),
-  UNIQUE KEY `id_costo_indirecto` (`id_costo_indirecto`)
+  UNIQUE KEY `id_costo_indirecto` (`id_costo_indirecto`),
+  KEY `idx_costo_indirecto_fecha` (`fecha`)
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -662,6 +664,7 @@ CREATE TABLE `ordenes_compra` (
   UNIQUE KEY `id_compra` (`id_orden_compra`),
   KEY `fk_ordenes_compra_proveedor` (`id_proveedor`),
   KEY `fk_oc_ordenCompra` (`id_orden_fabricacion`),
+  KEY `idx_oc_fecha` (`fecha`),
   CONSTRAINT `fk_oc_ordenCompra` FOREIGN KEY (`id_orden_fabricacion`) REFERENCES `ordenes_fabricacion` (`id_orden_fabricacion`) ON DELETE CASCADE,
   CONSTRAINT `fk_ordenes_compra_proveedor` FOREIGN KEY (`id_proveedor`) REFERENCES `proveedores` (`id_proveedor`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=181 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -736,6 +739,7 @@ CREATE TABLE `pagos_trabajadores` (
   PRIMARY KEY (`id_pago`),
   UNIQUE KEY `id_pago` (`id_pago`),
   KEY `ix_pagos_por_trabajador` (`id_trabajador`),
+  KEY `idx_pago_fecha` (`fecha_pago`),
   CONSTRAINT `fk_pagos_trabajador_trabajador` FOREIGN KEY (`id_trabajador`) REFERENCES `trabajadores` (`id_trabajador`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=193 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
