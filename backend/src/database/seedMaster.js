@@ -191,10 +191,14 @@ async function main() {
     console.log("────────────────────────────────────────────");
   } catch (err) {
     console.error("✗ Error en seedMaster:", err.message);
-    process.exit(1);
+    throw err;
   } finally {
     await conn.end();
   }
 }
 
-main();
+if (require.main === module) {
+  main().catch(() => process.exit(1));
+}
+
+module.exports = { initMasterDb: main };

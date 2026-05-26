@@ -55,6 +55,7 @@ const {
   ensureSaasAuthSchema,
   purgeStaleRefreshSessions,
 } = require("./src/controllers/saasController");
+const { initMasterDb } = require("./src/database/seedMaster");
 
 const consumoMateriaPrimaController = require("./src/controllers/consumoMateriaPrimaController.js");
 const allowedOrigins = (
@@ -211,6 +212,7 @@ const PORT = process.env.PORT;
 
 const startServer = async () => {
   try {
+    await initMasterDb();
     await ensureSaasAuthSchema();
     runSaasRefreshCleanup();
 
