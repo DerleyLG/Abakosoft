@@ -46,7 +46,12 @@ services:
       # MYSQL_USER: root
       # MYSQL_PASSWORD: masterkey
 
-    command: --default-time-zone=America/Bogota
+    command: >
+      --default-time-zone=America/Bogota
+      --innodb-buffer-pool-size=256M
+      --innodb-log-file-size=64M
+      --max-connections=50
+      --skip-name-resolve
     healthcheck:
       test:
         [

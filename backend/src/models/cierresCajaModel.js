@@ -36,8 +36,8 @@ const cierresCajaModel = {
             SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
             SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
           FROM movimientos_tesoreria mt
-          WHERE DATE(mt.fecha_movimiento) >= ?
-            AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
+          WHERE mt.fecha_movimiento >= ?
+            AND (? IS NULL OR mt.fecha_movimiento < DATE_ADD(?, INTERVAL 1 DAY))
         `;
 
         const [totales] = await db.query(queryTotales, [
@@ -137,8 +137,8 @@ const cierresCajaModel = {
           SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
         FROM movimientos_tesoreria mt
         JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-        WHERE DATE(mt.fecha_movimiento) >= ?
-          AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
+        WHERE mt.fecha_movimiento >= ?
+          AND (? IS NULL OR mt.fecha_movimiento < DATE_ADD(?, INTERVAL 1 DAY))
           AND LOWER(mp.nombre) NOT LIKE '%credito%'
         GROUP BY mt.id_metodo_pago
       `;
@@ -221,39 +221,23 @@ const cierresCajaModel = {
    * Calcular totales del período para un cierre
    */
   calcularTotalesPeriodo: async (id_cierre) => {
-    // Obtener fechas del cierre
-    const [cierre] = await db.query(
-      `SELECT fecha_inicio, fecha_fin FROM cierres_caja WHERE id_cierre = ?`,
-      [id_cierre]
-    );
-
-    if (!cierre || cierre.length === 0) {
-      throw new Error("Cierre no encontrado");
-    }
-
-    const { fecha_inicio, fecha_fin } = cierre[0];
-
-    // Calcular totales por método de pago
-    // Excluir "Crédito" porque los abonos ya se contabilizan en efectivo/transferencia
-    const query = `
-      SELECT 
+    // Query única con JOIN: evita round-trip extra y usa índice en fecha_movimiento
+    const [totales] = await db.query(
+      `SELECT 
         mt.id_metodo_pago,
         mp.nombre AS metodo_nombre,
         SUM(CASE WHEN mt.monto > 0 THEN mt.monto ELSE 0 END) AS total_ingresos,
         SUM(CASE WHEN mt.monto < 0 THEN ABS(mt.monto) ELSE 0 END) AS total_egresos
-      FROM movimientos_tesoreria mt
+      FROM cierres_caja cc
+      JOIN movimientos_tesoreria mt
+        ON mt.fecha_movimiento >= cc.fecha_inicio
+        AND (cc.fecha_fin IS NULL OR mt.fecha_movimiento < DATE_ADD(cc.fecha_fin, INTERVAL 1 DAY))
       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-      WHERE DATE(mt.fecha_movimiento) >= ?
-        AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
+      WHERE cc.id_cierre = ?
         AND LOWER(mp.nombre) NOT LIKE '%credito%'
-      GROUP BY mt.id_metodo_pago, mp.nombre
-    `;
-
-    const [totales] = await db.query(query, [
-      fecha_inicio,
-      fecha_fin,
-      fecha_fin,
-    ]);
+      GROUP BY mt.id_metodo_pago, mp.nombre`,
+      [id_cierre]
+    );
     return totales;
   },
 
@@ -261,54 +245,27 @@ const cierresCajaModel = {
    * Obtener movimientos detallados del período
    */
   getMovimientosPeriodo: async (id_cierre) => {
-    // Obtener fechas del cierre
-    const [cierre] = await db.query(
-      `SELECT fecha_inicio, fecha_fin FROM cierres_caja WHERE id_cierre = ?`,
-      [id_cierre]
-    );
-
-    if (!cierre || cierre.length === 0) {
-      throw new Error("Cierre no encontrado");
-    }
-
-    const { fecha_inicio, fecha_fin } = cierre[0];
-
-    console.log("[getMovimientosPeriodo] id_cierre:", id_cierre);
-    console.log("[getMovimientosPeriodo] fecha_inicio:", fecha_inicio);
-    console.log("[getMovimientosPeriodo] fecha_fin:", fecha_fin);
-
-    const query = `
-      SELECT 
+    // Query única con JOIN: evita round-trip extra y usa índice en fecha_movimiento
+    const [movimientos] = await db.query(
+      `SELECT 
         mt.id_movimiento,
         DATE(mt.fecha_movimiento) AS fecha,
-        CASE 
-          WHEN mt.monto > 0 THEN 'ingreso'
-          ELSE 'egreso'
-        END AS tipo_movimiento,
+        CASE WHEN mt.monto > 0 THEN 'ingreso' ELSE 'egreso' END AS tipo_movimiento,
         mt.tipo_documento,
         mt.id_documento,
         mt.monto,
         mt.referencia,
         mt.observaciones,
         mp.nombre AS metodo_pago
-      FROM movimientos_tesoreria mt
+      FROM cierres_caja cc
+      JOIN movimientos_tesoreria mt
+        ON mt.fecha_movimiento >= cc.fecha_inicio
+        AND (cc.fecha_fin IS NULL OR mt.fecha_movimiento < DATE_ADD(cc.fecha_fin, INTERVAL 1 DAY))
       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-      WHERE DATE(mt.fecha_movimiento) >= ?
-        AND (? IS NULL OR DATE(mt.fecha_movimiento) <= ?)
-      ORDER BY mt.fecha_movimiento DESC, tipo_movimiento
-    `;
-
-    const [movimientos] = await db.query(query, [
-      fecha_inicio,
-      fecha_fin,
-      fecha_fin,
-    ]);
-
-    console.log(
-      "[getMovimientosPeriodo] movimientos encontrados:",
-      movimientos.length
+      WHERE cc.id_cierre = ?
+      ORDER BY mt.fecha_movimiento DESC, tipo_movimiento`,
+      [id_cierre]
     );
-
     return movimientos;
   },
 

@@ -79,52 +79,47 @@ const getIngresosMes = async () => {
 const getEgresosMes = async () => {
   // Egresos del mes (caja operativa) en TZ definida, usando rangos de fecha
   const { start, next } = _monthRange(0, DEFAULT_TZ);
-  const [[{ total_pagos }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
-      FROM pagos_trabajadores
-      WHERE fecha_pago >= ? AND fecha_pago < ?
-    `,
-    [start, next],
-  );
 
-  const [[{ total_costos_indirectos }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
-      FROM costos_indirectos
-      WHERE fecha >= ? AND fecha < ?
-    `,
-    [start, next],
-  );
-
-  const [[{ total_servicios }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(costo), 0) AS total_servicios
-      FROM servicios_tercerizados
-      WHERE fecha_inicio >= ? AND fecha_inicio < ?
-    `,
-    [start, next],
-  );
-
-  const [[{ total_compras }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
-      FROM detalle_orden_compra doc
-      JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
-      WHERE oc.fecha >= ? AND oc.fecha < ?
-        AND oc.estado != 'cancelada'
-    `,
-    [start, next],
-  );
-
-  const [[{ total_materia_prima }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
-      FROM compras_materia_prima
-      WHERE fecha_compra >= ? AND fecha_compra < ?
-    `,
-    [start, next],
-  );
+  const [
+    [[{ total_pagos }]],
+    [[{ total_costos_indirectos }]],
+    [[{ total_servicios }]],
+    [[{ total_compras }]],
+    [[{ total_materia_prima }]],
+  ] = await Promise.all([
+    db.query(
+      `SELECT IFNULL(SUM(monto_total), 0) AS total_pagos
+       FROM pagos_trabajadores
+       WHERE fecha_pago >= ? AND fecha_pago < ?`,
+      [start, next],
+    ),
+    db.query(
+      `SELECT IFNULL(SUM(valor), 0) AS total_costos_indirectos
+       FROM costos_indirectos
+       WHERE fecha >= ? AND fecha < ?`,
+      [start, next],
+    ),
+    db.query(
+      `SELECT IFNULL(SUM(costo), 0) AS total_servicios
+       FROM servicios_tercerizados
+       WHERE fecha_inicio >= ? AND fecha_inicio < ?`,
+      [start, next],
+    ),
+    db.query(
+      `SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
+       FROM detalle_orden_compra doc
+       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
+       WHERE oc.fecha >= ? AND oc.fecha < ?
+         AND oc.estado != 'cancelada'`,
+      [start, next],
+    ),
+    db.query(
+      `SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
+       FROM compras_materia_prima
+       WHERE fecha_compra >= ? AND fecha_compra < ?`,
+      [start, next],
+    ),
+  ]);
 
   const egresos =
     parseFloat(total_pagos) +
@@ -158,24 +153,23 @@ const getVentasSemana = async () => {
 
 const getComprasSemana = async () => {
   // Comprado de la semana: órdenes de compra + compras de materia prima
-
-  const [[{ total_compras }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
-      FROM detalle_orden_compra doc
-      JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
-      WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
-        AND oc.estado != 'cancelada'
-    `,
-  );
-
-  const [[{ total_materia_prima }]] = await db.query(
-    `
-      SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
-      FROM compras_materia_prima
-      WHERE YEARWEEK(fecha_compra, 1) = YEARWEEK(CURDATE(), 1)
-    `,
-  );
+  const [
+    [[{ total_compras }]],
+    [[{ total_materia_prima }]],
+  ] = await Promise.all([
+    db.query(
+      `SELECT IFNULL(SUM(doc.precio_unitario * doc.cantidad), 0) AS total_compras
+       FROM detalle_orden_compra doc
+       JOIN ordenes_compra oc ON doc.id_orden_compra = oc.id_orden_compra
+       WHERE YEARWEEK(oc.fecha, 1) = YEARWEEK(CURDATE(), 1)
+         AND oc.estado != 'cancelada'`,
+    ),
+    db.query(
+      `SELECT IFNULL(SUM(cantidad * precio_unitario), 0) AS total_materia_prima
+       FROM compras_materia_prima
+       WHERE YEARWEEK(fecha_compra, 1) = YEARWEEK(CURDATE(), 1)`,
+    ),
+  ]);
 
   const compras = parseFloat(total_compras) + parseFloat(total_materia_prima);
   return compras;

@@ -634,6 +634,7 @@ CREATE TABLE `movimientos_tesoreria` (
   `observaciones` text,
   PRIMARY KEY (`id_movimiento`),
   KEY `id_metodo_pago` (`id_metodo_pago`),
+  KEY `idx_fecha_movimiento` (`fecha_movimiento`),
   CONSTRAINT `movimientos_tesoreria_ibfk_1` FOREIGN KEY (`id_metodo_pago`) REFERENCES `metodos_pago` (`id_metodo_pago`)
 ) ENGINE=InnoDB AUTO_INCREMENT=477 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
