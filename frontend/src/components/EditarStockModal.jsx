@@ -4,9 +4,7 @@ import { generateUUID } from "../utils/uuid";
 import { FiX, FiPackage, FiAlertTriangle } from "react-icons/fi";
 
 const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
-  const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    generateUUID(),
-  );
+  const [idempotencyKey, setIdempotencyKey] = useState(() => generateUUID());
   const [stockDisponible, setStockDisponible] = useState(0);
   const [stockMinimo, setStockMinimo] = useState(0);
   const [loading, setLoading] = useState(false);

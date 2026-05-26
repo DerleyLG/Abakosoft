@@ -115,7 +115,9 @@ const ListaArticulos = () => {
           onClick: async () => {
             try {
               const idempotencyKey = generateUUID();
-              await api.delete(`/articulos/${id}`, { headers: { "X-Idempotency-Key": idempotencyKey } });
+              await api.delete(`/articulos/${id}`, {
+                headers: { "X-Idempotency-Key": idempotencyKey },
+              });
               toast.success(" Artículo eliminado");
               setArticulos((prev) => prev.filter((a) => a.id_articulo !== id));
             } catch (error) {
