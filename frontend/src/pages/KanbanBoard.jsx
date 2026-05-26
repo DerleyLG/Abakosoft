@@ -105,7 +105,11 @@ const KanbanBoard = () => {
 
     if (result.isConfirmed) {
       try {
-        const response = await api.post(`/kanban/marcar-entregada/${id_orden}`);
+        const response = await api.post(
+          `/kanban/marcar-entregada/${id_orden}`,
+          {},
+          { headers: { "X-Idempotency-Key": crypto.randomUUID() } },
+        );
         toast.success("Orden marcada como entregada exitosamente");
 
         // Usar la fecha retornada por el backend para el filtro del drawer
@@ -129,17 +133,29 @@ const KanbanBoard = () => {
     }
   };
 
-  // Estructura de columnas con sus configuraciones
+  // Colores rotativos para las columnas de etapas (misma paleta visual)
+  const coloresColumnas = [
+    "bg-blue-50",
+    "bg-indigo-50",
+    "bg-purple-50",
+    "bg-pink-50",
+    "bg-amber-50",
+    "bg-cyan-50",
+    "bg-rose-50",
+    "bg-teal-50",
+  ];
+
+  // Construir columnas dinámicamente desde las etapas que devuelve el backend
+  // Solo mostrar etapas que tienen al menos una orden
   const columnasConfig = [
-    {
-      key: "etapa_11",
-      titulo: "Carpintería",
-      icon: FiClock,
-      color: "bg-blue-50",
-    },
-    { key: "etapa_12", titulo: "Pulido", icon: FiClock, color: "bg-indigo-50" },
-    { key: "etapa_3", titulo: "Pintura", icon: FiClock, color: "bg-purple-50" },
-    { key: "etapa_13", titulo: "Tapizado", icon: FiClock, color: "bg-pink-50" },
+    ...etapas
+      .filter((etapa) => (columnas[`etapa_${etapa.id_etapa}`] || []).length > 0)
+      .map((etapa, idx) => ({
+        key: `etapa_${etapa.id_etapa}`,
+        titulo: etapa.nombre,
+        icon: FiClock,
+        color: coloresColumnas[idx % coloresColumnas.length],
+      })),
     {
       key: "finalizada",
       titulo: "Finalizado",

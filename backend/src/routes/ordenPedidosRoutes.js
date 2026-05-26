@@ -2,50 +2,54 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/ordenPedidosController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
-// Todas las rutas requieren autenticación
 router.use(verifyToken);
 
-// Listado y detalle: operario, supervisor, admin
 router.get(
   "/",
-  checkRole([ROLES.OPERARIO, ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.getAll
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_VIEW),
+  controller.getAll,
 );
 router.get(
   "/:id",
-  checkRole([ROLES.OPERARIO, ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.getById
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_VIEW),
+  controller.getById,
 );
 
-// Completar pedido: supervisor y admin
 router.put(
   "/:id/completar",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.complete
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_EDIT),
+  checkIdempotency,
+  controller.complete,
 );
 
-// Crear pedido: operario, supervisor, admin
 router.post(
   "/",
-  checkRole([ROLES.OPERARIO, ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.create
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_CREATE),
+  checkIdempotency,
+  controller.create,
 );
 
-// Actualizar pedido: supervisor y admin
 router.put(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.update
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_EDIT),
+  checkIdempotency,
+  controller.update,
 );
 
-// Eliminar pedido: admin y supervisor (operario no)
 router.delete(
   "/:id",
-  checkRole([ROLES.ADMIN, ROLES.SUPERVISOR]),
-  controller.delete
+  requirePlanFeature("ordenes"),
+  requirePermission(ACTIONS.ORDERS_DELETE),
+  controller.delete,
 );
 
 module.exports = router;

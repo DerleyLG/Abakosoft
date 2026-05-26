@@ -6,6 +6,7 @@ import AsyncSelect from "react-select/async";
 import { X } from "lucide-react";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const formatCOP = (number) => {
   if (!number) return "0";
@@ -22,7 +23,8 @@ const cleanCOPFormat = (formattedValue) => {
 };
 
 const CrearOrdenCompra = () => {
-  // Obtener fecha actual en formato YYYY-MM-DD
+  const idempotencyKey = useIdempotencyKey();
+  const idempotencyKeyInicializar = useIdempotencyKey();
   const obtenerFechaActual = () => {
     const hoy = new Date();
     return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
@@ -79,7 +81,6 @@ const CrearOrdenCompra = () => {
   const timerRef = useRef(null);
   const [todosLosArticulos, setTodosLosArticulos] = useState([]);
 
-  // Cargar todos los artículos al inicio
   useEffect(() => {
     const cargarTodosArticulos = async () => {
       try {
@@ -140,7 +141,6 @@ const CrearOrdenCompra = () => {
 
       // Debounce: esperar 300ms después de que el usuario deje de escribir
       timerRef.current = setTimeout(() => {
-        // Filtrar localmente en todos los artículos cargados
         const filtered = todosLosArticulos.filter(
           (art) =>
             art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -151,7 +151,7 @@ const CrearOrdenCompra = () => {
         // Guardar en caché
         cacheRef.current[cacheKey] = filtered;
         callback(filtered);
-      }, 300); // 300ms de delay
+      }, 300);
     },
     [todosLosArticulos],
   );
@@ -178,7 +178,7 @@ const CrearOrdenCompra = () => {
                   try {
                     await api.post("/inventario/inicializar", {
                       id_articulo: Number(idArticulo),
-                    });
+                    }, { headers: { "X-Idempotency-Key": idempotencyKeyInicializar } });
                     toast.success(
                       "Artículo agregado al inventario con stock 0",
                     );
@@ -248,7 +248,7 @@ const CrearOrdenCompra = () => {
         abreviatura_unidad:
           articulo.abreviatura_unidad || articulo.nombre_unidad || "ud",
         precio_unitario: articulo.precio_costo || 0,
-        precio_costo_original: articulo.precio_costo || 0, // Guardar precio original para comparar
+        precio_costo_original: articulo.precio_costo || 0,
       },
     ]);
     setArticuloSeleccionado(null);
@@ -398,11 +398,12 @@ const CrearOrdenCompra = () => {
         await api.post("/ordenes-compra", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
+            "X-Idempotency-Key": idempotencyKey,
           },
         });
       } else {
         // Sin archivo, enviar JSON normal
-        await api.post("/ordenes-compra", datos);
+        await api.post("/ordenes-compra", datos, { headers: { "X-Idempotency-Key": idempotencyKey } });
       }
 
       toast.success("Orden de compra creada correctamente", {
@@ -426,7 +427,7 @@ const CrearOrdenCompra = () => {
         "Error creando orden de compra",
         error.response?.data || error.message,
       );
-      // Mostrar mensaje específico si viene del backend (error o message)
+
       const msg =
         error.response?.data?.error ||
         error.response?.data?.message ||
@@ -441,164 +442,147 @@ const CrearOrdenCompra = () => {
     navigate("/ordenes_compra");
   };
 
+  const inputCls =
+    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 placeholder:text-slate-400 transition disabled:opacity-50 disabled:cursor-not-allowed";
+  const labelCls =
+    "text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block";
+
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-4xl font-bold mb-8 text-gray-800 border-b pb-4">
-          Nueva Orden de Compra
-        </h2>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Nueva orden de compra
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Completa los datos para registrar la orden
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleCancelar}
+          className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+        >
+          ← Volver
+        </button>
+      </div>
 
-        {loading && (
-          <div className="flex items-center justify-center p-4 bg-blue-100 text-blue-700 rounded-md mb-4">
-            <svg
-              className="animate-spin h-5 w-5 mr-3 text-blue-500"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            Cargando...
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Card: Datos generales */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
+            Datos generales
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="proveedor" className={labelCls}>
+                Proveedor <span className="text-red-400 normal-case">*</span>
+              </label>
+              <select
+                id="proveedor"
+                value={idProveedor}
+                onChange={(e) => setIdProveedor(e.target.value)}
+                required
+                className={inputCls + " bg-white"}
+                disabled={loading}
+              >
+                <option value="">Selecciona un proveedor</option>
+                {proveedores.map((prov) => (
+                  <option key={prov.id_proveedor} value={prov.id_proveedor}>
+                    {prov.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label
-              htmlFor="proveedor"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Proveedor <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="proveedor"
-              value={idProveedor}
-              onChange={(e) => setIdProveedor(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            >
-              <option value="">-- Seleccione un proveedor --</option>
-              {proveedores.map((prov) => (
-                <option key={prov.id_proveedor} value={prov.id_proveedor}>
-                  {prov.nombre}
-                </option>
-              ))}
-            </select>
+        {/* Card: Datos de pago */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+            Datos de pago
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="fechaCompra" className={labelCls}>
+                Fecha de compra{" "}
+                <span className="text-red-400 normal-case">*</span>
+              </label>
+              <input
+                id="fechaCompra"
+                type="date"
+                value={fechaCompra}
+                onChange={(e) => setFechaCompra(e.target.value)}
+                required
+                className={inputCls + " cursor-pointer"}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="metodoPago" className={labelCls}>
+                Método de pago{" "}
+                <span className="text-red-400 normal-case">*</span>
+              </label>
+              <select
+                id="metodoPago"
+                value={idMetodoPago}
+                onChange={(e) => setIdMetodoPago(e.target.value)}
+                required
+                className={inputCls + " bg-white"}
+                disabled={loading}
+              >
+                <option value="">Selecciona un método</option>
+                {metodosPago.map((m) => (
+                  <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="referenciaPago" className={labelCls}>
+                Referencia de pago
+              </label>
+              <input
+                id="referenciaPago"
+                type="text"
+                value={referenciaPago}
+                onChange={(e) => setReferenciaPago(e.target.value)}
+                placeholder="Ej: Nº de cuenta, cheque…"
+                className={inputCls}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex flex-col md:col-span-2 lg:col-span-3">
+              <label htmlFor="observacionesPago" className={labelCls}>
+                Observaciones
+              </label>
+              <textarea
+                id="observacionesPago"
+                rows="2"
+                value={observacionesPago}
+                onChange={(e) => setObservacionesPago(e.target.value)}
+                placeholder="Notas adicionales sobre el pago"
+                className={inputCls + " resize-none"}
+                disabled={loading}
+              />
+            </div>
           </div>
+        </div>
 
-          <div>
-            <label
-              htmlFor="categoriaCosto"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Categoría de costo
-            </label>
-            <input
-              id="categoriaCosto"
-              type="text"
-              value={categoriaCosto}
-              onChange={(e) => setCategoriaCosto(e.target.value)}
-              placeholder="Ej: compra de articulos ya fabricados"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            />
-          </div>
-
-          <hr className="my-6 border-gray-300" />
-          <h3 className="text-xl font-bold mb-2 text-gray-800">
-            Datos de Pago
-          </h3>
-          <div>
-            <label
-              htmlFor="fechaCompra"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Fecha de Compra <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="fechaCompra"
-              type="date"
-              value={fechaCompra}
-              onChange={(e) => setFechaCompra(e.target.value)}
-              required
-              className="cursor-pointer w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="metodoPago"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Método de Pago <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="metodoPago"
-              value={idMetodoPago}
-              onChange={(e) => setIdMetodoPago(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            >
-              <option value="">-- Seleccione un método de pago --</option>
-              {metodosPago.map((metodo) => (
-                <option
-                  key={metodo.id_metodo_pago}
-                  value={metodo.id_metodo_pago}
-                >
-                  {metodo.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label
-              htmlFor="referenciaPago"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Referencia de Pago
-            </label>
-            <input
-              id="referenciaPago"
-              type="text"
-              value={referenciaPago}
-              onChange={(e) => setReferenciaPago(e.target.value)}
-              placeholder="Ej: Numero de cuenta"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="observacionesPago"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Observaciones de Pago
-            </label>
-            <textarea
-              id="observacionesPago"
-              rows="3"
-              value={observacionesPago}
-              onChange={(e) => setObservacionesPago(e.target.value)}
-              placeholder="Notas adicionales sobre el pago"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Checkbox para habilitar carga de comprobante */}
-          <div className="flex items-center gap-2">
+        {/* Card: Comprobante */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+            Comprobante / factura{" "}
+            <span className="font-normal normal-case text-slate-400">
+              (opcional)
+            </span>
+          </h2>
+          <div className="flex items-center gap-2 mb-3">
             <input
               type="checkbox"
               id="adjuntarComprobante"
@@ -610,156 +594,154 @@ const CrearOrdenCompra = () => {
                   setPreviewUrl(null);
                 }
               }}
-              className="w-4 h-4 text-slate-600 cursor-pointer"
+              className="w-4 h-4 rounded border-slate-300 text-slate-700 cursor-pointer"
               disabled={loading}
             />
             <label
               htmlFor="adjuntarComprobante"
-              className="text-sm font-medium text-gray-700 cursor-pointer"
+              className="text-sm text-slate-600 cursor-pointer"
             >
-              Adjuntar comprobante/factura (opcional)
+              Adjuntar comprobante o factura
             </label>
           </div>
-
-          {/* Campo de archivo (solo si está habilitado) */}
           {adjuntarComprobante && (
-            <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Cargar archivo
-              </label>
+            <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50">
               <input
                 type="file"
                 accept=".jpg,.jpeg,.png,.pdf"
                 onChange={handleArchivoChange}
-                className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 file:cursor-pointer"
+                className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
                 disabled={loading}
               />
-              <p className="mt-2 text-xs text-gray-500">
-                Formatos permitidos: JPG, PNG, PDF. Tamaño máximo: 5MB
+              <p className="mt-2 text-xs text-slate-400">
+                JPG, PNG o PDF · máx 5 MB
               </p>
-
-              {/* Preview de imagen */}
               {previewUrl && (
-                <div className="mt-4 relative">
+                <div className="mt-3 relative inline-block">
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="max-w-full h-auto max-h-48 rounded-md border border-gray-300"
+                    className="max-h-40 rounded-lg border border-slate-200"
                   />
                   <button
                     type="button"
                     onClick={eliminarArchivo}
-                    className="cursor-pointer absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 cursor-pointer"
                   >
-                    <X size={16} />
+                    <X size={10} />
                   </button>
                 </div>
               )}
-
-              {/* Nombre de archivo PDF */}
               {archivoComprobante && !previewUrl && (
-                <div className="mt-4 flex items-center justify-between bg-white border border-gray-300 rounded-md p-3">
-                  <span className="text-sm text-gray-700">
+                <div className="mt-3 flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                  <span className="text-sm text-slate-700 truncate">
                     {archivoComprobante.name}
                   </span>
                   <button
                     type="button"
                     onClick={eliminarArchivo}
-                    className="cursor-pointer text-red-600 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 cursor-pointer ml-2 flex-shrink-0"
                   >
-                    <X size={18} />
+                    <X size={16} />
                   </button>
                 </div>
               )}
             </div>
           )}
+        </div>
 
-          <hr className="my-6 border-gray-300" />
+        {/* Card: Artículos */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+            Artículos a comprar
+          </h2>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Agregar artículo
-            </label>
-            <div className="flex items-center gap-2">
-              <AsyncSelect
-                cacheOptions
-                loadOptions={loadArticulosOptions}
-                defaultOptions={todosLosArticulos}
-                value={articuloSeleccionado}
-                onChange={(option) => {
-                  setArticuloSeleccionado(option);
-                  if (option) {
-                    agregarArticulo(option);
-                  }
-                }}
-                placeholder="Escribe para buscar un artículo o selecciona de la lista..."
-                isClearable
-                className="text-sm w-full"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#d1d5db",
-                    boxShadow: "none",
-                    "&:hover": { borderColor: "#64748b" },
-                    borderRadius: "0.375rem",
-                  }),
-                  menuList: (base) => ({
-                    ...base,
-                    maxHeight: "300px",
-                  }),
-                }}
-                isDisabled={loading}
-                noOptionsMessage={() => "No se encontraron artículos"}
-                loadingMessage={() => "Cargando artículos..."}
-              />
-            </div>
+          {/* Buscador de artículo */}
+          <div className="mb-4">
+            <label className={labelCls}>Agregar artículo</label>
+            <AsyncSelect
+              cacheOptions
+              loadOptions={loadArticulosOptions}
+              defaultOptions={todosLosArticulos}
+              value={articuloSeleccionado}
+              onChange={(option) => {
+                setArticuloSeleccionado(option);
+                if (option) agregarArticulo(option);
+              }}
+              placeholder="Busca por nombre o referencia…"
+              isClearable
+              className="text-sm"
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: "#e2e8f0",
+                  boxShadow: "none",
+                  "&:hover": { borderColor: "#94a3b8" },
+                  borderRadius: "0.5rem",
+                  minHeight: "38px",
+                }),
+                menuList: (base) => ({ ...base, maxHeight: "260px" }),
+              }}
+              isDisabled={loading}
+              noOptionsMessage={() => "No se encontraron artículos"}
+              loadingMessage={() => "Cargando artículos…"}
+            />
           </div>
 
-          <div>
-            <h3 className="text-2xl font-bold mb-4 text-gray-800">
-              Artículos seleccionados
-            </h3>
-            <table className="w-full table-auto border-collapse border border-gray-300">
+          {/* Tabla de artículos seleccionados */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-200">
-                  <th className="px-4 py-2 text-left">Descripción</th>
-                  <th className="px-4 py-2 text-right">Cantidad</th>
-                  <th className="px-4 py-2 text-left">Unidad</th>
-                  <th className="px-4 py-2 text-right">Precio Unitario</th>
-                  <th className="px-4 py-2 text-center">Eliminar</th>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Descripción
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">
+                    Cantidad
+                  </th>
+                  <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-16">
+                    Unidad
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Precio unit.
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Subtotal
+                  </th>
+                  <th className="px-3 py-2 w-10" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-50">
                 {articulosSeleccionados.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="4"
-                      className="px-4 py-4 text-center text-gray-500"
+                      colSpan="6"
+                      className="text-center py-10 text-slate-400 text-xs"
                     >
-                      No hay artículos seleccionados.
+                      Agrega artículos usando el buscador de arriba
                     </td>
                   </tr>
                 ) : (
                   articulosSeleccionados.map((art) => (
-                    <tr
-                      key={art.id_articulo}
-                      className="border-t border-gray-200"
-                    >
-                      <td className="px-4 py-2">
+                    <tr key={art.id_articulo} className="hover:bg-slate-50">
+                      <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <span>{art.descripcion}</span>
+                          <span className="text-slate-800 font-medium text-xs">
+                            {art.descripcion}
+                          </span>
                           {art.precio_unitario !==
                             art.precio_costo_original && (
                             <span
-                              className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 pointer-events-none shadow-sm"
+                              className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5 flex-shrink-0"
                               title={`Precio original: ${formatCOP(art.precio_costo_original)}`}
                             >
-                              se actualizará costo
+                              actualizará costo
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="px-3 py-2 text-right">
                         <input
                           type="number"
                           min="0.001"
@@ -768,14 +750,14 @@ const CrearOrdenCompra = () => {
                           onChange={(e) =>
                             cambiarCantidad(art.id_articulo, e.target.value)
                           }
-                          className="w-20 border border-gray-300 rounded-md px-2 py-1 text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50"
                           disabled={loading}
                         />
                       </td>
-                      <td className="px-4 py-2 text-left">
+                      <td className="px-3 py-2 text-xs text-slate-500">
                         {art.abreviatura_unidad || "ud"}
                       </td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="px-3 py-2 text-right">
                         <input
                           type="text"
                           min="0"
@@ -786,46 +768,70 @@ const CrearOrdenCompra = () => {
                               e.target.value,
                             )
                           }
-                          className="w-28 border border-gray-300 rounded-md px-2 py-1 text-right bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-32 border border-slate-200 rounded-lg px-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50"
                           disabled={loading}
                         />
                       </td>
-                      <td className="px-4 py-2 text-center">
+                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-800">
+                        {formatCOP(art.cantidad * art.precio_unitario)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
                         <button
                           type="button"
                           onClick={() => eliminarArticulo(art.id_articulo)}
-                          className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={loading}
+                          className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
                         >
-                          <X className="w-5 h-5" />
+                          <X size={13} />
                         </button>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
+              {articulosSeleccionados.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-slate-100 bg-slate-50">
+                    <td
+                      colSpan="4"
+                      className="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                    >
+                      Total
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
+                      {formatCOP(
+                        articulosSeleccionados.reduce(
+                          (s, a) => s + a.cantidad * a.precio_unitario,
+                          0,
+                        ),
+                      )}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
+        </div>
 
-          <div className="flex gap-4 justify-end mt-8">
-            <button
-              type="button"
-              onClick={handleCancelar}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
-            >
-              Guardar Orden
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Acciones */}
+        <div className="flex items-center justify-end gap-3 pb-4">
+          <button
+            type="button"
+            onClick={handleCancelar}
+            className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold bg-slate-900 hover:bg-slate-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+            disabled={loading}
+          >
+            {loading ? "Guardando…" : "Crear orden"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

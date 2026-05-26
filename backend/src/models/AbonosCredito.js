@@ -31,7 +31,7 @@ const AbonosCreditoModel = {
           data.observaciones || null,
           data.id_metodo_pago || null,
           data.referencia || null,
-        ]
+        ],
       );
 
       const id_abono = result.insertId;
@@ -49,24 +49,21 @@ const AbonosCreditoModel = {
                ELSE 'pendiente'
              END
          WHERE id_venta_credito = ?`,
-        [data.monto, data.monto, data.monto, idVentaCredito]
+        [data.monto, data.monto, data.monto, idVentaCredito],
       );
 
       // Obtener el id_orden_venta correspondiente a este idVentaCredito
       const [ventaCreditoRows] = await conn.query(
         "SELECT id_orden_venta FROM ventas_credito WHERE id_venta_credito = ? LIMIT 1",
-        [idVentaCredito]
+        [idVentaCredito],
       );
       const id_orden_venta =
         ventaCreditoRows.length > 0 ? ventaCreditoRows[0].id_orden_venta : null;
-      if (!id_orden_venta) {
-        throw new Error(
-          "No se encontró la orden de venta asociada a este abono de crédito."
-        );
-      }
+      // Si el crédito tiene OV asociada, usar id_orden_venta; si no (crédito manual), usar id_venta_credito
+      const id_doc = id_orden_venta || Number(idVentaCredito);
       await TesoreriaModel.insertarMovimiento(
         {
-          id_documento: id_orden_venta,
+          id_documento: id_doc,
           tipo_documento: "abono_credito",
           monto: data.monto,
           id_metodo_pago: data.id_metodo_pago,
@@ -74,7 +71,7 @@ const AbonosCreditoModel = {
           observaciones: data.observaciones || null,
           fecha_movimiento: new Date(),
         },
-        conn
+        conn,
       );
 
       await conn.commit();
@@ -100,7 +97,7 @@ const AbonosCreditoModel = {
        LEFT JOIN metodos_pago mp ON a.id_metodo_pago = mp.id_metodo_pago
        WHERE a.id_venta_credito = ?
        ORDER BY a.fecha DESC`,
-      [idVentaCredito]
+      [idVentaCredito],
     );
     return rows;
   },
@@ -116,7 +113,7 @@ const AbonosCreditoModel = {
        LEFT JOIN abonos_credito a ON vc.id_venta_credito = a.id_venta_credito
        WHERE vc.id_venta_credito = ?
        GROUP BY vc.id_venta_credito`,
-      [idVentaCredito]
+      [idVentaCredito],
     );
 
     if (rows.length === 0) return null;
@@ -127,7 +124,7 @@ const AbonosCreditoModel = {
        FROM abonos_credito
        WHERE id_venta_credito = ?
        ORDER BY fecha DESC`,
-      [idVentaCredito]
+      [idVentaCredito],
     );
 
     return {

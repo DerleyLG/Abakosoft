@@ -37,3 +37,19 @@ Este proyecto es una plataforma web desarrollada para facilitar la gestión de i
 ```bash
 git clone https://github.com/DerleyLG/plataforma-gestion-fabrica.git
 cd plataforma-gestion-fabrica
+copy .env.example .env
+docker compose up -d --build
+```
+
+## Variables de entorno para Docker
+
+El archivo [docker-compose.yml](docker-compose.yml) usa variables leídas desde un `.env` en la raíz del proyecto.
+
+Usa [ .env.example ](.env.example) como plantilla y ajusta como mínimo:
+
+- `MYSQL_ROOT_PASSWORD`
+- `JWT_SECRET`
+- `SAAS_JWT_SECRET`
+- `SAAS_REFRESH_JWT_SECRET`
+- `SAAS_SEED_ADMIN_PASSWORD`
+- `FRONTEND_URLS`

@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Listbox } from "@headlessui/react";
 import { format } from "date-fns";
 import { Plus, X, Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { FiArrowLeft } from "react-icons/fi";
 import { useNavigate, useParams } from "react-router-dom";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 import { toast } from "react-hot-toast";
 import AsyncSelect from "react-select/async";
 import api from "../services/api";
@@ -14,6 +16,7 @@ const CrearOrdenFabricacion = () => {
   const modoEdicion = !!idEditar;
   const idPedidoSeleccionado = location.state?.idPedidoSeleccionado || null;
   const navigate = useNavigate();
+  const idempotencyKey = useIdempotencyKey();
   const [cargandoEdicion, setCargandoEdicion] = useState(false);
   const [ordenesPedido, setOrdenesPedido] = useState([]);
   const [ordenPedido, setOrdenPedido] = useState(null);
@@ -533,10 +536,10 @@ const CrearOrdenFabricacion = () => {
       };
 
       if (modoEdicion) {
-        await api.put(`/ordenes-fabricacion/${idEditar}`, payload);
+        await api.put(`/ordenes-fabricacion/${idEditar}`, payload, { headers: { "X-Idempotency-Key": idempotencyKey } });
         toast.success("Orden de fabricación actualizada");
       } else {
-        await api.post("/ordenes-fabricacion", payload);
+        await api.post("/ordenes-fabricacion", payload, { headers: { "X-Idempotency-Key": idempotencyKey } });
         toast.success("Orden de fabricación creada");
       }
       navigate("/ordenes_fabricacion");
@@ -551,402 +554,445 @@ const CrearOrdenFabricacion = () => {
     }
   };
 
+  if (cargandoEdicion) {
+    return (
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-500 text-sm">Cargando orden...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-4xl font-bold mb-8 text-gray-800 border-b pb-4">
-          {modoEdicion
-            ? "Editar orden de fabricación"
-            : "Nueva orden de fabricación"}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              Orden de pedido <span className="text-red-500">*</span>
-            </label>
-            <Listbox value={ordenPedido} onChange={setOrdenPedido}>
-              <div className="relative">
-                <Listbox.Button className="w-full border border-gray-300 rounded-md px-4 py-2 text-left focus:outline-none focus:ring-2 focus:ring-slate-600">
-                  {ordenPedido
-                    ? `#${ordenPedido.id_pedido} - ${
-                        ordenPedido.cliente_nombre || "Sin cliente"
-                      } - ${format(
-                        new Date(ordenPedido.fecha_pedido),
-                        "dd/MM/yyyy",
-                      )}`
-                    : "Selecciona una orden"}
-                </Listbox.Button>
-
-                <Listbox.Options className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {ordenesPedido.map((op) => (
-                    <Listbox.Option
-                      key={op.id_pedido}
-                      value={op}
-                      className={({ active }) =>
-                        `cursor-pointer select-none px-4 py-2 ${
-                          active ? "bg-slate-100" : ""
-                        }`
-                      }
-                    >
-                      {`#${op.id_pedido} - ${
-                        op.cliente_nombre || "Sin cliente"
-                      } - ${format(new Date(op.fecha_pedido), "dd/MM/yyyy")}`}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
-              </div>
-            </Listbox>
-          </div>
-
-          {/* Fechas y estado */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Fecha de Inicio <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                required
-                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Fecha Fin Estimada
-              </label>
-              <input
-                type="date"
-                value={fechaFinEstimada}
-                onChange={(e) => setFechaFinEstimada(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Estado
-              </label>
-              <select
-                value={estado}
-                onChange={(e) => setEstado(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              >
-                <option value="pendiente">Pendiente</option>
-                <option value="completada">Completada</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Detalles */}
-
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Detalles de la orden</h3>
-              <button
-                type="button"
-                onClick={agregarDetalle}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 cursor-pointer"
-              >
-                <Plus size={18} />
-                Agregar detalle
-              </button>
-            </div>
-
-            {detalles.map((detalle, index) => (
-              <div
-                key={detalle.id}
-                className="grid grid-cols-6 md:grid-cols-6 gap-4 mb-4 items-end relative"
-              >
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Artículo <span className="text-red-500">*</span>
-                  </label>
-                  <AsyncSelect
-                    cacheOptions
-                    loadOptions={loadArticulosOptions}
-                    defaultOptions={articulosOptions}
-                    value={
-                      articulosOptions.find(
-                        (opt) => opt.value === detalle.articulo?.id_articulo,
-                      ) || null
-                    }
-                    onChange={(option) => {
-                      const articuloSeleccionado = option
-                        ? articulos.find((a) => a.id_articulo === option.value)
-                        : null;
-                      handleDetalleChange(
-                        index,
-                        "articulo",
-                        articuloSeleccionado,
-                      );
-                    }}
-                    placeholder="Busca o selecciona un artículo..."
-                    isClearable
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderColor: "#d1d5db",
-                        boxShadow: "none",
-                        "&:hover": { borderColor: "#64748b" },
-                        borderRadius: "0.375rem",
-                        minHeight: "42px",
-                      }),
-                      menuList: (base) => ({
-                        ...base,
-                        maxHeight: "250px",
-                      }),
-                    }}
-                    noOptionsMessage={() => "No se encontraron artículos"}
-                    loadingMessage={() => "Cargando artículos..."}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Cantidad <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={detalle.cantidad}
-                    onChange={(e) =>
-                      handleDetalleChange(index, "cantidad", e.target.value)
-                    }
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Etapa final
-                    {detalle.personalizarFlujo && (
-                      <span className="text-xs text-amber-600 ml-2">
-                        (usando flujo personalizado)
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    className={`w-full border rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-                      detalle.personalizarFlujo
-                        ? "border-amber-300 bg-amber-50 text-gray-500 line-through cursor-not-allowed"
-                        : "border-gray-300"
-                    }`}
-                    value={detalle.id_etapa_final || ""}
-                    onChange={(e) =>
-                      handleDetalleChange(
-                        index,
-                        "id_etapa_final",
-                        e.target.value,
-                      )
-                    }
-                    disabled={detalle.personalizarFlujo}
-                    title={
-                      detalle.personalizarFlujo
-                        ? "El flujo se define en la configuración personalizada"
-                        : ""
-                    }
-                  >
-                    <option value="">Seleccionar etapa final</option>
-                    {etapasProduccion.map((etapa) => (
-                      <option key={etapa.id_etapa} value={etapa.id_etapa}>
-                        {etapa.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Observaciones
-                  </label>
-                  <input
-                    type="text"
-                    value={detalle.descripcion}
-                    onChange={(e) =>
-                      handleDetalleChange(index, "descripcion", e.target.value)
-                    }
-                    placeholder="Opcional"
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                  />
-                </div>
-
-                {/* Configuración de flujo de etapas */}
-                <div className="col-span-6 mt-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`personalizar-flujo-${index}`}
-                      checked={detalle.personalizarFlujo || false}
-                      onChange={() => togglePersonalizarFlujo(index)}
-                      className="w-4 h-4 text-slate-600 rounded border-gray-300 focus:ring-slate-500"
-                    />
-                    <label
-                      htmlFor={`personalizar-flujo-${index}`}
-                      className="text-sm font-medium text-gray-700 flex items-center gap-1 cursor-pointer"
-                    >
-                      <Settings size={16} className="text-slate-500" />
-                      Personalizar flujo de etapas
-                    </label>
-                    {detalle.personalizarFlujo && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nuevosDetalles = [...detalles];
-                          nuevosDetalles[index].mostrarConfigEtapas =
-                            !nuevosDetalles[index].mostrarConfigEtapas;
-                          setDetalles(nuevosDetalles);
-                        }}
-                        className="ml-2 text-slate-500 hover:text-slate-700"
-                      >
-                        {detalle.mostrarConfigEtapas ? (
-                          <ChevronUp size={18} />
-                        ) : (
-                          <ChevronDown size={18} />
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Panel de configuración expandible */}
-                  {detalle.personalizarFlujo && detalle.mostrarConfigEtapas && (
-                    <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                      <p className="text-sm text-gray-600 mb-3">
-                        Selecciona las etapas que aplican para este artículo y
-                        asigna el orden:
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                        {etapasProduccion.map((etapa) => {
-                          const etapaConfig =
-                            detalle.etapasPersonalizadas?.[etapa.id_etapa];
-                          const isActiva = etapaConfig?.activa || false;
-                          return (
-                            <div
-                              key={etapa.id_etapa}
-                              className={`p-3 rounded-lg border-2 transition-all ${
-                                isActiva
-                                  ? "border-slate-500 bg-white shadow-sm"
-                                  : "border-gray-200 bg-gray-50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isActiva}
-                                  onChange={() =>
-                                    toggleEtapaPersonalizada(
-                                      index,
-                                      etapa.id_etapa,
-                                    )
-                                  }
-                                  className="w-4 h-4 text-slate-600 rounded"
-                                />
-                                <span
-                                  className={`text-sm font-medium ${isActiva ? "text-slate-700" : "text-gray-400"}`}
-                                >
-                                  {etapa.nombre}
-                                </span>
-                              </div>
-                              {isActiva && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-gray-500">
-                                    Orden:
-                                  </span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    value={etapaConfig?.orden || 1}
-                                    onChange={(e) =>
-                                      cambiarOrdenEtapa(
-                                        index,
-                                        etapa.id_etapa,
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-14 text-center border border-gray-300 rounded px-2 py-1 text-sm"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Previsualización del flujo */}
-                  {detalle.personalizarFlujo &&
-                    obtenerFlujoEtapas(index).length > 0 && (
-                      <div className="mt-3 p-3 bg-gradient-to-r from-slate-100 to-slate-50 rounded-lg border border-slate-200">
-                        <p className="text-xs text-gray-500 mb-2 font-medium">
-                          Flujo de producción:
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {obtenerFlujoEtapas(index).map((etapa, idx, arr) => (
-                            <div
-                              key={etapa.id_etapa}
-                              className="flex items-center gap-2"
-                            >
-                              <span className="px-3 py-1.5 bg-white border border-slate-300 rounded-full text-sm font-medium text-slate-700 shadow-sm">
-                                {idx + 1}. {etapa.nombre}
-                              </span>
-                              {idx < arr.length - 1 && (
-                                <span className="text-slate-400 font-bold">
-                                  →
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
-
-                {detalle.mensajeError && (
-                  <div
-                    className="col-span-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
-                    role="alert"
-                  >
-                    <span className="block sm:inline">
-                      {detalle.mensajeError}
-                    </span>
-                  </div>
-                )}
-                {index > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDetalle(index)}
-                    className="absolute top-0 right-0 mt-0 mr-0 text-red-500 hover:text-red-900 cursor-pointer"
-                  >
-                    <X size={25} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Botón submit */}
-          <div className="pt-4 border-t flex justify-end gap-4">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-8">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => navigate("/ordenes_fabricacion")}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
+            >
+              <FiArrowLeft size={17} />
+            </button>
+            <div>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                Órdenes de Fabricación
+              </p>
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                {modoEdicion
+                  ? `Editar orden #${idEditar}`
+                  : "Nueva orden de fabricación"}
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/ordenes_fabricacion")}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              form="fabricacion-form"
               disabled={hayArticuloCompuesto || submitting}
-              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm"
             >
               {submitting
-                ? modoEdicion ? "Guardando..." : "Creando..."
-                : modoEdicion ? "Guardar cambios" : "Crear orden de fabricación"}
+                ? modoEdicion
+                  ? "Guardando..."
+                  : "Creando..."
+                : modoEdicion
+                  ? "Guardar cambios"
+                  : "Crear orden"}
             </button>
+          </div>
+        </div>
+
+        <form
+          id="fabricacion-form"
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-6"
+        >
+          {/* Información general */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">
+              Información general
+            </h2>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-slate-600 mb-2">
+                Orden de pedido
+              </label>
+              <Listbox value={ordenPedido} onChange={setOrdenPedido}>
+                <div className="relative">
+                  <Listbox.Button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition">
+                    {ordenPedido ? (
+                      `#${ordenPedido.id_pedido} - ${ordenPedido.cliente_nombre || "Sin cliente"} - ${format(new Date(ordenPedido.fecha_pedido), "dd/MM/yyyy")}`
+                    ) : (
+                      <span className="text-slate-400">
+                        Selecciona una orden de pedido
+                      </span>
+                    )}
+                  </Listbox.Button>
+                  <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                    {ordenesPedido.map((op) => (
+                      <Listbox.Option
+                        key={op.id_pedido}
+                        value={op}
+                        className={({ active }) =>
+                          `cursor-pointer select-none px-4 py-2.5 text-sm ${active ? "bg-slate-50" : ""}`
+                        }
+                      >
+                        {`#${op.id_pedido} - ${op.cliente_nombre || "Sin cliente"} - ${format(new Date(op.fecha_pedido), "dd/MM/yyyy")}`}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </div>
+              </Listbox>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Fecha de inicio <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Fecha fin estimada
+                </label>
+                <input
+                  type="date"
+                  value={fechaFinEstimada}
+                  onChange={(e) => setFechaFinEstimada(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Estado
+                </label>
+                <select
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition"
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="completada">Completada</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Detalles */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Detalles de la orden
+              </h2>
+              <button
+                type="button"
+                onClick={agregarDetalle}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
+              >
+                <Plus size={15} />
+                Agregar artículo
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {detalles.map((detalle, index) => (
+                <div
+                  key={detalle.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50/50 p-5"
+                >
+                  <div className="grid grid-cols-6 md:grid-cols-6 gap-4 items-end">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-semibold text-slate-600 mb-2">
+                        Artículo <span className="text-red-400">*</span>
+                      </label>
+                      <AsyncSelect
+                        cacheOptions
+                        loadOptions={loadArticulosOptions}
+                        defaultOptions={articulosOptions}
+                        value={
+                          articulosOptions.find(
+                            (opt) =>
+                              opt.value === detalle.articulo?.id_articulo,
+                          ) || null
+                        }
+                        onChange={(option) => {
+                          const articuloSeleccionado = option
+                            ? articulos.find(
+                                (a) => a.id_articulo === option.value,
+                              )
+                            : null;
+                          handleDetalleChange(
+                            index,
+                            "articulo",
+                            articuloSeleccionado,
+                          );
+                        }}
+                        placeholder="Busca o selecciona..."
+                        isClearable
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            borderColor: "#e2e8f0",
+                            borderRadius: "0.75rem",
+                            boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+                            minHeight: "46px",
+                            "&:hover": { borderColor: "#94a3b8" },
+                          }),
+                          menuList: (base) => ({ ...base, maxHeight: "250px" }),
+                        }}
+                        noOptionsMessage={() => "No se encontraron artículos"}
+                        loadingMessage={() => "Cargando..."}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-600 mb-2">
+                        Cantidad <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={detalle.cantidad}
+                        onChange={(e) =>
+                          handleDetalleChange(index, "cantidad", e.target.value)
+                        }
+                        required
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-600 mb-2">
+                        Etapa final
+                        {detalle.personalizarFlujo && (
+                          <span className="text-xs text-amber-600 ml-1">
+                            (flujo pers.)
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        value={detalle.id_etapa_final || ""}
+                        onChange={(e) =>
+                          handleDetalleChange(
+                            index,
+                            "id_etapa_final",
+                            e.target.value,
+                          )
+                        }
+                        disabled={detalle.personalizarFlujo}
+                        className={`w-full rounded-xl border px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition ${
+                          detalle.personalizarFlujo
+                            ? "border-amber-200 bg-amber-50 text-slate-400 cursor-not-allowed line-through"
+                            : "border-slate-200 bg-white text-slate-800"
+                        }`}
+                      >
+                        <option value="">Seleccionar etapa</option>
+                        {etapasProduccion.map((etapa) => (
+                          <option key={etapa.id_etapa} value={etapa.id_etapa}>
+                            {etapa.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-2 flex items-end gap-3">
+                      <div className="flex-1">
+                        <label className="block text-sm font-semibold text-slate-600 mb-2">
+                          Observaciones
+                        </label>
+                        <input
+                          type="text"
+                          value={detalle.descripcion}
+                          onChange={(e) =>
+                            handleDetalleChange(
+                              index,
+                              "descripcion",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Opcional"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                        />
+                      </div>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDetalle(index)}
+                          className="mb-0.5 p-2.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer border border-slate-200 bg-white shadow-sm"
+                          title="Eliminar artículo"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Personalizar flujo */}
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={detalle.personalizarFlujo || false}
+                        onClick={() => togglePersonalizarFlujo(index)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                          detalle.personalizarFlujo
+                            ? "bg-amber-500"
+                            : "bg-slate-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            detalle.personalizarFlujo
+                              ? "translate-x-6"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span
+                        className="text-sm font-medium text-slate-600 flex items-center gap-1.5 cursor-pointer select-none"
+                        onClick={() => togglePersonalizarFlujo(index)}
+                      >
+                        <Settings size={14} className="text-slate-400" />
+                        Personalizar flujo de etapas
+                      </span>
+                      {detalle.personalizarFlujo && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nuevosDetalles = [...detalles];
+                            nuevosDetalles[index].mostrarConfigEtapas =
+                              !nuevosDetalles[index].mostrarConfigEtapas;
+                            setDetalles(nuevosDetalles);
+                          }}
+                          className="ml-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {detalle.mostrarConfigEtapas ? (
+                            <ChevronUp size={16} />
+                          ) : (
+                            <ChevronDown size={16} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {detalle.personalizarFlujo &&
+                      detalle.mostrarConfigEtapas && (
+                        <div className="mt-3 p-4 bg-white rounded-xl border border-slate-200">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                            Selecciona las etapas y su orden
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {etapasProduccion.map((etapa) => {
+                              const etapaConfig =
+                                detalle.etapasPersonalizadas?.[etapa.id_etapa];
+                              const isActiva = etapaConfig?.activa || false;
+                              return (
+                                <div
+                                  key={etapa.id_etapa}
+                                  className={`p-3 rounded-xl border-2 transition-all ${
+                                    isActiva
+                                      ? "border-slate-400 bg-slate-50 shadow-sm"
+                                      : "border-slate-100 bg-white"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={isActiva}
+                                      onChange={() =>
+                                        toggleEtapaPersonalizada(
+                                          index,
+                                          etapa.id_etapa,
+                                        )
+                                      }
+                                      className="w-4 h-4 text-slate-600 rounded border-slate-300 focus:ring-slate-400"
+                                    />
+                                    <span
+                                      className={`text-xs font-semibold ${isActiva ? "text-slate-700" : "text-slate-400"}`}
+                                    >
+                                      {etapa.nombre}
+                                    </span>
+                                  </div>
+                                  {isActiva && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs text-slate-400">
+                                        Orden:
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={etapaConfig?.orden || 1}
+                                        onChange={(e) =>
+                                          cambiarOrdenEtapa(
+                                            index,
+                                            etapa.id_etapa,
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="w-12 text-center border border-slate-200 rounded-lg px-1 py-0.5 text-xs"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                    {detalle.personalizarFlujo &&
+                      obtenerFlujoEtapas(index).length > 0 && (
+                        <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            Flujo de producción
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {obtenerFlujoEtapas(index).map(
+                              (etapa, idx, arr) => (
+                                <div
+                                  key={etapa.id_etapa}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-700 shadow-sm">
+                                    {idx + 1}. {etapa.nombre}
+                                  </span>
+                                  {idx < arr.length - 1 && (
+                                    <span className="text-slate-300 font-bold">
+                                      →
+                                    </span>
+                                  )}
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+
+                  {detalle.mensajeError && (
+                    <div className="mt-3 px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl">
+                      {detalle.mensajeError}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </form>
       </div>

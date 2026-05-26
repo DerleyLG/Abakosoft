@@ -42,3 +42,152 @@
 .animate-slide-in-right {
   animation: slideInRight 0.3s ease-out forwards;
 }
+
+/* Modern custom scrollbar for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(120deg, #334155 40%, #64748b 100%);
+  border-radius: 6px;
+  min-height: 40px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(120deg, #475569 40%, #94a3b8 100%);
+}
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #64748b #1e293b;
+}
+
+/* ── Landing ring float ────────────────────────────────── */
+@keyframes landing-ring-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-18px);
+  }
+}
+.landing-ring-tr {
+  animation: landing-ring-float 11s ease-in-out infinite;
+}
+.landing-ring-bl {
+  animation: landing-ring-float 14s ease-in-out infinite 2.5s;
+}
+
+/* ── Login page ──────────────────────────────────────────── */
+
+@keyframes login-slide-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes login-slide-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  18% {
+    transform: translateX(-8px);
+  }
+  36% {
+    transform: translateX(8px);
+  }
+  54% {
+    transform: translateX(-5px);
+  }
+  72% {
+    transform: translateX(5px);
+  }
+  90% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes login-eye-pop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  35% {
+    transform: scale(1.45) rotate(-18deg);
+  }
+  65% {
+    transform: scale(0.88) rotate(8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.login-panel-left {
+  animation: login-slide-from-left 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.login-panel-right {
+  animation: login-slide-from-right 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-feature,
+.login-field {
+  opacity: 0;
+  animation: login-fade-up 0.5s ease-out forwards;
+}
+
+.login-form-heading {
+  animation: login-fade-up 0.45s 0.05s ease-out both;
+}
+
+.login-shake {
+  animation: login-shake 0.45s ease-out;
+}
+
+.login-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: login-spin 0.65s linear infinite;
+}
+
+.login-eye-pop {
+  display: inline-flex;
+  animation: login-eye-pop 0.38s ease-out forwards;
+}

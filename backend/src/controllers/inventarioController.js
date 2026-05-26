@@ -1,6 +1,6 @@
 const InventarioModel = require("../models/inventarioModel");
 const db = require("../database/db");
-const articuloModel = require("../models/articulosModel"); // Necesario para verificar si el artículo existe
+const articuloModel = require("../models/articulosModel"); 
 
 module.exports = {
   registrarMovimiento: async (req, res) => {
@@ -106,19 +106,7 @@ module.exports = {
         stock_en_proceso = "",
         stock_disponible = "",
       } = req.query;
-      console.log("[InventarioController.obtenerInventario] query params =>", {
-        page,
-        pageSize,
-        buscar,
-        id_categoria,
-        tipo_categoria,
-        sortBy,
-        sortDir,
-        stock_fabricado,
-        stock_en_proceso,
-        stock_disponible,
-      });
-
+   
       const { data, total } = await InventarioModel.obtenerPaginado({
         buscar,
         id_categoria,
@@ -132,22 +120,9 @@ module.exports = {
         stock_disponible,
       });
 
-      // LOG CRITICO: Verificar si id_categoria viene en los datos
-      if (data && data.length > 0) {
-        console.log("[InventarioController] MUESTRA DE DATOS DEVUELTOS:", {
-          primerItem: data[0],
-          tieneIdCategoria: "id_categoria" in data[0],
-          valorIdCategoria: data[0].id_categoria,
-        });
-      }
+      
 
-      console.log("[InventarioController.obtenerInventario] resultados =>", {
-        count: Array.isArray(data) ? data.length : 0,
-        total,
-        muestraData: data
-          .slice(0, 2)
-          .map((it) => ({ desc: it.descripcion, id_cat: it.id_categoria })),
-      });
+      
       const p = Math.max(1, parseInt(page) || 1);
       const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
       const totalPages = Math.ceil(total / ps) || 1;
@@ -169,15 +144,10 @@ module.exports = {
   },
 
   getById: async (req, res) => {
-    console.log(
-      `[InventarioController.getById] req.params recibido:`,
-      req.params,
-    );
+   
     const { id } = req.params;
     const id_articulo = id;
-    console.log(
-      `[InventarioController.getById] Extracted id_articulo: ${id_articulo}`,
-    );
+   
 
     try {
       const articulo =
@@ -200,7 +170,6 @@ module.exports = {
 
   /**
    * Actualiza el stock y/o stock mínimo de un artículo en inventario (ajuste manual).
-   * Ruta: PUT /inventario/:id_articulo
    */
   actualizarInventario: async (req, res) => {
     const { id } = req.params;
@@ -359,9 +328,7 @@ module.exports = {
         });
       }
 
-      console.log(
-        `[inventarioController] Inicializando artículo ${id_articulo} en inventario con stock ${stockInicialNum}.`,
-      );
+   
 
       // Llamar a tu función processInventoryMovement para insertar el registro inicial
       await InventarioModel.processInventoryMovement(

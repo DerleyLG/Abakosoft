@@ -2,17 +2,28 @@ const express = require("express");
 const router = express.Router();
 const kanbanController = require("../controllers/kanbanController");
 const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
 
-// Todas las rutas requieren autenticación
 router.use(verifyToken);
 
-// Obtener datos del tablero Kanban
-router.get("/ordenes-fabricacion", kanbanController.getOrdenesKanban);
-
-// Obtener órdenes entregadas
-router.get("/ordenes-entregadas", kanbanController.getOrdenesEntregadas);
-
-// Marcar orden como entregada
-router.post("/marcar-entregada/:id", kanbanController.marcarComoEntregada);
+router.get(
+  "/ordenes-fabricacion",
+  requirePlanFeature("kanban"),
+  requirePermission(ACTIONS.KANBAN_VIEW),
+  kanbanController.getOrdenesKanban,
+);
+router.get(
+  "/ordenes-entregadas",
+  requirePlanFeature("kanban"),
+  requirePermission(ACTIONS.KANBAN_VIEW),
+  kanbanController.getOrdenesEntregadas,
+);
+router.post(
+  "/marcar-entregada/:id",
+  requirePlanFeature("kanban"),
+  requirePermission(ACTIONS.KANBAN_MANAGE),
+  kanbanController.marcarComoEntregada,
+);
 
 module.exports = router;

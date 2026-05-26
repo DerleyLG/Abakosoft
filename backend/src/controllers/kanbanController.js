@@ -10,22 +10,22 @@ const kanbanController = {
       const ordenes = await kanbanModel.getOrdenesKanban();
       const etapas = await kanbanModel.getEtapasProduccion();
 
-      // Agrupar órdenes por columna
+      // Construir columnas dinámicamente desde las etapas registradas
       const columnas = {
         sin_iniciar: [],
-        etapa_11: [], // Carpintería
-        etapa_12: [], // Pulido
-        etapa_3: [], // Pintura
-        etapa_13: [], // Tapizado
-        finalizada: [],
-        entregada: [],
       };
+
+      etapas.forEach((etapa) => {
+        columnas[`etapa_${etapa.id_etapa}`] = [];
+      });
+
+      columnas.finalizada = [];
+      columnas.entregada = [];
 
       ordenes.forEach((orden) => {
         if (columnas[orden.columna]) {
           columnas[orden.columna].push(orden);
         } else {
-          // Si no encaja en ninguna columna conocida, va a sin_iniciar
           columnas.sin_iniciar.push(orden);
         }
       });
@@ -73,7 +73,7 @@ const kanbanController = {
 
       const ordenes = await kanbanModel.getOrdenesEntregadas(
         mes ? parseInt(mes) : null,
-        anio ? parseInt(anio) : null
+        anio ? parseInt(anio) : null,
       );
 
       res.json({

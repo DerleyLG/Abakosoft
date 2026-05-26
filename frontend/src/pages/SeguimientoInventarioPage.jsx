@@ -579,7 +579,7 @@ const SeguimientoInventarioPage = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <FiCalendar size={14} className="text-slate-400" />
-                          <span className="text-slate-700">
+                          <span className="text-slate-700 truncate max-w-[130px] block" title={formatDate(mov.fecha)}>
                             {formatDate(mov.fecha)}
                           </span>
                         </div>

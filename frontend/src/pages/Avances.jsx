@@ -230,22 +230,43 @@ const ListaAvances = () => {
     });
   };
 
+  const ESTADO_AVZ_CLS = {
+    completado: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    completada: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    "en proceso": "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    pendiente: "bg-amber-50 text-amber-700 border border-amber-200",
+    parcial: "bg-sky-50 text-sky-700 border border-sky-200",
+  };
+
+  const fmtCOP = (n) =>
+    new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(Number(n) || 0);
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-4xl font-bold text-gray-800">
-          Avances de Producción
-        </h2>
-        <div className="flex items-center gap-3">
-           <button
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Avances de producción
+          </h1>
+          {total > 0 && (
+            <p className="text-xs text-slate-400 mt-0.5">{total} registros</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
             onClick={() => navigate("/trabajadores/pagos")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
           >
             Pagos
-          </button> 
+          </button>
           <button
             onClick={() => navigate("/pagos_anticipados")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
           >
             Anticipos
           </button>
@@ -253,90 +274,113 @@ const ListaAvances = () => {
             onClick={() => {
               setMostrarPagados(!mostrarPagados);
               setPage(1);
-              setSeleccionados([]); // limpiar selección al cambiar vista pagados/no pagados
+              setSeleccionados([]);
             }}
-            className={`px-4 py-2 rounded-md font-semibold transition ${
+            className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg shadow-sm transition-colors cursor-pointer ${
               mostrarPagados
-                ? "bg-blue-600 hover:bg-blue-500 text-white cursor-pointer"
-                : "bg-gray-300 hover:bg-gray-400 text-gray-800 cursor-pointer"
+                ? "bg-indigo-600 hover:bg-indigo-500 text-white"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
           >
             {mostrarPagados ? "Ver no pagados" : "Ver pagados"}
           </button>
-
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-semibold cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
           >
-            <FiArrowLeft /> Volver
+            <FiArrowLeft size={14} /> Volver
           </button>
         </div>
       </div>
-      <div className="mb-4 flex flex-col gap-3">
-        <label
-          htmlFor="trabajador"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Selecciona un trabajador:
-        </label>
-        <select
-          id="trabajador"
-          value={idTrabajadorSeleccionado}
-          onChange={(e) => {
-            setIdTrabajadorSeleccionado(e.target.value);
-            setPage(1);
-            setSeleccionados([]); // limpiar selección al cambiar de trabajador
-          }}
-          className="px-3 py-2 border border-gray-300 rounded-md w-full max-w-xs"
-        >
-          <option value="">-- Todos --</option>
-          {trabajadores.map((t) => (
-            <option key={t.id_trabajador} value={t.id_trabajador}>
-              {t.nombre}
-            </option>
-          ))}
-        </select>
-        {anticipoPendienteInfo && anticipoPendienteInfo.hasPendiente && (
-          <div className="mt-2 text-sm text-sky-700 font-medium">
-            Trabajador:{" "}
-            {trabajadores.find(
-              (t) =>
-                String(t.id_trabajador) === String(idTrabajadorSeleccionado),
-            )?.nombre || ""}{" "}
-            — Anticipo pendiente detectado (${" "}
-            {Number(
-              anticipoPendienteInfo.totalDisponible || 0,
-            ).toLocaleString()}
-            )
-            {Array.isArray(
-              anticiposDetallePorTrabajador[idTrabajadorSeleccionado],
-            ) &&
-              anticiposDetallePorTrabajador[idTrabajadorSeleccionado].length >
-                0 && (
-                <span className="block text-sm text-slate-500 mt-1">
-                  Orden(es):{" "}
-                  {anticiposDetallePorTrabajador[idTrabajadorSeleccionado]
-                    .map((a) => a.id_orden_fabricacion)
-                    .filter(Boolean)
-                    .map((o) => `#${o}`)
-                    .join(", ") || "—"}
-                </span>
-              )}
+
+      {/* Filtros */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-xs">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Trabajador
+            </label>
+            <select
+              value={idTrabajadorSeleccionado}
+              onChange={(e) => {
+                setIdTrabajadorSeleccionado(e.target.value);
+                setPage(1);
+                setSeleccionados([]);
+              }}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition"
+            >
+              <option value="">Todos</option>
+              {trabajadores.map((t) => (
+                <option key={t.id_trabajador} value={t.id_trabajador}>
+                  {t.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 flex-1 min-w-[180px] max-w-xs">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Buscar
+            </label>
+            <input
+              type="text"
+              placeholder="Orden, artículo…"
+              value={buscar}
+              onChange={(e) => {
+                setBuscar(e.target.value);
+                setPage(1);
+              }}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+        {anticipoPendienteInfo?.hasPendiente && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+              Anticipo detectado
+            </span>
+            <div className="text-xs text-slate-600">
+              <span className="font-semibold">
+                {trabajadores.find(
+                  (t) =>
+                    String(t.id_trabajador) ===
+                    String(idTrabajadorSeleccionado),
+                )?.nombre || ""}
+              </span>
+              {" — "}anticipo pendiente:{" "}
+              <span className="font-semibold text-sky-700">
+                {fmtCOP(anticipoPendienteInfo.totalDisponible)}
+              </span>
+              {Array.isArray(
+                anticiposDetallePorTrabajador[idTrabajadorSeleccionado],
+              ) &&
+                anticiposDetallePorTrabajador[idTrabajadorSeleccionado].length >
+                  0 && (
+                  <span className="ml-1 text-slate-400">
+                    — Orden(es):{" "}
+                    {anticiposDetallePorTrabajador[idTrabajadorSeleccionado]
+                      .map((a) => a.id_orden_fabricacion)
+                      .filter(Boolean)
+                      .map((o) => `#${o}`)
+                      .join(", ") || "—"}
+                  </span>
+                )}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="overflow-x-auto shadow rounded-lg mt-4">
-        <table className="min-w-full table-auto border border-slate-300 bg-white">
-          <thead className="bg-slate-200 text-slate-700">
-            <tr>
-              {!mostrarPagados && (
-                <th className="px-4 py-2 text-left">
-                  <div className="flex items-center gap-2">
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                {!mostrarPagados && (
+                  <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      title="Seleccionar todos los avances de esta página"
-                      className="cursor-pointer"
+                      title="Seleccionar todos"
+                      className="cursor-pointer rounded border-slate-300"
                       checked={
                         avances.length > 0 &&
                         avances.every((a) =>
@@ -352,7 +396,7 @@ const ListaAvances = () => {
                             prev.filter((id) => !idsPagina.has(id)),
                           );
                           return;
-                        } // Si marca: intentar seleccionar todos los visibles respetando la regla de mismo trabajador
+                        }
                         if (avances.length === 0) return;
                         const trabajadoresEnPagina = Array.from(
                           new Set(avances.map((a) => a.id_trabajador)),
@@ -365,7 +409,7 @@ const ListaAvances = () => {
                             "Para seleccionar todos, filtra por un trabajador primero.",
                           );
                           return;
-                        } // Si ya filtraste por trabajador, permite seleccionar todos sin validar el trabajador
+                        }
                         if (idTrabajadorSeleccionado) {
                           setSeleccionados(
                             Array.from(
@@ -376,7 +420,7 @@ const ListaAvances = () => {
                             ),
                           );
                           return;
-                        } // Si no hay filtro, validar que todos los avances sean del mismo trabajador
+                        }
                         if (seleccionados.length > 0) {
                           const primeraSel = avances.find(
                             (a) => a.id_avance_etapa === seleccionados[0],
@@ -402,234 +446,288 @@ const ListaAvances = () => {
                         );
                       }}
                     />
-                    <span>Seleccionar</span>
-                  </div>
+                  </th>
+                )}
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Orden
                 </th>
-              )}
-              <th className="px-4 py-2 text-left">Orden</th>
-              <th className="px-4 py-2 text-left">Artículo</th>
-              <th className="px-4 py-2 text-left">Etapa</th>
-              <th className="px-4 py-2 text-left">Trabajador</th>
-              <th className="px-4 py-2 text-left">Cantidad</th>
-              <th className="px-4 py-2 text-left">Costo unitario</th>
-              <th className="px-4 py-2 text-left">Subtotal</th>
-              <th className="px-4 py-2 text-left">Anticipo (saldo)</th>
-              <th className="px-4 py-2 text-left">Fecha</th>
-              <th className="px-4 py-2 text-left">Estado</th>
-              <th className="px-4 py-2 text-left">Estado de pago</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading && (
-              <tr>
-                <td
-                  colSpan={mostrarPagados ? 11 : 12}
-                  className="px-4 py-4 text-center text-slate-500"
-                >
-                  Cargando..
-                </td>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Artículo
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Etapa
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Trabajador
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Cant.
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Costo unit.
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Subtotal
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Anticipo
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Pago
+                </th>
               </tr>
-            )}
-
-            {!loading &&
-              avances.map((avance, index) => (
-                <tr
-                  key={avance.id_avance_etapa}
-                  className="border-t border-slate-300 hover:bg-slate-50"
-                >
-                  {!mostrarPagados && (
-                    <td className="px-4 py-2 ">
-                      <input
-                        type="checkbox"
-                        className="cursor-pointer"
-                        checked={seleccionados.includes(avance.id_avance_etapa)}
-                        onChange={() => handleToggle(avance)}
-                      />
-                    </td>
-                  )}
-
-                  <td className="px-4 py-2">
-                    #{avance.id_orden_fabricacion} -{avance.nombre_cliente}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {avance.descripcion || avance.id_articulo}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {avance.nombre_etapa || avance.id_etapa_produccion}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {avance.nombre_trabajador || avance.id_trabajador}
-                  </td>
-
-                  <td className="px-4 py-2">{avance.cantidad}</td>
-
-                  <td className="px-4 py-2">{`$${(
-                    avance.costo_fabricacion ?? 0
-                  ).toLocaleString()}`}</td>
-
-                  <td className="px-4 py-2 font-semibold text-slate-700">
-                    {`$${(
-                      (avance.costo_fabricacion ?? 0) * (avance.cantidad ?? 0)
-                    ).toLocaleString()}`}
-                  </td>
-                  <td className="px-4 py-2">
-                    {(() => {
-                      const saldo = Number(avance.monto_anticipo || 0);
-                      const estado = avance.estado_anticipo || null;
-                      // Considerar tanto el anticipo ligado a la orden (monto_anticipo) como el pendiente a nivel trabajador
-                      const pendingInfo =
-                        pendientesPorTrabajador[avance.id_trabajador];
-                      const workerSaldo = pendingInfo?.totalDisponible || 0;
-                      const tieneAnticipo = saldo > 0 || workerSaldo > 0;
-                      const yaMostrado = avances.slice(0, index).some((a) => {
-                        const prevPending =
-                          pendientesPorTrabajador[a.id_trabajador];
-                        const prevSaldo =
-                          Number(a.monto_anticipo || 0) +
-                          (prevPending?.totalDisponible || 0);
-                        return (
-                          a.id_trabajador === avance.id_trabajador &&
-                          prevSaldo > 0
-                        );
-                      });
-
-                      if (tieneAnticipo && !yaMostrado) {
-                        const displaySaldo = saldo > 0 ? saldo : workerSaldo;
-                        const displayEstado =
-                          estado ||
-                          (pendingInfo?.hasPendiente ? "pendiente" : null);
-                        return (
-                          <div className="flex items-center gap-3">
-                            <button
-                              title={`Aplicar anticipo: $${displaySaldo.toLocaleString()}`}
-                              onClick={() =>
-                                navigate("/pagos/nuevo", {
-                                  state: { avances: [avance] },
-                                })
-                              }
-                              className="text-sky-700 font-semibold hover:underline cursor-pointer"
-                            >
-                              ${displaySaldo.toLocaleString()}
-                            </button>
-                            {displayEstado && displayEstado !== "saldado" && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
-                                {displayEstado}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      if (
-                        (saldo > 0 || workerSaldo > 0) &&
-                        estado === "saldado"
-                      ) {
-                        const displaySaldo = saldo > 0 ? saldo : workerSaldo;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-700 font-semibold">
-                              ${displaySaldo.toLocaleString()}
-                            </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                              Saldado
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <span className="text-slate-400 italic text-sm">
-                          Sin anticipo
-                        </span>
-                      );
-                    })()}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {new Date(avance.fecha_registro).toLocaleDateString(
-                      "es-CO",
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: mostrarPagados ? 11 : 12 }).map(
+                      (__, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="animate-pulse h-3.5 bg-slate-100 rounded w-full" />
+                        </td>
+                      ),
                     )}
-                  </td>
-
-                  <td className="px-4 py-2 capitalize">{avance.estado}</td>
-                  <td className="px-4 py-2">
-                    {mostrarPagados ? (
-                      <span className="text-green-700 font-semibold">
-                        Pagado
-                      </span>
-                    ) : (
-                      <span className="text-green-700 font-semibold">
-                        Pendiente
-                      </span>
-                    )}
+                  </tr>
+                ))
+              ) : avances.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={mostrarPagados ? 11 : 12}
+                    className="text-center py-16"
+                  >
+                    <p className="text-sm font-semibold text-slate-500">
+                      Sin avances
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      No hay avances registrados para los filtros seleccionados
+                    </p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                avances.map((avance, index) => {
+                  const estAvz = (avance.estado || "").toLowerCase();
+                  const badgeCls =
+                    ESTADO_AVZ_CLS[estAvz] ||
+                    "bg-slate-50 text-slate-600 border border-slate-200";
+                  return (
+                    <tr
+                      key={avance.id_avance_etapa}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      {!mostrarPagados && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="cursor-pointer rounded border-slate-300"
+                            checked={seleccionados.includes(
+                              avance.id_avance_etapa,
+                            )}
+                            onChange={() => handleToggle(avance)}
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                        #{avance.id_orden_fabricacion}
+                        {avance.nombre_cliente && (
+                          <span className="ml-1 text-slate-400 font-sans">
+                            — {avance.nombre_cliente}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-700">
+                        {avance.descripcion || avance.id_articulo}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {avance.nombre_etapa || avance.id_etapa_produccion}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-700 font-medium">
+                        {avance.nombre_trabajador || avance.id_trabajador}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums text-slate-700">
+                        {avance.cantidad}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums text-slate-600">
+                        {fmtCOP(avance.costo_fabricacion ?? 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums font-semibold text-slate-800">
+                        {fmtCOP(
+                          (avance.costo_fabricacion ?? 0) *
+                            (avance.cantidad ?? 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const saldo = Number(avance.monto_anticipo || 0);
+                          const estado = avance.estado_anticipo || null;
+                          const pendingInfo =
+                            pendientesPorTrabajador[avance.id_trabajador];
+                          const workerSaldo = pendingInfo?.totalDisponible || 0;
+                          const tieneAnticipo = saldo > 0 || workerSaldo > 0;
+                          const yaMostrado = avances
+                            .slice(0, index)
+                            .some((a) => {
+                              const prevPending =
+                                pendientesPorTrabajador[a.id_trabajador];
+                              const prevSaldo =
+                                Number(a.monto_anticipo || 0) +
+                                (prevPending?.totalDisponible || 0);
+                              return (
+                                a.id_trabajador === avance.id_trabajador &&
+                                prevSaldo > 0
+                              );
+                            });
 
-            {!loading && avances.length === 0 && (
-              <tr>
-                <td
-                  colSpan={mostrarPagados ? 11 : 12}
-                  className="px-4 py-4 text-center text-slate-500"
-                >
-                  No hay avances registrados
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                          if (tieneAnticipo && !yaMostrado) {
+                            const displaySaldo =
+                              saldo > 0 ? saldo : workerSaldo;
+                            const displayEstado =
+                              estado ||
+                              (pendingInfo?.hasPendiente ? "pendiente" : null);
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  title={`Aplicar anticipo: ${fmtCOP(displaySaldo)}`}
+                                  onClick={() =>
+                                    navigate("/pagos/nuevo", {
+                                      state: { avances: [avance] },
+                                    })
+                                  }
+                                  className="text-sky-700 font-semibold hover:underline cursor-pointer text-xs"
+                                >
+                                  {fmtCOP(displaySaldo)}
+                                </button>
+                                {displayEstado &&
+                                  displayEstado !== "saldado" && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                      {displayEstado}
+                                    </span>
+                                  )}
+                              </div>
+                            );
+                          }
+                          if (
+                            (saldo > 0 || workerSaldo > 0) &&
+                            estado === "saldado"
+                          ) {
+                            const displaySaldo =
+                              saldo > 0 ? saldo : workerSaldo;
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-emerald-700 font-semibold text-xs">
+                                  {fmtCOP(displaySaldo)}
+                                </span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  SALDADO
+                                </span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="text-slate-300 text-xs italic">
+                              —
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+                        {new Date(avance.fecha_registro).toLocaleDateString(
+                          "es-CO",
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {estAvz ? (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${badgeCls}`}
+                          >
+                            {avance.estado.toUpperCase()}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {mostrarPagados ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            PAGADO
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            PENDIENTE
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Barra de selección */}
         {!mostrarPagados && seleccionados.length > 0 && (
-          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4">
-            <div className="text-base text-slate-700">
-              Subtotal seleccionado:
-              <span className="text-green-700 font-extrabold">
-                ${subtotalSeleccionados.toLocaleString()}
+          <div className="border-t border-slate-200 px-5 py-3 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="text-sm text-slate-700">
+              <span className="font-semibold">{seleccionados.length}</span>{" "}
+              avance(s) seleccionado(s) — subtotal:{" "}
+              <span className="font-bold text-emerald-700">
+                {fmtCOP(subtotalSeleccionados)}
               </span>
             </div>
             <button
               onClick={manejarPagoMultiple}
-              className="bg-green-700 hover:bg-green-600 text-white px-6 py-2 rounded font-semibold mb-4  cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white shadow-sm transition-colors cursor-pointer"
             >
-              Registrar Pago ({seleccionados.length})
+              Registrar pago ({seleccionados.length})
             </button>
           </div>
         )}
       </div>
-      <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 ">
-        <div className="text-sm text-gray-600">
-          Página {page} de {totalPages} — {total} avance
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50 cursor-pointer"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={!hasPrev}
-          >
-            Anterior
-          </button>
-          <button
-            className="px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50 cursor-pointer"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={!hasNext}
-          >
-            Siguiente
-          </button>
-          <select
-            className="ml-2 border border-gray-400 rounded-md px-2 py-2"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(parseInt(e.target.value));
-              setPage(1);
-            }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+
+      {/* Paginación */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">
+            Página <span className="font-semibold text-slate-700">{page}</span>{" "}
+            de{" "}
+            <span className="font-semibold text-slate-700">{totalPages}</span> —{" "}
+            {total} registros
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              ← Anterior
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasNext}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              Siguiente →
+            </button>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value));
+                setPage(1);
+              }}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition cursor-pointer"
+            >
+              <option value="10">10 / página</option>
+              <option value="25">25 / página</option>
+              <option value="50">50 / página</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

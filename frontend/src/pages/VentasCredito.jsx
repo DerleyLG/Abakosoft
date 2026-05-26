@@ -1,358 +1,399 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "../services/api"; // Usa tu instancia de API
-import { FiEye, FiArrowLeft, FiPlusCircle, FiSearch } from "react-icons/fi";
+import api from "../services/api";
+import {
+  FiEye,
+  FiArrowLeft,
+  FiPlusCircle,
+  FiSearch,
+  FiDollarSign,
+  FiCreditCard,
+} from "react-icons/fi";
 import toast from "react-hot-toast";
 import AbonoDrawer from "../components/AbonoDrawer";
 import CrearCreditoManualModal from "../components/CrearCreditoManualModal";
 import CreditoHistorialDrawer from "../components/CreditoHistorialDrawer";
+import { useAuth } from "../context/AuthContext";
+import { ACTIONS, can } from "../utils/permissions";
+
+const ESTADO_STYLE = {
+  pendiente: "bg-red-50 text-red-700 border border-red-200",
+  parcial: "bg-amber-50 text-amber-700 border border-amber-200",
+  pagado: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+};
+
+const fmt = (amount) => `$${Number(amount || 0).toLocaleString()}`;
 
 const VentasCredito = () => {
-    const [creditos, setCreditos] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [estadoFiltro, setEstadoFiltro] = useState('todos');
-    const navigate = useNavigate();
-    const [showAbonoModal, setShowAbonoModal] = useState(false);
-    const [selectedCredito, setSelectedCredito] = useState(null);
-    const [historialCreditoId, setHistorialCreditoId] = useState(null);
-    const [montoAbono, setMontoAbono] = useState(0);
-    const [metodosPago, setMetodosPago] = useState([]);
-    const [metodoSeleccionado, setMetodoSeleccionado] = useState("");
-    const [referencia, setReferencia] = useState("");
-    const [obsAbono, setObsAbono] = useState("");
-    const [guardandoAbono, setGuardandoAbono] = useState(false);
-    const [openCrearManual, setOpenCrearManual] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-    const API_ENDPOINT = "/creditos"; 
+  const [creditos, setCreditos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("todos");
 
-    const location = useLocation();
+  const [showAbonoModal, setShowAbonoModal] = useState(false);
+  const [selectedCredito, setSelectedCredito] = useState(null);
+  const [historialCreditoId, setHistorialCreditoId] = useState(null);
+  const [openCrearManual, setOpenCrearManual] = useState(false);
 
-    useEffect(() => {
-        const fetchCreditos = async () => {
-            setLoading(true);
-            try {
-                const res = await api.get(API_ENDPOINT);
-                setCreditos(res.data);
-             
-                const openId = location.state?.openCreditId;
-                const openOrderId = location.state?.openOrderId;
-                if (openId || openOrderId) {
-                    
-                    let credito = (res.data || []).find(c => c.id_venta_credito === openId);
-                  
-                    if (!credito && openOrderId) {
-                        credito = (res.data || []).find(c => c.id_orden_venta === openOrderId);
-                    }
-                    if (credito) {
-                        setSelectedCredito(credito);
-                        setMontoAbono(credito.saldo_pendiente || 0);
-                        setMetodoSeleccionado('');
-                        setReferencia('');
-                        setObsAbono('');
-                        setShowAbonoModal(true);
-                    }
-                   
-                    try { navigate(location.pathname, { replace: true, state: {} }); } catch(e){}
-                }
-            } catch (error) {
-                console.error("Error al cargar ventas a crédito:", error);
-                toast.error("Error al cargar la lista de cuentas por cobrar.");
-            } finally {
-                setLoading(false);
-            }
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const canManage = can(user, ACTIONS.CREDITS_MANAGE);
+  const canCreate = can(user, ACTIONS.CREDITS_CREATE);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const fetchCreditos = async () => {
+      setLoading(true);
+      try {
+        const params = {
+          buscar: debouncedSearch || undefined,
+          estado: estadoFiltro !== "todos" ? estadoFiltro : undefined,
+          page,
+          pageSize,
         };
+        const res = await api.get("/creditos", { params });
+        const payload = res.data || {};
+        const data = Array.isArray(payload.data) ? payload.data : [];
+        setCreditos(data);
+        setTotal(payload.total || 0);
+        setTotalPages(payload.totalPages || 1);
+        setHasNext(!!payload.hasNext);
+        setHasPrev(!!payload.hasPrev);
 
-        fetchCreditos();
-       
-        (async () => {
-            try {
-                const r = await api.get('/metodos-pago');
-                setMetodosPago(r.data || []);
-            } catch (e) {
-                // Silenciar error
-            }
-        })();
-    }, []);
-
-    const handleAbonar = (id) => {
-        const credito = creditos.find(c => c.id_venta_credito === id);
-        if (!credito) return toast.error('Crédito no encontrado');
-        setSelectedCredito(credito);
-        setMontoAbono(credito.saldo_pendiente || 0);
-        setMetodoSeleccionado('');
-        setReferencia('');
-        setObsAbono('');
-        setShowAbonoModal(true);
+        const openId = location.state?.openCreditId;
+        const openOrderId = location.state?.openOrderId;
+        if (openId || openOrderId) {
+          const credito =
+            data.find((c) => c.id_venta_credito === openId) ||
+            data.find((c) => c.id_orden_venta === openOrderId);
+          if (credito) {
+            setSelectedCredito(credito);
+            setShowAbonoModal(true);
+          }
+          try {
+            navigate(location.pathname, { replace: true, state: {} });
+          } catch (_) {}
+        }
+      } catch {
+        toast.error("Error al cargar la lista de cuentas por cobrar.");
+      } finally {
+        setLoading(false);
+      }
     };
-    
-  
+    fetchCreditos();
+  }, [debouncedSearch, estadoFiltro, page, pageSize, refreshKey]);
 
-    const formatCurrency = (amount) => {
-        return `$${Number(amount || 0).toLocaleString()}`;
-    };
+  const triggerRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-    const closeModal = () => {
-        setShowAbonoModal(false);
-        setSelectedCredito(null);
-    };
+  const handleAbonar = (credito) => {
+    setSelectedCredito(credito);
+    setShowAbonoModal(true);
+  };
 
- 
-
-    const filteredCreditos = creditos.filter((credito) => {
-        const term = searchTerm.toLowerCase();
-        const cliente = credito.cliente_nombre?.toLowerCase() || "";
-        const idVenta = String(credito.id_orden_venta || "");
-        const idCredito = String(credito.id_venta_credito || "");
-
-        const montoTotal = Number(credito.monto_total || 0);
-        const saldo = Number(credito.saldo_pendiente || 0);
-        let estadoDerivado = 'pendiente';
-        if (saldo === 0) estadoDerivado = 'pagado';
-        else if (saldo < montoTotal) estadoDerivado = 'parcial';
-
-       
-        if (estadoFiltro !== 'todos' && estadoDerivado !== estadoFiltro) return false;
-
-        return (
-            cliente.includes(term) ||
-            idVenta.includes(term) ||
-            idCredito.includes(term) ||
-            estadoDerivado.includes(term) ||
-            (credito.estado || '').toLowerCase().includes(term)
-        );
-    });
-
-    if (loading) {
-        return (
-            <div className="w-full px-4 md:px-12 lg:px-20 py-10 text-center">
-                Cargando 
-            </div>
-        );
-    }
-
-    return (
-        <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-            
-            
-            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">
-                    Ventas a Crédito
-                </h2>
-
-                <div className="flex w-full md:w-auto items-center gap-4">
-                    <div className="relative flex-grow">
-                        <input
-                            type="text"
-                            placeholder="cliente, ID de venta"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="flex-grow border border-gray-500 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px] w-full"
-                        />
-                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 " size={18} />
-                    </div>
-
-                    <div>
-                        <select
-                            value={estadoFiltro}
-                            onChange={(e) => setEstadoFiltro(e.target.value)}
-                            className="h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                            title="Filtrar por estado"
-                        >
-                            <option value="todos">Todos</option>
-                            <option value="pendiente">Pendientes</option>
-                            <option value="parcial">Parciales</option>
-                            <option value="pagado">Pagados</option>
-                        </select>
-                    </div>
-
-                    <button
-                        onClick={() => setOpenCrearManual(true)}
-                        className="h-[42px] flex items-center bg-emerald-600 hover:bg-emerald-700 gap-2 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-                    >
-                        <FiPlusCircle /> Registrar factura pendiente
-                    </button>
-
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-                    >
-                        <FiArrowLeft />
-                        Volver
-                    </button>
-                </div>
-            </div>
-
-      
-            <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-                <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-                    <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-                        <tr>
-                            <th className="px-4 py-3">Documento</th>
-                            <th className="px-4 py-3">Cliente</th>
-                            <th className="px-4 py-3">Fecha Crédito</th>
-                          
-                            <th className="px-4 py-3 text-center">Total Crédito</th>
-                            <th className="px-4 py-3 text-center">Monto Abonado</th>
-                            <th className="px-4 py-3 text-center text-red-600">Saldo Pendiente</th>
-                           
-                            <th className="px-4 py-3">Estado</th>
-                            <th className="px-4 py-3 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredCreditos.length > 0 ? (
-                            filteredCreditos.map((credito) => {
-                                
-                                
-                                const abonado = credito.monto_total - credito.saldo_pendiente;
-                                const isPendiente = credito.saldo_pendiente > 0;
-                                const montoTotal = Number(credito.monto_total || 0);
-                                const saldo = Number(credito.saldo_pendiente || 0);
-                                let estadoDerivado = 'pendiente';
-                                if (saldo === 0) estadoDerivado = 'pagado';
-                                else if (saldo < montoTotal) estadoDerivado = 'parcial';
-
-                                return (
-                                    <tr 
-                                        key={credito.id_venta_credito} 
-                                        className={`transition ${
-                                            isPendiente 
-                                                ? 'hover:bg-yellow-50' 
-                                                : 'hover:bg-green-50'
-                                        }`}
-                                    >
-                                     
-                                        <td className="px-4 py-3">
-                                            {credito.id_orden_venta ? (
-                                                <span className="font-mono text-gray-700">OV #{credito.id_orden_venta}</span>
-                                            ) : (
-                                                <span className="font-mono text-slate-700">CR #{credito.id_venta_credito}</span>
-                                            )}
-                                        </td>
-
-                                  
-                                        <td className="px-4 py-3">{credito.cliente_nombre}</td>
-
-                                 
-                                        <td className="px-4 py-3">
-                                            {credito.fecha
-                                                ? new Date(credito.fecha).toLocaleDateString('es-CO')
-                                                : ""}
-                                        </td>
-
-                                       
-                                        <td className="px-4 py-3 text-center text-gray-800 font-medium">
-                                            {formatCurrency(credito.monto_total)}
-                                        </td>
-
-                                       
-                                        <td className="px-4 py-3 text-center text-green-600 font-medium">
-                                            {formatCurrency(abonado)}
-                                        </td>
-
-                                        
-                                        <td className={`px-4 py-3 text-center font-bold ${
-                                            isPendiente ? 'text-red-600' : 'text-gray-500'
-                                        }`}>
-                                            {formatCurrency(credito.saldo_pendiente)}
-                                        </td>
-
-                                      
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                                    estadoDerivado === 'pendiente' ? 'bg-red-100 text-red-800' :
-                                                    estadoDerivado === 'parcial' ? 'bg-slate-100 text-slate-800' :
-                                                    'bg-green-100 text-green-800'
-                                                }`}
-                                            >
-                                                {estadoDerivado.toUpperCase()}
-                                            </span>
-                                        </td>
-
-                                    
-                                        <td className="px-4 py-3 text-center flex gap-3 justify-center items-center">
-                                            {isPendiente && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleAbonar(credito.id_venta_credito);
-                                                    }}
-                                                    className="text-indigo-600 hover:text-indigo-900 cursor-pointer p-1 rounded-full hover:bg-indigo-50 transition"
-                                                    title="Registrar Abono"
-                                                >
-                                                    <FiPlusCircle size={18} />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                  
-                                                    setHistorialCreditoId(credito.id_venta_credito);
-                                                }}
-                                                className="text-blue-600 hover:text-blue-900 cursor-pointer p-1 rounded-full hover:bg-blue-50 transition"
-                                                title="Ver Historial de Abonos"
-                                            >
-                                                <FiEye size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan="8" className="text-center py-6 text-gray-500">
-                                    No se encontraron cuentas por cobrar que coincidan con la búsqueda.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            {showAbonoModal && selectedCredito && (
-                <AbonoDrawer
-                    credito={selectedCredito}
-                    onClose={() => setShowAbonoModal(false)}
-                    onSaved={async () => {
-                        
-                        setLoading(true);
-                        try {
-                            const res = await api.get(API_ENDPOINT);
-                            setCreditos(res.data);
-                            toast.success('Lista actualizada');
-                        } catch (e) {
-                            // Silenciar
-                        } finally {
-                            setLoading(false);
-                        }
-                    }}
-                />
-            )}
-            {historialCreditoId && (
-                <CreditoHistorialDrawer creditoId={historialCreditoId} onClose={() => setHistorialCreditoId(null)} />
-            )}
-                        {openCrearManual && (
-                                <CrearCreditoManualModal
-                                    open={openCrearManual}
-                                    onClose={() => setOpenCrearManual(false)}
-                                    onCreated={async () => {
-                                        setLoading(true);
-                                        try {
-                                            const res = await api.get(API_ENDPOINT);
-                                            setCreditos(res.data);
-                                            toast.success('Lista actualizada');
-                                        } catch (e) {
-                                            // Silenciar
-                                        } finally {
-                                            setLoading(false);
-                                        }
-                                    }}
-                                />
-                        )}
+  return (
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Ventas a Crédito
+          </h1>
+          {total > 0 && (
+            <p className="text-xs text-slate-400 mt-0.5">
+              {total} cuentas por cobrar
+            </p>
+          )}
         </div>
-    );
+        <div className="flex items-center gap-2 flex-wrap">
+          {canCreate && (
+            <button
+              onClick={() => setOpenCrearManual(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer"
+            >
+              <FiPlusCircle size={14} /> Registrar factura
+            </button>
+          )}
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+          >
+            <FiArrowLeft size={14} /> Volver
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[180px] flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Buscar
+            </label>
+            <div className="relative">
+              <FiSearch
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={14}
+              />
+              <input
+                type="text"
+                placeholder="Cliente, ID de venta…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 placeholder:text-slate-400 transition"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Estado
+            </label>
+            <select
+              value={estadoFiltro}
+              onChange={(e) => {
+                setEstadoFiltro(e.target.value);
+                setPage(1);
+              }}
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition min-w-[150px] cursor-pointer"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="parcial">Parciales</option>
+              <option value="pagado">Pagados</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Documento
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Cliente
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Abonado
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Saldo
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 8 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="animate-pulse h-3 bg-slate-100 rounded w-full" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : creditos.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-16">
+                    <FiCreditCard
+                      size={32}
+                      className="mx-auto text-slate-300 mb-2"
+                    />
+                    <p className="text-sm font-semibold text-slate-500">
+                      Sin cuentas por cobrar
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {searchTerm || estadoFiltro !== "todos"
+                        ? "No hay resultados para esa búsqueda"
+                        : "No hay ventas a crédito registradas"}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                creditos.map((credito) => {
+                  const montoTotal = Number(credito.monto_total || 0);
+                  const saldo = Number(credito.saldo_pendiente || 0);
+                  const abonado = montoTotal - saldo;
+                  const isPendiente = saldo > 0;
+
+                  let estadoDerivado = "pagado";
+                  if (saldo > 0 && saldo < montoTotal)
+                    estadoDerivado = "parcial";
+                  else if (saldo >= montoTotal) estadoDerivado = "pendiente";
+
+                  return (
+                    <tr
+                      key={credito.id_venta_credito}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                        {credito.id_orden_venta
+                          ? `OV #${credito.id_orden_venta}`
+                          : `CR #${credito.id_venta_credito}`}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {credito.cliente_nombre}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">
+                        {credito.fecha
+                          ? new Date(credito.fecha).toLocaleDateString("es-CO")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                        {fmt(montoTotal)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-600 font-medium">
+                        {fmt(abonado)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right font-bold ${
+                          isPendiente ? "text-red-600" : "text-slate-400"
+                        }`}
+                      >
+                        {fmt(saldo)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${ESTADO_STYLE[estadoDerivado]}`}
+                        >
+                          {estadoDerivado.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {isPendiente && canManage && (
+                            <button
+                              onClick={() => handleAbonar(credito)}
+                              title="Registrar Abono"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer"
+                            >
+                              <FiDollarSign size={12} />
+                              Abonar
+                            </button>
+                          )}
+                          <button
+                            onClick={() =>
+                              setHistorialCreditoId(credito.id_venta_credito)
+                            }
+                            title="Ver Historial"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                          >
+                            <FiEye size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Paginación */}
+        <div className="border-t border-slate-100 px-4 py-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500">
+              Página{" "}
+              <span className="font-semibold text-slate-700">{page}</span> de{" "}
+              <span className="font-semibold text-slate-700">{totalPages}</span>{" "}
+              — <span className="font-semibold text-slate-700">{total}</span>{" "}
+              créditos
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={!hasPrev}
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNext}
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value));
+                  setPage(1);
+                }}
+                className="px-2 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
+              >
+                <option value={10}>10 / pág.</option>
+                <option value={25}>25 / pág.</option>
+                <option value={50}>50 / pág.</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showAbonoModal && selectedCredito && (
+        <AbonoDrawer
+          credito={selectedCredito}
+          onClose={() => setShowAbonoModal(false)}
+          onSaved={() => {
+            triggerRefresh();
+            toast.success("Lista actualizada");
+          }}
+        />
+      )}
+      {historialCreditoId && (
+        <CreditoHistorialDrawer
+          creditoId={historialCreditoId}
+          onClose={() => setHistorialCreditoId(null)}
+        />
+      )}
+      {openCrearManual && (
+        <CrearCreditoManualModal
+          open={openCrearManual}
+          onClose={() => setOpenCrearManual(false)}
+          onCreated={() => {
+            setPage(1);
+            triggerRefresh();
+            toast.success("Lista actualizada");
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default VentasCredito;
-

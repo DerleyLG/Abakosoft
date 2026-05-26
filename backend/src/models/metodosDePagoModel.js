@@ -11,29 +11,39 @@ module.exports = {
     const like = `%${name}%`;
     const [rows] = await db.query(
       "SELECT id_metodo_pago FROM metodos_pago WHERE nombre LIKE ? LIMIT 1",
-      [like]
+      [like],
     );
     return rows.length ? rows[0].id_metodo_pago : null;
   },
 
-  create: async (req, res) => {
-    try {
-      const { nombre } = req.body;
-      if (!nombre) {
-        return res
-          .status(400)
-          .json({ error: "El nombre del método de pago es obligatorio." });
-      }
-      const result = await metodosDePagoModel.create(nombre);
-      res
-        .status(201)
-        .json({
-          message: "Método de pago creado con éxito.",
-          id: result.insertId,
-        });
-    } catch (error) {
-      console.error("Error al crear metodo de pago:", error);
-      res.status(500).json({ error: "Error al crear metodo de pago" });
+  create: async ({ nombre, tipo }) => {
+    const [result] = await db.query(
+      "INSERT INTO metodos_pago (nombre, tipo) VALUES (?, ?)",
+      [nombre, tipo || "contado"],
+    );
+    return { id: result.insertId, nombre };
+  },
+
+  update: async (id, { nombre, tipo }) => {
+    const fields = ["nombre = ?"];
+    const values = [nombre];
+    if (tipo) {
+      fields.push("tipo = ?");
+      values.push(tipo);
     }
+    values.push(id);
+    const [result] = await db.query(
+      `UPDATE metodos_pago SET ${fields.join(", ")} WHERE id_metodo_pago = ?`,
+      values,
+    );
+    return result;
+  },
+
+  delete: async (id) => {
+    const [result] = await db.query(
+      "DELETE FROM metodos_pago WHERE id_metodo_pago = ?",
+      [id],
+    );
+    return result;
   },
 };

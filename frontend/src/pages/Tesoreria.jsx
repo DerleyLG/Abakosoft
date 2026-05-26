@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 import {
   FiDollarSign,
   FiCreditCard,
@@ -10,8 +11,10 @@ import {
   FiRepeat,
 } from "react-icons/fi";
 import TransferenciaDrawer from "../components/TransferenciaDrawer";
+import { usePlan } from "../hooks/usePlanApi";
 
 const TesoreriaDashboard = () => {
+  const { features } = usePlan();
   const [movimientos, setMovimientos] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
   const [ingresosSummary, setIngresosSummary] = useState({
@@ -28,13 +31,37 @@ const TesoreriaDashboard = () => {
   // Estados de filtros
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [filtroMetodo, setFiltroMetodo] = useState("");
+  const [filtroIdReferencia, setFiltroIdReferencia] = useState("");
   const [cacheCreditos, setCacheCreditos] = useState({});
 
   // Estados para drawer de transferencias
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [transferenciaKey, setTransferenciaKey] = useState(null);
   const [procesandoTransferencia, setProcesandoTransferencia] = useState(false);
 
+  // Tooltip flotante para referencia y observaciones
+  const [tooltip, setTooltip] = useState({
+    visible: false,
+    text: "",
+    x: 0,
+    y: 0,
+  });
+  const showTooltip = (e, text) => {
+    if (!text) return;
+    setTooltip({ visible: true, text, x: e.clientX, y: e.clientY });
+  };
+  const moveTooltip = (e) => {
+    setTooltip((prev) => ({ ...prev, x: e.clientX, y: e.clientY }));
+  };
+  const hideTooltip = () => {
+    setTooltip((prev) => ({ ...prev, visible: false }));
+  };
+
   const [resumenFinanciero, setResumenFinanciero] = useState({
+    fecha_inicio_periodo: null,
+    id_cierre: null,
+    saldoInicialEfectivo: 0,
+    saldoInicialTransferencia: 0,
     totalCompras: 0,
     totalVentas: 0,
     ventasEfectivo: 0,
@@ -88,6 +115,10 @@ const TesoreriaDashboard = () => {
 
   const calcularResumenFinanciero = (movs, metodos) => {
     const resumen = {
+      fecha_inicio_periodo: null,
+      id_cierre: null,
+      saldoInicialEfectivo: 0,
+      saldoInicialTransferencia: 0,
       totalCompras: 0,
       totalVentas: 0,
       ventasEfectivo: 0,
@@ -108,10 +139,6 @@ const TesoreriaDashboard = () => {
       transferenciasEgresoTransferencia: 0,
     };
 
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
     const efectivoId = metodos.find((m) =>
       m.nombre.toLowerCase().includes("efectivo"),
     )?.id_metodo_pago;
@@ -120,14 +147,6 @@ const TesoreriaDashboard = () => {
     )?.id_metodo_pago;
 
     movs.forEach((mov) => {
-      const fecha = parseFecha(mov.fecha_movimiento);
-      if (!fecha) return;
-      if (
-        fecha.getMonth() !== currentMonth ||
-        fecha.getFullYear() !== currentYear
-      )
-        return;
-
       const tipo = getTipoMovimiento(mov);
       const monto = Number(mov.monto) || 0;
       const montoAbsoluto = Math.abs(monto);
@@ -204,6 +223,7 @@ const TesoreriaDashboard = () => {
         const [
           movimientosRes,
           metodosRes,
+          resumenTarjetasRes,
           ingresosRes,
           egresosRes,
           pagosCountRes,
@@ -214,6 +234,7 @@ const TesoreriaDashboard = () => {
         ] = await Promise.all([
           api.get("/tesoreria/movimientos-tesoreria"),
           api.get("/tesoreria/metodos-pago"),
+          api.get("/tesoreria/resumen-tarjetas"),
           api.get("/tesoreria/ingresos-summary"),
           api.get("/tesoreria/egresos-summary"),
           api.get("/tesoreria/pagos-trabajadores/count"),
@@ -225,7 +246,14 @@ const TesoreriaDashboard = () => {
 
         const movimientosData = movimientosRes.data;
         const metodosData = metodosRes.data;
-        setMovimientos(movimientosData);
+        // Garantizar orden: más reciente primero (por id_movimiento desc como desempate)
+        const movimientosOrdenados = [...movimientosData].sort((a, b) => {
+          const fechaDiff =
+            new Date(b.fecha_movimiento) - new Date(a.fecha_movimiento);
+          if (fechaDiff !== 0) return fechaDiff;
+          return b.id_movimiento - a.id_movimiento;
+        });
+        setMovimientos(movimientosOrdenados);
         setMetodosPago(metodosData);
         setIngresosSummary(ingresosRes.data);
 
@@ -245,11 +273,7 @@ const TesoreriaDashboard = () => {
           anticiposCount: anticiposCountRes.data.count,
         });
 
-        const resumenCalculado = calcularResumenFinanciero(
-          movimientosData,
-          metodosData,
-        );
-        setResumenFinanciero(resumenCalculado);
+        setResumenFinanciero(resumenTarjetasRes.data);
       } catch (err) {
         setError("Error al cargar los datos de tesorería.");
         console.error(err);
@@ -317,6 +341,10 @@ const TesoreriaDashboard = () => {
     if (tipo === "orden_venta") return `OV-${mov.id_documento}`;
     if (tipo === "abono_credito") return `OV-${mov.id_documento} (Abono)`;
     if (tipo === "orden_compra") return `OC-${mov.id_documento}`;
+    if (tipo === "reversion_orden_compra")
+      return `OC-${mov.id_documento} (Rev.)`;
+    if (tipo === "cancelacion_orden_compra")
+      return `OC-${mov.id_documento} (Canc.)`;
     if (tipo === "pago_trabajador") return `PT-${mov.id_documento}`;
     if (tipo === "anticipo") return `ANT-${mov.id_documento}`;
     if (tipo === "costo_indirecto") return `CI-${mov.id_documento}`;
@@ -334,6 +362,12 @@ const TesoreriaDashboard = () => {
 
     if (filtroMetodo && mov.id_metodo_pago.toString() !== filtroMetodo) {
       return false;
+    }
+
+    if (filtroIdReferencia && filtroTipo !== "todos") {
+      if (mov.id_documento?.toString() !== filtroIdReferencia) {
+        return false;
+      }
     }
 
     return true;
@@ -366,14 +400,19 @@ const TesoreriaDashboard = () => {
         await Promise.all(
           creditosIds.map(async (id) => {
             if (!mounted) return;
-            if (cacheCreditos[id]) return;
+            if (id in cacheCreditos) return;
             try {
-              const res = await api.get(`/creditos/${id}`);
+              const res = await api.get(`/creditos/buscar-documento/${id}`);
               if (mounted) {
                 setCacheCreditos((prev) => ({ ...prev, [id]: res.data }));
               }
             } catch (e) {
-              console.error("Error fetching credito", id, e);
+              // Si no existe el crédito, cachear null para no reintentar
+              if (e.response?.status === 404) {
+                if (mounted) {
+                  setCacheCreditos((prev) => ({ ...prev, [id]: null }));
+                }
+              }
             }
           }),
         );
@@ -393,19 +432,26 @@ const TesoreriaDashboard = () => {
     const loadingToast = toast.loading("Procesando transferencia...");
 
     try {
-      await api.post("/tesoreria/transferencia-metodos", datos);
+      await api.post("/tesoreria/transferencia-metodos", datos, {
+        headers: { "X-Idempotency-Key": transferenciaKey },
+      });
 
       toast.dismiss(loadingToast);
       toast.success("Transferencia registrada exitosamente");
 
       // Recargar datos
-      const movimientosRes = await api.get("/tesoreria/movimientos-tesoreria");
-      setMovimientos(movimientosRes.data);
-      const resumenCalculado = calcularResumenFinanciero(
-        movimientosRes.data,
-        metodosPago,
-      );
-      setResumenFinanciero(resumenCalculado);
+      const [movimientosRes, resumenTarjetasRes] = await Promise.all([
+        api.get("/tesoreria/movimientos-tesoreria"),
+        api.get("/tesoreria/resumen-tarjetas"),
+      ]);
+      const movimientosOrdenados2 = [...movimientosRes.data].sort((a, b) => {
+        const fechaDiff =
+          new Date(b.fecha_movimiento) - new Date(a.fecha_movimiento);
+        if (fechaDiff !== 0) return fechaDiff;
+        return b.id_movimiento - a.id_movimiento;
+      });
+      setMovimientos(movimientosOrdenados2);
+      setResumenFinanciero(resumenTarjetasRes.data);
     } catch (error) {
       toast.dismiss(loadingToast);
       console.error("Error en transferencia:", error);
@@ -420,17 +466,22 @@ const TesoreriaDashboard = () => {
 
   if (loading) {
     return (
-      <div className="text-center py-10 text-gray-500">
-        Cargando datos de tesorería...
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Cargando tesorería...</p>
       </div>
     );
   }
 
   if (error) {
-    return <div className="text-center py-10 text-red-500">{error}</div>;
+    return (
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-rose-500 text-sm">{error}</p>
+      </div>
+    );
   }
 
   const balanceEfectivo =
+    (Number(resumenFinanciero.saldoInicialEfectivo) || 0) +
     resumenFinanciero.ventasEfectivo +
     resumenFinanciero.abonosEfectivo +
     resumenFinanciero.transferenciasIngresoEfectivo -
@@ -440,6 +491,7 @@ const TesoreriaDashboard = () => {
     resumenFinanciero.anticiposEfectivo -
     resumenFinanciero.transferenciasEgresoEfectivo;
   const balanceTransferencia =
+    (Number(resumenFinanciero.saldoInicialTransferencia) || 0) +
     resumenFinanciero.ventasTransferencia +
     resumenFinanciero.abonosTransferencia +
     resumenFinanciero.transferenciasIngresoTransferencia -
@@ -454,8 +506,19 @@ const TesoreriaDashboard = () => {
     balanceTransferencia >= 0 ? "text-green-600" : "text-red-600";
 
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      {/* Componente Drawer de Transferencias */}
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6 select-none">
+      {/* Tooltip flotante global */}
+      {tooltip.visible && (
+        <div
+          className="fixed z-[9999] pointer-events-none max-w-sm bg-slate-900 text-white text-xs rounded-xl px-3 py-2 shadow-2xl whitespace-pre-wrap break-words leading-relaxed"
+          style={{
+            left: tooltip.x + 14,
+            top: tooltip.y + 14,
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
       <TransferenciaDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -465,173 +528,358 @@ const TesoreriaDashboard = () => {
         onTransferenciaExitosa={handleTransferenciaExitosa}
       />
 
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-4xl font-bold text-gray-800">Panel de Tesorería</h2>
+      {/* ─── Header ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Panel de
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Tesorería
+            </h1>
+          </div>
+          <span className="mt-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-500 text-[11px] font-bold rounded-lg shadow-sm">
+            {totalFiltrados} movimientos
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer shadow-lg"
+            onClick={() => {
+              setDrawerOpen(true);
+              setTransferenciaKey(crypto.randomUUID());
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >
-            <FiRepeat />
+            <FiRepeat size={14} />
             Transferir Fondos
           </button>
+          {features.includes("creditos") && (
+            <button
+              onClick={() => navigate("/ventas_credito")}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
+            >
+              Créditos
+              <FiArrowRight size={14} />
+            </button>
+          )}
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded-md hover:bg-gray-300 cursor-pointer"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
           >
-            <FiArrowLeft />
+            <FiArrowLeft size={14} />
             Volver
           </button>
-          <button
-            onClick={() => navigate("/ventas_credito")}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 cursor-pointer"
-          >
-            Ir a Créditos
-            <FiArrowRight />
-          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-700">
-              Balance Efectivo
-            </h3>
-            <FiDollarSign size={28} className="text-gray-300" />
+      {/* ─── Balance Cards ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Efectivo */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <FiDollarSign size={17} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Balance
+                </p>
+                <p className="text-sm font-bold text-slate-800 -mt-0.5">
+                  Efectivo
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Disponible
+              </p>
+              <p className={`text-xl font-bold -mt-0.5 ${efectivoClass}`}>
+                {formatCurrency(balanceEfectivo)}
+              </p>
+            </div>
           </div>
-          <div className={`text-3xl font-bold mb-3 ${efectivoClass}`}>
-            {formatCurrency(balanceEfectivo)}
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Ventas:</span>
-              <span className="font-medium text-green-700">
-                {formatCurrency(resumenFinanciero.ventasEfectivo)}
-              </span>
+          <div className="px-6 py-4 grid grid-cols-2 gap-x-6">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2.5">
+                Ingresos
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo inicial</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {formatCurrency(
+                      resumenFinanciero.saldoInicialEfectivo || 0,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Ventas</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(resumenFinanciero.ventasEfectivo)}
+                  </span>
+                </div>
+                {features.includes("creditos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Abonos crédito
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      {formatCurrency(resumenFinanciero.abonosEfectivo)}
+                    </span>
+                  </div>
+                )}
+                {resumenFinanciero.transferenciasIngresoEfectivo > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Transf. entrada
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      {formatCurrency(
+                        resumenFinanciero.transferenciasIngresoEfectivo,
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Abonos credito:</span>
-              <span className="font-medium text-green-700">
-                {formatCurrency(resumenFinanciero.abonosEfectivo)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Compras:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.comprasEfectivo)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Costos:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.costosEfectivo)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Pagos Trababajdores.:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.pagosEfectivo)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Anticipos:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.anticiposEfectivo)}
-              </span>
+            <div>
+              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2.5">
+                Egresos
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Compras</span>
+                  <span className="text-xs font-semibold text-rose-600">
+                    -{formatCurrency(resumenFinanciero.comprasEfectivo)}
+                  </span>
+                </div>
+                {features.includes("costos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Costos</span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -{formatCurrency(resumenFinanciero.costosEfectivo)}
+                    </span>
+                  </div>
+                )}
+                {features.includes("pagos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Pagos trabaj.
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -{formatCurrency(resumenFinanciero.pagosEfectivo)}
+                    </span>
+                  </div>
+                )}
+                {features.includes("anticipos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Anticipos</span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -{formatCurrency(resumenFinanciero.anticiposEfectivo)}
+                    </span>
+                  </div>
+                )}
+                {resumenFinanciero.transferenciasEgresoEfectivo > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Transf. salida
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -
+                      {formatCurrency(
+                        resumenFinanciero.transferenciasEgresoEfectivo,
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-700">
-              Balance Transferencia
-            </h3>
-            <FiCreditCard size={28} className="text-gray-300" />
+        {/* Transferencia */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                <FiCreditCard size={17} className="text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Balance
+                </p>
+                <p className="text-sm font-bold text-slate-800 -mt-0.5">
+                  Transferencia
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Disponible
+              </p>
+              <p className={`text-xl font-bold -mt-0.5 ${transferenciaClass}`}>
+                {formatCurrency(balanceTransferencia)}
+              </p>
+            </div>
           </div>
-          <div className={`text-3xl font-bold mb-3 ${transferenciaClass}`}>
-            {formatCurrency(balanceTransferencia)}
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Ventas:</span>
-              <span className="font-medium text-green-700">
-                {formatCurrency(resumenFinanciero.ventasTransferencia)}
-              </span>
+          <div className="px-6 py-4 grid grid-cols-2 gap-x-6">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2.5">
+                Ingresos
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo inicial</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {formatCurrency(
+                      resumenFinanciero.saldoInicialTransferencia || 0,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Ventas</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(resumenFinanciero.ventasTransferencia)}
+                  </span>
+                </div>
+                {features.includes("creditos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Abonos crédito
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      {formatCurrency(resumenFinanciero.abonosTransferencia)}
+                    </span>
+                  </div>
+                )}
+                {resumenFinanciero.transferenciasIngresoTransferencia > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Transf. entrada
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      {formatCurrency(
+                        resumenFinanciero.transferenciasIngresoTransferencia,
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Abonos:</span>
-              <span className="font-medium text-green-700">
-                {formatCurrency(resumenFinanciero.abonosTransferencia)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Compras:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.comprasTransferencia)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Costos:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.costosTransferencia)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Pagos Trab.:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.pagosTransferencia)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Anticipos:</span>
-              <span className="font-medium text-red-700">
-                -{formatCurrency(resumenFinanciero.anticiposTransferencia)}
-              </span>
+            <div>
+              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2.5">
+                Egresos
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Compras</span>
+                  <span className="text-xs font-semibold text-rose-600">
+                    -{formatCurrency(resumenFinanciero.comprasTransferencia)}
+                  </span>
+                </div>
+                {features.includes("costos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Costos</span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -{formatCurrency(resumenFinanciero.costosTransferencia)}
+                    </span>
+                  </div>
+                )}
+                {features.includes("pagos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Pagos trabaj.
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -{formatCurrency(resumenFinanciero.pagosTransferencia)}
+                    </span>
+                  </div>
+                )}
+                {features.includes("anticipos") && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Anticipos</span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -
+                      {formatCurrency(resumenFinanciero.anticiposTransferencia)}
+                    </span>
+                  </div>
+                )}
+                {resumenFinanciero.transferenciasEgresoTransferencia > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">
+                      Transf. salida
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600">
+                      -
+                      {formatCurrency(
+                        resumenFinanciero.transferenciasEgresoTransferencia,
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <h3 className="text-xl font-semibold text-gray-700 mb-4">
-          Movimientos Recientes
-        </h3>
-        <div className="mb-4 flex flex-wrap gap-8 items-end">
-          <div className="flex-1 max-w-[200px]">
-            <label
-              htmlFor="filtroTipo"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Filtrar por Tipo
-            </label>
+      {/* ─── Tabla de Movimientos ─── */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        {/* Header + Filtros */}
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <h3 className="text-sm font-bold text-slate-900">Movimientos</h3>
+            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-md">
+              {totalFiltrados}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 flex-1">
             <select
               id="filtroTipo"
               value={filtroTipo}
               onChange={(e) => {
                 setFiltroTipo(e.target.value);
+                setFiltroIdReferencia("");
                 setPage(1);
               }}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              className="flex-1 min-w-[140px] px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Todos los tipos</option>
               <option value="venta">Venta</option>
               <option value="compra">Compra</option>
-              <option value="costo_indirecto">Costo Indirecto</option>
-              <option value="pago_trabajador">Pagos a Trabajadores</option>
-              <option value="anticipo">Anticipos</option>
-              <option value="abono_credito">Abonos Crédito</option>
+              {features.includes("costos") && (
+                <option value="costo_indirecto">Costo Indirecto</option>
+              )}
+              {features.includes("pagos") && (
+                <option value="pago_trabajador">Pagos a Trabajadores</option>
+              )}
+              {features.includes("anticipos") && (
+                <option value="anticipo">Anticipos</option>
+              )}
+              {features.includes("creditos") && (
+                <option value="abono_credito">Abonos Crédito</option>
+              )}
               <option value="transferencia_fondos">Transferencia fondos</option>
             </select>
-          </div>
-          <div className="flex-1 max-w-[200px]">
-            <label
-              htmlFor="filtroMetodo"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Filtrar por Método
-            </label>
+            <input
+              id="filtroIdReferencia"
+              type="text"
+              placeholder={
+                filtroTipo === "todos"
+                  ? "Selecciona tipo primero"
+                  : "Buscar por ID..."
+              }
+              value={filtroIdReferencia}
+              disabled={filtroTipo === "todos"}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                setFiltroIdReferencia(val);
+                setPage(1);
+              }}
+              className="flex-1 min-w-[140px] px-3 py-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
             <select
               id="filtroMetodo"
               value={filtroMetodo}
@@ -639,9 +887,9 @@ const TesoreriaDashboard = () => {
                 setFiltroMetodo(e.target.value);
                 setPage(1);
               }}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              className="flex-1 min-w-[140px] px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
             >
-              <option value="">Todos</option>
+              <option value="">Todos los métodos</option>
               {metodosPago.map((metodo) => (
                 <option
                   key={metodo.id_metodo_pago}
@@ -654,138 +902,213 @@ const TesoreriaDashboard = () => {
           </div>
         </div>
 
-        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-          <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-            <tr>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">ID Referencia</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Monto</th>
-              <th className="px-4 py-3">Método de Pago</th>
-              <th className="px-4 py-3">Referencia</th>
-              <th className="px-4 py-3">Observaciones</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movimientosPaginados.length > 0 ? (
-              movimientosPaginados.map((mov) => {
-                const tipo = getTipoMovimiento(mov);
-                const idRef = getIdReferencia(mov);
-                // Color según símbolo '-' en el valor: si comienza con '-'  rojo, si no  verde
-                const montoStr = String(mov.monto ?? "").trim();
-                const montoColor = montoStr.startsWith("-")
-                  ? "text-red-700"
-                  : "text-green-700";
-                const creditoInfo =
-                  tipo === "abono_credito" && mov.id_documento
-                    ? cacheCreditos[mov.id_documento]
-                    : null;
-                const clienteNombre = creditoInfo
-                  ? creditoInfo.cliente_nombre
-                  : null;
-                return (
-                  <tr
-                    key={mov.id_movimiento}
-                    className="hover:bg-slate-100 transition"
-                  >
-                    <td className="px-4 py-3 font-medium">
-                      {tipo.charAt(0).toUpperCase() +
-                        tipo.slice(1).replace("_", " ")}
-                    </td>
-                    <td className="px-4 py-3">
-                      #{idRef}
-                      {clienteNombre ? ` · ${clienteNombre}` : ""}
-                    </td>
-                    <td className="px-4 py-3">
-                      {formatDate(mov.fecha_movimiento)}
-                    </td>
-                    <td className={`px-4 py-3 font-semibold ${montoColor}`}>
-                      {formatCurrency(mov.monto)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getMetodoNombre(mov.id_metodo_pago)}
-                    </td>
-                    <td
-                      className="px-4 py-3 max-w-[150px] truncate"
-                      title={mov.referencia || ""}
-                    >
-                      {mov.referencia || "-"}
-                    </td>
-                    <td
-                      className="px-4 py-3 max-w-[200px] truncate"
-                      title={mov.observaciones || ""}
-                    >
-                      {mov.observaciones || "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {tipo === "abono_credito" && mov.id_documento && (
-                        <button
-                          onClick={() =>
-                            navigate("/ventas_credito", {
-                              state: { openCreditId: mov.id_documento },
-                            })
-                          }
-                          className="p-2 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                          title="Ver crédito"
-                        >
-                          <FiCreditCard />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
+        {/* Tabla */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-100 border-b border-slate-200">
               <tr>
-                <td colSpan="8" className="text-center py-6 text-gray-500">
-                  No se encontraron movimientos de tesorería que coincidan con
-                  los filtros.
-                </td>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Tipo
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Referencia
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Monto
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Método
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Ref.
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Observaciones
+                </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {movimientosPaginados.length > 0 ? (
+                movimientosPaginados.map((mov) => {
+                  const tipo = getTipoMovimiento(mov);
+                  const idRef = getIdReferencia(mov);
+                  const montoNum = Number(mov.monto ?? 0);
+                  const esEgreso = montoNum < 0;
+                  const td = mov.tipo_documento?.toLowerCase() || "";
 
-        <div className="mt-4 bg-white rounded-lg p-4 border-t border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
-              de{" "}
-              <span className="font-semibold text-gray-800">
-                {totalPages || 1}
-              </span>{" "}
-              — {totalFiltrados} movimientos
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={!hasPrev}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                ← Anterior
-              </button>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={!hasNext}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                Siguiente →
-              </button>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(parseInt(e.target.value));
-                  setPage(1);
-                }}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-slate-600 cursor-pointer"
-              >
-                <option value={10}>10 / página</option>
-                <option value={25}>25 / página</option>
-                <option value={50}>50 / página</option>
-                <option value={100}>100 / página</option>
-              </select>
-            </div>
+                  const badgeClass =
+                    tipo === "venta"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : td === "reversion_orden_compra" ||
+                          td === "cancelacion_orden_compra"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : tipo === "compra"
+                          ? "bg-rose-50 text-rose-700 border border-rose-200"
+                          : tipo === "costo_indirecto"
+                            ? "bg-orange-50 text-orange-700 border border-orange-200"
+                            : tipo === "pago_trabajador"
+                              ? "bg-violet-50 text-violet-700 border border-violet-200"
+                              : tipo === "anticipo"
+                                ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                : tipo === "abono_credito"
+                                  ? "bg-teal-50 text-teal-700 border border-teal-200"
+                                  : tipo === "transferencia_fondos"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                    : "bg-slate-50 text-slate-600 border border-slate-200";
+
+                  const tipoLabel =
+                    td === "orden_venta"
+                      ? "Venta"
+                      : td === "abono_credito"
+                        ? "Abono"
+                        : td === "orden_compra"
+                          ? "Compra"
+                          : td === "reversion_orden_compra"
+                            ? "Reversión OC"
+                            : td === "cancelacion_orden_compra"
+                              ? "Cancelación OC"
+                              : td === "pago_trabajador"
+                                ? "Pago Trabajador"
+                                : td === "anticipo"
+                                  ? "Anticipo"
+                                  : td === "costo_indirecto"
+                                    ? "Costo Indirecto"
+                                    : td === "transferencia_fondos"
+                                      ? "Transferencia"
+                                      : tipo.charAt(0).toUpperCase() +
+                                        tipo.slice(1).replace(/_/g, " ");
+
+                  return (
+                    <tr
+                      key={mov.id_movimiento}
+                      className="hover:bg-slate-50/70 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold ${badgeClass}`}
+                        >
+                          {tipoLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-700">
+                        {idRef}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-500">
+                        {formatDate(mov.fecha_movimiento)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`text-sm font-bold ${esEgreso ? "text-rose-600" : "text-emerald-600"}`}
+                        >
+                          {esEgreso ? "" : "+"}
+                          {formatCurrency(montoNum)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {getMetodoNombre(mov.id_metodo_pago)}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm text-slate-500 max-w-[150px] truncate cursor-default"
+                        onMouseEnter={(e) => showTooltip(e, mov.referencia)}
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                      >
+                        {mov.referencia || (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate cursor-default"
+                        onMouseEnter={(e) => showTooltip(e, mov.observaciones)}
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                      >
+                        {mov.observaciones || (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {tipo === "abono_credito" && mov.id_documento && (
+                          <button
+                            onClick={() =>
+                              navigate("/ventas_credito", {
+                                state: { openCreditId: mov.id_documento },
+                              })
+                            }
+                            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
+                            title="Ver crédito"
+                          >
+                            <FiCreditCard size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan="8"
+                    className="text-center py-12 text-slate-400 text-sm"
+                  >
+                    No se encontraron movimientos con los filtros actuales.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Paginación */}
+        <div className="px-6 py-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="text-xs text-slate-500">
+            Mostrando{" "}
+            <span className="font-semibold text-slate-700">
+              {totalFiltrados === 0 ? 0 : startIndex + 1}–
+              {Math.min(endIndex, totalFiltrados)}
+            </span>{" "}
+            de{" "}
+            <span className="font-semibold text-slate-700">
+              {totalFiltrados}
+            </span>{" "}
+            movimientos
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrev}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              ← Anterior
+            </button>
+            <span className="text-xs text-slate-500 px-1">
+              Pág. <span className="font-semibold text-slate-700">{page}</span>{" "}
+              / {totalPages || 1}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasNext}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              Siguiente →
+            </button>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value));
+                setPage(1);
+              }}
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
+            >
+              <option value={10}>10 / pág</option>
+              <option value={25}>25 / pág</option>
+              <option value={50}>50 / pág</option>
+              <option value={100}>100 / pág</option>
+            </select>
           </div>
         </div>
       </div>

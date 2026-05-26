@@ -2,7 +2,7 @@ const db = require("../database/db");
 
 const CostosIndirectos = {
   getAll: () => {
-    return db.query("SELECT * FROM costos_indirectos ORDER BY fecha DESC");
+    return db.query("SELECT * FROM costos_indirectos ORDER BY id_costo_indirecto DESC");
   },
 
   getById: (id) => {

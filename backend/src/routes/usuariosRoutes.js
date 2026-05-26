@@ -2,31 +2,50 @@ const express = require("express");
 const router = express.Router();
 const usuariosController = require("../controllers/usuariosController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
-router.get("/", verifyToken, checkRole(["admin"]), usuariosController.getAll);
+router.get(
+  "/",
+  verifyToken,
+  requirePlanFeature("usuarios"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  usuariosController.getAll,
+);
 
 router.get(
   "/:id",
   verifyToken,
-  checkRole(["admin"]),
-  usuariosController.getById
+  requirePlanFeature("usuarios"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  usuariosController.getById,
 );
 
-router.post("/", verifyToken, checkRole(["admin"]), usuariosController.create);
+router.post(
+  "/",
+  verifyToken,
+  requirePlanFeature("usuarios"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  checkIdempotency,
+  usuariosController.create,
+);
 
 router.put(
   "/:id",
   verifyToken,
-  checkRole(["admin"]),
-  usuariosController.update
+  requirePlanFeature("usuarios"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  checkIdempotency,
+  usuariosController.update,
 );
 
 router.delete(
   "/:id",
   verifyToken,
-  checkRole(["admin"]),
-  usuariosController.delete
+  requirePlanFeature("usuarios"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  usuariosController.delete,
 );
 
 module.exports = router;

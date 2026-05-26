@@ -1,5 +1,6 @@
 import formateaCantidad from "../utils/formateaCantidad";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 import {
   FiX,
   FiMinus,
@@ -21,6 +22,8 @@ import AsignarEtapaModal from "./AsignarEtapaModal";
 
 const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const idempotencyKey = useIdempotencyKey();
+  const idempotencyKeyInicializar = useIdempotencyKey();
   const [searchTerm, setSearchTerm] = useState("");
   const [articulos, setArticulos] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
@@ -60,7 +63,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Búsqueda dinámica con debounce
+  // Busqueda dinámica con debounce
   const buscarArticulos = useCallback(async (termino) => {
     setLoadingArticulos(true);
     try {
@@ -141,7 +144,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
         cantidad: cantidadNum,
         notas: notas || null,
         id_orden_fabricacion: null,
-      });
+      }, { headers: { "X-Idempotency-Key": idempotencyKey } });
 
       toast.success(
         `Consumo registrado: ${cantidadNum} ${articuloSeleccionado.abreviatura_unidad || "uds"} de ${articuloSeleccionado.descripcion}`,
@@ -248,7 +251,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
         id_articulo: modalInicializar.articulo.id_articulo,
         stock_inicial: stockNum,
         stock_minimo: 2,
-      });
+      }, { headers: { "X-Idempotency-Key": idempotencyKeyInicializar } });
 
       toast.success(
         `${modalInicializar.articulo.descripcion} agregado al inventario con ${stockNum} ${modalInicializar.articulo.abreviatura_unidad || "uds"}`,
@@ -320,7 +323,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
     <>
       {/* Overlay */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
@@ -328,382 +331,359 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-lg bg-gradient-to-br from-slate-50 to-white shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-6 py-5 flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-xl p-2.5">
-                  <FiPackage className="text-white text-xl" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">
-                    Consumo de MP
-                  </h3>
-                  <p className="text-emerald-100 text-sm">
-                    Registra salida de inventario
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="text-white/80 hover:text-white hover:bg-white/20 rounded-xl p-2 transition cursor-pointer"
-              >
-                <FiX size={22} />
-              </button>
-            </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
+          <div>
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-0.5">
+              Inventario
+            </p>
+            <h3 className="text-lg font-bold text-slate-900">
+              Registrar consumo de MP
+            </h3>
           </div>
+          <button
+            onClick={onClose}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <FiX size={16} />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            {/* Busqueda de articulo */}
-            <div className="p-4 bg-white border-b border-slate-200">
-              <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                <FiSearch className="text-emerald-500" />
-                Buscar articulo
-              </label>
-              <div className="relative">
-                <FiSearch
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Referencia o descripcion..."
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50 transition-all"
-                />
-              </div>
-
-              {/* Lista de articulos */}
-              {(searchTerm || !articuloSeleccionado) && (
-                <div className="mt-3 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  {loadingArticulos ? (
-                    <div className="p-4 text-center text-slate-500 text-sm flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
-                      Buscando...
-                    </div>
-                  ) : articulos.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 text-sm">
-                      <FiBox className="mx-auto text-2xl mb-2 text-slate-300" />
-                      {searchTerm
-                        ? "No se encontraron artículos"
-                        : "Escribe para buscar artículos"}
-                    </div>
-                  ) : (
-                    articulos.map((art) => {
-                      const etapaColor = getEtapaColor(art.nombre_etapa);
-                      const sinInventario = necesitaInicializarInventario(art);
-                      return (
-                        <button
-                          key={art.id_articulo}
-                          onClick={() => {
-                            if (sinInventario) {
-                              // Mostrar modal para inicializar inventario
-                              setModalInicializar({
-                                visible: true,
-                                articulo: art,
-                              });
-                              setStockInicial("");
-                            } else {
-                              setArticuloSeleccionado(art);
-                              setSearchTerm("");
-                            }
-                          }}
-                          className={`w-full px-4 py-3 text-left hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition cursor-pointer ${
-                            articuloSeleccionado?.id_articulo ===
-                            art.id_articulo
-                              ? "bg-emerald-50"
-                              : ""
-                          } ${sinInventario ? "bg-amber-50/50" : ""}`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-slate-800 text-sm truncate">
-                                {art.descripcion}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-slate-400">
-                                  Ref: {art.referencia || "N/A"}
-                                </span>
-                                {art.nombre_etapa && (
-                                  <span
-                                    className={`text-xs px-1.5 py-0.5 rounded-md ${etapaColor.badge}`}
-                                  >
-                                    {art.nombre_etapa}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right ml-3 flex-shrink-0">
-                              {sinInventario ? (
-                                <div className="flex items-center gap-1.5 text-amber-600">
-                                  <FiAlertCircle size={14} />
-                                  <span className="text-xs font-medium">
-                                    Sin inventario
-                                  </span>
-                                </div>
-                              ) : (
-                                <>
-                                  <p className="font-bold text-emerald-700 text-sm">
-                                    {formateaCantidad(art.stock_disponible)}{" "}
-                                    {art.abreviatura_unidad || "uds"}
-                                  </p>
-                                  <p className="text-xs text-slate-400">
-                                    disponible
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Search */}
+          <div className="px-6 py-4 border-b border-slate-100">
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Buscar artículo
+            </label>
+            <div className="relative">
+              <FiSearch
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={16}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Referencia o descripción..."
+                className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+              />
             </div>
 
-            {/* Articulo seleccionado y formulario */}
-            {articuloSeleccionado && (
-              <div className="p-4">
-                {/* Card del articulo seleccionado */}
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200 mb-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-emerald-100 rounded-lg p-2">
-                        <FiBox className="text-emerald-600 text-lg" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-emerald-800">
-                          {articuloSeleccionado.descripcion}
-                        </p>
-                        <p className="text-sm text-emerald-600">
-                          Ref: {articuloSeleccionado.referencia || "N/A"}
-                        </p>
-                        {articuloSeleccionado.nombre_etapa && (
-                          <span
-                            className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-md ${getEtapaColor(articuloSeleccionado.nombre_etapa).badge}`}
-                          >
-                            Etapa: {articuloSeleccionado.nombre_etapa}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setArticuloSeleccionado(null)}
-                      className="text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-lg p-1 transition cursor-pointer"
-                    >
-                      <FiX size={18} />
-                    </button>
+            {(searchTerm || !articuloSeleccionado) && (
+              <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                {loadingArticulos ? (
+                  <div className="p-4 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-800" />
+                    Buscando...
                   </div>
-                  <div className="mt-3 pt-3 border-t border-emerald-200 flex justify-between items-center">
-                    <span className="text-sm text-emerald-700">
-                      Stock disponible:
-                    </span>
-                    <span className="font-bold text-emerald-800 text-lg">
-                      {formateaCantidad(articuloSeleccionado.stock_disponible)}{" "}
-                      {articuloSeleccionado.abreviatura_unidad || "uds"}
-                    </span>
+                ) : articulos.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-sm">
+                    <FiBox className="mx-auto text-2xl mb-2 text-slate-300" />
+                    {searchTerm
+                      ? "No se encontraron artículos"
+                      : "Escribe para buscar artículos"}
                   </div>
-                </div>
-
-                {/* Formulario de consumo */}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Fecha */}
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
-                      <FiCalendar className="text-slate-400" size={14} />
-                      Fecha
-                    </label>
-                    <input
-                      type="date"
-                      value={fecha}
-                      onChange={(e) => setFecha(e.target.value)}
-                      max={getFechaHoy()}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                      required
-                    />
-                  </div>
-
-                  {/* Cantidad */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Cantidad a consumir (
-                      {articuloSeleccionado.abreviatura_unidad || "unidades"})
-                    </label>
-                    <input
-                      type="number"
-                      value={cantidad}
-                      onChange={(e) => setCantidad(e.target.value)}
-                      placeholder={`Ej: 10.5 ${articuloSeleccionado.abreviatura_unidad || ""}`}
-                      min="0.001"
-                      step="0.001"
-                      max={articuloSeleccionado.stock_disponible || 0}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                      required
-                    />
-                    {cantidad && parseFloat(cantidad) > 0 && (
-                      <div
-                        className={`mt-2 p-3 rounded-xl text-sm flex items-center justify-between ${
-                          stockDespues < 0
-                            ? "bg-red-50 border border-red-200"
-                            : "bg-slate-50 border border-slate-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {stockDespues < 0 ? (
-                            <FiAlertCircle className="text-red-500" />
-                          ) : (
-                            <FiCheck className="text-emerald-500" />
-                          )}
-                          <span className="text-slate-600">
-                            Stock despues del consumo:
-                          </span>
-                        </div>
-                        <span
-                          className={`font-bold ${stockDespues < 0 ? "text-red-600" : "text-emerald-600"}`}
-                        >
-                          {formateaCantidad(stockDespues)}{" "}
-                          {articuloSeleccionado.abreviatura_unidad || "uds"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Notas */}
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-2">
-                      <FiFileText className="text-slate-400" size={14} />
-                      Notas (opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={notas}
-                      onChange={(e) => setNotas(e.target.value)}
-                      placeholder="Ej: Consumo para ordenes de la semana"
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                    />
-                  </div>
-
-                  {/* Boton submit */}
-                  <button
-                    type="submit"
-                    disabled={
-                      loading ||
-                      !cantidad ||
-                      parseFloat(cantidad) <= 0 ||
-                      stockDespues < 0
-                    }
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-200"
-                  >
-                    <FiMinus size={18} />
-                    {loading ? "Registrando..." : "Registrar Consumo"}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* Consumos recientes */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50/50">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold text-slate-700 flex items-center gap-2">
-                  <FiBox className="text-emerald-600" size={16} />
-                  Ultimos consumos
-                </h4>
-              </div>
-
-              {loadingConsumos ? (
-                <div className="text-center text-slate-500 text-sm py-6">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600 mx-auto"></div>
-                </div>
-              ) : consumosRecientes.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-8 bg-white rounded-xl border border-slate-200">
-                  <FiPackage className="mx-auto text-2xl mb-2 text-slate-300" />
-                  No hay consumos recientes
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {consumosRecientes.slice(0, 6).map((item) => {
-                    let fechaStr = "";
-                    if (item.fecha) {
-                      const fechaObj = new Date(item.fecha);
-                      if (!isNaN(fechaObj)) {
-                        const day = fechaObj
-                          .getDate()
-                          .toString()
-                          .padStart(2, "0");
-                        const month = fechaObj.toLocaleString("es-CO", {
-                          month: "short",
-                        });
-                        fechaStr = `${day} ${month}`;
-                      }
-                    }
-                    const etapaColor = getEtapaColor(item.nombre_etapa);
+                ) : (
+                  articulos.map((art) => {
+                    const etapaColor = getEtapaColor(art.nombre_etapa);
+                    const sinInventario = necesitaInicializarInventario(art);
                     return (
-                      <div
-                        key={item.id_consumo}
-                        className="p-3 bg-white rounded-xl hover:shadow-sm transition border border-slate-100"
+                      <button
+                        key={art.id_articulo}
+                        onClick={() => {
+                          if (sinInventario) {
+                            setModalInicializar({
+                              visible: true,
+                              articulo: art,
+                            });
+                            setStockInicial("");
+                          } else {
+                            setArticuloSeleccionado(art);
+                            setSearchTerm("");
+                          }
+                        }}
+                        className={`w-full px-4 py-3 text-left border-b border-slate-100 last:border-0 transition cursor-pointer hover:bg-slate-50 ${
+                          articuloSeleccionado?.id_articulo === art.id_articulo
+                            ? "bg-slate-50"
+                            : ""
+                        } ${sinInventario ? "bg-amber-50/50 hover:bg-amber-50" : ""}`}
                       >
                         <div className="flex justify-between items-center">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-slate-800 text-sm truncate">
-                              {item.descripcion}
+                              {art.descripcion}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-xs text-slate-400">
-                                {fechaStr}
+                                Ref: {art.referencia || "N/A"}
                               </span>
-                              {item.nombre_etapa && (
+                              {art.nombre_etapa && (
                                 <span
-                                  className={`text-xs px-1.5 py-0.5 rounded ${etapaColor.badge}`}
+                                  className={`text-xs px-1.5 py-0.5 rounded-md ${etapaColor.badge}`}
                                 >
-                                  {item.nombre_etapa}
+                                  {art.nombre_etapa}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="text-right ml-3">
-                            <p className="font-bold text-emerald-700 text-sm">
-                              -{formateaCantidad(item.cantidad)}{" "}
-                              {item.abreviatura_unidad || "uds"}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              {formatMoneda(item.costo_total)}
-                            </p>
+                          <div className="text-right ml-3 flex-shrink-0">
+                            {sinInventario ? (
+                              <div className="flex items-center gap-1.5 text-amber-600">
+                                <FiAlertCircle size={13} />
+                                <span className="text-xs font-medium">
+                                  Sin inventario
+                                </span>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="font-bold text-slate-900 text-sm">
+                                  {formateaCantidad(art.stock_disponible)}{" "}
+                                  {art.abreviatura_unidad || "uds"}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  disponible
+                                </p>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
-                  })}
-                </div>
-              )}
-            </div>
+                  })
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-slate-200 p-4 bg-white flex-shrink-0">
-            <button
-              onClick={() => {
-                onClose();
-                navigate("/inventario/consumo-mp");
-              }}
-              className="w-full py-2.5 border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-medium transition cursor-pointer flex items-center justify-center gap-2"
-            >
-              <FiExternalLink size={16} />
-              Ver historial completo
-            </button>
+          {/* Selected article + form */}
+          {articuloSeleccionado && (
+            <div className="px-6 py-4">
+              {/* Article card */}
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-white rounded-lg border border-slate-200 p-2">
+                      <FiBox className="text-slate-600 text-lg" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {articuloSeleccionado.descripcion}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        Ref: {articuloSeleccionado.referencia || "N/A"}
+                      </p>
+                      {articuloSeleccionado.nombre_etapa && (
+                        <span
+                          className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-md ${getEtapaColor(articuloSeleccionado.nombre_etapa).badge}`}
+                        >
+                          {articuloSeleccionado.nombre_etapa}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setArticuloSeleccionado(null)}
+                    className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg p-1 transition cursor-pointer"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </div>
+                <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                  <span className="text-sm text-slate-500">
+                    Stock disponible
+                  </span>
+                  <span className="font-bold text-slate-900">
+                    {formateaCantidad(articuloSeleccionado.stock_disponible)}{" "}
+                    {articuloSeleccionado.abreviatura_unidad || "uds"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    max={getFechaHoy()}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">
+                    Cantidad a consumir (
+                    {articuloSeleccionado.abreviatura_unidad || "unidades"})
+                  </label>
+                  <input
+                    type="number"
+                    value={cantidad}
+                    onChange={(e) => setCantidad(e.target.value)}
+                    placeholder={`Ej: 10.5 ${articuloSeleccionado.abreviatura_unidad || ""}`}
+                    min="0.001"
+                    step="0.001"
+                    max={articuloSeleccionado.stock_disponible || 0}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                    required
+                  />
+                  {cantidad && parseFloat(cantidad) > 0 && (
+                    <div
+                      className={`mt-2 p-3 rounded-xl text-sm flex items-center justify-between border ${
+                        stockDespues < 0
+                          ? "bg-red-50 border-red-200"
+                          : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {stockDespues < 0 ? (
+                          <FiAlertCircle className="text-red-500" size={15} />
+                        ) : (
+                          <FiCheck className="text-emerald-600" size={15} />
+                        )}
+                        <span className="text-slate-600">
+                          Stock después del consumo:
+                        </span>
+                      </div>
+                      <span
+                        className={`font-bold ${stockDespues < 0 ? "text-red-600" : "text-slate-900"}`}
+                      >
+                        {formateaCantidad(stockDespues)}{" "}
+                        {articuloSeleccionado.abreviatura_unidad || "uds"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">
+                    Notas (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                    placeholder="Ej: Consumo para órdenes de la semana"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={
+                    loading ||
+                    !cantidad ||
+                    parseFloat(cantidad) <= 0 ||
+                    stockDespues < 0
+                  }
+                  className="w-full px-5 py-3 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <FiMinus size={16} />
+                  {loading ? "Registrando..." : "Registrar Consumo"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Recent consumptions */}
+          <div className="px-6 py-4 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+              Últimos consumos
+            </h4>
+            {loadingConsumos ? (
+              <div className="flex justify-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-800" />
+              </div>
+            ) : consumosRecientes.length === 0 ? (
+              <div className="text-center text-slate-400 text-sm py-8 bg-slate-50 rounded-xl border border-slate-200">
+                <FiPackage className="mx-auto text-2xl mb-2 text-slate-300" />
+                No hay consumos recientes
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {consumosRecientes.slice(0, 6).map((item) => {
+                  let fechaStr = "";
+                  if (item.fecha) {
+                    const fechaObj = new Date(item.fecha);
+                    if (!isNaN(fechaObj)) {
+                      const day = fechaObj
+                        .getDate()
+                        .toString()
+                        .padStart(2, "0");
+                      const month = fechaObj.toLocaleString("es-CO", {
+                        month: "short",
+                      });
+                      fechaStr = `${day} ${month}`;
+                    }
+                  }
+                  const etapaColor = getEtapaColor(item.nombre_etapa);
+                  return (
+                    <div
+                      key={item.id_consumo}
+                      className="p-3 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-800 text-sm truncate">
+                            {item.descripcion}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-400">
+                              {fechaStr}
+                            </span>
+                            {item.nombre_etapa && (
+                              <span
+                                className={`text-xs px-1.5 py-0.5 rounded-md ${etapaColor.badge}`}
+                              >
+                                {item.nombre_etapa}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          <p className="font-bold text-slate-900 text-sm">
+                            -{formateaCantidad(item.cantidad)}{" "}
+                            {item.abreviatura_unidad || "uds"}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {formatMoneda(item.costo_total)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-slate-200 p-4 bg-white flex-shrink-0">
+          <button
+            onClick={() => {
+              onClose();
+              navigate("/inventario/consumo-mp");
+            }}
+            className="w-full px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2"
+          >
+            <FiExternalLink size={15} />
+            Ver historial completo
+          </button>
         </div>
       </div>
 
-      {/* Overlay interno para modal */}
+      {/* Overlay for inner modal */}
       {modalEtapa.visible && (
         <div
           className="absolute inset-0 bg-white/60 z-50"
@@ -711,7 +691,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
         />
       )}
 
-      {/* Modal para asignar etapa */}
+      {/* Assign stage modal */}
       <AsignarEtapaModal
         visible={modalEtapa.visible}
         articulo={modalEtapa.articulo}
@@ -722,44 +702,44 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
         onClose={() => setModalEtapa({ visible: false, articulo: null })}
       />
 
-      {/* Modal para inicializar inventario */}
+      {/* Initialize inventory modal */}
       {modalInicializar.visible && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/40"
             onClick={() => {
               setModalInicializar({ visible: false, articulo: null });
               setStockInicial("");
             }}
           />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Header del modal */}
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-xl p-2.5">
-                  <FiDatabase className="text-white text-xl" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold text-white">
-                    Inicializar en Inventario
-                  </h4>
-                  <p className="text-amber-100 text-sm">
-                    Este artículo no está en inventario
-                  </p>
-                </div>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-0.5">
+                  Inventario
+                </p>
+                <h4 className="text-lg font-bold text-slate-900">
+                  Inicializar en inventario
+                </h4>
               </div>
+              <button
+                onClick={() => {
+                  setModalInicializar({ visible: false, articulo: null });
+                  setStockInicial("");
+                }}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+              >
+                <FiX size={15} />
+              </button>
             </div>
-
-            {/* Contenido del modal */}
             <div className="p-6">
-              {/* Info del articulo */}
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-5">
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-amber-100 rounded-lg p-2.5">
-                    <FiBox className="text-amber-600 text-lg" />
+                  <div className="bg-white rounded-lg border border-slate-200 p-2">
+                    <FiBox className="text-slate-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-800">
+                    <p className="font-semibold text-slate-900">
                       {modalInicializar.articulo?.descripcion}
                     </p>
                     <p className="text-sm text-slate-500">
@@ -768,22 +748,18 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               </div>
-
-              {/* Mensaje explicativo */}
               <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
                 <FiAlertCircle
                   className="text-amber-500 flex-shrink-0 mt-0.5"
-                  size={20}
+                  size={18}
                 />
                 <p className="text-sm text-amber-800">
                   Para registrar consumos de este artículo, primero debes
                   agregarlo al inventario con un stock inicial.
                 </p>
               </div>
-
-              {/* Campo stock inicial */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
                   Stock inicial (
                   {modalInicializar.articulo?.abreviatura_unidad || "unidades"})
                 </label>
@@ -794,22 +770,20 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
                   placeholder={`Ej: 100 ${modalInicializar.articulo?.abreviatura_unidad || ""}`}
                   min="0.001"
                   step="0.001"
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
                   autoFocus
                 />
-                <p className="text-xs text-slate-500 mt-1.5">
+                <p className="text-xs text-slate-400 mt-1.5">
                   Ingresa la cantidad disponible actualmente en físico
                 </p>
               </div>
-
-              {/* Botones */}
               <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setModalInicializar({ visible: false, articulo: null });
                     setStockInicial("");
                   }}
-                  className="flex-1 px-4 py-3 border-2 border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition cursor-pointer"
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -820,9 +794,9 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
                     !stockInicial ||
                     parseFloat(stockInicial) <= 0
                   }
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <FiPlus size={18} />
+                  <FiPlus size={15} />
                   {guardandoInventario ? "Guardando..." : "Agregar"}
                 </button>
               </div>

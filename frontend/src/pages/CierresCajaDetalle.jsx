@@ -106,20 +106,20 @@ const CierresCajaDetalle = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500 text-lg">Cargando detalle...</div>
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Cargando detalle...</p>
       </div>
     );
   }
 
   if (!cierre) {
     return (
-      <div className="p-6">
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 text-lg">Cierre no encontrado</p>
+          <p className="text-slate-500 text-sm mb-3">Cierre no encontrado</p>
           <button
             onClick={() => navigate("/cierres-caja")}
-            className="mt-4 cursor-pointer text-slate-600 hover:text-slate-700 font-semibold"
+            className="text-xs text-slate-600 underline cursor-pointer"
           >
             Volver a lista
           </button>
@@ -131,331 +131,320 @@ const CierresCajaDetalle = () => {
   const movimientosAgrupados = agruparMovimientos();
 
   return (
-    <div className="p-6">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6 select-none">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Detalle de Cierre
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Detalle de
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+            Período #{cierre.id_cierre}
           </h1>
-          <p className="text-gray-600 mt-1">
-            Del {formatFecha(cierre.fecha_inicio)} al{" "}
-            {formatFecha(cierre.fecha_fin)}
+          <p className="text-xs text-slate-500 mt-0.5">
+            {formatFecha(cierre.fecha_inicio)}
+            {cierre.fecha_fin
+              ? ` — ${formatFecha(cierre.fecha_fin)}`
+              : " — En curso"}
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleExportar}
-            className="cursor-pointer flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
           >
-            <FiDownload size={18} />
+            <FiDownload size={14} />
             Exportar PDF
           </button>
           {cierre.estado === "abierto" && (
             <>
               <button
                 onClick={() => setMostrarModalEditarSaldos(true)}
-                className="cursor-pointer flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
               >
-                <FiEdit size={18} />
+                <FiEdit size={14} />
                 Editar Saldos
               </button>
               <button
                 onClick={() => navigate(`/cierres-caja/${id}/cerrar`)}
-                className="cursor-pointer flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg animate-pulse"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
               >
-                <FiCheck size={18} />
+                <FiCheck size={14} />
                 Cerrar Período
               </button>
             </>
           )}
           <button
             onClick={() => navigate("/cierres-caja")}
-            className="cursor-pointer flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
           >
-            <FiArrowLeft size={18} />
+            <FiArrowLeft size={14} />
             Volver
           </button>
         </div>
       </div>
 
-      {/* Estado del Cierre */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {cierre.estado === "abierto" ? (
-              <div className="bg-green-100 p-3 rounded-full">
-                <FiClock className="text-green-600" size={24} />
-              </div>
-            ) : (
-              <div className="bg-gray-100 p-3 rounded-full">
-                <FiCheck className="text-gray-600" size={24} />
-              </div>
+      {/* Resumen 4 stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Saldo Inicial */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+              <FiDollarSign size={15} className="text-indigo-600" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Saldo Inicial
+            </p>
+          </div>
+          <p className="text-xl font-bold text-slate-800">
+            {formatMonto(
+              cierre.detalle_metodos.reduce(
+                (sum, d) => sum + d.saldo_inicial,
+                0,
+              ),
             )}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {formatFecha(cierre.fecha_inicio)}
+          </p>
+        </div>
+        {/* Ingresos */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+              <FiTrendingUp size={15} className="text-emerald-600" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Ingresos
+            </p>
+          </div>
+          <p className="text-xl font-bold text-emerald-700">
+            +
+            {formatMonto(
+              cierre.detalle_metodos.reduce(
+                (sum, d) => sum + d.total_ingresos,
+                0,
+              ),
+            )}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Entradas del período
+          </p>
+        </div>
+        {/* Egresos */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
+              <FiTrendingDown size={15} className="text-rose-600" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Egresos
+            </p>
+          </div>
+          <p className="text-xl font-bold text-rose-600">
+            -
+            {formatMonto(
+              cierre.detalle_metodos.reduce(
+                (sum, d) => sum + d.total_egresos,
+                0,
+              ),
+            )}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Salidas del período
+          </p>
+        </div>
+        {/* Saldo Final */}
+        <div
+          className={`bg-white border rounded-xl shadow-sm px-5 py-4 ${cierre.estado === "abierto" ? "border-emerald-200" : "border-slate-200"}`}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${cierre.estado === "abierto" ? "bg-emerald-50 border border-emerald-100" : "bg-slate-100 border border-slate-200"}`}
+            >
+              <FiDollarSign
+                size={15}
+                className={
+                  cierre.estado === "abierto"
+                    ? "text-emerald-600"
+                    : "text-slate-600"
+                }
+              />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {cierre.estado === "abierto" ? "Saldo Actual" : "Saldo Final"}
+            </p>
+          </div>
+          <p className="text-xl font-bold text-slate-900">
+            {formatMonto(
+              cierre.detalle_metodos.reduce((sum, d) => sum + d.saldo_final, 0),
+            )}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {cierre.estado === "abierto"
+              ? "Tiempo real"
+              : formatFecha(cierre.fecha_fin)}
+          </p>
+        </div>
+      </div>
+
+      {/* Estado del cierre */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cierre.estado === "abierto" ? "bg-emerald-50 border border-emerald-100" : "bg-slate-100 border border-slate-200"}`}
+            >
+              {cierre.estado === "abierto" ? (
+                <FiClock size={16} className="text-emerald-600" />
+              ) : (
+                <FiCheck size={16} className="text-slate-500" />
+              )}
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                Estado: {cierre.estado === "abierto" ? "Abierto" : "Cerrado"}
-              </h2>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-slate-800">
+                  {cierre.estado === "abierto"
+                    ? "Período en curso"
+                    : "Período cerrado"}
+                </p>
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                    cierre.estado === "abierto"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
+                  }`}
+                >
+                  {cierre.estado === "abierto" ? "ABIERTO" : "CERRADO"}
+                </span>
+              </div>
               {cierre.estado === "cerrado" && (
-                <p className="text-gray-600 text-sm mt-1">
-                  <FiUser className="inline mr-1" />
+                <p className="text-xs text-slate-500 mt-0.5">
+                  <FiUser className="inline mr-1" size={11} />
                   Cerrado por: {cierre.usuario_cierre || "N/A"}
                 </p>
               )}
             </div>
           </div>
-
           {cierre.estado === "cerrado" && cierre.fecha_cierre && (
             <div className="text-right">
-              <p className="text-gray-600 text-sm">Fecha de cierre</p>
-              <p className="font-semibold text-gray-800">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider">
+                Fecha de cierre
+              </p>
+              <p className="text-sm font-semibold text-slate-700">
                 {new Date(cierre.fecha_cierre).toLocaleString("es-CO")}
               </p>
             </div>
           )}
         </div>
-
         {cierre.observaciones && (
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-gray-600 text-sm mb-1">Observaciones:</p>
-            <p className="text-gray-800">{cierre.observaciones}</p>
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+              Observaciones
+            </p>
+            <p className="text-sm text-slate-700">{cierre.observaciones}</p>
           </div>
         )}
       </div>
 
-      {/* Cards de Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Saldo Inicial */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiDollarSign size={24} />
-            </div>
-            <div className="text-right">
-              <p className="text-blue-100 text-sm font-medium">Saldo Inicial</p>
-              <p className="text-2xl font-bold mt-1">
-                {formatMonto(
-                  cierre.detalle_metodos.reduce(
-                    (sum, d) => sum + d.saldo_inicial,
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center text-blue-100 text-xs">
-            <FiCalendar className="mr-1" size={12} />
-            {formatFecha(cierre.fecha_inicio)}
-          </div>
-        </div>
-
-        {/* Total Ingresos */}
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiTrendingUp size={24} />
-            </div>
-            <div className="text-right">
-              <p className="text-green-100 text-sm font-medium">Ingresos</p>
-              <p className="text-2xl font-bold mt-1">
-                {formatMonto(
-                  cierre.detalle_metodos.reduce(
-                    (sum, d) => sum + d.total_ingresos,
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center text-green-100 text-xs">
-            <FiTrendingUp className="mr-1" size={12} />
-            Entradas del período
-          </div>
-        </div>
-
-        {/* Total Egresos */}
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiTrendingDown size={24} />
-            </div>
-            <div className="text-right">
-              <p className="text-red-100 text-sm font-medium">Egresos</p>
-              <p className="text-2xl font-bold mt-1">
-                {formatMonto(
-                  cierre.detalle_metodos.reduce(
-                    (sum, d) => sum + d.total_egresos,
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center text-red-100 text-xs">
-            <FiTrendingDown className="mr-1" size={12} />
-            Salidas del período
-          </div>
-        </div>
-
-        {/* Saldo Final/Actual */}
-        <div
-          className={`bg-gradient-to-br ${
-            cierre.estado === "abierto"
-              ? "from-purple-500 to-purple-600"
-              : "from-slate-600 to-slate-700"
-          } rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-all duration-200`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiDollarSign size={24} />
-            </div>
-            <div className="text-right">
-              <p
-                className={`${
-                  cierre.estado === "abierto"
-                    ? "text-purple-100"
-                    : "text-slate-100"
-                } text-sm font-medium`}
-              >
-                {cierre.estado === "abierto" ? "Saldo Actual" : "Saldo Final"}
-              </p>
-              <p className="text-2xl font-bold mt-1">
-                {formatMonto(
-                  cierre.detalle_metodos.reduce(
-                    (sum, d) => sum + d.saldo_final,
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-          <div
-            className={`flex items-center ${
-              cierre.estado === "abierto" ? "text-purple-100" : "text-slate-100"
-            } text-xs`}
-          >
-            {cierre.estado === "abierto" ? (
-              <>
-                <FiClock className="mr-1" size={12} />
-                Actualizado en tiempo real
-              </>
-            ) : (
-              <>
-                <FiCalendar className="mr-1" size={12} />
-                {formatFecha(cierre.fecha_fin)}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Tabla de Saldos por Método */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
-        <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <FiDollarSign className="text-slate-600" />
+      {/* Tabla de saldos por método */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
             Saldos por Método de Pago
-          </h2>
+          </h3>
         </div>
-
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+          <table className="w-full text-left">
+            <thead className="bg-slate-100 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Método de Pago
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Método
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Saldo Inicial
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Ingresos
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Egresos
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   {cierre.estado === "abierto" ? "Saldo Actual" : "Saldo Final"}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {cierre.detalle_metodos.map((detalle, index) => (
+            <tbody className="divide-y divide-slate-100">
+              {cierre.detalle_metodos.map((detalle) => (
                 <tr
                   key={detalle.id_detalle}
-                  className={`hover:bg-blue-50 transition-colors duration-150 ${
-                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                  }`}
+                  className="hover:bg-slate-50/70 transition-colors"
                 >
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-gray-900">
-                      {detalle.metodo_nombre}
-                    </span>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">
+                    {detalle.metodo_nombre}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-gray-700 font-medium">
-                      {formatMonto(detalle.saldo_inicial)}
-                    </span>
+                  <td className="px-4 py-3 text-sm text-slate-600 text-right">
+                    {formatMonto(detalle.saldo_inicial)}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-sm">
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                       +{formatMonto(detalle.total_ingresos)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold text-sm">
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
                       -{formatMonto(detalle.total_egresos)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-gray-900 font-bold text-lg">
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-sm font-bold text-slate-900">
                       {formatMonto(detalle.saldo_final)}
                     </span>
                   </td>
                 </tr>
               ))}
-
-              {/* Totales */}
-              <tr className="bg-gradient-to-r from-slate-100 to-slate-200 font-bold border-t-2 border-slate-300">
-                <td className="px-6 py-5 text-gray-900 text-lg">TOTAL</td>
-                <td className="px-6 py-5 text-right text-gray-900">
+              <tr className="bg-slate-100 border-t-2 border-slate-300">
+                <td className="px-4 py-3 text-sm font-bold text-slate-900">
+                  TOTAL
+                </td>
+                <td className="px-4 py-3 text-sm font-bold text-slate-700 text-right">
                   {formatMonto(
                     cierre.detalle_metodos.reduce(
                       (sum, d) => sum + d.saldo_inicial,
-                      0
-                    )
+                      0,
+                    ),
                   )}
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-green-600 text-white font-bold">
+                <td className="px-4 py-3 text-right">
+                  <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold">
                     +
                     {formatMonto(
                       cierre.detalle_metodos.reduce(
                         (sum, d) => sum + d.total_ingresos,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </span>
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-red-600 text-white font-bold">
+                <td className="px-4 py-3 text-right">
+                  <span className="inline-block px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold">
                     -
                     {formatMonto(
                       cierre.detalle_metodos.reduce(
                         (sum, d) => sum + d.total_egresos,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </span>
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <span className="text-gray-900 text-xl font-extrabold">
+                <td className="px-4 py-3 text-right">
+                  <span className="text-base font-extrabold text-slate-900">
                     {formatMonto(
                       cierre.detalle_metodos.reduce(
                         (sum, d) => sum + d.saldo_final,
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </span>
                 </td>
@@ -465,112 +454,94 @@ const CierresCajaDetalle = () => {
         </div>
       </div>
 
-      {/* Movimientos Detallados */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      {/* Movimientos detallados */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ">
         <button
           onClick={() => setMostrarMovimientos(!mostrarMovimientos)}
-          className="w-full bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200 text-left hover:from-slate-100 hover:to-slate-200 transition-all duration-200"
+          className="w-full px-6 py-4 border-b border-slate-100 text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <FiCalendar className="text-slate-600" />
-              Detalle de Movimientos
-              <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+          <div className="flex items-center justify-between ">
+            <div className="flex items-center gap-2 ">
+              <h3 className="text-sm font-bold text-slate-900">
+                Detalle de Movimientos
+              </h3>
+              <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold rounded-md">
                 {movimientos.length}
               </span>
-            </h2>
+            </div>
             <span
-              className={`text-gray-600 transform transition-transform duration-200 ${
-                mostrarMovimientos ? "rotate-180" : ""
-              }`}
+              className={`cursor-pointer text-slate-400 transition-transform duration-200 ${mostrarMovimientos ? "rotate-180" : ""}`}
             >
-              <FiChevronDown size={20} />
+              <FiChevronDown size={18} />
             </span>
           </div>
         </button>
 
         {mostrarMovimientos && (
-          <div className="p-6 bg-gray-50">
+          <div className="p-6 bg-slate-50/50">
             {Object.entries(movimientosAgrupados).length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <FiCalendar size={48} className="mx-auto mb-3 opacity-50" />
-                <p className="text-lg">No hay movimientos en este período</p>
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <FiCalendar size={32} className="mb-2 opacity-40" />
+                <p className="text-sm">No hay movimientos en este período</p>
               </div>
             ) : (
               Object.entries(movimientosAgrupados).map(([key, grupo]) => (
                 <div key={key} className="mb-6 last:mb-0">
                   <div
-                    className={`flex items-center gap-2 mb-3 ${
-                      grupo.tipo === "ingreso"
-                        ? "text-green-700"
-                        : "text-red-700"
-                    }`}
+                    className={`flex items-center gap-2 mb-3 ${grupo.tipo === "ingreso" ? "text-emerald-700" : "text-rose-600"}`}
                   >
-                    {grupo.tipo === "ingreso" ? (
-                      <div className="bg-green-100 p-2 rounded-lg">
-                        <FiTrendingUp size={20} />
-                      </div>
-                    ) : (
-                      <div className="bg-red-100 p-2 rounded-lg">
-                        <FiTrendingDown size={20} />
-                      </div>
-                    )}
-                    <h3 className="font-bold text-lg">
-                      {grupo.tipo === "ingreso" ? "INGRESOS" : "EGRESOS"} -{" "}
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center ${grupo.tipo === "ingreso" ? "bg-emerald-50 border border-emerald-200" : "bg-rose-50 border border-rose-200"}`}
+                    >
+                      {grupo.tipo === "ingreso" ? (
+                        <FiTrendingUp size={14} />
+                      ) : (
+                        <FiTrendingDown size={14} />
+                      )}
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      {grupo.tipo === "ingreso" ? "Ingresos" : "Egresos"} —{" "}
                       {grupo.metodo}
-                    </h3>
+                    </span>
                   </div>
-
-                  <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gradient-to-r from-gray-100 to-gray-200">
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-100 border-b border-slate-200">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                             Fecha
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                             Documento
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                             Observaciones
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                             Monto
                           </th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {grupo.movimientos.map((mov, index) => (
+                      <tbody className="divide-y divide-slate-100">
+                        {grupo.movimientos.map((mov) => (
                           <tr
                             key={mov.id_movimiento}
-                            className={`border-t border-gray-200 hover:bg-blue-50 transition ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
+                            className="hover:bg-slate-50/70 transition-colors"
                           >
-                            <td className="px-4 py-3">
-                              <span className="inline-flex items-center text-gray-700 font-medium">
-                                <FiCalendar
-                                  className="mr-1 text-gray-400"
-                                  size={14}
-                                />
-                                {formatFecha(mov.fecha)}
-                              </span>
+                            <td className="px-4 py-2.5 text-sm text-slate-600">
+                              {formatFecha(mov.fecha)}
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold text-xs">
+                            <td className="px-4 py-2.5">
+                              <span className="inline-block px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold rounded-md">
                                 {mov.tipo_documento} #{mov.id_documento}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-gray-600">
-                              {mov.observaciones || "-"}
+                            <td className="px-4 py-2.5 text-sm text-slate-500">
+                              {mov.observaciones || "—"}
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-2.5 text-right">
                               <span
-                                className={`font-bold text-base ${
-                                  grupo.tipo === "ingreso"
-                                    ? "text-green-600"
-                                    : "text-red-600"
-                                }`}
+                                className={`text-sm font-bold ${grupo.tipo === "ingreso" ? "text-emerald-600" : "text-rose-600"}`}
                               >
                                 {formatMonto(mov.monto)}
                               </span>
@@ -587,7 +558,6 @@ const CierresCajaDetalle = () => {
         )}
       </div>
 
-      {/* Modal Editar Saldos Iniciales */}
       {mostrarModalEditarSaldos && (
         <EditarSaldosInicialesModal
           cierre={cierre}

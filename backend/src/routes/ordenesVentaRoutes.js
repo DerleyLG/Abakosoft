@@ -2,46 +2,52 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/ordenesVentaController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
 router.use(verifyToken);
 
 router.get(
   "/articulos-con-stock",
-  checkRole([ROLES.OPERARIO, ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.getArticulosConStock
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_VIEW),
+  controller.getArticulosConStock,
 );
 
-// Listado y detalle: supervisor y admin
 router.get(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.getAll
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_VIEW),
+  controller.getAll,
 );
 router.get(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.getById
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_VIEW),
+  controller.getById,
 );
 
-// Crear/actualizar: supervisor y admin
 router.post(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.create
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_CREATE),
+  checkIdempotency,
+  controller.create,
 );
 router.put(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.update
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_EDIT),
+  checkIdempotency,
+  controller.update,
 );
 
-// Eliminar: solo admin
 router.delete(
   "/:id",
-  checkRole([ROLES.ADMIN, ROLES.SUPERVISOR]),
-  controller.delete
+  requirePlanFeature("ventas"),
+  requirePermission(ACTIONS.SALES_DELETE),
+  controller.delete,
 );
 
 module.exports = router;

@@ -2,77 +2,80 @@ const express = require("express");
 const router = express.Router();
 const reportesController = require("../controllers/reportesController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
 
-// Todas las rutas de reportes requieren autenticación y rol supervisor o admin
+// Todas las rutas de reportes requieren autenticación
+const requirePlanFeature = require("./_requirePlanFeature");
 router.use(verifyToken);
 
-// Ruta para servicios tercerizados asignados
 router.get(
   "/servicios-tercerizados",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getServiciosTercerizados
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getServiciosTercerizados,
 );
 
-// Ruta para servicios avances de fabricacion
 router.get(
   "/avance-fabricacion",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getAvanceFabricacion
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getAvanceFabricacion,
 );
 
-// Ruta para servicios Ordenes de compra
 router.get(
   "/ordenes-compra",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getReporteOrdenesCompra
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getReporteOrdenesCompra,
 );
 
-// Ruta para inventario
 router.get(
   "/inventario",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getInventarioActual
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getInventarioActual,
 );
 
 router.get(
   "/ventas-periodo",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getVentasPorPeriodo
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getVentasPorPeriodo,
 );
 
-// Ruta para costos de produccion
 router.get(
   "/costos-produccion",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getCostosProduccion
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getCostosProduccion,
 );
 
-// Ruta para utilidad por orden de venta
 router.get(
   "/utilidad-por-orden",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getUtilidadPorOrden
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getUtilidadPorOrden,
 );
 
-//Ruta para pagos de trabajadores
 router.get(
   "/pagos-trabajadores",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  reportesController.getPagosTrabajadores
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getPagosTrabajadores,
 );
 
 router.get(
   "/pagos-trabajadores-dia",
-  checkRole(["supervisor", "admin"]),
-  reportesController.getPagosTrabajadoresPorDia
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getPagosTrabajadoresPorDia,
 );
 
 router.get(
   "/movimientos-inventario",
-  checkRole(["supervisor", "admin"]),
-  reportesController.getMovimientosInventario
+  requirePlanFeature("reportes"),
+  requirePermission(ACTIONS.REPORTS_VIEW),
+  reportesController.getMovimientosInventario,
 );
 
 // Nuevos: Absorción y Costos por OF

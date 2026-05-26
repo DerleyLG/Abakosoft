@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import { X, Plus } from "lucide-react";
+import { FiArrowLeft, FiPlus, FiTrash2 } from "react-icons/fi";
 
 const EditarArticulo = () => {
   const [referencia, setReferencia] = useState("");
@@ -18,6 +19,9 @@ const EditarArticulo = () => {
   const [articulosSimples, setArticulosSimples] = useState([]);
 
   const navigate = useNavigate();
+  const idempotencyKey = useIdempotencyKey();
+  const [loading, setLoading] = useState(false);
+  const [guardado, setGuardado] = useState(false);
   const { id } = useParams();
 
   useEffect(() => {
@@ -107,6 +111,8 @@ const EditarArticulo = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading || guardado) return;
+    setLoading(true);
     try {
       if (esCompuesto) {
         if (
@@ -143,8 +149,9 @@ const EditarArticulo = () => {
           : [],
       };
 
-      await api.put(`/articulos/${id}`, formData);
+      await api.put(`/articulos/${id}`, formData, { headers: { "X-Idempotency-Key": idempotencyKey } });
       toast.success(" Artículo actualizado correctamente");
+      setGuardado(true);
       setTimeout(() => {
         navigate("/articulos");
       }, 500);
@@ -154,6 +161,8 @@ const EditarArticulo = () => {
         error.response?.data?.message ||
         error.message;
       toast.error(mensajeBackend);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,193 +170,270 @@ const EditarArticulo = () => {
     navigate("/articulos");
   };
 
+  const inputCls =
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition";
+  const labelCls =
+    "block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5";
+
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-4xl font-bold mb-8 text-gray-800 border-b pb-4">
-          Editar artículo
-        </h2>
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          <div>
-            <label
-              htmlFor="referencia"
-              className="block text-sm font-semibold text-gray-700 mb-1"
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6">
+      <div className="max-w-5xl mx-auto flex flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCancelar}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
             >
-              Referencia <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="referencia"
-              type="text"
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              placeholder="Ej: 001-A"
-            />
+              <FiArrowLeft size={15} />
+            </button>
+            <div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Artículos
+              </p>
+              <h1 className="text-xl font-bold text-slate-900 leading-tight">
+                Editar artículo
+              </h1>
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="precio_venta"
-              className="block text-sm font-semibold text-gray-700 mb-1"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelar}
+              className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
             >
-              Precio de Venta <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="precio_venta"
-              type="number"
-              step="0.01"
-              min="0"
-              value={precioVenta}
-              onChange={(e) => setPrecioVenta(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              placeholder="Ej: 120.00"
-            />
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="editar-articulo-form"
+              className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer shadow-sm disabled:opacity-60"
+              disabled={loading || guardado}
+            >
+              {loading ? "Guardando..." : "Guardar cambios"}
+            </button>
           </div>
-          <div>
-            <label
-              htmlFor="precio_costo"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Precio de costo
-            </label>
-            <input
-              id="precio_costo"
-              type="number"
-              step="0.01"
-              min="0"
-              value={precioCosto}
-              onChange={(e) => setPrecioCosto(e.target.value)}
-              disabled={esCompuesto}
-              className={`w-full border rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-                esCompuesto
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : "border-gray-300"
-              }`}
-              placeholder="Calculado automáticamente"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label
-              htmlFor="descripcion"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Descripción
-            </label>
-            <textarea
-              id="descripcion"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              rows="4"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              placeholder="Descripción del artículo"
-            ></textarea>
-          </div>
-          <div className="md:col-span-2">
-            <label
-              htmlFor="categoria"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Categoría
-            </label>
-            <select
-              id="categoria"
-              value={idCategoria}
-              onChange={(e) => setIdCategoria(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-            >
-              <option value="">-- Seleccione una categoría --</option>
-              {categorias.map((cat) => (
-                <option key={cat.id_categoria} value={cat.id_categoria}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        </div>
 
-          <div className="md:col-span-2">
-            <label
-              htmlFor="unidad"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Unidad de medida
-            </label>
-            <select
-              id="unidad"
-              value={idUnidad}
-              onChange={(e) => setIdUnidad(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-            >
-              <option value="">-- Seleccione una unidad --</option>
-              {unidades.map((u) => (
-                <option key={u.id_unidad} value={u.id_unidad}>
-                  {u.nombre} ({u.abreviatura})
-                </option>
-              ))}
-            </select>
-          </div>
+        <form id="editar-articulo-form" onSubmit={handleSubmit}>
+          {/* Layout principal */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {/* Campos principales — 2/3 */}
+            <div className="xl:col-span-2">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-4 pb-3 border-b border-slate-100">
+                  Información principal
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="referencia" className={labelCls}>
+                      Referencia{" "}
+                      <span className="text-red-500 normal-case font-normal">
+                        *
+                      </span>
+                    </label>
+                    <input
+                      id="referencia"
+                      type="text"
+                      value={referencia}
+                      onChange={(e) => setReferencia(e.target.value)}
+                      required
+                      className={inputCls}
+                      placeholder="Ej: ART-001"
+                    />
+                  </div>
 
-          <div className="md:col-span-2 flex items-center gap-2 mt-4">
-            <input
-              type="checkbox"
-              id="esCompuesto"
-              checked={!!esCompuesto}
-              onChange={(e) => setEsCompuesto(e.target.checked)}
-              className="w-4 h-4 text-slate-600 bg-gray-100 border-gray-300 rounded focus:ring-slate-500"
-            />
-            <label
-              htmlFor="esCompuesto"
-              className="text-sm font-semibold text-gray-700"
-            >
-              ¿Es un artículo compuesto?
-            </label>
-          </div>
-          {!!esCompuesto && (
-            <div className="md:col-span-2 bg-gray-50 p-6 rounded-md border border-gray-200 mt-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Componentes del Artículo
-              </h3>
-              {componentes.map((comp, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4 p-4 border border-gray-200 rounded-md bg-white"
-                >
-                  <div className="col-span-2">
-                    <label
-                      htmlFor={`componente-${index}`}
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Artículo Componente
+                  <div className="sm:col-span-2">
+                    <label htmlFor="descripcion" className={labelCls}>
+                      Descripción
+                    </label>
+                    <textarea
+                      id="descripcion"
+                      value={descripcion}
+                      onChange={(e) => setDescripcion(e.target.value)}
+                      rows="3"
+                      className={`${inputCls} resize-none`}
+                      placeholder="Descripción del artículo"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="precio_venta" className={labelCls}>
+                      Precio de venta{" "}
+                      <span className="text-red-500 normal-case font-normal">
+                        *
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
+                        $
+                      </span>
+                      <input
+                        id="precio_venta"
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={precioVenta}
+                        onChange={(e) => setPrecioVenta(e.target.value)}
+                        required
+                        className={`${inputCls} pl-7`}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="precio_costo" className={labelCls}>
+                      Precio de costo
+                      {esCompuesto && (
+                        <span className="ml-1.5 text-[10px] font-medium text-amber-600 normal-case">
+                          (calculado)
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
+                        $
+                      </span>
+                      <input
+                        id="precio_costo"
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={precioCosto}
+                        onChange={(e) => setPrecioCosto(e.target.value)}
+                        disabled={esCompuesto}
+                        className={`${inputCls} pl-7 ${esCompuesto ? "bg-slate-50 text-slate-400 cursor-not-allowed" : ""}`}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar clasificación — 1/3 */}
+            <div>
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-4 pb-3 border-b border-slate-100">
+                  Clasificación
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="categoria" className={labelCls}>
+                      Categoría
                     </label>
                     <select
-                      id={`componente-${index}`}
-                      value={comp.id}
-                      onChange={(e) =>
-                        handleComponenteChange(index, "id", e.target.value)
-                      }
-                      className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                      required
+                      id="categoria"
+                      value={idCategoria}
+                      onChange={(e) => setIdCategoria(e.target.value)}
+                      className={`${inputCls} cursor-pointer`}
                     >
-                      <option value="">-- Seleccione un artículo --</option>
-                      {articulosSimples.map((art) => (
-                        <option key={art.id_articulo} value={art.id_articulo}>
-                          {art.referencia} - {art.descripcion}
+                      <option value="">Sin categoría</option>
+                      {categorias.map((cat) => (
+                        <option key={cat.id_categoria} value={cat.id_categoria}>
+                          {cat.nombre}
                         </option>
                       ))}
                     </select>
                   </div>
+
                   <div>
-                    <label
-                      htmlFor={`cantidad-${index}`}
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Cantidad
+                    <label htmlFor="unidad" className={labelCls}>
+                      Unidad de medida
                     </label>
+                    <select
+                      id="unidad"
+                      value={idUnidad}
+                      onChange={(e) => setIdUnidad(e.target.value)}
+                      className={`${inputCls} cursor-pointer`}
+                    >
+                      <option value="">Sin unidad</option>
+                      {unidades.map((u) => (
+                        <option key={u.id_unidad} value={u.id_unidad}>
+                          {u.nombre} ({u.abreviatura})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="pt-1">
+                    <label
+                      htmlFor="esCompuesto"
+                      className="flex items-center gap-3 cursor-pointer"
+                    >
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          id="esCompuesto"
+                          checked={!!esCompuesto}
+                          onChange={(e) => setEsCompuesto(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 rounded-full bg-slate-200 peer-checked:bg-slate-900 transition-colors" />
+                        <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          Artículo compuesto
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Definir componentes
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Componentes */}
+          {!!esCompuesto && (
+            <div className="mt-4 bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div>
+                  <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Componentes
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {componentes.length} componente
+                    {componentes.length !== 1 ? "s" : ""} añadido
+                    {componentes.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddComponente}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  <FiPlus size={13} /> Agregar componente
+                </button>
+              </div>
+              <div className="space-y-2">
+                {componentes.map((comp, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-[1fr_120px_36px] gap-2 items-center p-2.5 border border-slate-100 rounded-lg bg-slate-50"
+                  >
+                    <select
+                      value={comp.id}
+                      onChange={(e) =>
+                        handleComponenteChange(index, "id", e.target.value)
+                      }
+                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer transition"
+                      required
+                    >
+                      <option value="">Seleccionar artículo…</option>
+                      {articulosSimples.map((art) => (
+                        <option key={art.id_articulo} value={art.id_articulo}>
+                          {art.referencia ? `${art.referencia} — ` : ""}
+                          {art.descripcion}
+                        </option>
+                      ))}
+                    </select>
                     <input
-                      id={`cantidad-${index}`}
                       type="number"
                       min="1"
                       value={comp.cantidad}
@@ -359,48 +445,23 @@ const EditarArticulo = () => {
                         )
                       }
                       required
-                      className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                      placeholder="Cantidad"
+                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 transition"
+                      placeholder="Cant."
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveComponente(index)}
+                      disabled={componentes.length === 1}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Eliminar componente"
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
                   </div>
-                  {componentes.length > 1 && (
-                    <div className="col-span-1 md:col-span-3 lg:col-span-1">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveComponente(index)}
-                        className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-md transition cursor-pointer"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={handleAddComponente}
-                className="mt-4 w-full bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 rounded-md transition cursor-pointer"
-              >
-                <Plus size={18} className="inline-block mr-2" /> Agregar otro
-                componente
-              </button>
+                ))}
+              </div>
             </div>
           )}
-          <div className="md:col-span-2 flex justify-end gap-4 pt-4 h-[60px]">
-            <button
-              type="submit"
-              className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded-md text-2xs font-medium transition cursor-pointer"
-            >
-              Guardar cambios
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelar}
-              className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-md text-2xs font-medium transition cursor-pointer"
-            >
-              Cancelar
-            </button>
-          </div>
         </form>
       </div>
     </div>

@@ -135,12 +135,7 @@ const cierresCajaController = {
       const id_usuario_cierre =
         req.user?.id_usuario || req.user?.userId || req.user?.id || null;
 
-      // Log detallado para debugging
-      console.log("=== DEBUGGING CIERRE DE PERÍODO ===");
-      console.log("req.user completo:", JSON.stringify(req.user, null, 2));
-      console.log("id_usuario_cierre extraído:", id_usuario_cierre);
-      console.log("tipo de id_usuario_cierre:", typeof id_usuario_cierre);
-      console.log("===================================");
+     
 
       if (!id_usuario_cierre) {
         console.error(

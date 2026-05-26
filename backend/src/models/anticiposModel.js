@@ -16,7 +16,7 @@ module.exports = {
       a.observaciones
     FROM anticipos_trabajadores a
     JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
-    JOIN ordenes_fabricacion o ON a.id_orden_fabricacion = o.id_orden_fabricacion
+    LEFT JOIN ordenes_fabricacion o ON a.id_orden_fabricacion = o.id_orden_fabricacion
 
     LEFT JOIN pedidos p ON o.id_pedido = p.id_pedido
     LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
@@ -24,6 +24,56 @@ module.exports = {
   `);
 
     return rows;
+  },
+
+  getAllPaginated: async ({
+    page = 1,
+    pageSize = 20,
+    sortBy = "fecha",
+    sortDir = "desc",
+  } = {}) => {
+    const SORT_MAP = {
+      fecha: "a.fecha",
+      monto: "a.monto",
+      trabajador: "t.nombre",
+      estado: "a.estado",
+    };
+    const col = SORT_MAP[sortBy] || "a.fecha";
+    const dir = String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
+    const pg = Math.max(1, parseInt(page) || 1);
+    const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 20));
+    const offset = (pg - 1) * ps;
+
+    const [rows] = await db.query(
+      `SELECT 
+        a.id_anticipo,
+        a.id_trabajador,
+        t.nombre AS trabajador,
+        a.id_orden_fabricacion,
+        c.nombre AS cliente,
+        a.fecha,
+        a.monto,
+        a.monto_usado,
+        a.estado,
+        a.observaciones
+      FROM anticipos_trabajadores a
+      JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
+      LEFT JOIN ordenes_fabricacion o ON a.id_orden_fabricacion = o.id_orden_fabricacion
+      LEFT JOIN pedidos p ON o.id_pedido = p.id_pedido
+      LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+      ORDER BY ${col} ${dir}
+      LIMIT ? OFFSET ?`,
+      [ps, offset],
+    );
+
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) AS total
+       FROM anticipos_trabajadores a
+       JOIN trabajadores t ON a.id_trabajador = t.id_trabajador
+       LEFT JOIN ordenes_fabricacion o ON a.id_orden_fabricacion = o.id_orden_fabricacion`,
+    );
+
+    return { data: rows, total };
   },
 
   // Alias para compatibilidad

@@ -4,6 +4,7 @@ import cierresCajaService from "../services/cierresCajaService";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import Swal from "sweetalert2";
+import ConfirmarCierrePeriodoModal from "../components/ConfirmarCierrePeriodoModal";
 import {
   FiArrowLeft,
   FiCheck,
@@ -12,10 +13,12 @@ import {
   FiTruck,
   FiPercent,
 } from "react-icons/fi";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const CierresCajaCerrar = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const idempotencyKey = useIdempotencyKey();
   const [cierre, setCierre] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +28,8 @@ const CierresCajaCerrar = () => {
     fecha_fin: new Date().toISOString().split("T")[0],
     observaciones: "",
   });
+  const [mostrarModalConfirmar, setMostrarModalConfirmar] = useState(false);
+  const [datosConfirmacion, setDatosConfirmacion] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -235,79 +240,36 @@ const CierresCajaCerrar = () => {
         0,
       );
 
-      // Construir HTML con warnings (si los hay)
-      let warningsHtml = "";
-      if (validaciones.warnings && validaciones.warnings.length > 0) {
-        warningsHtml =
-          '<div class="bg-yellow-50 border border-yellow-300 rounded p-3 mb-4 text-left">';
-        warningsHtml +=
-          '<p class="font-semibold text-yellow-800 mb-2">⚠️ Advertencias:</p>';
-        warningsHtml += '<ul class="list-disc pl-5 text-sm text-yellow-700">';
-        validaciones.warnings.forEach((warning) => {
-          warningsHtml += `<li>${warning.mensaje}</li>`;
-        });
-        warningsHtml += "</ul></div>";
-      }
-
-      // Confirmar cierre con resumen y warnings
-      const result = await Swal.fire({
-        title: "¿Confirmar cierre de período?",
-        html: `
-          ${warningsHtml}
-          <div class="text-left">
-            <p class="mb-2"><strong>⚠️ Una vez cerrado no se podrán:</strong></p>
-            <ul class="list-disc list-inside text-sm text-gray-600 mb-4">
-              <li>Editar movimientos de este período</li>
-              <li>Agregar movimientos en estas fechas</li>
-              <li>Modificar los saldos iniciales</li>
-            </ul>
-            <div class="mt-4 p-4 bg-blue-50 rounded border border-blue-200">
-              <p class="text-sm font-semibold mb-2 text-blue-900">📊 Resumen del Período:</p>
-              <p class="text-sm"><strong>Período:</strong> ${formatFecha(cierre.fecha_inicio)} al ${formatFecha(formData.fecha_fin)}</p>
-              <div class="mt-3 space-y-1">
-                <p class="text-sm"><strong>Saldo Inicial:</strong> <span class="text-blue-600">${formatMonto(saldoInicial)}</span></p>
-                <p class="text-sm"><strong>Total Ingresos:</strong> <span class="text-green-600">+${formatMonto(totalIngresos)}</span></p>
-                <p class="text-sm"><strong>Total Egresos:</strong> <span class="text-red-600">-${formatMonto(totalEgresos)}</span></p>
-                <hr class="my-2">
-                <p class="text-sm font-bold"><strong>Saldo Final:</strong> <span class="text-lg">${formatMonto(saldoFinal)}</span></p>
-              </div>
-            </div>
-          </div>
-        `,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#10b981",
-        cancelButtonColor: "#6b7280",
-        confirmButtonText: "Sí, Cerrar Período",
-        cancelButtonText: "Cancelar",
-        width: "600px",
+      // Mostrar modal de confirmación
+      setDatosConfirmacion({
+        resumen: { saldoInicial, totalIngresos, totalEgresos, saldoFinal },
+        warnings: validaciones.warnings || [],
+        fechaInicio: formatFecha(cierre.fecha_inicio),
+        fechaFin: formatFecha(formData.fecha_fin),
       });
-
-      if (!result.isConfirmed) return;
+      setMostrarModalConfirmar(true);
     } catch (error) {
       console.error("Error validando período:", error);
       toast.error("Error al validar el período");
       return;
     }
+  };
 
+  const ejecutarCierre = async () => {
     try {
       setSubmitting(true);
-      const response = await cierresCajaService.cerrar(id, formData);
+      const response = await cierresCajaService.cerrar(
+        id,
+        formData,
+        idempotencyKey,
+      );
 
-      // Mostrar warnings si los hay en la respuesta
+      setMostrarModalConfirmar(false);
+
       if (response.warnings && response.warnings.length > 0) {
-        let warningsMessage =
-          "Período cerrado con las siguientes advertencias:\n\n";
-        response.warnings.forEach((w) => {
-          warningsMessage += `• ${w.mensaje}\n`;
-        });
-
-        await Swal.fire({
-          title: "Período Cerrado",
-          text: warningsMessage,
-          icon: "info",
-          confirmButtonText: "Entendido",
-          confirmButtonColor: "#3b82f6",
+        const msgs = response.warnings.map((w) => `• ${w.mensaje}`).join("\n");
+        toast.success(`Período cerrado con advertencias:\n${msgs}`, {
+          duration: 6000,
         });
       } else {
         toast.success("Período cerrado exitosamente");
@@ -324,8 +286,8 @@ const CierresCajaCerrar = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500 text-lg">Cargando...</div>
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Cargando...</p>
       </div>
     );
   }
@@ -335,136 +297,140 @@ const CierresCajaCerrar = () => {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6 select-none">
+      {/* Modal confirmar cierre */}
+      {mostrarModalConfirmar && datosConfirmacion && (
+        <ConfirmarCierrePeriodoModal
+          datos={datosConfirmacion}
+          onConfirmar={ejecutarCierre}
+          onCancelar={() => setMostrarModalConfirmar(false)}
+          submitting={submitting}
+        />
+      )}
+
       {/* Header */}
-      <div className="mb-6 flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="cursor-pointer text-3xl font-bold text-gray-800">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Cierre de
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
             Cerrar Período
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-xs text-slate-500 mt-0.5">
             Iniciado el {formatFecha(cierre.fecha_inicio)}
           </p>
         </div>
         <button
           onClick={() => navigate(`/cierres-caja/${id}`)}
-          className="cursor-pointer flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+          className="self-start flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
         >
-          <FiArrowLeft size={18} />
+          <FiArrowLeft size={14} />
           Volver
         </button>
       </div>
 
-      {/* Alerta */}
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-        <div className="flex items-start">
-          <FiAlertCircle
-            className="text-yellow-600 mt-0.5 mr-3 flex-shrink-0"
-            size={20}
-          />
-          <div>
-            <h3 className="text-yellow-800 font-semibold mb-1">Importante</h3>
-            <p className="text-yellow-700 text-sm">
-              Una vez cerrado el período, no podrás editar o agregar movimientos
-              en estas fechas. El sistema creará automáticamente el siguiente
-              período con los saldos finales como saldos iniciales.
-            </p>
-          </div>
+      {/* Alerta importante */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-start gap-3">
+        <FiAlertCircle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+        <div>
+          <p className="text-sm font-bold text-amber-800">Importante</p>
+          <p className="text-sm text-amber-700 mt-0.5">
+            Una vez cerrado el período, no podrás editar ni agregar movimientos
+            en estas fechas. El sistema creará automáticamente el siguiente
+            período con los saldos finales como saldos iniciales.
+          </p>
         </div>
       </div>
 
       {/* Warning horario tardío */}
       {new Date().getHours() >= 22 && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6">
-          <div className="flex items-start">
-            <FiAlertCircle
-              className="text-amber-600 mt-0.5 mr-3 flex-shrink-0"
-              size={20}
-            />
-            <div>
-              <h3 className="text-amber-800 font-semibold mb-1">
-                ⏰ Cierre en Horario Tardío
-              </h3>
-              <p className="text-amber-700 text-sm">
-                Son las{" "}
-                <strong>
-                  {new Date().toLocaleTimeString("es-CO", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </strong>
-                . Verifica cuidadosamente la <strong>fecha de fin</strong> que
-                deseas cerrar. Si el proceso cruza la medianoche, los
-                movimientos posteriores a las 00:00 pertenecerán al día
-                siguiente.
-              </p>
-            </div>
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-4 flex items-start gap-3">
+          <FiAlertCircle
+            className="text-orange-500 shrink-0 mt-0.5"
+            size={18}
+          />
+          <div>
+            <p className="text-sm font-bold text-orange-800">
+              Cierre en horario tardío
+            </p>
+            <p className="text-sm text-orange-700 mt-0.5">
+              Son las{" "}
+              <strong>
+                {new Date().toLocaleTimeString("es-CO", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </strong>
+              . Verifica cuidadosamente la <strong>fecha de fin</strong>. Los
+              movimientos después de las 00:00 pertenecerán al día siguiente.
+            </p>
           </div>
         </div>
       )}
 
       {/* Resumen de Saldos */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6 transform hover:scale-[1.01] transition-transform duration-200">
-        <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <FiCheck className="text-slate-600" />
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
             Resumen de Saldos
-          </h2>
+          </h3>
         </div>
-
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+          <table className="w-full text-left">
+            <thead className="bg-slate-100 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Método de Pago
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Método
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Saldo Inicial
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Ingresos
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Egresos
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Saldo Final
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {cierre.detalle_metodos.map((detalle, index) => (
+            <tbody className="divide-y divide-slate-100">
+              {cierre.detalle_metodos.map((detalle) => (
                 <tr
                   key={detalle.id_detalle}
-                  className={`hover:bg-blue-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
-                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="hover:bg-slate-50/70 transition-colors"
                 >
-                  <td className="px-6 py-4 font-semibold text-gray-900">
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">
                     {detalle.metodo_nombre}
                   </td>
-                  <td className="px-6 py-4 text-right text-gray-700 font-medium">
+                  <td className="px-4 py-3 text-sm text-slate-600 text-right">
                     {formatMonto(detalle.saldo_inicial)}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                       +{formatMonto(detalle.total_ingresos)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold">
                       -{formatMonto(detalle.total_egresos)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-gray-900 text-lg">
-                    {formatMonto(detalle.saldo_final)}
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-sm font-bold text-slate-900">
+                      {formatMonto(detalle.saldo_final)}
+                    </span>
                   </td>
                 </tr>
               ))}
-
-              <tr className="bg-gradient-to-r from-slate-100 to-slate-200 font-bold border-t-2 border-slate-300">
-                <td className="px-6 py-5 text-gray-900 text-lg">TOTAL</td>
-                <td className="px-6 py-5 text-right text-gray-900">
+              <tr className="bg-slate-100 border-t-2 border-slate-300">
+                <td className="px-4 py-3 text-sm font-bold text-slate-900">
+                  TOTAL
+                </td>
+                <td className="px-4 py-3 text-sm font-bold text-slate-700 text-right">
                   {formatMonto(
                     cierre.detalle_metodos.reduce(
                       (sum, d) => sum + d.saldo_inicial,
@@ -472,8 +438,8 @@ const CierresCajaCerrar = () => {
                     ),
                   )}
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-green-600 text-white font-bold">
+                <td className="px-4 py-3 text-right">
+                  <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold">
                     +
                     {formatMonto(
                       cierre.detalle_metodos.reduce(
@@ -483,8 +449,8 @@ const CierresCajaCerrar = () => {
                     )}
                   </span>
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-red-600 text-white font-bold">
+                <td className="px-4 py-3 text-right">
+                  <span className="inline-block px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold">
                     -
                     {formatMonto(
                       cierre.detalle_metodos.reduce(
@@ -494,13 +460,15 @@ const CierresCajaCerrar = () => {
                     )}
                   </span>
                 </td>
-                <td className="px-6 py-5 text-right text-gray-900 text-xl font-extrabold">
-                  {formatMonto(
-                    cierre.detalle_metodos.reduce(
-                      (sum, d) => sum + d.saldo_final,
-                      0,
-                    ),
-                  )}
+                <td className="px-4 py-3 text-right">
+                  <span className="text-base font-extrabold text-slate-900">
+                    {formatMonto(
+                      cierre.detalle_metodos.reduce(
+                        (sum, d) => sum + d.saldo_final,
+                        0,
+                      ),
+                    )}
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -509,114 +477,107 @@ const CierresCajaCerrar = () => {
       </div>
 
       {/* Resumen de Consumo de Materia Prima */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6 transform hover:scale-[1.01] transition-transform duration-200">
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FiBox className="text-white" />
-                Resumen de Consumo de Materia Prima
-              </h2>
-              {resumenConsumo?.periodo && (
-                <p className="text-emerald-100 text-xs mt-1">
-                  Semana:{" "}
-                  {new Date(
-                    resumenConsumo.periodo.fechaInicio + "T00:00:00",
-                  ).toLocaleDateString("es-CO")}{" "}
-                  -{" "}
-                  {new Date(
-                    resumenConsumo.periodo.fechaFin + "T00:00:00",
-                  ).toLocaleDateString("es-CO")}
-                </p>
-              )}
-            </div>
-            {resumenConsumo && (
-              <div className="text-right text-white">
-                <p className="text-2xl font-bold">
-                  {formatMonto(resumenConsumo.totales?.costo_total || 0)}
-                </p>
-                <p className="text-emerald-100 text-sm">
-                  {resumenConsumo.totales?.total_registros || 0} registros
-                </p>
-              </div>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900">
+              Consumo de Materia Prima
+            </h3>
+            {resumenConsumo?.periodo && (
+              <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-md">
+                Semana{" "}
+                {new Date(
+                  resumenConsumo.periodo.fechaInicio + "T00:00:00",
+                ).toLocaleDateString("es-CO")}{" "}
+                —{" "}
+                {new Date(
+                  resumenConsumo.periodo.fechaFin + "T00:00:00",
+                ).toLocaleDateString("es-CO")}
+              </span>
             )}
           </div>
+          {resumenConsumo && (
+            <div className="text-right">
+              <p className="text-base font-extrabold text-emerald-700">
+                {formatMonto(resumenConsumo.totales?.costo_total || 0)}
+              </p>
+              <p className="text-[10px] text-slate-400">
+                {resumenConsumo.totales?.total_registros || 0} registros
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="p-6">
           {loadingConsumo ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              <div className="animate-spin rounded-full h-7 w-7 border-2 border-emerald-500 border-t-transparent"></div>
             </div>
           ) : !resumenConsumo || resumenConsumo.totales?.costo_total === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <FiBox className="mx-auto text-4xl mb-2" />
-              <p>No hay consumos registrados en este período</p>
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <FiBox size={32} className="mb-2 opacity-40" />
+              <p className="text-sm">
+                No hay consumos registrados en este período
+              </p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="flex flex-col gap-5">
               {/* Consumos por Etapa */}
               {resumenConsumo.consumosPorEtapa &&
                 resumenConsumo.consumosPorEtapa.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <FiBox className="text-emerald-500" />
-                      Consumo por Etapa de Producción
-                    </h3>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      Por etapa de producción
+                    </p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {resumenConsumo.consumosPorEtapa.map((etapa, idx) => {
                         const etapaColorsMap = {
                           Mecanizado: {
-                            gradient: "from-blue-500 to-blue-600",
                             bg: "bg-blue-50",
                             border: "border-blue-200",
-                            text: "text-blue-600",
-                            dot: "bg-blue-500",
+                            text: "text-blue-700",
+                            badge: "bg-blue-100 border-blue-200 text-blue-700",
                           },
                           Pintura: {
-                            gradient: "from-pink-500 to-pink-600",
                             bg: "bg-pink-50",
                             border: "border-pink-200",
-                            text: "text-pink-600",
-                            dot: "bg-pink-500",
+                            text: "text-pink-700",
+                            badge: "bg-pink-100 border-pink-200 text-pink-700",
                           },
                           Tapizado: {
-                            gradient: "from-green-500 to-green-600",
-                            bg: "bg-green-50",
-                            border: "border-green-200",
-                            text: "text-green-600",
-                            dot: "bg-green-500",
+                            bg: "bg-emerald-50",
+                            border: "border-emerald-200",
+                            text: "text-emerald-700",
+                            badge:
+                              "bg-emerald-100 border-emerald-200 text-emerald-700",
                           },
                           Pulido: {
-                            gradient: "from-amber-500 to-amber-600",
                             bg: "bg-amber-50",
                             border: "border-amber-200",
-                            text: "text-amber-600",
-                            dot: "bg-amber-500",
+                            text: "text-amber-700",
+                            badge:
+                              "bg-amber-100 border-amber-200 text-amber-700",
                           },
                           Ensamble: {
-                            gradient: "from-purple-500 to-purple-600",
                             bg: "bg-purple-50",
                             border: "border-purple-200",
-                            text: "text-purple-600",
-                            dot: "bg-purple-500",
+                            text: "text-purple-700",
+                            badge:
+                              "bg-purple-100 border-purple-200 text-purple-700",
                           },
                         };
                         const colors = etapaColorsMap[etapa.nombre_etapa] || {
-                          gradient: "from-slate-500 to-slate-600",
                           bg: "bg-slate-50",
                           border: "border-slate-200",
-                          text: "text-slate-600",
-                          dot: "bg-slate-500",
+                          text: "text-slate-700",
+                          badge: "bg-slate-100 border-slate-200 text-slate-700",
                         };
-                        // Formatear unidades por tipo
                         const formatUnidades = (unidadesPorTipo) => {
                           if (
                             !unidadesPorTipo ||
                             Object.keys(unidadesPorTipo).length === 0
-                          ) {
+                          )
                             return "0 uds";
-                          }
                           return Object.entries(unidadesPorTipo)
                             .map(
                               ([unidad, cantidad]) =>
@@ -627,39 +588,24 @@ const CierresCajaCerrar = () => {
                         return (
                           <div
                             key={idx}
-                            className={`rounded-xl border ${colors.border} ${colors.bg} overflow-hidden shadow-sm`}
+                            className={`rounded-xl border ${colors.border} ${colors.bg} p-3 shadow-sm`}
                           >
-                            <div
-                              className={`bg-gradient-to-r ${colors.gradient} px-3 py-2`}
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <FiBox size={13} className={colors.text} />
+                              <span
+                                className={`text-xs font-bold ${colors.text}`}
+                              >
+                                {etapa.nombre_etapa || "Sin etapa"}
+                              </span>
+                            </div>
+                            <p
+                              className={`text-sm font-extrabold ${colors.text}`}
                             >
-                              <div className="flex items-center justify-between text-white">
-                                <div className="flex items-center gap-1.5">
-                                  <FiBox className="text-sm" />
-                                  <span className="font-semibold text-sm">
-                                    {etapa.nombre_etapa || "Sin etapa"}
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-bold text-sm">
-                                    {formatMonto(etapa.costo_total)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-2">
-                              <div className="p-2 rounded-lg bg-white/60 border border-slate-200/50">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-500">
-                                    Consumido:
-                                  </span>
-                                  <span
-                                    className={`font-bold text-xs ${colors.text}`}
-                                  >
-                                    {formatUnidades(etapa.unidades_por_tipo)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
+                              {formatMonto(etapa.costo_total)}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {formatUnidades(etapa.unidades_por_tipo)}
+                            </p>
                           </div>
                         );
                       })}
@@ -671,43 +617,40 @@ const CierresCajaCerrar = () => {
               {resumenConsumo.ordenesProrrateo &&
                 resumenConsumo.ordenesProrrateo.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <FiTruck className="text-indigo-500" />
-                      Distribución por Orden de Fabricación
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                      Distribución por orden de fabricación
+                    </p>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-100 border-b border-slate-200">
                           <tr>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">
+                            <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                               Orden
                             </th>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">
+                            <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                               Cliente
                             </th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">
+                            <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-center">
                               %
                             </th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">
-                              Consumo Aprox.
+                            <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-center">
+                              Consumo
                             </th>
-                            <th className="px-4 py-2 text-right font-semibold text-gray-700">
-                              Costo Estimado
+                            <th className="px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
+                              Costo Est.
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-slate-100">
                           {resumenConsumo.ordenesProrrateo
                             .slice(0, 10)
                             .map((orden, idx) => {
-                              // Formatear unidades por tipo
                               const formatUnidadesOrden = (unidadesPorTipo) => {
                                 if (
                                   !unidadesPorTipo ||
                                   Object.keys(unidadesPorTipo).length === 0
-                                ) {
-                                  return "-";
-                                }
+                                )
+                                  return "—";
                                 return Object.entries(unidadesPorTipo)
                                   .map(
                                     ([unidad, cantidad]) =>
@@ -716,23 +659,28 @@ const CierresCajaCerrar = () => {
                                   .join(", ");
                               };
                               return (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  <td className="px-4 py-2 font-semibold text-indigo-600">
-                                    OF #{orden.id_orden_fabricacion}
+                                <tr
+                                  key={idx}
+                                  className="hover:bg-slate-50/70 transition-colors"
+                                >
+                                  <td className="px-4 py-2.5">
+                                    <span className="inline-block px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold rounded-md">
+                                      OF #{orden.id_orden_fabricacion}
+                                    </span>
                                   </td>
-                                  <td className="px-4 py-2 text-gray-600 truncate max-w-[150px]">
+                                  <td className="px-4 py-2.5 text-sm text-slate-600 truncate max-w-[150px]">
                                     {orden.nombre_cliente || "Sin cliente"}
                                   </td>
-                                  <td className="px-4 py-2 text-center">
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
-                                      <FiPercent size={10} />
+                                  <td className="px-4 py-2.5 text-center">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-[11px] font-bold">
+                                      <FiPercent size={9} />
                                       {(orden.porcentaje || 0).toFixed(1)}%
                                     </span>
                                   </td>
-                                  <td className="px-4 py-2 text-center text-gray-600 text-xs">
+                                  <td className="px-4 py-2.5 text-center text-xs text-slate-500">
                                     {formatUnidadesOrden(orden.unidadesPorTipo)}
                                   </td>
-                                  <td className="px-4 py-2 text-right font-bold text-emerald-700">
+                                  <td className="px-4 py-2.5 text-right text-sm font-bold text-emerald-700">
                                     {formatMonto(orden.totalCostoEstimado)}
                                   </td>
                                 </tr>
@@ -741,10 +689,10 @@ const CierresCajaCerrar = () => {
                         </tbody>
                         {resumenConsumo.ordenesProrrateo.length > 10 && (
                           <tfoot>
-                            <tr className="bg-gray-50">
+                            <tr className="bg-slate-50">
                               <td
                                 colSpan={5}
-                                className="px-4 py-2 text-center text-gray-500 text-xs"
+                                className="px-4 py-2 text-center text-[11px] text-slate-400"
                               >
                                 +{resumenConsumo.ordenesProrrateo.length - 10}{" "}
                                 órdenes más...
@@ -761,29 +709,28 @@ const CierresCajaCerrar = () => {
         </div>
       </div>
 
-      {/* Formulario de Cierre */}
+      {/* Formulario de cierre */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-lg p-8 transform hover:scale-[1.01] transition-transform duration-200"
+        className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col gap-5"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-green-100 p-3 rounded-lg">
-            <FiCheck className="text-green-600" size={24} />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+            <FiCheck size={16} className="text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
+            <p className="text-sm font-bold text-slate-900">
               Información de Cierre
-            </h2>
-            <p className="text-gray-600 text-sm">
+            </p>
+            <p className="text-xs text-slate-500">
               Completa los datos para cerrar el período
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <FiAlertCircle className="text-blue-500" size={16} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
               Fecha de Inicio
             </label>
             <input
@@ -792,14 +739,12 @@ const CierresCajaCerrar = () => {
                 cierre.fecha_inicio ? cierre.fecha_inicio.split("T")[0] : ""
               }
               disabled
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed font-medium"
+              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed"
             />
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <FiAlertCircle className="text-green-500" size={16} />
-              Fecha de Fin <span className="text-red-500">*</span>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+              Fecha de Fin <span className="text-rose-500">*</span>
             </label>
             <input
               type="date"
@@ -809,17 +754,16 @@ const CierresCajaCerrar = () => {
               }
               min={cierre.fecha_inicio ? cierre.fecha_inicio.split("T")[0] : ""}
               required
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all font-medium"
+              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
             />
-            <p className="text-xs text-gray-500 flex items-center gap-1">
-              <FiAlertCircle size={12} />
-              Selecciona la última fecha que deseas incluir en este período
+            <p className="text-[11px] text-slate-400">
+              Última fecha a incluir en este período
             </p>
           </div>
         </div>
 
-        <div className="mb-6 space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
             Observaciones
           </label>
           <textarea
@@ -828,33 +772,33 @@ const CierresCajaCerrar = () => {
               setFormData({ ...formData, observaciones: e.target.value })
             }
             placeholder="Notas adicionales sobre el cierre (opcional)"
-            rows={4}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none transition-all"
+            rows={3}
+            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none transition-all"
           />
         </div>
 
-        <div className="flex justify-end gap-4 pt-4 border-t">
+        <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
           <button
             type="button"
             onClick={() => navigate(`/cierres-caja/${id}`)}
-            className="cursor-pointer px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
+            className="cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
           >
-            <FiArrowLeft size={18} />
+            <FiArrowLeft size={14} />
             Cancelar
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 py-3 rounded-lg font-bold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed min-w-[180px]"
+            className="cursor-pointer flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[160px]"
           >
             {submitting ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                 Cerrando...
               </>
             ) : (
               <>
-                <FiCheck size={20} />
+                <FiCheck size={15} />
                 Cerrar Período
               </>
             )}

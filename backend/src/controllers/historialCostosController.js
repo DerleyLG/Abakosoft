@@ -31,7 +31,7 @@ const historialCostosController = {
 
   create: async (req, res) => {
     try {
-        console.log('Body recibido:', req.body);
+       
       const {id_articulo, id_etapa, costo_unitario, fecha_inicio} = req.body;
 
         // Validación básica de campos obligatorios

@@ -14,7 +14,7 @@ const getDashboardData = async (req, res) => {
       descuentosSemana,
       produccionMensual,
       articulosBajoStock,
-      ordenesEnProceso,
+      ordenesEnProcesoData,
       ingresosMesAnterior,
       egresosMesAnterior,
       pagosTrabajadoresSemanaAnterior,
@@ -51,22 +51,22 @@ const getDashboardData = async (req, res) => {
       ingresosMesAnterior > 0
         ? ((ingresosMes - ingresosMesAnterior) / ingresosMesAnterior) * 100
         : ingresosMes > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
     const tendenciaEgresos =
       egresosMesAnterior > 0
         ? ((egresosMes - egresosMesAnterior) / egresosMesAnterior) * 100
         : egresosMes > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
     const tendenciaPagosSem =
       pagosTrabajadoresSemanaAnterior > 0
         ? ((pagosTrabajadoresSemana - pagosTrabajadoresSemanaAnterior) /
             pagosTrabajadoresSemanaAnterior) *
           100
         : pagosTrabajadoresSemana > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Enviamos los datos en una única respuesta JSON
     res.json({
@@ -87,7 +87,8 @@ const getDashboardData = async (req, res) => {
       margenUtilidad: parseFloat(margenUtilidad.toFixed(2)),
       produccionMensual,
       articulosBajoStock,
-      ordenesEnProceso,
+      totalOrdenesEnProceso: Number(ordenesEnProcesoData?.total || 0),
+      ordenesEnProceso: ordenesEnProcesoData?.items || [],
       topVendidosMes,
       topFabricadosMes,
     });

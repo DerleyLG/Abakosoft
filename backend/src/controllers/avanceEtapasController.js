@@ -666,4 +666,45 @@ module.exports = {
       return res.status(500).json({ error: "Error actualizando responsable" });
     }
   },
+
+  updateCantidad: async (req, res) => {
+    const { id } = req.params;
+    const { cantidad } = req.body;
+
+    try {
+      if (!id || isNaN(Number(id))) {
+        return res.status(400).json({ error: "ID de avance inválido" });
+      }
+      const avance = await AvanceModel.getById(id);
+      if (!avance) {
+        return res.status(404).json({ error: "Avance no encontrado" });
+      }
+      const cantidadNum = Number(cantidad);
+      if (!Number.isFinite(cantidadNum) || cantidadNum <= 0) {
+        return res
+          .status(400)
+          .json({ error: "La cantidad debe ser un número mayor a 0" });
+      }
+
+      // Verificar si la orden tiene pagos vinculados
+      const tienePagos = await AvanceModel.tienePagosVinculadosAOrden(
+        avance.id_orden_fabricacion,
+      );
+      if (tienePagos) {
+        return res.status(409).json({
+          error:
+            "No se puede modificar la cantidad: la orden tiene pagos vinculados.",
+        });
+      }
+
+      await db.execute(
+        "UPDATE avance_etapas_produccion SET cantidad = ? WHERE id_avance_etapa = ?",
+        [cantidadNum, id],
+      );
+      return res.json({ message: "Cantidad actualizada correctamente" });
+    } catch (error) {
+      console.error("Error actualizando cantidad del avance:", error);
+      return res.status(500).json({ error: "Error al actualizar la cantidad" });
+    }
+  },
 };

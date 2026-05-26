@@ -292,7 +292,7 @@ module.exports = {
       if (!pedido) {
         return res.status(404).json({ error: "Pedido no encontrado." });
       }
-      console.log("Estado pedido:", pedido.estado);
+      
 
       if (pedido.estado.toLowerCase().trim() !== "pendiente") {
         return res

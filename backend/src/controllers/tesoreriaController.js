@@ -39,9 +39,8 @@ const tesoreriaController = {
   getMovimientosTesoreria: async (req, res) => {
     try {
       const { tipo_documento } = req.query;
-      const movimientos = await TesoreriaModel.getMovimientosTesoreria(
-        tipo_documento
-      );
+      const movimientos =
+        await TesoreriaModel.getMovimientosTesoreria(tipo_documento);
       res.json(movimientos);
     } catch (error) {
       console.error("Error al obtener movimientos de tesorería:", error);
@@ -79,7 +78,7 @@ const tesoreriaController = {
     } catch (error) {
       console.error(
         "Error al obtener el conteo de pagos a trabajadores:",
-        error
+        error,
       );
       res
         .status(500)
@@ -134,6 +133,22 @@ const tesoreriaController = {
         .json({ error: "Error al obtener el conteo de anticipos" });
     }
   },
+
+  getResumenTarjetas: async (req, res) => {
+    try {
+      const resumen = await TesoreriaModel.getResumenTarjetasDesdeCierre();
+      res.json(resumen);
+    } catch (error) {
+      console.error(
+        "Error al obtener resumen de tarjetas de tesorería:",
+        error,
+      );
+      res.status(500).json({
+        error: "Error interno del servidor al obtener el resumen de tarjetas.",
+      });
+    }
+  },
+
   getMovimientoByDocumento: async (req, res) => {
     try {
       const idDocumento = req.params.idDocumento;
@@ -147,9 +162,9 @@ const tesoreriaController = {
 
       const movimiento = await TesoreriaModel.getByDocumentoIdAndTipo(
         idDocumento,
-        tipoDocumento
+        tipoDocumento,
       );
-      console.log("Movimiento recuperado del modelo:", movimiento);
+
       if (!movimiento) {
         return res.status(200).json(null);
       }
@@ -158,7 +173,7 @@ const tesoreriaController = {
     } catch (error) {
       console.error(
         "Error al obtener movimiento de tesorería por documento:",
-        error
+        error,
       );
       res.status(500).json({
         error: "Error interno del servidor al obtener movimiento de tesorería.",
@@ -239,10 +254,10 @@ const tesoreriaController = {
       // Obtener nombres de métodos para observaciones
       const metodos = await metodosModel.getMetodosPago();
       const metodoOrigen = metodos.find(
-        (m) => m.id_metodo_pago === parseInt(id_metodo_origen)
+        (m) => m.id_metodo_pago === parseInt(id_metodo_origen),
       );
       const metodoDestino = metodos.find(
-        (m) => m.id_metodo_pago === parseInt(id_metodo_destino)
+        (m) => m.id_metodo_pago === parseInt(id_metodo_destino),
       );
 
       const observacionFinal =
@@ -280,7 +295,7 @@ const tesoreriaController = {
           observaciones: observacionFinal,
           fecha_movimiento: new Date(),
         },
-        connection
+        connection,
       );
 
       // Registrar entrada al método destino (positivo)
@@ -294,7 +309,7 @@ const tesoreriaController = {
           observaciones: observacionFinal,
           fecha_movimiento: new Date(),
         },
-        connection
+        connection,
       );
 
       await connection.commit();

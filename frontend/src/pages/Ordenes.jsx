@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
 
 const OrdenesDashboard = () => {
   const [resumen, setResumen] = useState({
@@ -16,11 +17,8 @@ const OrdenesDashboard = () => {
     const fetchResumen = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3300/api/ordenes/resumen');
-        
-        if (!response.ok) throw new Error('Error al obtener datos');
-
-        const data = await response.json();
+        const response = await api.get("/ordenes/resumen");
+        const data = response.data;
 
         // Convierte los valores a números por si vienen como string
         setResumen({
@@ -40,7 +38,7 @@ const OrdenesDashboard = () => {
         setError(null);
       } catch (err) {
         console.error(err);
-        setError('No se pudo cargar el resumen de órdenes');
+        setError("No se pudo cargar el resumen de órdenes");
       } finally {
         setLoading(false);
       }
@@ -66,19 +64,27 @@ const OrdenesDashboard = () => {
   }
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-      <h1 className="text-4xl font-bold text-gray-800 mb-10 ">Gestión de ordenes</h1>
+      <h1 className="text-4xl font-bold text-gray-800 mb-10 ">
+        Gestión de ordenes
+      </h1>
 
       <div className="grid gap-8 md:grid-cols-3">
-
         {/* Órdenes de Compra */}
         <section className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-800">Órdenes de Compra</h2>
-            <p className="mb-1 text-gray-700">Total: <span className="font-bold">{resumen.compra.total}</span></p>
-            <p className="mb-1 text-gray-700">Pendientes: <span className="font-bold">{resumen.compra.pendientes}</span></p>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-800">
+              Órdenes de Compra
+            </h2>
+            <p className="mb-1 text-gray-700">
+              Total: <span className="font-bold">{resumen.compra.total}</span>
+            </p>
+            <p className="mb-1 text-gray-700">
+              Pendientes:{" "}
+              <span className="font-bold">{resumen.compra.pendientes}</span>
+            </p>
           </div>
           <button
-            onClick={() => navigate('/ordenes_compra')}
+            onClick={() => navigate("/ordenes_compra")}
             className="mt-auto bg-slate-800 hover:bg-slate-600 text-white py-3 rounded-md font-semibold transition cursor-pointer"
           >
             Ver órdenes de compra
@@ -88,12 +94,23 @@ const OrdenesDashboard = () => {
         {/* Órdenes de Fabricación */}
         <section className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-800">Órdenes de Fabricación</h2>
-            <p className="mb-1 text-gray-700">Total: <span className="font-bold">{resumen.fabricacion.total}</span></p>
-            <p className="mb-1 text-gray-700">Pendientes:<span className="font-bold"> {resumen.fabricacion.pendientes}</span></p>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-800">
+              Órdenes de Fabricación
+            </h2>
+            <p className="mb-1 text-gray-700">
+              Total:{" "}
+              <span className="font-bold">{resumen.fabricacion.total}</span>
+            </p>
+            <p className="mb-1 text-gray-700">
+              Pendientes:
+              <span className="font-bold">
+                {" "}
+                {resumen.fabricacion.pendientes}
+              </span>
+            </p>
           </div>
           <button
-            onClick={() => navigate('/ordenes_fabricacion')}
+            onClick={() => navigate("/ordenes_fabricacion")}
             className="mt-auto bg-slate-800 hover:bg-slate-600 text-white py-3 rounded-md font-semibold transition cursor-pointer"
           >
             Ver órdenes de fabricación
@@ -103,18 +120,24 @@ const OrdenesDashboard = () => {
         {/* Órdenes de Venta */}
         <section className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-800">Órdenes de Venta</h2>
-            <p className="mb-1 text-gray-700">Total: <span className="font-bold">{resumen.venta.total}</span></p>
-            <p className="mb-1 text-gray-700">Pendientes: <span className="font-bold">{resumen.venta.pendientes}</span></p>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-800">
+              Órdenes de Venta
+            </h2>
+            <p className="mb-1 text-gray-700">
+              Total: <span className="font-bold">{resumen.venta.total}</span>
+            </p>
+            <p className="mb-1 text-gray-700">
+              Pendientes:{" "}
+              <span className="font-bold">{resumen.venta.pendientes}</span>
+            </p>
           </div>
           <button
-            onClick={() => navigate('/ordenes_venta')}
+            onClick={() => navigate("/ordenes_venta")}
             className="mt-auto bg-slate-800 hover:bg-slate-600 text-white py-3 rounded-md font-semibold transition cursor-pointer"
           >
             Ver órdenes de venta
           </button>
         </section>
-
       </div>
     </div>
   );

@@ -322,28 +322,14 @@ const consumoMateriaPrimaModel = {
       (c) => !c.id_orden_fabricacion,
     );
 
-    // DEBUG: Mostrar ids de artículos de consumos generales
-    console.log(
-      "[DEBUG] Artículos de consumos generales:",
-      consumosGenerales.map((c) => c.id_articulo),
-    );
+   
 
     // 4. Obtener avances por orden, artículo y etapa en el periodo
     const idsOrdenes = ordenes.map((o) => o.id_orden_fabricacion);
     const avanceEtapasModel = require("./avanceEtapasModel");
     const avances = await avanceEtapasModel.getByOrdenes(idsOrdenes);
 
-    // DEBUG: Mostrar ids de artículos y etapas de avances
-    console.log(
-      "[DEBUG] Avances encontrados:",
-      avances.map((a) => ({
-        id_articulo: a.id_articulo,
-        id_etapa: a.id_etapa_produccion,
-        nombre_etapa: a.nombre_etapa,
-        cantidad: a.cantidad,
-      })),
-    );
-
+   
     // Agrupar avances por artículo y etapa
     const avancesPorArticuloEtapa = {};
     let totalGlobalPorArticuloEtapa = {};

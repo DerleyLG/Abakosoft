@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import Layout from "./pages/Layout";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import NoPermisoPlan from "./pages/NoPermisoPlan";
 import Articulos from "./pages/Articulos";
 import Categorias from "./pages/Categorias";
 import Dashboard from "./pages/Dashboard";
@@ -71,44 +72,199 @@ import ProgresoFabricacion from "./pages/ProgresoFabricacion";
 import MovimientosArticuloPage from "./pages/MovimientosArticuloPage";
 import SeguimientoInventarioPage from "./pages/SeguimientoInventarioPage";
 import HistorialConsumoMP from "./pages/HistorialConsumoMP";
+import GestionRoles from "./pages/GestionRoles";
+import Configuracion from "./pages/Configuracion";
+import PlanGuard from "./components/PlanGuard";
+import SaasLogin from "./pages/saas/SaasLogin";
+import SaasSetup from "./pages/saas/SaasSetup";
+import SaasDashboard from "./pages/saas/SaasDashboard";
+import SaasCrearEmpresa from "./pages/saas/SaasCrearEmpresa";
+import CambiarPasswordAdmin from "./pages/saas/CambiarPasswordAdmin";
+import { SaasAuthProvider, useSaasAuth } from "./context/SaasAuthContext";
+import LandingPage from "./pages/LandingPage";
+import Planes from "./pages/Planes";
+import SuscripcionSuspendida from "./pages/SuscripcionSuspendida";
+
+const ProtectedSaasRoute = ({ children }) => {
+  const { admin, loading } = useSaasAuth();
+  if (loading) return <div>Cargando...</div>;
+  if (!admin) return <Navigate to="/saas/login" replace />;
+  return children;
+};
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, subscriptionBlocked } = useAuth();
   if (loading) {
     return <div>Cargando...</div>;
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+  if (subscriptionBlocked) {
+    return <SuscripcionSuspendida es_prueba={subscriptionBlocked.es_prueba} />;
+  }
   return children;
 };
 
 const AppLogic = () => {
+  const navigate = useNavigate();
+
+  // Redirigir via React Router cuando el backend bloquea por plan
+  useEffect(() => {
+    const handler = () => navigate("/no-permiso-plan");
+    window.addEventListener("plan-restricted", handler);
+    return () => window.removeEventListener("plan-restricted", handler);
+  }, [navigate]);
+
   return (
     <Routes>
+      <Route path="/no-permiso-plan" element={<NoPermisoPlan />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/planes" element={<Planes />} />
       <Route path="/login" element={<Login />} />
+
+      <Route path="/saas/login" element={<SaasLogin />} />
+      <Route path="/saas/setup" element={<SaasSetup />} />
       <Route
-        path="/"
+        path="/saas/cambiar-password"
+        element={
+          <ProtectedSaasRoute>
+            <CambiarPasswordAdmin />
+          </ProtectedSaasRoute>
+        }
+      />
+      <Route
+        path="/saas/empresas"
+        element={
+          <ProtectedSaasRoute>
+            <SaasDashboard />
+          </ProtectedSaasRoute>
+        }
+      />
+      <Route
+        path="/saas/empresas/nueva"
+        element={
+          <ProtectedSaasRoute>
+            <SaasCrearEmpresa />
+          </ProtectedSaasRoute>
+        }
+      />
+      <Route path="/saas" element={<Navigate to="/saas/login" replace />} />
+      {/* ─────────────────────────────────────────────── */}
+      <Route
         element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
-        <Route path="articulos" element={<Articulos />} />
-        <Route path="articulos/nuevo" element={<ArticuloForm />} />
-        <Route path="articulos/editar/:id" element={<EditarArticulo />} />
-        <Route path="categorias" element={<Categorias />} />
-        <Route path="categorias/nuevo" element={<CategoriasForm />} />
-        <Route path="categorias/editar/:id" element={<EditarCategoria />} />
-        <Route path="proveedores" element={<Proveedores />} />
-        <Route path="proveedores/nuevo" element={<ProveedoresForm />} />
-        <Route path="proveedores/editar/:id" element={<EditarProveedor />} />
-        <Route path="clientes" element={<Clientes />} />
-        <Route path="clientes/nuevo" element={<ClientesForm />} />
-        <Route path="clientes/editar/:id" element={<EditarCliente />} />
+
+        {/* Artículos */}
+        <Route
+          path="articulos"
+          element={
+            <RequirePermission action={ACTIONS.ARTICLES_VIEW}>
+              <Articulos />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="articulos/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.ARTICLES_CREATE}>
+              <ArticuloForm />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="articulos/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.ARTICLES_EDIT}>
+              <EditarArticulo />
+            </RequirePermission>
+          }
+        />
+
+        {/* Categorías */}
+        <Route
+          path="categorias"
+          element={
+            <RequirePermission action={ACTIONS.CATEGORIES_VIEW}>
+              <Categorias />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="categorias/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.CATEGORIES_CREATE}>
+              <CategoriasForm />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="categorias/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.CATEGORIES_EDIT}>
+              <EditarCategoria />
+            </RequirePermission>
+          }
+        />
+
+        {/* Proveedores */}
+        <Route
+          path="proveedores"
+          element={
+            <RequirePermission action={ACTIONS.SUPPLIERS_VIEW}>
+              <Proveedores />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="proveedores/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.SUPPLIERS_CREATE}>
+              <ProveedoresForm />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="proveedores/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.SUPPLIERS_EDIT}>
+              <EditarProveedor />
+            </RequirePermission>
+          }
+        />
+
+        {/* Clientes */}
+        <Route
+          path="clientes"
+          element={
+            <RequirePermission action={ACTIONS.CLIENTS_VIEW}>
+              <Clientes />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="clientes/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.CLIENTS_CREATE}>
+              <ClientesForm />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="clientes/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.CLIENTS_EDIT}>
+              <EditarCliente />
+            </RequirePermission>
+          }
+        />
+
+        {/* Trabajadores */}
         <Route
           path="trabajadores"
           element={
@@ -120,7 +276,7 @@ const AppLogic = () => {
         <Route
           path="trabajadores/nuevo"
           element={
-            <RequirePermission action={ACTIONS.WORKERS_VIEW}>
+            <RequirePermission action={ACTIONS.WORKERS_CREATE}>
               <TrabajadoresForm />
             </RequirePermission>
           }
@@ -128,191 +284,95 @@ const AppLogic = () => {
         <Route
           path="trabajadores/editar/:id"
           element={
-            <RequirePermission action={ACTIONS.WORKERS_VIEW}>
+            <RequirePermission action={ACTIONS.WORKERS_EDIT}>
               <EditarTrabajador />
             </RequirePermission>
           }
         />
+
+        {/* Pagos */}
         <Route
           path="trabajadores/pagos"
           element={
-            <RequirePermission action={ACTIONS.PAYMENTS_VIEW}>
-              <PagosTrabajadores />
+            <RequirePermission
+              action={[ACTIONS.PAYMENTS_VIEW, ACTIONS.PAYMENTS_CREATE]}
+            >
+              <PlanGuard feature="pagos">
+                <PagosTrabajadores />
+              </PlanGuard>
             </RequirePermission>
           }
         />
         <Route
           path="pagos/nuevo"
           element={
-            <RequirePermission action={ACTIONS.PAYMENTS_VIEW}>
-              <PagosForm />
+            <RequirePermission action={ACTIONS.PAYMENTS_CREATE}>
+              <PlanGuard feature="pagos">
+                <PagosForm />
+              </PlanGuard>
             </RequirePermission>
           }
         />
-        <Route path="inventario" element={<Inventario />} />
-        <Route path="inventario/nuevo" element={<InventarioForm />} />
+
+        {/* Inventario */}
+        <Route
+          path="inventario"
+          element={
+            <RequirePermission action={ACTIONS.INVENTORY_VIEW}>
+              <Inventario />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="inventario/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.INVENTORY_CREATE}>
+              <InventarioForm />
+            </RequirePermission>
+          }
+        />
         <Route
           path="inventario/seguimiento"
-          element={<SeguimientoInventarioPage />}
+          element={
+            <RequirePermission action={ACTIONS.INVENTORY_TRACKING}>
+              <SeguimientoInventarioPage />
+            </RequirePermission>
+          }
         />
         <Route
           path="inventario/movimientos/:id"
-          element={<MovimientosArticuloPage />}
+          element={
+            <RequirePermission action={ACTIONS.MOVEMENTS_VIEW}>
+              <MovimientosArticuloPage />
+            </RequirePermission>
+          }
         />
-        <Route path="inventario/consumo-mp" element={<HistorialConsumoMP />} />
+        <Route
+          path="inventario/consumo-mp"
+          element={
+            <RequirePermission action={ACTIONS.INVENTORY_CONSUME}>
+              <PlanGuard feature="costos_materia_prima">
+                <HistorialConsumoMP />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+
+        {/* Órdenes */}
         <Route path="ordenes" element={<Ordenes />} />
-        <Route path="ordenes_compra" element={<OrdenesCompra />} />
+        <Route
+          path="ordenes_compra"
+          element={
+            <RequirePermission action={ACTIONS.PURCHASES_VIEW}>
+              <OrdenesCompra />
+            </RequirePermission>
+          }
+        />
         <Route
           path="ordenes_compra/nuevo"
           element={
             <RequirePermission action={ACTIONS.PURCHASES_CREATE}>
               <OrdenesCompraForm />
-            </RequirePermission>
-          }
-        />
-        <Route path="ordenes_fabricacion" element={<OrdenesFabricacion />} />
-        <Route
-          path="ordenes_fabricacion/nuevo"
-          element={
-            <RequirePermission action={ACTIONS.FABRICATION_CREATE}>
-              <OrdenFabricacionForm />
-            </RequirePermission>
-          }
-        />
-        <Route path="kanban" element={<KanbanBoard />} />
-        <Route path="ordenes_venta" element={<OrdenesVenta />} />
-        <Route
-          path="ordenes_venta/nuevo"
-          element={
-            <RequirePermission action={ACTIONS.SALES_CREATE}>
-              <OrdenVentaForm />
-            </RequirePermission>
-          }
-        />
-        <Route path="ordenes_pedido" element={<OrdenesPedido />} />
-        <Route
-          path="ordenes_pedido/nuevo"
-          element={
-            <RequirePermission action={ACTIONS.SALES_CREATE}>
-              <OrdenPedidoForm />
-            </RequirePermission>
-          }
-        />
-        <Route path="etapas_produccion" element={<CrearEtapa />} />
-        <Route path="lotes_fabricados" element={<ListaLotesFabricacion />} />
-        <Route
-          path="avances_fabricacion"
-          element={
-            <RequirePermission action={ACTIONS.PAYMENTS_VIEW}>
-              <ListaAvances />
-            </RequirePermission>
-          }
-        />
-        <Route path="costos_indirectos" element={<CostosIndirectos />} />
-        <Route
-          path="costos_indirectos/nuevo"
-          element={<CostosIndirectosNuevo />}
-        />
-        <Route
-          path="reportes"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <VistaReportes />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/inventario"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteInventario />
-            </RequirePermission>
-          }
-        />
-        <Route path="pagos_anticipados" element={<ListaAnticipos />} />
-        <Route path="costos_materia_prima" element={<CostosMateriaPrima />} />
-        <Route
-          path="reportes/avances_fabricacion"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteAvanceFabricacion />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/ventas_por_periodo"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteVentasPorPeriodo />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/ordenes_compra"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteOrdenesCompra />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/pagos_trabajadores"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReportePagosTrabajadores />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/pagos_trabajadores_dia"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReportePagoTrabajadorPorDia />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/costos_fabricacion"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteCostosProduccion />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/utilidad_por_orden"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteUtilidadPorOrden />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/movimientos_inventario"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteMovimientosInventario />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="reportes/tesoreria_ventas"
-          element={
-            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
-              <ReporteTesoreriaVentas />
-            </RequirePermission>
-          }
-        />
-        <Route path="tesoreria" element={<Tesoreria />} />
-        <Route path="gestionUsuarios" element={<GestionUsuarios />} />
-
-        <Route path="usuarios/nuevo" element={<UsuarioForm />} />
-        <Route path="usuarios/editar/:id" element={<EditarUsuario />} />
-        <Route
-          path="ordenes_pedido/editar/:id"
-          element={
-            <RequirePermission action={ACTIONS.SALES_EDIT}>
-              <EditarPedido />
             </RequirePermission>
           }
         />
@@ -325,6 +385,72 @@ const AppLogic = () => {
           }
         />
         <Route
+          path="ordenes_fabricacion"
+          element={
+            <RequirePermission action={ACTIONS.FABRICATION_VIEW}>
+              <PlanGuard feature="fabricacion">
+                <OrdenesFabricacion />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_fabricacion/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.FABRICATION_CREATE}>
+              <PlanGuard feature="fabricacion">
+                <OrdenFabricacionForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_fabricacion/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.FABRICATION_EDIT}>
+              <PlanGuard feature="fabricacion">
+                <OrdenFabricacionForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="kanban"
+          element={
+            <RequirePermission action={ACTIONS.KANBAN_VIEW}>
+              <PlanGuard feature="kanban">
+                <KanbanBoard />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="progreso-fabricacion"
+          element={
+            <RequirePermission action={ACTIONS.PROGRESS_VIEW}>
+              <PlanGuard feature="progreso">
+                <ProgresoFabricacion />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_venta"
+          element={
+            <RequirePermission action={ACTIONS.SALES_VIEW}>
+              <OrdenesVenta />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_venta/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.SALES_CREATE}>
+              <OrdenVentaForm />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="ordenes_venta/editar/:id"
           element={
             <RequirePermission action={ACTIONS.SALES_EDIT}>
@@ -332,16 +458,324 @@ const AppLogic = () => {
             </RequirePermission>
           }
         />
-        <Route path="ventas_credito" element={<VentasCredito />} />
+        <Route
+          path="ordenes_pedido"
+          element={
+            <RequirePermission action={ACTIONS.ORDERS_VIEW}>
+              <PlanGuard feature="ordenes">
+                <OrdenesPedido />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_pedido/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.ORDERS_CREATE}>
+              <PlanGuard feature="ordenes">
+                <OrdenPedidoForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ordenes_pedido/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.ORDERS_EDIT}>
+              <PlanGuard feature="ordenes">
+                <EditarPedido />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="etapas_produccion"
+          element={
+            <RequirePermission action={ACTIONS.FABRICATION_EDIT}>
+              <PlanGuard feature="etapas">
+                <CrearEtapa />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="lotes_fabricados"
+          element={
+            <RequirePermission action={ACTIONS.FABRICATION_VIEW}>
+              <PlanGuard feature="lotes">
+                <ListaLotesFabricacion />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="avances_fabricacion"
+          element={
+            <RequirePermission action={ACTIONS.ADVANCES_VIEW}>
+              <PlanGuard feature="avances">
+                <ListaAvances />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="ventas_credito"
+          element={
+            <RequirePermission action={ACTIONS.CREDITS_VIEW}>
+              <PlanGuard feature="creditos">
+                <VentasCredito />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+
+        {/* Costos */}
+        <Route
+          path="costos_indirectos"
+          element={
+            <RequirePermission action={ACTIONS.INDIRECT_COSTS_VIEW}>
+              <PlanGuard feature="costos">
+                <CostosIndirectos />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="costos_indirectos/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.INDIRECT_COSTS_CREATE}>
+              <PlanGuard feature="costos">
+                <CostosIndirectosNuevo />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="pagos_anticipados"
+          element={
+            <RequirePermission action={ACTIONS.ANTICIPOS_VIEW}>
+              <PlanGuard feature="anticipos">
+                <ListaAnticipos />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="costos_materia_prima"
+          element={
+            <RequirePermission action={ACTIONS.INDIRECT_COSTS_VIEW}>
+              <PlanGuard feature="costos_materia_prima">
+                <CostosMateriaPrima />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+
+        {/* Tesorería */}
+        <Route
+          path="tesoreria"
+          element={
+            <RequirePermission action={ACTIONS.TREASURY_VIEW}>
+              <PlanGuard feature="tesoreria">
+                <Tesoreria />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
 
         {/* Cierres de Caja */}
-        <Route path="cierres-caja" element={<CierresCajaList />} />
-        <Route path="cierres-caja/crear" element={<CierresCajaForm />} />
-        <Route path="cierres-caja/:id" element={<CierresCajaDetalle />} />
-        <Route path="cierres-caja/:id/cerrar" element={<CierresCajaCerrar />} />
+        <Route
+          path="cierres-caja"
+          element={
+            <RequirePermission action={ACTIONS.CASH_CLOSINGS_VIEW}>
+              <PlanGuard feature="cierres_caja">
+                <CierresCajaList />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="cierres-caja/crear"
+          element={
+            <RequirePermission action={ACTIONS.CASH_CLOSINGS_CREATE}>
+              <PlanGuard feature="cierres_caja">
+                <CierresCajaForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="cierres-caja/:id"
+          element={
+            <RequirePermission action={ACTIONS.CASH_CLOSINGS_VIEW}>
+              <PlanGuard feature="cierres_caja">
+                <CierresCajaDetalle />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="cierres-caja/:id/cerrar"
+          element={
+            <RequirePermission action={ACTIONS.CASH_CLOSINGS_CLOSE}>
+              <PlanGuard feature="cierres_caja">
+                <CierresCajaCerrar />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
 
-        {/* Progreso de Fabricación */}
-        <Route path="progreso-fabricacion" element={<ProgresoFabricacion />} />
+        {/* Reportes */}
+        <Route
+          path="reportes"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <VistaReportes />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/inventario"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteInventario />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/avances_fabricacion"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteAvanceFabricacion />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/ventas_por_periodo"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteVentasPorPeriodo />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/ordenes_compra"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteOrdenesCompra />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/pagos_trabajadores"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReportePagosTrabajadores />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/pagos_trabajadores_dia"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReportePagoTrabajadorPorDia />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/costos_fabricacion"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteCostosProduccion />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/utilidad_por_orden"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteUtilidadPorOrden />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/movimientos_inventario"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <PlanGuard feature="reportes">
+                <ReporteMovimientosInventario />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reportes/tesoreria_ventas"
+          element={
+            <RequirePermission action={ACTIONS.REPORTS_VIEW}>
+              <ReporteTesoreriaVentas />
+            </RequirePermission>
+          }
+        />
+
+        {/* Gestión de Usuarios */}
+        <Route
+          path="gestionUsuarios"
+          element={
+            <RequirePermission action={ACTIONS.USERS_MANAGE}>
+              <GestionUsuarios />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="gestionRoles"
+          element={
+            <RequirePermission action={ACTIONS.USERS_MANAGE}>
+              <GestionRoles />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="configuracion"
+          element={
+            <RequirePermission action={ACTIONS.PAYMENT_METHODS_MANAGE}>
+              <Configuracion />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="usuarios/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.USERS_MANAGE}>
+              <UsuarioForm />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="usuarios/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.USERS_MANAGE}>
+              <EditarUsuario />
+            </RequirePermission>
+          }
+        />
       </Route>
     </Routes>
   );
@@ -350,10 +784,12 @@ const AppLogic = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <SidebarProvider>
-        <Toaster position="top-right" reverseOrder={false} />
-        <AppLogic />
-      </SidebarProvider>
+      <SaasAuthProvider>
+        <SidebarProvider>
+          <Toaster position="top-right" reverseOrder={false} />
+          <AppLogic />
+        </SidebarProvider>
+      </SaasAuthProvider>
     </AuthProvider>
   );
 }

@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { FiArrowLeft } from "react-icons/fi";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const NuevoInventario = () => {
+  const idempotencyKey = useIdempotencyKey();
   const [articulos, setArticulos] = useState([]);
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [cantidad, setCantidad] = useState(0);
@@ -14,12 +17,10 @@ const NuevoInventario = () => {
   useEffect(() => {
     const fetchArticulos = async () => {
       try {
-        // Obtener total de artículos primero
         const resTotal = await api.get("/articulos", {
           params: { page: 1, pageSize: 1 },
         });
         const total = resTotal.data.total || 10000;
-
         const res = await api.get("/articulos", {
           params: {
             page: 1,
@@ -31,13 +32,14 @@ const NuevoInventario = () => {
         const lista = Array.isArray(res.data?.data)
           ? res.data.data
           : Array.isArray(res.data)
-          ? res.data
-          : [];
-        const opciones = lista.map((art) => ({
-          value: art.id_articulo,
-          label: art.descripcion,
-        }));
-        setArticulos(opciones);
+            ? res.data
+            : [];
+        setArticulos(
+          lista.map((art) => ({
+            value: art.id_articulo,
+            label: art.descripcion,
+          })),
+        );
       } catch (error) {
         console.error("Error al cargar artículos", error);
         toast.error("Error al cargar artículos");
@@ -48,37 +50,24 @@ const NuevoInventario = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!articuloSeleccionado) {
-      toast.error("Por favor selecciona un artículo");
-      return;
-    }
-    if (cantidad < 0) {
-      toast.error("La cantidad inicial no puede ser negativa");
-      return;
-    }
-    if (stockMinimo < 0) {
-      toast.error("El stock mínimo no puede ser negativo");
-      return;
-    }
-
+    if (!articuloSeleccionado)
+      return toast.error("Por favor selecciona un artículo");
+    if (cantidad < 0)
+      return toast.error("La cantidad inicial no puede ser negativa");
+    if (stockMinimo < 0)
+      return toast.error("El stock mínimo no puede ser negativo");
     try {
-      // Los datos que enviamos al backend deben coincidir con lo que espera InventarioController.registrarMovimiento
       await api.post("/inventario/movimientos", {
         id_articulo: Number(articuloSeleccionado.value),
-        cantidad: Number(cantidad), // Esto se mapea a 'cantidad_movida' en el backend
-        tipo_movimiento: "entrada", // Tipo de movimiento para el ingreso inicial
-        descripcion: "Ingreso inicial de artículo al inventario", // Observaciones del movimiento
-        origen: "inicial", // Tipo de origen del movimiento (definido en el ENUM del modelo)
-        stock_minimo: Number(stockMinimo), // Se pasa para que se establezca en el registro de inventario
-      });
+        cantidad: Number(cantidad),
+        tipo_movimiento: "entrada",
+        descripcion: "Ingreso inicial de artículo al inventario",
+        origen: "inicial",
+        stock_minimo: Number(stockMinimo),
+      }, { headers: { "X-Idempotency-Key": idempotencyKey } });
       toast.success("Artículo agregado al inventario");
       navigate("/inventario");
     } catch (error) {
-      console.error(
-        "Error al agregar inventario",
-        error.response?.data || error.message
-      );
       const mensajeError =
         error.response?.data?.error ||
         error.response?.data?.message ||
@@ -87,77 +76,126 @@ const NuevoInventario = () => {
     }
   };
 
+  const inputCls =
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition";
+  const labelCls = "block text-sm font-semibold text-slate-600 mb-2";
+
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-xl shadow-lg">
-      <h2 className="text-3xl font-bold text-slate-800 mb-6">
-        Agregar artículo al inventario
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block font-semibold mb-1 ">Artículo</label>
-          <Select
-            options={articulos}
-            value={articuloSeleccionado}
-            onChange={setArticuloSeleccionado}
-            placeholder="Selecciona un artículo"
-            isClearable
-            className="text-sm "
-            styles={{
-              control: (base) => ({
-                ...base,
-                borderColor: "#d1d5db",
-                boxShadow: "none",
-                "&:hover": {
-                  borderColor: "#64748b",
-                },
-                borderRadius: "0.375rem",
-              }),
-            }}
-          />
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-8">
+      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/inventario")}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
+            >
+              <FiArrowLeft size={17} />
+            </button>
+            <div>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                Inventario
+              </p>
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                Agregar artículo
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/inventario")}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="inventario-form"
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer shadow-sm"
+            >
+              Guardar
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label className="block font-semibold mb-1">
-            Cantidad (stock inicial)
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={cantidad}
-            onChange={(e) => setCantidad(Number(e.target.value))}
-            className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block font-semibold mb-1">Stock mínimo</label>
-          <input
-            type="number"
-            min="0"
-            value={stockMinimo}
-            onChange={(e) => setStockMinimo(Number(e.target.value))}
-            className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-            required
-          />
-        </div>
-
-        <div className="flex justify-end gap-4 pt-4">
-          <button
-            type="button"
-            onClick={() => navigate("/inventario")}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
+        {/* Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+          <form
+            id="inventario-form"
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-6"
           >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
-          >
-            Guardar
-          </button>
+            <div>
+              <label className={labelCls}>
+                Artículo <span className="text-red-400">*</span>
+              </label>
+              <Select
+                options={articulos}
+                value={articuloSeleccionado}
+                onChange={setArticuloSeleccionado}
+                placeholder="Selecciona un artículo…"
+                isClearable
+                className="text-sm"
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    borderColor: state.isFocused ? "#94a3b8" : "#e2e8f0",
+                    boxShadow: state.isFocused
+                      ? "0 0 0 2px rgba(148,163,184,0.4)"
+                      : "0 1px 2px rgba(0,0,0,0.05)",
+                    borderRadius: "0.75rem",
+                    padding: "2px 4px",
+                    "&:hover": { borderColor: "#94a3b8" },
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    fontSize: "0.875rem",
+                    backgroundColor: state.isSelected
+                      ? "#1e293b"
+                      : state.isFocused
+                        ? "#f1f5f9"
+                        : "white",
+                    color: state.isSelected ? "white" : "#1e293b",
+                  }),
+                }}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <label className={labelCls}>Cantidad inicial</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={cantidad}
+                  onChange={(e) => setCantidad(Number(e.target.value))}
+                  className={inputCls}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Stock con el que entra al inventario
+                </p>
+              </div>
+              <div>
+                <label className={labelCls}>Stock mínimo</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={stockMinimo}
+                  onChange={(e) => setStockMinimo(Number(e.target.value))}
+                  className={inputCls}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Alerta cuando el stock baje de este valor
+                </p>
+              </div>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 };

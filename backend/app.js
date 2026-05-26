@@ -1,6 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const cookieParser = require("cookie-parser");
+
+const app = express();
 
 require("dotenv").config();
 
@@ -46,17 +49,34 @@ const progresoFabricacionRoutes = require("./src/routes/progresoFabricacionRoute
 const seguimientoArticuloRoutes = require("./src/routes/seguimientoArticulo.js");
 const consumoMateriaPrimaRoutes = require("./src/routes/consumoMateriaPrimaRoutes.js");
 const unidadesRoutes = require("./src/routes/unidadesRoutes.js");
+const plansRoutes = require("./src/routes/plansRoutes");
+const saasRoutes = require("./src/routes/saasRoutes.js");
+const {
+  ensureSaasAuthSchema,
+  purgeStaleRefreshSessions,
+} = require("./src/controllers/saasController");
 
-// Inicializar tabla de consumos de materia prima
 const consumoMateriaPrimaController = require("./src/controllers/consumoMateriaPrimaController.js");
+const allowedOrigins = (
+  process.env.FRONTEND_URLS || "http://localhost:3001,http://127.0.0.1:3001"
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
-const app = express();
 app.use(
   cors({
-    origin: "*",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Origen no permitido por CORS"));
+    },
+    credentials: true,
   }),
 );
 app.use(express.json());
+app.use(cookieParser());
 
 // Servir archivos estáticos desde la carpeta uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -162,7 +182,53 @@ app.use("/api/seguimiento-articulo", seguimientoArticuloRoutes);
 app.use("/api/consumos-materia-prima", consumoMateriaPrimaRoutes);
 app.use("/api/unidades", unidadesRoutes);
 
+// Panel de administración SaaS (gestión de empresas, planes, admins)
+app.use("/api/saas", saasRoutes);
+
+// Exponer features de planes para el frontend
+app.use("/api/planes", plansRoutes);
+
+const cleanupIntervalRaw = parseInt(
+  process.env.SAAS_REFRESH_CLEANUP_MS || `${6 * 60 * 60 * 1000}`,
+  10,
+);
+const saasRefreshCleanupMs = Number.isFinite(cleanupIntervalRaw)
+  ? Math.max(cleanupIntervalRaw, 60 * 1000)
+  : 6 * 60 * 60 * 1000;
+
+const runSaasRefreshCleanup = async () => {
+  try {
+    const deleted = await purgeStaleRefreshSessions();
+    if (deleted > 0) {
+      console.log(`[saas] Sesiones refresh limpiadas: ${deleted}`);
+    }
+  } catch (error) {
+    console.error("[saas] Error limpiando sesiones refresh:", error.message);
+  }
+};
+
 const PORT = process.env.PORT;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await ensureSaasAuthSchema();
+    runSaasRefreshCleanup();
+
+    const saasRefreshCleanupTimer = setInterval(
+      runSaasRefreshCleanup,
+      saasRefreshCleanupMs,
+    );
+    if (typeof saasRefreshCleanupTimer.unref === "function") {
+      saasRefreshCleanupTimer.unref();
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Servidor corriendo en puerto ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Error iniciando backend:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();

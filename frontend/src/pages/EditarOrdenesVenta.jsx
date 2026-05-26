@@ -57,8 +57,8 @@ const OrdenVentaEdit = () => {
       prev.map((a) =>
         a.id_articulo === id_articulo
           ? { ...a, precio_unitario: numericValue }
-          : a
-      )
+          : a,
+      ),
     );
   };
   const handlePriceFocus = (id_articulo, value) => {
@@ -77,19 +77,19 @@ const OrdenVentaEdit = () => {
   const fetchMetodoPago = async (ordenId, metodosPagoAPI, ordenData) => {
     try {
       const resMovimiento = await api.get(
-        `/tesoreria/documento/${ordenId}?tipo=orden_venta`
+        `/tesoreria/documento/${ordenId}?tipo=orden_venta`,
       );
       const movimiento = resMovimiento.data;
       if (movimiento) {
         const metodoPagoExistente = metodosPagoAPI.find(
-          (m) => m.id_metodo_pago == movimiento.id_metodo_pago
+          (m) => m.id_metodo_pago == movimiento.id_metodo_pago,
         );
         if (metodoPagoExistente) setMetodoPago(metodoPagoExistente);
         setReferencia(movimiento.referencia || "");
         setObservaciones(movimiento.observaciones || "");
       } else if (ordenData && ordenData.id_metodo_pago) {
         const metodoPagoOrden = metodosPagoAPI.find(
-          (m) => m.id_metodo_pago == ordenData.id_metodo_pago
+          (m) => m.id_metodo_pago == ordenData.id_metodo_pago,
         );
         if (metodoPagoOrden) setMetodoPago(metodoPagoOrden);
         setReferencia(ordenData.referencia_pago || "");
@@ -103,7 +103,7 @@ const OrdenVentaEdit = () => {
       // Si hay error, intentar cargar desde la orden
       if (ordenData && ordenData.id_metodo_pago) {
         const metodoPagoOrden = metodosPagoAPI.find(
-          (m) => m.id_metodo_pago == ordenData.id_metodo_pago
+          (m) => m.id_metodo_pago == ordenData.id_metodo_pago,
         );
         if (metodoPagoOrden) setMetodoPago(metodoPagoOrden);
         setReferencia(ordenData.referencia_pago || "");
@@ -123,7 +123,7 @@ const OrdenVentaEdit = () => {
     }
 
     const yaExiste = articulosSeleccionados.some(
-      (a) => a.id_articulo === articulo.value
+      (a) => a.id_articulo === articulo.value,
     );
     if (yaExiste) {
       toast.error("El artículo ya está en la lista.");
@@ -145,7 +145,7 @@ const OrdenVentaEdit = () => {
 
   const eliminarArticulo = (id_articulo) => {
     setArticulosSeleccionados((prev) =>
-      prev.filter((a) => a.id_articulo !== id_articulo)
+      prev.filter((a) => a.id_articulo !== id_articulo),
     );
   };
 
@@ -154,8 +154,8 @@ const OrdenVentaEdit = () => {
     if (cant < 1 || isNaN(cant)) return;
     setArticulosSeleccionados((prev) =>
       prev.map((a) =>
-        a.id_articulo === id_articulo ? { ...a, cantidad: cant } : a
-      )
+        a.id_articulo === id_articulo ? { ...a, cantidad: cant } : a,
+      ),
     );
   };
 
@@ -169,7 +169,7 @@ const OrdenVentaEdit = () => {
     return articulosSeleccionados.reduce(
       (sum, detalle) =>
         sum + calcularSubtotal(detalle.cantidad, detalle.precio_unitario),
-      0
+      0,
     );
   };
 
@@ -205,18 +205,16 @@ const OrdenVentaEdit = () => {
         // Si viene de un pedido, mostrar mensaje y no permitir edición
         if (!vieneDeUndefinedOrden) {
           toast.error(
-            "Esta orden proviene de un pedido y no puede ser editada directamente."
+            "Esta orden proviene de un pedido y no puede ser editada directamente.",
           );
         }
 
         setEstado(ordenData.estado);
 
         const clienteExistente = clientesAPI.find(
-          (c) => c.id_cliente === ordenData.id_cliente
+          (c) => c.id_cliente === ordenData.id_cliente,
         );
         if (clienteExistente) setCliente(clienteExistente);
-
-        // La fecha no se usa ni se muestra en el formulario de edición
 
         await fetchMetodoPago(id, metodosPagoAPI, ordenData);
 
@@ -278,11 +276,11 @@ const OrdenVentaEdit = () => {
         d.cantidad <= 0 ||
         d.precio_unitario <= 0 ||
         isNaN(d.cantidad) ||
-        isNaN(d.precio_unitario)
+        isNaN(d.precio_unitario),
     );
     if (detallesInvalidos) {
       toast.error(
-        "Asegúrate de que todos los artículos tengan cantidad y precio válidos (> 0)."
+        "Asegúrate de que todos los artículos tengan cantidad y precio válidos (> 0).",
       );
       return false;
     }
@@ -325,337 +323,337 @@ const OrdenVentaEdit = () => {
 
   if (loading) {
     return (
-      <div className="text-center py-10 text-xl font-medium text-slate-700">
-        Cargando orden de venta...
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-500 text-sm">Cargando orden de venta...</div>
       </div>
     );
   }
 
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-          Editar Orden de Venta{" "}
-          <span className="text-slate-500 font-normal">#{id}</span>
-          {!vieneDeUndefined && (
-            <span className="text-base text-red-500 ml-4 p-1 border border-red-500 rounded font-semibold">
-              ORDEN DE PEDIDO - SOLO LECTURA
-            </span>
-          )}
-        </h2>
-        <button
-          onClick={() => navigate(-1)}
-          className="cursor-pointer flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-slate-800 px-4 py-2 rounded-lg font-semibold transition"
-        >
-          <FiArrowLeft />
-          Volver
-        </button>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-xl shadow-2xl"
-      >
-        <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700">
-          Detalles de la Orden
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="flex flex-col">
-            <label
-              htmlFor="cliente"
-              className="mb-2 font-medium text-slate-600"
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-8">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
             >
-              Cliente
-            </label>
-            <Listbox
-              value={cliente}
-              onChange={setCliente}
-              disabled={!vieneDeUndefined}
-            >
-              <div className="relative">
-                <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
-                  {cliente ? cliente.nombre : "Selecciona un cliente"}
-                </Listbox.Button>
-                <Listbox.Options className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {clientes.map((c) => (
-                    <Listbox.Option
-                      key={c.id_cliente}
-                      value={c}
-                      className={({ active }) =>
-                        `cursor-pointer select-none px-4 py-2 ${
-                          active ? "bg-slate-100" : ""
-                        }`
-                      }
-                    >
-                      {c.nombre}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
+              <FiArrowLeft size={17} />
+            </button>
+            <div>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                Órdenes de Venta
+              </p>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                  Editar orden{" "}
+                  <span className="text-slate-500 font-normal">#{id}</span>
+                </h1>
+                {!vieneDeUndefined && (
+                  <span className="px-2.5 py-1 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg uppercase tracking-wide">
+                    Solo lectura
+                  </span>
+                )}
               </div>
-            </Listbox>
+            </div>
           </div>
-
-          {/* Campo de fecha removido: la fecha está definida por el backend y no es editable */}
-
-          <div className="flex flex-col">
-            <label htmlFor="estado" className="mb-2 font-medium text-slate-600">
-              Estado
-            </label>
-            <Listbox
-              value={estado}
-              onChange={setEstado}
-              disabled={!vieneDeUndefined}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
             >
-              <div className="relative">
-                <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
-                  {estados.find((e) => e.id === estado)?.nombre ||
-                    "Selecciona un estado"}
-                </Listbox.Button>
-                <Listbox.Options className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {estados.map((e) => (
-                    <Listbox.Option
-                      key={e.id}
-                      value={e.id}
-                      className={({ active }) =>
-                        `cursor-pointer select-none px-4 py-2 ${
-                          active ? "bg-slate-100" : ""
-                        }`
-                      }
-                    >
-                      {e.nombre}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
-              </div>
-            </Listbox>
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="id_metodo_pago"
-              className="mb-2 font-medium text-slate-600"
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="orden-venta-form"
+              disabled={!vieneDeUndefined || isSubmitting}
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm"
             >
-              Método de Pago
-            </label>
-            <Listbox
-              value={metodoPago}
-              onChange={setMetodoPago}
-              disabled={!vieneDeUndefined}
-            >
-              <div className="relative">
-                <Listbox.Button className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500">
-                  {metodoPago ? metodoPago.nombre : "Selecciona un método"}
-                </Listbox.Button>
-                <Listbox.Options className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {metodosPago.map((m) => (
-                    <Listbox.Option
-                      key={m.id_metodo_pago}
-                      value={m}
-                      className={({ active }) =>
-                        `cursor-pointer select-none px-4 py-2 ${
-                          active ? "bg-slate-100" : ""
-                        }`
-                      }
-                    >
-                      {m.nombre}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
-              </div>
-            </Listbox>
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="referencia"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Referencia / No. Transacción
-            </label>
-            <input
-              type="text"
-              id="referencia"
-              name="referencia"
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              disabled={!vieneDeUndefined}
-              placeholder="Ej: N° de comprobante, tarjeta"
-              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="observaciones"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Observaciones (Pago)
-            </label>
-            <input
-              type="text"
-              id="observaciones"
-              name="observaciones"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              disabled={!vieneDeUndefined}
-              placeholder="Notas adicionales sobre el pago"
-              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            />
+              {isSubmitting ? "Guardando..." : "Guardar cambios"}
+            </button>
           </div>
         </div>
 
-        <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700 mt-10">
-          Detalles de Venta
-        </h3>
-
-        {vieneDeUndefined && (
-          <div className="flex flex-col mb-6">
-            <label className="mb-2 font-medium text-slate-600">
-              Agregar Artículo
-            </label>
-            <Select
-              options={articulos.map((a) => {
-                const stockText =
-                  a.stock !== undefined ? ` (Stock: ${a.stock})` : "";
-                return {
-                  value: a.id_articulo,
-                  label: a.referencia
-                    ? `${a.referencia} - ${a.descripcion}${stockText}`
-                    : `${a.descripcion}${stockText}`,
-                  precio_venta: a.precio_venta,
-                  ...a,
-                };
-              })}
-              value={articuloSeleccionado}
-              onChange={agregarArticulo}
-              placeholder="Buscar por referencia o descripción..."
-              isClearable
-              className="text-sm"
-            />
-          </div>
-        )}
-
-        <div className="space-y-6 mb-8">
-          {articulosSeleccionados.map((art, index) => (
-            <div
-              key={art.id_articulo}
-              className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end p-5 border border-gray-200 rounded-lg bg-gray-50 shadow-sm"
-            >
-              <div className="col-span-1 md:col-span-5 flex flex-col">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Artículo
+        <form
+          id="orden-venta-form"
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-6"
+        >
+          {/* Detalles de la orden */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">
+              Detalles de la orden
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Cliente
                 </label>
-                <p className="py-2.5 px-3 bg-white text-slate-800 border border-gray-300 rounded-lg">
-                  {art.descripcion}
-                </p>
+                <Listbox
+                  value={cliente}
+                  onChange={setCliente}
+                  disabled={!vieneDeUndefined}
+                >
+                  <div className="relative">
+                    <Listbox.Button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400 transition">
+                      {cliente ? cliente.nombre : "Selecciona un cliente"}
+                    </Listbox.Button>
+                    <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      {clientes.map((c) => (
+                        <Listbox.Option
+                          key={c.id_cliente}
+                          value={c}
+                          className={({ active }) =>
+                            `cursor-pointer select-none px-4 py-2.5 text-sm ${active ? "bg-slate-50" : ""}`
+                          }
+                        >
+                          {c.nombre}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </div>
+                </Listbox>
               </div>
 
-              <div className="col-span-1 md:col-span-2 flex flex-col">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Cantidad
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Estado
+                </label>
+                <Listbox
+                  value={estado}
+                  onChange={setEstado}
+                  disabled={!vieneDeUndefined}
+                >
+                  <div className="relative">
+                    <Listbox.Button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400 transition">
+                      {estados.find((e) => e.id === estado)?.nombre ||
+                        "Selecciona un estado"}
+                    </Listbox.Button>
+                    <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      {estados.map((e) => (
+                        <Listbox.Option
+                          key={e.id}
+                          value={e.id}
+                          className={({ active }) =>
+                            `cursor-pointer select-none px-4 py-2.5 text-sm ${active ? "bg-slate-50" : ""}`
+                          }
+                        >
+                          {e.nombre}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </div>
+                </Listbox>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Método de Pago
+                </label>
+                <Listbox
+                  value={metodoPago}
+                  onChange={setMetodoPago}
+                  disabled={!vieneDeUndefined}
+                >
+                  <div className="relative">
+                    <Listbox.Button className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400 transition">
+                      {metodoPago ? metodoPago.nombre : "Selecciona un método"}
+                    </Listbox.Button>
+                    <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                      {metodosPago.map((m) => (
+                        <Listbox.Option
+                          key={m.id_metodo_pago}
+                          value={m}
+                          className={({ active }) =>
+                            `cursor-pointer select-none px-4 py-2.5 text-sm ${active ? "bg-slate-50" : ""}`
+                          }
+                        >
+                          {m.nombre}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </div>
+                </Listbox>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Referencia / No. Transacción
                 </label>
                 <input
-                  type="number"
-                  name="cantidad"
-                  value={art.cantidad}
-                  onChange={(e) =>
-                    cambiarCantidad(art.id_articulo, e.target.value)
-                  }
-                  min="1"
-                  required
+                  type="text"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
                   disabled={!vieneDeUndefined}
-                  className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right"
+                  placeholder="Ej: N° de comprobante, tarjeta"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-400 transition"
                 />
               </div>
 
-              <div className="col-span-1 md:col-span-3 flex flex-col">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Precio Unitario (COP)
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Observaciones (Pago)
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="precio_unitario"
-                    value={
-                      focusedPrice[art.id_articulo] !== undefined
-                        ? focusedPrice[art.id_articulo]
-                        : formatCurrency(art.precio_unitario)
-                    }
-                    onChange={(e) =>
-                      handlePriceChange(art.id_articulo, e.target.value)
-                    }
-                    onFocus={() =>
-                      handlePriceFocus(art.id_articulo, art.precio_unitario)
-                    }
-                    onBlur={() => handlePriceBlur(art.id_articulo)}
-                    required
-                    disabled={!vieneDeUndefined}
-                    className="border border-gray-300 rounded-lg pl-10 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full"
-                  />
-                  <FiDollarSign
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    size={18}
-                  />
-                </div>
-              </div>
-
-              <div className="col-span-1 md:col-span-1 flex flex-col justify-end">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Subtotal
-                </label>
-                <p className="py-2.5 px-3 bg-white text-slate-800 font-semibold border border-gray-300 rounded-lg text-right">
-                  {formatCurrency(
-                    calcularSubtotal(art.cantidad, art.precio_unitario)
-                  )}
-                </p>
-              </div>
-
-              <div className="col-span-1 md:col-span-1 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => eliminarArticulo(art.id_articulo)}
-                  disabled={
-                    articulosSeleccionados.length === 1 || !vieneDeUndefined
-                  }
-                  className="cursor-pointer bg-red-500 text-white p-2.5 rounded-lg hover:bg-red-600 disabled:bg-red-300 transition shadow-md"
-                  title="Eliminar artículo"
-                >
-                  <FiTrash2 size={20} />
-                </button>
+                <input
+                  type="text"
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  disabled={!vieneDeUndefined}
+                  placeholder="Notas adicionales sobre el pago"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-400 transition"
+                />
               </div>
             </div>
-          ))}
-
-          {
-            <button
-              type="button"
-              onClick={() => agregarArticulo({ value: null })}
-              className="hidden items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg font-semibold transition mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <FiPlus size={20} />
-              Agregar Artículo
-            </button>
-          }
-        </div>
-
-        <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-10">
-          <div className="text-xl font-bold text-slate-700">
-            Total General:{" "}
-            <span className="text-3xl text-green-700 ml-2">
-              {formatCurrency(totalGeneral)}
-            </span>
           </div>
 
-          <button
-            type="submit"
-            disabled={!vieneDeUndefined}
-            className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg cursor-pointer"
-          >
-            <FiSave size={20} />
-            Guardar Cambios
-          </button>
-        </div>
-      </form>
+          {/* Artículos */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Detalles de venta
+              </h2>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Total general
+                </span>
+                <span className="text-xl font-bold text-emerald-700">
+                  {formatCurrency(totalGeneral)}
+                </span>
+              </div>
+            </div>
+
+            {vieneDeUndefined && (
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-600 mb-2">
+                  Agregar Artículo
+                </label>
+                <Select
+                  options={articulos.map((a) => {
+                    const stockText =
+                      a.stock !== undefined ? ` (Stock: ${a.stock})` : "";
+                    return {
+                      value: a.id_articulo,
+                      label: a.referencia
+                        ? `${a.referencia} - ${a.descripcion}${stockText}`
+                        : `${a.descripcion}${stockText}`,
+                      precio_venta: a.precio_venta,
+                      ...a,
+                    };
+                  })}
+                  value={articuloSeleccionado}
+                  onChange={agregarArticulo}
+                  placeholder="Buscar por referencia o descripción..."
+                  isClearable
+                  className="text-sm"
+                />
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Artículo
+                    </th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-28">
+                      Cantidad
+                    </th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-40">
+                      Precio Unit.
+                    </th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-36">
+                      Subtotal
+                    </th>
+                    <th className="px-4 py-3 w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {articulosSeleccionados.map((art) => (
+                    <tr
+                      key={art.id_articulo}
+                      className="hover:bg-slate-50/70 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-slate-800">
+                        {art.descripcion}
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          value={art.cantidad}
+                          onChange={(e) =>
+                            cambiarCantidad(art.id_articulo, e.target.value)
+                          }
+                          min="1"
+                          required
+                          disabled={!vieneDeUndefined}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={
+                              focusedPrice[art.id_articulo] !== undefined
+                                ? focusedPrice[art.id_articulo]
+                                : art.precio_unitario
+                                  ? Number(art.precio_unitario).toLocaleString(
+                                      "es-CO",
+                                    )
+                                  : ""
+                            }
+                            onChange={(e) =>
+                              handlePriceChange(art.id_articulo, e.target.value)
+                            }
+                            onFocus={() =>
+                              handlePriceFocus(
+                                art.id_articulo,
+                                art.precio_unitario,
+                              )
+                            }
+                            onBlur={() => handlePriceBlur(art.id_articulo)}
+                            required
+                            disabled={!vieneDeUndefined}
+                            className="w-full rounded-lg border border-slate-200 bg-white pl-7 pr-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                          />
+                          <FiDollarSign
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={14}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                        {formatCurrency(
+                          calcularSubtotal(art.cantidad, art.precio_unitario),
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => eliminarArticulo(art.id_articulo)}
+                          disabled={
+                            articulosSeleccionados.length === 1 ||
+                            !vieneDeUndefined
+                          }
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          title="Eliminar artículo"
+                        >
+                          <FiTrash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

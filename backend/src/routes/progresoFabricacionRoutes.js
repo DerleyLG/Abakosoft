@@ -1,39 +1,41 @@
-/**
- * GET /api/progreso-fabricacion/costos-por-articulo/:id_orden_fabricacion
- * Devuelve el prorrateo y costo total por artículo avanzado en la orden
- */
-
 const express = require("express");
 const router = express.Router();
 const progresoFabricacionController = require("../controllers/progresoFabricacionController");
+const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
+
+router.use(verifyToken);
 
 router.get(
   "/costos-por-articulo/:id_orden_fabricacion",
+  requirePlanFeature("progreso"),
+  requirePermission(ACTIONS.PROGRESS_VIEW),
   progresoFabricacionController.getCostosPorArticulo,
 );
-router.get("/", progresoFabricacionController.getProgresoDetallado);
-
-/**
- * GET /api/progreso-fabricacion/resumen
- * Obtiene el resumen agrupado por orden de fabricación
- * Query params: fecha_inicio, fecha_fin, estado
- */
-router.get("/resumen", progresoFabricacionController.getResumenPorOrden);
-
-/**
- * GET /api/progreso-fabricacion/materia-prima
- * Obtiene el resumen de materia prima consumida en un período
- * Query params: fecha_inicio, fecha_fin (requeridos)
- */
+router.get(
+  "/",
+  requirePlanFeature("progreso"),
+  requirePermission(ACTIONS.PROGRESS_VIEW),
+  progresoFabricacionController.getProgresoDetallado,
+);
+router.get(
+  "/resumen",
+  requirePlanFeature("progreso"),
+  requirePermission(ACTIONS.PROGRESS_VIEW),
+  progresoFabricacionController.getResumenPorOrden,
+);
 router.get(
   "/materia-prima",
+  requirePlanFeature("progreso"),
+  requirePermission(ACTIONS.PROGRESS_VIEW),
   progresoFabricacionController.getResumenMateriaPrima,
 );
-
-/**
- * GET /api/progreso-fabricacion/orden/:id
- * Obtiene el progreso detallado de una orden específica
- */
-router.get("/orden/:id", progresoFabricacionController.getProgresoOrden);
+router.get(
+  "/orden/:id",
+  requirePlanFeature("progreso"),
+  requirePermission(ACTIONS.PROGRESS_VIEW),
+  progresoFabricacionController.getProgresoOrden,
+);
 
 module.exports = router;

@@ -2,40 +2,52 @@ const express = require("express");
 const router = express.Router();
 const seguimientoArticuloController = require("../controllers/seguimientoArticuloController");
 const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
 
-// Obtener TODOS los movimientos de inventario (vista general con paginación)
-router.get("/", verifyToken, seguimientoArticuloController.getAllMovimientos);
+router.use(verifyToken);
 
-// Obtener seguimiento completo de un artículo
-router.get("/:id", verifyToken, seguimientoArticuloController.getSeguimiento);
-
-// Endpoints específicos por tipo de orden
+router.get(
+  "/",
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getAllMovimientos,
+);
+router.get(
+  "/:id",
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getSeguimiento,
+);
 router.get(
   "/:id/ventas",
-  verifyToken,
-  seguimientoArticuloController.getOrdenesVenta
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getOrdenesVenta,
 );
 router.get(
   "/:id/pedidos",
-  verifyToken,
-  seguimientoArticuloController.getOrdenesPedido
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getOrdenesPedido,
 );
 router.get(
   "/:id/fabricacion",
-  verifyToken,
-  seguimientoArticuloController.getOrdenesFabricacion
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getOrdenesFabricacion,
 );
 router.get(
   "/:id/compras",
-  verifyToken,
-  seguimientoArticuloController.getOrdenesCompra
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getOrdenesCompra,
 );
-
-// Endpoint para movimientos detallados de inventario
 router.get(
   "/:id/movimientos-detallados",
-  verifyToken,
-  seguimientoArticuloController.getMovimientosDetallados
+  requirePlanFeature("seguimiento_inventario"),
+  requirePermission(ACTIONS.INVENTORY_TRACKING),
+  seguimientoArticuloController.getMovimientosDetallados,
 );
 
 module.exports = router;

@@ -4,8 +4,6 @@ const router = express.Router();
 
 const verifyToken = require("./verifyToken");
 const checkRole = require("./checkRole");
-
-// Importa el modelo de usuario (asegúrate de que el nombre del modelo sea correcto)
 const Usuario = require("../models/usuariosModel");
 
 // Middleware para verificar múltiples roles permitidos

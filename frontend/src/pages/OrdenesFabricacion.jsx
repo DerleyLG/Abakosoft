@@ -4,12 +4,12 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 import "../styles/confirmAlert.css";
 import {
   FiTrash2,
   FiPlus,
   FiArrowLeft,
-  FiArrowUp,
   FiArrowRight,
   FiEdit,
   FiX,
@@ -17,6 +17,7 @@ import {
   FiBox,
   FiEye,
   FiEyeOff,
+  FiChevronDown,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import ProrrateoButton from "../components/ProrrateoButton";
@@ -45,6 +46,7 @@ const ListaOrdenesFabricacion = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedOrden, setExpandedOrden] = useState(null);
   const [mostrarFormularioAvance, setMostrarFormularioAvance] = useState(null);
+  const [avanceKey, setAvanceKey] = useState(null);
   const navigate = useNavigate();
   const [formularios, setFormularios] = useState({});
   const [etapas, setEtapas] = useState([]);
@@ -63,9 +65,12 @@ const ListaOrdenesFabricacion = () => {
   const [hasPrev, setHasPrev] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-  const role = user?.rol;
-  const canCreate = can(role, ACTIONS.FABRICATION_CREATE);
-  const canDelete = can(role, ACTIONS.FABRICATION_DELETE);
+  const canCreate = can(user, ACTIONS.FABRICATION_CREATE);
+  const canDelete = can(user, ACTIONS.FABRICATION_DELETE);
+  const canEdit = can(user, ACTIONS.FABRICATION_EDIT);
+  const canCreateAdvance = can(user, ACTIONS.ADVANCES_CREATE);
+  const canEditAdvance = can(user, ACTIONS.ADVANCES_EDIT);
+  const canEditAdvanceQuantity = can(user, ACTIONS.ADVANCES_EDIT_QUANTITY);
   const yaConsultadoCosto = useRef({});
   const historialCostos = useRef({});
   const formularioAvanceRef = useRef(null);
@@ -75,6 +80,7 @@ const ListaOrdenesFabricacion = () => {
   const [editandoAvanceResponsable, setEditandoAvanceResponsable] = useState(
     {},
   );
+  const [editandoAvanceCantidad, setEditandoAvanceCantidad] = useState({});
   const [drawerConsumo, setDrawerConsumo] = useState(false);
 
   const [articulosCatalogo, setArticulosCatalogo] = useState([]);
@@ -145,7 +151,6 @@ const ListaOrdenesFabricacion = () => {
     fetchInitialData();
   }, []);
 
-  // Cerrar sugerencias cuando se haga clic fuera del filtro de artículos
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -170,35 +175,49 @@ const ListaOrdenesFabricacion = () => {
     }
   }, [ordenes, mostrarFormularioAvance]);
 
-  // Scroll y focus al formulario de avance cuando se abre
+  // Focus y scroll suave al formulario de avance cuando se abre
   useEffect(() => {
     if (mostrarFormularioAvance && formularioAvanceRef.current) {
       setTimeout(() => {
         formularioAvanceRef.current?.scrollIntoView({
           behavior: "smooth",
-          block: "center",
+          block: "nearest",
         });
-        // Focus en el primer select del formulario
         const primerSelect =
-          formularioAvanceRef.current?.querySelector("select");
-        if (primerSelect) primerSelect.focus();
-      }, 100);
+          formularioAvanceRef.current?.querySelector("select, input");
+        if (primerSelect) primerSelect.focus({ preventScroll: true });
+      }, 150);
     }
   }, [mostrarFormularioAvance]);
+
+  // Cuando hay algún filtro activo, pedir todos los registros al backend
+  const hayFiltro =
+    (searchTerm && searchTerm.length > 1) || !!articuloSeleccion;
 
   useEffect(() => {
     const fetchOrdenes = async () => {
       try {
         setLoading(true);
-        const params = { page, pageSize, sortBy: "id", sortDir: "desc" };
-        if (mostrarCanceladas) {
-          params.estados = "cancelada";
-        } else if (filtroEstadoActivas !== "todas") {
-          params.estados = filtroEstadoActivas;
-        }
-        // Si hay búsqueda por ID (empieza con #), enviarla al backend
-        if (searchTerm && searchTerm.startsWith("#")) {
+        // Si hay filtro activo, ignorar paginación y traer todo
+        const pageSizeEfectivo = hayFiltro ? 1000 : pageSize;
+        const pageEfectiva = hayFiltro ? 1 : page;
+        const params = {
+          page: pageEfectiva,
+          pageSize: pageSizeEfectivo,
+          sortBy: "id",
+          sortDir: "desc",
+        };
+
+        // Al buscar por #ID buscamos en todos los estados (incluidas canceladas)
+        if (searchTerm && searchTerm.startsWith("#") && searchTerm.length > 1) {
           params.buscar = searchTerm;
+          // Sin filtro de estado para encontrar cualquier orden
+        } else {
+          if (mostrarCanceladas) {
+            params.estados = "cancelada";
+          } else if (filtroEstadoActivas !== "todas") {
+            params.estados = filtroEstadoActivas;
+          }
         }
         const res = await api.get("/ordenes-fabricacion", { params });
         const payload = res.data || {};
@@ -270,7 +289,15 @@ const ListaOrdenesFabricacion = () => {
       }
     };
     fetchOrdenes();
-  }, [mostrarCanceladas, filtroEstadoActivas, page, pageSize, searchTerm]);
+  }, [
+    mostrarCanceladas,
+    filtroEstadoActivas,
+    page,
+    pageSize,
+    searchTerm,
+    articuloSeleccion,
+    hayFiltro,
+  ]);
 
   // Carga el costo de fabricación anterior cuando cambian los formularios
   useEffect(() => {
@@ -418,15 +445,18 @@ const ListaOrdenesFabricacion = () => {
       }));
     } else if (campo === "etapa") {
       const etapaSeleccionada = etapas.find((et) => et.value === Number(valor));
-      const nombreCargoEtapa = etapaSeleccionada?.cargo;
+      const nombreCargoEtapa = (etapaSeleccionada?.cargo || "").trim();
 
-      const trabajadoresFiltrados = trabajadores.filter(
-        (trab) =>
-          trab.cargo &&
-          nombreCargoEtapa &&
-          trab.cargo.toLowerCase().trim() ===
-            nombreCargoEtapa.toLowerCase().trim(),
-      );
+      // Si la etapa tiene cargo configurado, filtrar por coincidencia case-insensitive
+      // Si no tiene cargo configurado, mostrar todos los trabajadores
+      const trabajadoresFiltrados = nombreCargoEtapa
+        ? trabajadores.filter(
+            (trab) =>
+              trab.cargo &&
+              trab.cargo.toLowerCase().trim() ===
+                nombreCargoEtapa.toLowerCase(),
+          )
+        : trabajadores;
 
       setTrabajadoresDisponibles((prev) => ({
         ...prev,
@@ -561,30 +591,41 @@ const ListaOrdenesFabricacion = () => {
 
   const renderDetalles = (orden) => {
     if (!orden.detalles || orden.detalles.length === 0) {
-      return <div>No hay detalles para mostrar.</div>;
+      return (
+        <p className="text-sm text-slate-400 py-2">
+          No hay detalles para mostrar.
+        </p>
+      );
     }
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
-          <thead className="bg-gray-200 text-gray-700">
-            <tr>
-              <th className="px-2 py-2 border-b border-gray-300">Artículo</th>
-              <th className="px-2 py-2 border-b border-gray-300">Cantidad</th>
-              <th className="px-2 py-2 border-b border-gray-300">
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-200">
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Artículo
+              </th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Cantidad
+              </th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                 Etapa final
               </th>
             </tr>
           </thead>
           <tbody>
             {orden.detalles.map((detalle, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-2 py-2 border-b border-gray-300">
+              <tr
+                key={idx}
+                className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+              >
+                <td className="px-4 py-2.5 text-slate-900 font-semibold text-xs">
                   {detalle.descripcion || "N/A"}
                 </td>
-                <td className="px-2 py-2 border-b border-gray-300">
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-800 font-bold text-xs">
                   {detalle.cantidad}
                 </td>
-                <td className="px-2 py-2 border-b border-gray-300">
+                <td className="px-4 py-2.5 text-slate-700 text-xs font-medium">
                   {detalle.nombre_etapa_final}
                 </td>
               </tr>
@@ -597,14 +638,17 @@ const ListaOrdenesFabricacion = () => {
 
   const renderAvancesPorArticulo = (orden) => {
     if (!orden.avances || orden.avances.length === 0) {
-      return <div className="mt-4">No hay avances registrados.</div>;
+      return (
+        <p className="text-sm text-slate-400 py-2">
+          No hay avances registrados.
+        </p>
+      );
     }
 
     const ordenCompletada = esOrdenCompletada(orden.estado);
 
     const avancesPorArticulo = {};
     orden.avances.forEach((avance) => {
-      // Intenta encontrar la descripción del artículo desde los detalles de la orden
       const articuloAsociado = orden.detalles.find(
         (det) => det.id_articulo === avance.id_articulo,
       );
@@ -630,35 +674,38 @@ const ListaOrdenesFabricacion = () => {
     });
 
     return (
-      <>
+      <div className="flex flex-col gap-4">
         {Object.entries(avancesPorArticulo).map(([idArticulo, data], idx) => (
-          <div key={idx} className="mt-6">
-            <h3 className="font-bold text-gray-800 mb-2">
-              Artículo: {data.descripcion}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden">
-                <thead className="bg-gray-200 text-gray-700">
-                  <tr>
-                    <th className="px-2 py-2 border-b border-gray-300">
+          <div key={idx}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-1 h-4 rounded-full bg-indigo-400 inline-block"></span>
+              <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                {data.descripcion}
+              </p>
+            </div>
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200">
+                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Etapa
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
+                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Responsable
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Cantidad
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
-                      Costo de fabricación
+                    <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Costo fab.
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
+                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Estado
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
+                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Observaciones
                     </th>
-                    <th className="px-2 py-2 border-b border-gray-300">
+                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Fecha
                     </th>
                   </tr>
@@ -679,20 +726,25 @@ const ListaOrdenesFabricacion = () => {
                       : trabajadores;
 
                     return (
-                      <tr key={idx2} className="hover:bg-gray-50">
-                        <td className="px-2 py-2 border-b border-gray-300">
+                      <tr
+                        key={idx2}
+                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-4 py-2.5 text-slate-900 text-xs font-semibold">
                           {avance.nombre_etapa || "N/A"}
                         </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
+                        <td className="px-4 py-2.5">
                           {ordenCompletada ? (
                             <div className="flex items-center gap-2">
-                              <span>{avance.nombre_trabajador || "N/A"}</span>
+                              <span className="text-slate-800 font-semibold text-xs">
+                                {avance.nombre_trabajador || "N/A"}
+                              </span>
                               <button
                                 className="text-slate-300 cursor-not-allowed"
                                 title="La orden está completada. No se puede editar el responsable."
                                 disabled
                               >
-                                <FiEdit />
+                                <FiEdit size={11} />
                               </button>
                             </div>
                           ) : editandoAvanceResponsable?.[
@@ -711,7 +763,7 @@ const ListaOrdenesFabricacion = () => {
                                     [avance.id_avance_etapa]: e.target.value,
                                   }));
                                 }}
-                                className="border rounded px-2 py-1 border-slate-300"
+                                className="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-slate-400"
                               >
                                 <option value="">Selecciona responsable</option>
                                 {trabajadoresFiltrados.map((trab) => (
@@ -724,7 +776,7 @@ const ListaOrdenesFabricacion = () => {
                                 ))}
                               </select>
                               <button
-                                className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
+                                className="px-2 py-1 text-xs text-white bg-slate-800 rounded-lg hover:bg-slate-700 font-medium cursor-pointer"
                                 onClick={async () => {
                                   const nuevoTrabajadorRaw =
                                     editandoAvanceResponsable[
@@ -808,7 +860,7 @@ const ListaOrdenesFabricacion = () => {
                                 Guardar
                               </button>
                               <button
-                                className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+                                className="px-2 py-1 text-xs text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer"
                                 onClick={() =>
                                   setEditandoAvanceResponsable((prev) => {
                                     const n = { ...prev };
@@ -822,18 +874,20 @@ const ListaOrdenesFabricacion = () => {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span>{avance.nombre_trabajador || "N/A"}</span>
+                              <span className="text-slate-800 font-semibold text-xs">
+                                {avance.nombre_trabajador || "N/A"}
+                              </span>
                               {trabajadoresFiltrados.length === 0 ? (
                                 <button
-                                  className="text-gray-400 cursor-not-allowed"
+                                  className="text-slate-300 cursor-not-allowed"
                                   title="No hay trabajadores con el cargo requerido"
                                   disabled
                                 >
-                                  <FiEdit />
+                                  <FiEdit size={11} />
                                 </button>
-                              ) : (
+                              ) : canEditAdvance ? (
                                 <button
-                                  className="text-slate-700 hover:text-slate-900 cursor-pointer"
+                                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
                                   title="Editar responsable"
                                   onClick={() =>
                                     setEditandoAvanceResponsable((prev) => ({
@@ -844,19 +898,137 @@ const ListaOrdenesFabricacion = () => {
                                     }))
                                   }
                                 >
-                                  <FiEdit />
+                                  <FiEdit size={11} />
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {ordenCompletada ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-slate-800 font-bold tabular-nums text-xs">
+                                {avance.cantidad}
+                              </span>
+                              <button
+                                className="text-slate-300 cursor-not-allowed"
+                                title="La orden está completada. No se puede editar la cantidad."
+                                disabled
+                              >
+                                <FiEdit size={11} />
+                              </button>
+                            </div>
+                          ) : editandoAvanceCantidad[avance.id_avance_etapa] !==
+                            undefined ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                value={
+                                  editandoAvanceCantidad[avance.id_avance_etapa]
+                                }
+                                onChange={(e) => {
+                                  setEditandoAvanceCantidad((prev) => ({
+                                    ...prev,
+                                    [avance.id_avance_etapa]: e.target.value,
+                                  }));
+                                }}
+                                className="border border-slate-200 rounded-lg px-2 py-1 text-xs w-16 text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
+                              />
+                              <button
+                                className="px-2 py-1 text-xs text-white bg-slate-800 rounded-lg hover:bg-slate-700 font-medium cursor-pointer"
+                                onClick={async () => {
+                                  const num = Number(
+                                    editandoAvanceCantidad[
+                                      avance.id_avance_etapa
+                                    ],
+                                  );
+                                  if (!num || num <= 0) {
+                                    toast.error("Ingresa una cantidad válida");
+                                    return;
+                                  }
+                                  try {
+                                    await api.put(
+                                      `/avance-etapas/${avance.id_avance_etapa}/cantidad`,
+                                      { cantidad: num },
+                                    );
+                                    setOrdenes((prev) =>
+                                      prev.map((o) => {
+                                        if (
+                                          o.id_orden_fabricacion !==
+                                          orden.id_orden_fabricacion
+                                        )
+                                          return o;
+                                        const avancesActualizados = (
+                                          o.avances || []
+                                        ).map((av) =>
+                                          av.id_avance_etapa ===
+                                          avance.id_avance_etapa
+                                            ? { ...av, cantidad: num }
+                                            : av,
+                                        );
+                                        return {
+                                          ...o,
+                                          avances: avancesActualizados,
+                                        };
+                                      }),
+                                    );
+                                    setEditandoAvanceCantidad((prev) => {
+                                      const n = { ...prev };
+                                      delete n[avance.id_avance_etapa];
+                                      return n;
+                                    });
+                                    toast.success("Cantidad actualizada");
+                                  } catch (error) {
+                                    const msg =
+                                      error?.response?.data?.error ||
+                                      "No se pudo actualizar la cantidad";
+                                    toast.error(msg);
+                                  }
+                                }}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="px-2 py-1 text-xs text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer"
+                                onClick={() =>
+                                  setEditandoAvanceCantidad((prev) => {
+                                    const n = { ...prev };
+                                    delete n[avance.id_avance_etapa];
+                                    return n;
+                                  })
+                                }
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-slate-800 font-bold tabular-nums text-xs">
+                                {avance.cantidad}
+                              </span>
+                              {canEditAdvanceQuantity && (
+                                <button
+                                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                  title="Editar cantidad"
+                                  onClick={() =>
+                                    setEditandoAvanceCantidad((prev) => ({
+                                      ...prev,
+                                      [avance.id_avance_etapa]:
+                                        avance.cantidad || 0,
+                                    }))
+                                  }
+                                >
+                                  <FiEdit size={11} />
                                 </button>
                               )}
                             </div>
                           )}
                         </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.cantidad}
-                        </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
+                        <td className="px-4 py-2.5 text-right">
                           {ordenCompletada ? (
-                            <div className="flex items-center gap-2">
-                              <span>
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-slate-800 font-bold tabular-nums text-xs">
                                 {formatCOP(Number(avance.costo_fabricacion))}
                               </span>
                               <button
@@ -864,12 +1036,12 @@ const ListaOrdenesFabricacion = () => {
                                 title="La orden está completada. No se puede editar el costo."
                                 disabled
                               >
-                                <FiEdit />
+                                <FiEdit size={11} />
                               </button>
                             </div>
                           ) : editandoAvanceCosto[avance.id_avance_etapa] !==
                             undefined ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-end gap-2">
                               <input
                                 type="text"
                                 value={
@@ -890,10 +1062,10 @@ const ListaOrdenesFabricacion = () => {
                                     [avance.id_avance_etapa]: formatCOP(num),
                                   }));
                                 }}
-                                className="border rounded px-2 py-1 border-slate-300"
+                                className="border border-slate-200 rounded-lg px-2 py-1 text-xs w-28 text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
                               />
                               <button
-                                className="px-2 py-1 text-white bg-slate-700 rounded hover:bg-slate-600 cursor-pointer"
+                                className="px-2 py-1 text-xs text-white bg-slate-800 rounded-lg hover:bg-slate-700 font-medium cursor-pointer"
                                 onClick={async () => {
                                   const formVal =
                                     editandoAvanceCosto[avance.id_avance_etapa];
@@ -907,7 +1079,6 @@ const ListaOrdenesFabricacion = () => {
                                       `/avance-etapas/${avance.id_avance_etapa}/costo`,
                                       { costo_fabricacion: num },
                                     );
-                                    // actualizar en memoria
                                     setOrdenes((prev) =>
                                       prev.map((o) => {
                                         if (
@@ -946,7 +1117,7 @@ const ListaOrdenesFabricacion = () => {
                                 Guardar
                               </button>
                               <button
-                                className="px-2 py-1 text-slate-700 bg-gray-200 rounded hover:bg-gray-300 cursor-pointer"
+                                className="px-2 py-1 text-xs text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer"
                                 onClick={() =>
                                   setEditandoAvanceCosto((prev) => {
                                     const n = { ...prev };
@@ -959,35 +1130,67 @@ const ListaOrdenesFabricacion = () => {
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <span>
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-slate-800 font-bold tabular-nums text-xs">
                                 {formatCOP(Number(avance.costo_fabricacion))}
                               </span>
-                              <button
-                                className="text-slate-700 hover:text-slate-900 cursor-pointer"
-                                title="Editar costo"
-                                onClick={() =>
-                                  setEditandoAvanceCosto((prev) => ({
-                                    ...prev,
-                                    [avance.id_avance_etapa]: formatCOP(
-                                      Number(avance.costo_fabricacion) || 0,
-                                    ),
-                                  }))
-                                }
-                              >
-                                <FiEdit />
-                              </button>
+                              {canEditAdvance && (
+                                <button
+                                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                  title="Editar costo"
+                                  onClick={() =>
+                                    setEditandoAvanceCosto((prev) => ({
+                                      ...prev,
+                                      [avance.id_avance_etapa]: formatCOP(
+                                        Number(avance.costo_fabricacion) || 0,
+                                      ),
+                                    }))
+                                  }
+                                >
+                                  <FiEdit size={11} />
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.estado || "-"}
+                        <td className="px-4 py-2.5">
+                          {(() => {
+                            const est = (avance.estado || "").toLowerCase();
+                            const CLS = {
+                              completado:
+                                "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                              completada:
+                                "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                              "en proceso":
+                                "bg-indigo-50 text-indigo-700 border border-indigo-200",
+                              pendiente:
+                                "bg-amber-50 text-amber-700 border border-amber-200",
+                              parcial:
+                                "bg-sky-50 text-sky-700 border border-sky-200",
+                            };
+                            const cls =
+                              CLS[est] ||
+                              "bg-slate-50 text-slate-600 border border-slate-200";
+                            return est ? (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${cls}`}
+                              >
+                                {avance.estado.toUpperCase()}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            );
+                          })()}
                         </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {avance.observaciones || "-"}
+                        <td className="px-4 py-2.5 text-slate-600 text-xs">
+                          {avance.observaciones || (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
-                        <td className="px-2 py-2 border-b border-gray-300">
-                          {new Date(avance.fecha_registro).toLocaleDateString()}
+                        <td className="px-4 py-2.5 text-slate-500 text-xs font-medium whitespace-nowrap">
+                          {new Date(avance.fecha_registro).toLocaleDateString(
+                            "es-CO",
+                          )}
                         </td>
                       </tr>
                     );
@@ -997,16 +1200,9 @@ const ListaOrdenesFabricacion = () => {
             </div>
           </div>
         ))}
-        <button
-          onClick={() => setExpandedOrden(null)}
-          className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 flex items-center gap-2 cursor-pointer"
-        >
-          <FiArrowUp /> Cerrar Avances
-        </button>
-      </>
+      </div>
     );
   };
-
   const manejarRegistroAvance = async (idOrden, formulario) => {
     if (!formulario) {
       toast.error("Formulario vacío");
@@ -1082,7 +1278,9 @@ const ListaOrdenesFabricacion = () => {
       }
 
       // Envía el avance.
-      await api.post("/avance-etapas", datos);
+      await api.post("/avance-etapas", datos, {
+        headers: { "X-Idempotency-Key": avanceKey },
+      });
 
       // Obtiene los datos de la orden actualizada.
       const res = await api.get(`/ordenes-fabricacion/${idOrden}`);
@@ -1147,137 +1345,136 @@ const ListaOrdenesFabricacion = () => {
     }
   };
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      {/* Modal para consumo de materia prima */}
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Modal consumo de materia prima */}
       {showModalConsumo && (
-        <div className="flex items-center justify-center fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-fade-in">
+        <div className="flex items-center justify-center fixed inset-0 z-40 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
             <div className="flex flex-col items-center mb-4">
               <div className="bg-amber-100 rounded-full p-3 mb-2">
-                <FiTrendingUp className="text-amber-600" size={32} />
+                <FiTrendingUp className="text-amber-700" size={28} />
               </div>
-              <h3 className="text-2xl font-bold text-amber-700 mb-1">
+              <h3 className="text-xl font-bold text-amber-700 mb-1">
                 ¡Acción requerida!
               </h3>
-              <p className="text-gray-700 text-base font-medium mb-2">
+              <p className="text-slate-700 text-sm font-medium mb-1">
                 Registraste un avance en mecanizado, pero aún no has registrado
                 consumos de materia prima.
               </p>
-              <p className="text-gray-500 text-sm mb-2">
-                ¿Deseas hacerlo ahora?
-              </p>
+              <p className="text-slate-400 text-xs">¿Deseas hacerlo ahora?</p>
             </div>
-            <div className="flex flex-row gap-3 justify-center mt-2">
+            <div className="flex gap-3 justify-center mt-4">
               <button
-                className="cursor-pointer flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-5 py-2 rounded-xl font-semibold shadow-md transition-all duration-150"
+                className="cursor-pointer inline-flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-colors"
                 onClick={() => {
                   setShowModalConsumo(false);
                   setDrawerConsumo(true);
                 }}
               >
-                <FiBox size={20} /> Registrar consumo
+                <FiBox size={16} /> Registrar consumo
               </button>
               <button
-                className="cursor-pointer flex items-center gap-2 bg-gray-100 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded-xl font-semibold shadow-md transition-all duration-150"
+                className="cursor-pointer inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
                 onClick={() => setShowModalConsumo(false)}
               >
-                <FiX size={20} /> Cancelar
+                <FiX size={16} /> Cancelar
               </button>
             </div>
           </div>
         </div>
       )}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h2 className="text-4xl font-bold text-gray-800">
-            Órdenes de fabricación
-          </h2>
-          <div className="w-full md:flex-1 md:ml-100px md:justify-end flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-            {/* Filtro por ID de orden */}
-            <div className="w-full md:w-32">
-              <label className="block text-gray-700 font-semibold mb-1">
-                ID Orden
-              </label>
+
+      {/* Header + botones de navegación */}
+      <div className="flex flex-col gap-3">
+        {/* Fila 1: título | filtros */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
+          {/* Título */}
+          <div className="flex items-center gap-2 shrink-0">
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+              Órdenes de fabricación
+            </h1>
+            {total > 0 && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
+                {total}
+              </span>
+            )}
+          </div>
+
+          {/* Filtros — siempre en una sola fila, se encogen proporcionalmente */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {/* ID */}
+            <input
+              type="text"
+              placeholder="#ID orden"
+              className="flex-[1] min-w-0 w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400 transition"
+              value={searchTerm}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && !val.startsWith("#")) {
+                  setSearchTerm("#" + val);
+                } else {
+                  setSearchTerm(val);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setPage(1);
+                }
+              }}
+            />
+
+            {/* Artículo */}
+            <div
+              className="relative flex-[3] min-w-0 w-0"
+              ref={articuloFilterRef}
+            >
               <input
                 type="text"
-                placeholder="#105"
-                className="w-full border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-                value={searchTerm}
+                placeholder="Buscar por artículo…"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400 transition pr-8"
+                value={articuloQuery}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  // Asegurar que siempre tenga el prefijo #
-                  if (val && !val.startsWith("#")) {
-                    setSearchTerm("#" + val);
-                  } else {
-                    setSearchTerm(val);
-                  }
+                  setArticuloQuery(e.target.value);
+                  setArticuloSeleccion(null);
+                  setShowSugArticulos(true);
                 }}
+                onFocus={() => setShowSugArticulos(true)}
                 onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowSugArticulos(false);
+                    e.currentTarget.blur();
+                  }
                   if (e.key === "Enter") {
-                    setPage(1);
-                    fetchOrdenes();
+                    const s = sugerenciasArticulos;
+                    if (s.length > 0) {
+                      setArticuloSeleccion(s[0]);
+                      setArticuloQuery(s[0].label);
+                      setShowSugArticulos(false);
+                      e.preventDefault();
+                    }
                   }
                 }}
               />
-            </div>
-            {/* Filtro por artículo */}
-            <div
-              className="w-full md:w-[28rem] lg:w-[32rem] relative"
-              ref={articuloFilterRef}
-            >
-              <label className="block text-gray-700 font-semibold mb-1">
-                Artículo en la orden
-              </label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  placeholder="Escribe y selecciona…"
-                  className="flex-grow border border-gray-500 rounded-md px-3 py-2 h-[42px]"
-                  value={articuloQuery}
-                  onChange={(e) => {
-                    setArticuloQuery(e.target.value);
-                    setArticuloSeleccion(null);
-                    setShowSugArticulos(true);
-                  }}
-                  onFocus={() => setShowSugArticulos(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      setShowSugArticulos(false);
-                      e.currentTarget.blur();
-                    }
-                    if (e.key === "Enter") {
-                      const s = sugerenciasArticulos;
-                      if (s.length > 0) {
-                        const opt = s[0];
-                        setArticuloSeleccion(opt);
-                        setArticuloQuery(opt.label);
-                        setShowSugArticulos(false);
-                        e.preventDefault();
-                      }
-                    }
-                  }}
-                />
+              {(articuloQuery || articuloSeleccion) && (
                 <button
                   type="button"
-                  className="h-[42px] px-3 border border-slate-300 rounded-md cursor-pointer text-slate-600 hover:bg-slate-100 flex items-center justify-center"
-                  title="Limpiar"
-                  aria-label="Limpiar"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
                   onClick={() => {
                     setArticuloQuery("");
                     setArticuloSeleccion(null);
                     setShowSugArticulos(false);
                   }}
                 >
-                  <FiX size={18} />
+                  <FiX size={13} />
                 </button>
-              </div>
+              )}
               {showSugArticulos && sugerenciasArticulos.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full border border-slate-200 rounded-md bg-white max-h-56 overflow-auto">
-                  <ul className="divide-y divide-slate-100">
+                <div className="absolute z-20 top-full mt-1 w-full border border-slate-200 rounded-xl bg-white shadow-lg max-h-56 overflow-auto">
+                  <ul className="divide-y divide-slate-100 py-1">
                     {sugerenciasArticulos.map((opt) => (
                       <li
                         key={opt.value}
-                        className="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
+                        className="px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 cursor-pointer transition-colors"
                         onMouseDown={() => {
                           setArticuloSeleccion(opt);
                           setArticuloQuery(opt.label);
@@ -1291,572 +1488,755 @@ const ListaOrdenesFabricacion = () => {
                 </div>
               )}
             </div>
-            {/* Filtro por estado */}
-            <div className="w-full md:w-64">
-              <label className="block text-gray-700 font-semibold mb-1">
-                Filtrar por estado:
-              </label>
-              <select
-                value={filtroEstadoActivas}
-                onChange={handleFiltroEstadoChange}
-                disabled={mostrarCanceladas}
-                className={`w-full h-[42px] border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 ${
-                  mostrarCanceladas
-                    ? "bg-gray-200 cursor-not-allowed text-gray-600"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                <option value="todas">Todas</option>
-                <option value="pendiente">Pendientes</option>
-                <option value="en proceso">En proceso</option>
-                <option value="completada">Completadas</option>
-              </select>
-            </div>
+
+            {/* Estado */}
+            <select
+              value={filtroEstadoActivas}
+              onChange={handleFiltroEstadoChange}
+              disabled={mostrarCanceladas}
+              className="flex-[1.5] min-w-0 w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              <option value="todas">Todos los estados</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="en proceso">En proceso</option>
+              <option value="completada">Completadas</option>
+            </select>
           </div>
         </div>
-        {/* Botones de acción - grid simétrico 2x4 en desktop */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+
+        {/* Fila 2: acciones */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 w-full mb-4">
           {canCreate && (
             <button
               onClick={() => navigate("/ordenes_fabricacion/nuevo")}
-              className="w-full bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+              className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-white shadow-sm transition-colors cursor-pointer"
             >
-              <FiPlus size={16} /> Orden
+              <FiPlus size={14} /> Nueva orden
             </button>
           )}
           <button
             onClick={() => navigate("/etapas_produccion")}
-            className="w-full bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 shadow-sm transition-colors cursor-pointer"
           >
-            <FiPlus size={16} /> Etapa
+            <FiPlus size={14} /> Etapa
           </button>
           <button
             onClick={() => navigate("/lotes_fabricados")}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 shadow-sm transition-colors cursor-pointer"
           >
-            <FiBox size={16} /> Lotes
+            <FiBox size={14} /> Lotes
           </button>
           <button
             onClick={() => navigate("/avances_fabricacion")}
-            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-sm transition-colors cursor-pointer"
           >
-            <FiArrowRight size={16} /> Avances
+            <FiArrowRight size={14} /> Avances
           </button>
           <button
             onClick={() => setDrawerConsumo(true)}
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 shadow-sm transition-colors cursor-pointer"
           >
-            <FiBox size={16} /> Consumo
+            <FiBox size={14} /> Consumo
           </button>
           <button
             onClick={() => navigate("/progreso-fabricacion")}
-            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 shadow-sm transition-colors cursor-pointer"
           >
-            <FiArrowRight size={16} /> Progreso
+            <FiTrendingUp size={14} /> Progreso
           </button>
           <button
             onClick={toggleMostrarCanceladas}
-            className={`w-full h-[40px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-md font-medium text-sm transition cursor-pointer ${
+            className={`inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-lg shadow-sm transition-colors cursor-pointer ${
               mostrarCanceladas
-                ? "bg-rose-600 hover:bg-rose-700 text-white"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-700"
+                ? "bg-red-600 hover:bg-red-500 text-white border border-red-600"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
             }`}
           >
             {mostrarCanceladas ? (
               <>
-                <FiEye size={16} /> Activas
+                <FiEye size={14} /> Ver activas
               </>
             ) : (
               <>
-                <FiEyeOff size={16} /> Canceladas
+                <FiEyeOff size={14} /> Canceladas
               </>
             )}
           </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="w-full bg-gray-200 hover:bg-gray-300 text-slate-700 px-3 py-2 rounded-md font-medium text-sm h-[40px] flex items-center justify-center gap-1.5 cursor-pointer transition"
-          >
-            <FiArrowLeft size={16} /> Volver
-          </button>
         </div>
       </div>
-      <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-          <thead className="bg-slate-200 text-gray-700 uppercase font-semibold">
-            <tr>
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">Fecha inicio</th>
-              <th className="px-4 py-3">Fecha fin estimada</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Orden de pedido</th>
-              <th className="px-4 py-3 text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="6" className="text-center py-4 text-gray-500">
-                  Cargando…
-                </td>
+
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-200">
+                <th className="px-4 py-3 w-8"></th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Fecha inicio
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Fecha fin est.
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Pedido
+                </th>
+                <th className="px-4 py-3 w-32"></th>
               </tr>
-            ) : ordenesFiltradas.length > 0 ? (
-              ordenesFiltradas.map((orden) => (
-                <React.Fragment key={orden.id_orden_fabricacion}>
-                  <tr
-                    className={`cursor-pointer transition select-none ${
-                      expandedOrden === orden.id_orden_fabricacion
-                        ? "bg-gray-200"
-                        : "hover:bg-gray-200"
-                    }`}
-                    onClick={() => expandirOrden(orden.id_orden_fabricacion)}
-                  >
-                    <td className="px-4 py-2">{orden.id_orden_fabricacion}</td>
-                    <td className="px-4 py-2">
-                      {orden.fecha_inicio
-                        ? String(orden.fecha_inicio)
-                            .substring(0, 10)
-                            .split("-")
-                            .reverse()
-                            .join("/")
-                        : ""}
-                    </td>
-
-                    <td className="px-4 py-2">
-                      {orden.fecha_fin_estimada
-                        ? String(orden.fecha_fin_estimada)
-                            .substring(0, 10)
-                            .split("-")
-                            .reverse()
-                            .join("/")
-                        : ""}
-                    </td>
-                    <td className="px-4 py-2 capitalize">{orden.estado}</td>
-                    <td className="px-4 py-2">
-                      {orden.nombre_cliente
-                        ? `#${orden.id_pedido} - ${orden.nombre_cliente}`
-                        : orden.id_pedido
-                          ? `#${orden.id_pedido}`
-                          : "No asociada"}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <div className="flex items-center gap-4 justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(
-                              `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
-                            );
-                          }}
-                          className="text-blue-600 hover:text-blue-400 transition cursor-pointer"
-                          title="Ver progreso de fabricación"
-                        >
-                          <FiTrendingUp size={18} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate("/costos_indirectos/nuevo", {
-                              state: {
-                                id_orden_fabricacion:
-                                  orden.id_orden_fabricacion,
-                              },
-                            });
-                          }}
-                          className="text-emerald-700 hover:text-emerald-500 transition cursor-pointer"
-                          title="Registrar costo indirecto para esta OF"
-                        >
-                          <FiPlus size={18} />
-                        </button>
-                        {canDelete && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              eliminarOrden(orden.id_orden_fabricacion);
-                            }}
-                            className="text-red-600 hover:text-red-400 transition cursor-pointer"
-                            title="Eliminar orden"
-                          >
-                            <FiTrash2 size={18} />
-                          </button>
-                        )}
-                        {!canDelete && (
-                          <span className="text-gray-400 italic select-none">
-                            Sin permisos
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedOrden === orden.id_orden_fabricacion && (
-                    <tr>
-                      <td
-                        colSpan="6"
-                        className="bg-gray-100 px-6 py-4 border-b"
-                      >
-                        <div className="mb-2 font-semibold text-slate-700">
-                          Detalles de la orden:
-                        </div>
-                        {renderDetalles(orden)}
-                        {renderAvancesPorArticulo(orden)}
-                        {(() => {
-                          const completada = esOrdenCompletada(orden.estado);
-                          if (completada) {
-                            return (
-                              <div className="mt-4 flex items-center gap-6">
-                                <button
-                                  type="button"
-                                  disabled
-                                  title="La orden está completada. No se pueden registrar más avances."
-                                  className="text-slate-400 flex items-center gap-2 cursor-not-allowed"
-                                >
-                                  <FiPlus /> Registrar nuevo avance
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    navigate(
-                                      `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
-                                    )
-                                  }
-                                  className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
-                                  title="Ver progreso de fabricación"
-                                >
-                                  <FiTrendingUp /> Ver progreso de fabricación
-                                </button>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="mt-4 flex items-center gap-6">
-                              <button
-                                onClick={() =>
-                                  setMostrarFormularioAvance((prev) =>
-                                    prev === orden.id_orden_fabricacion
-                                      ? null
-                                      : orden.id_orden_fabricacion,
-                                  )
-                                }
-                                className="text-slate-700 flex items-center gap-2 hover:underline cursor-pointer"
-                              >
-                                <FiPlus /> Registrar nuevo avance
-                              </button>
-                              <button
-                                onClick={() =>
-                                  navigate("/costos_indirectos/nuevo", {
-                                    state: {
-                                      id_orden_fabricacion:
-                                        orden.id_orden_fabricacion,
-                                    },
-                                  })
-                                }
-                                className="text-emerald-700 flex items-center gap-2 hover:underline cursor-pointer"
-                                title="Registrar un costo indirecto y asignarlo a esta OF"
-                              >
-                                <FiPlus /> Registrar costo indirecto
-                              </button>
-                              <button
-                                onClick={() =>
-                                  navigate(
-                                    `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
-                                  )
-                                }
-                                className="text-blue-600 flex items-center gap-2 hover:underline cursor-pointer"
-                                title="Ver progreso de fabricación"
-                              >
-                                <FiTrendingUp /> Ver progreso de fabricación
-                              </button>
-                            </div>
-                          );
-                        })()}
-                        {mostrarFormularioAvance ===
-                          orden.id_orden_fabricacion &&
-                          !esOrdenCompletada(orden.estado) && (
-                            <div
-                              ref={formularioAvanceRef}
-                              className="mt-4 p-4 rounded-md bg-white shadow border border-slate-200 animate-fade-in-up"
-                            >
-                              <form
-                                onSubmit={(e) => {
-                                  e.preventDefault();
-                                  if (esOrdenCompletada(orden.estado)) {
-                                    toast.error(
-                                      "La orden está completada. No se pueden registrar más avances.",
-                                    );
-                                    setMostrarFormularioAvance(null);
-                                    return;
-                                  }
-                                  const form =
-                                    formularios[orden.id_orden_fabricacion] ||
-                                    {};
-                                  const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                  const valorEnEdicion =
-                                    editandoCosto[claveCosto];
-                                  const costoNormalizado =
-                                    valorEnEdicion !== undefined
-                                      ? cleanCOPFormat(valorEnEdicion)
-                                      : Number(form?.costo_fabricacion) || 0;
-
-                                  const formNormalizado = {
-                                    ...form,
-                                    costo_fabricacion: costoNormalizado,
-                                  };
-
-                                  manejarRegistroAvance(
-                                    orden.id_orden_fabricacion,
-                                    formNormalizado,
-                                  );
-                                }}
-                                className="mt-4 space-y-3 bg-white rounded-xl p-4 border border-slate-200"
-                              >
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                  <select
-                                    value={
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.articulo || ""
-                                    }
-                                    onChange={(e) =>
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "articulo",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="border rounded px-2 py-1 border-slate-300 p-5"
-                                  >
-                                    <option value="">
-                                      Selecciona el artículo
-                                    </option>
-                                    {(
-                                      articulosPendientesPorOrden[
-                                        orden.id_orden_fabricacion
-                                      ] || []
-                                    ).map((art) => (
-                                      <option key={art.value} value={art.value}>
-                                        {art.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    value={
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.etapa || ""
-                                    }
-                                    onChange={(e) =>
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "etapa",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="border rounded px-2 py-1 border-slate-300 p-5"
-                                  >
-                                    <option value="">Selecciona etapa</option>
-                                    {(
-                                      etapasDisponibles[
-                                        orden.id_orden_fabricacion
-                                      ] || []
-                                    ).map((etapa) => (
-                                      <option
-                                        key={etapa.value}
-                                        value={etapa.value}
-                                      >
-                                        {etapa.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    value={
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.trabajador || ""
-                                    }
-                                    onChange={(e) =>
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "trabajador",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="border rounded px-2 py-1 border-slate-300 p-5"
-                                  >
-                                    <option value="">
-                                      Selecciona trabajador
-                                    </option>
-                                    {(
-                                      trabajadoresDisponibles[
-                                        orden.id_orden_fabricacion
-                                      ] || []
-                                    ).map((trab) => (
-                                      <option
-                                        key={trab.value}
-                                        value={trab.value}
-                                      >
-                                        {trab.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <input
-                                    type="number"
-                                    placeholder="Cantidad"
-                                    value={
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.cantidad || ""
-                                    }
-                                    onChange={(e) =>
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "cantidad",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="border rounded px-2 py-1 border-slate-300 p-5 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
-                                  />
-                                  <input
-                                    type="text"
-                                    placeholder="Costo de fabricación unitario"
-                                    value={(() => {
-                                      const form =
-                                        formularios[
-                                          orden.id_orden_fabricacion
-                                        ] || {};
-                                      const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                      const enEdicion = editandoCosto[clave];
-                                      if (enEdicion !== undefined)
-                                        return enEdicion;
-                                      const num = Number(
-                                        form?.costo_fabricacion,
-                                      );
-                                      return Number.isFinite(num) && num > 0
-                                        ? formatCOP(num)
-                                        : "";
-                                    })()}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      const form =
-                                        formularios[
-                                          orden.id_orden_fabricacion
-                                        ] || {};
-                                      const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
-                                      if (!raw || raw.trim() === "") {
-                                        setEditandoCosto((prev) => ({
-                                          ...prev,
-                                          [clave]: "",
-                                        }));
-                                        actualizarFormulario(
-                                          orden.id_orden_fabricacion,
-                                          "costo_fabricacion",
-                                          "",
-                                        );
-                                        return;
-                                      }
-                                      const num = cleanCOPFormat(raw);
-                                      costoManualEditado.current[clave] = true;
-                                      setEditandoCosto((prev) => ({
-                                        ...prev,
-                                        [clave]: formatCOP(num),
-                                      }));
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "costo_fabricacion",
-                                        num,
-                                      );
-                                    }}
-                                    onFocus={() => {
-                                      /* mantener formato mientras escribe */
-                                    }}
-                                    onBlur={() => {
-                                      /* ya formateado en onChange */
-                                    }}
-                                    className="border rounded px-2 py-1 border-slate-300 p-5"
-                                  />
-                                  <input
-                                    type="text"
-                                    placeholder="Observaciones"
-                                    value={
-                                      formularios[orden.id_orden_fabricacion]
-                                        ?.observaciones || ""
-                                    }
-                                    onChange={(e) =>
-                                      actualizarFormulario(
-                                        orden.id_orden_fabricacion,
-                                        "observaciones",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="border rounded px-2 py-1 border-slate-300 p-5"
-                                  />
-                                </div>
-                                <div className="flex justify-end gap-2 mt-4">
-                                  <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 cursor-pointer"
-                                  >
-                                    Registrar avance
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setMostrarFormularioAvance(null)
-                                    }
-                                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 cursor-pointer"
-                                  >
-                                    Cerrar
-                                  </button>
-                                </div>
-                              </form>
-                            </div>
-                          )}
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    {Array.from({ length: 7 }).map((__, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="animate-pulse h-4 bg-slate-100 rounded w-full" />
                       </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="text-center py-4 text-gray-500">
-                  No se encontraron órdenes.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
-              de{" "}
-              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
-              — <span className="font-semibold text-gray-800">{total}</span>{" "}
-              órdenes
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={!hasPrev}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
-              >
-                ← Anterior
-              </button>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={!hasNext}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
-              >
-                Siguiente →
-              </button>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(parseInt(e.target.value));
-                  setPage(1);
-                }}
-                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-              >
-                <option value={10}>10 / página</option>
-                <option value={25}>25 / página</option>
-                <option value={50}>50 / página</option>
-              </select>
+                    ))}
+                  </tr>
+                ))
+              ) : ordenesFiltradas.length > 0 ? (
+                ordenesFiltradas.map((orden) => {
+                  const isExpanded =
+                    expandedOrden === orden.id_orden_fabricacion;
+                  const estado = (orden.estado || "").toLowerCase().trim();
+                  const ESTADO_BADGE = {
+                    pendiente:
+                      "bg-amber-50 text-amber-700 border border-amber-200",
+                    "en proceso":
+                      "bg-indigo-50 text-indigo-700 border border-indigo-200",
+                    completada:
+                      "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                    cancelada: "bg-red-50 text-red-700 border border-red-200",
+                  };
+                  const badgeClass =
+                    ESTADO_BADGE[estado] ||
+                    "bg-slate-50 text-slate-600 border border-slate-200";
+                  const ESTADO_BORDER = {
+                    pendiente: "border-l-amber-400",
+                    "en proceso": "border-l-indigo-400",
+                    completada: "border-l-emerald-400",
+                    cancelada: "border-l-red-400",
+                  };
+                  const borderColor =
+                    ESTADO_BORDER[estado] || "border-l-slate-200";
+
+                  return (
+                    <React.Fragment key={orden.id_orden_fabricacion}>
+                      <tr
+                        className={`border-b last:border-b-0 border-slate-200 cursor-pointer transition-all select-none group border-l-4 ${
+                          isExpanded
+                            ? "bg-indigo-100 border-l-indigo-500 hover:bg-indigo-100 shadow-md ring-1 ring-indigo-200"
+                            : `${borderColor} border-l-2 border-slate-200 hover:bg-slate-50 hover:shadow-sm`
+                        }`}
+                        onClick={() =>
+                          expandirOrden(orden.id_orden_fabricacion)
+                        }
+                      >
+                        <td className="px-4 py-3.5">
+                          <FiChevronDown
+                            size={16}
+                            className={`transition-transform font-bold ${
+                              isExpanded
+                                ? "rotate-180 text-indigo-600 drop-shadow-sm"
+                                : "text-slate-300 hover:text-slate-500"
+                            }`}
+                          />
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-sm font-extrabold text-slate-900">
+                          #{orden.id_orden_fabricacion}
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-700 text-xs font-medium whitespace-nowrap">
+                          {orden.fecha_inicio
+                            ? String(orden.fecha_inicio)
+                                .substring(0, 10)
+                                .split("-")
+                                .reverse()
+                                .join("/")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-700 text-xs font-medium whitespace-nowrap">
+                          {orden.fecha_fin_estimada
+                            ? String(orden.fecha_fin_estimada)
+                                .substring(0, 10)
+                                .split("-")
+                                .reverse()
+                                .join("/")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ${badgeClass}`}
+                          >
+                            {(orden.estado || "—").toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs">
+                          {orden.nombre_cliente ? (
+                            <span>
+                              <span className="font-mono font-bold text-slate-700">
+                                #{orden.id_pedido}
+                              </span>{" "}
+                              <span className="text-slate-600 font-medium">
+                                — {orden.nombre_cliente}
+                              </span>
+                            </span>
+                          ) : orden.id_pedido ? (
+                            <span className="font-mono font-bold text-slate-700">
+                              #{orden.id_pedido}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">No asociada</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            {canEdit &&
+                              (!orden.avances ||
+                                orden.avances.length === 0) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(
+                                      `/ordenes_fabricacion/editar/${orden.id_orden_fabricacion}`,
+                                    );
+                                  }}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                                  title="Editar orden"
+                                >
+                                  <FiEdit size={14} />
+                                </button>
+                              )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(
+                                  `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
+                                );
+                              }}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
+                              title="Ver progreso"
+                            >
+                              <FiTrendingUp size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate("/costos_indirectos/nuevo", {
+                                  state: {
+                                    id_orden_fabricacion:
+                                      orden.id_orden_fabricacion,
+                                  },
+                                });
+                              }}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                              title="Registrar costo indirecto"
+                            >
+                              <FiPlus size={14} />
+                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  eliminarOrden(orden.id_orden_fabricacion);
+                                }}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr
+                          className="border-b border-indigo-100 bg-indigo-200"
+                          ref={(el) => {
+                            if (el) {
+                              setTimeout(() => {
+                                el.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "nearest",
+                                });
+                              }, 50);
+                            }
+                          }}
+                        >
+                          <td
+                            colSpan="7"
+                            className="px-6 pb-6 pt-4 bg-indigo-50 border-t border-indigo-200"
+                          >
+                            <div className="flex flex-col gap-5">
+                              {/* Artículos a fabricar */}
+                              <div className="bg-white border-2 border-indigo-200 rounded-xl shadow-md overflow-hidden">
+                                <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-indigo-100 bg-indigo-50/60">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                  <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                                    Artículos a fabricar
+                                  </p>
+                                </div>
+                                <div className="p-3">
+                                  {renderDetalles(orden)}
+                                </div>
+                              </div>
+
+                              {/* Avances */}
+                              <div className="bg-white border-2 border-emerald-100 rounded-xl shadow-md overflow-hidden">
+                                <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-emerald-100 bg-emerald-50/60">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                  <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                                    Avances de producción
+                                  </p>
+                                </div>
+                                <div className="p-3">
+                                  {renderAvancesPorArticulo(orden)}
+                                </div>
+                              </div>
+
+                              {/* Acciones rápidas */}
+                              {(() => {
+                                const completada = esOrdenCompletada(
+                                  orden.estado,
+                                );
+                                if (completada) {
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <button
+                                        type="button"
+                                        disabled
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-300 bg-white cursor-not-allowed"
+                                        title="La orden está completada"
+                                      >
+                                        <FiPlus size={12} /> Registrar avance
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          navigate(
+                                            `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
+                                          )
+                                        }
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer"
+                                      >
+                                        <FiTrendingUp size={12} /> Ver progreso
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {canCreateAdvance && (
+                                      <button
+                                        onClick={() => {
+                                          const next =
+                                            mostrarFormularioAvance ===
+                                            orden.id_orden_fabricacion
+                                              ? null
+                                              : orden.id_orden_fabricacion;
+                                          setMostrarFormularioAvance(next);
+                                          if (next)
+                                            setAvanceKey(crypto.randomUUID());
+                                        }}
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+                                      >
+                                        <FiPlus size={12} />
+                                        {mostrarFormularioAvance ===
+                                        orden.id_orden_fabricacion
+                                          ? "Cerrar formulario"
+                                          : "Registrar avance"}
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() =>
+                                        navigate("/costos_indirectos/nuevo", {
+                                          state: {
+                                            id_orden_fabricacion:
+                                              orden.id_orden_fabricacion,
+                                          },
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                    >
+                                      <FiPlus size={12} /> Costo indirecto
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        navigate(
+                                          `/progreso-fabricacion?orden=${orden.id_orden_fabricacion}`,
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer"
+                                    >
+                                      <FiTrendingUp size={12} /> Ver progreso
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Formulario de avance */}
+                              {canCreateAdvance &&
+                                mostrarFormularioAvance ===
+                                  orden.id_orden_fabricacion &&
+                                !esOrdenCompletada(orden.estado) && (
+                                  <div
+                                    ref={formularioAvanceRef}
+                                    className="border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden"
+                                  >
+                                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                                      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                        Registrar avance de producción
+                                      </p>
+                                    </div>
+                                    <form
+                                      onSubmit={(e) => {
+                                        e.preventDefault();
+                                        if (esOrdenCompletada(orden.estado)) {
+                                          toast.error(
+                                            "La orden está completada. No se pueden registrar más avances.",
+                                          );
+                                          setMostrarFormularioAvance(null);
+                                          return;
+                                        }
+                                        const form =
+                                          formularios[
+                                            orden.id_orden_fabricacion
+                                          ] || {};
+                                        const claveCosto = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                        const valorEnEdicion =
+                                          editandoCosto[claveCosto];
+                                        const costoNormalizado =
+                                          valorEnEdicion !== undefined
+                                            ? cleanCOPFormat(valorEnEdicion)
+                                            : Number(form?.costo_fabricacion) ||
+                                              0;
+                                        const formNormalizado = {
+                                          ...form,
+                                          costo_fabricacion: costoNormalizado,
+                                        };
+                                        manejarRegistroAvance(
+                                          orden.id_orden_fabricacion,
+                                          formNormalizado,
+                                        );
+                                      }}
+                                      className="p-4"
+                                    >
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Artículo *
+                                          </label>
+                                          <select
+                                            value={
+                                              formularios[
+                                                orden.id_orden_fabricacion
+                                              ]?.articulo || ""
+                                            }
+                                            onChange={(e) =>
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "articulo",
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                          >
+                                            <option value="">
+                                              Selecciona el artículo
+                                            </option>
+                                            {(
+                                              articulosPendientesPorOrden[
+                                                orden.id_orden_fabricacion
+                                              ] || []
+                                            ).map((art) => (
+                                              <option
+                                                key={art.value}
+                                                value={art.value}
+                                              >
+                                                {art.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Etapa *
+                                          </label>
+                                          <select
+                                            value={
+                                              formularios[
+                                                orden.id_orden_fabricacion
+                                              ]?.etapa || ""
+                                            }
+                                            onChange={(e) =>
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "etapa",
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                          >
+                                            <option value="">
+                                              Selecciona etapa
+                                            </option>
+                                            {(
+                                              etapasDisponibles[
+                                                orden.id_orden_fabricacion
+                                              ] || []
+                                            ).map((etapa) => (
+                                              <option
+                                                key={etapa.value}
+                                                value={etapa.value}
+                                              >
+                                                {etapa.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Trabajador *
+                                          </label>
+                                          <select
+                                            value={
+                                              formularios[
+                                                orden.id_orden_fabricacion
+                                              ]?.trabajador || ""
+                                            }
+                                            onChange={(e) =>
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "trabajador",
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                          >
+                                            <option value="">
+                                              Selecciona trabajador
+                                            </option>
+                                            {(
+                                              trabajadoresDisponibles[
+                                                orden.id_orden_fabricacion
+                                              ] || []
+                                            ).map((trab) => (
+                                              <option
+                                                key={trab.value}
+                                                value={trab.value}
+                                              >
+                                                {trab.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Cantidad *
+                                          </label>
+                                          <input
+                                            type="number"
+                                            placeholder="Cantidad"
+                                            value={
+                                              formularios[
+                                                orden.id_orden_fabricacion
+                                              ]?.cantidad || ""
+                                            }
+                                            onChange={(e) =>
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "cantidad",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                                          />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Costo unitario *
+                                          </label>
+                                          <input
+                                            type="text"
+                                            placeholder="Costo de fabricación unitario"
+                                            value={(() => {
+                                              const form =
+                                                formularios[
+                                                  orden.id_orden_fabricacion
+                                                ] || {};
+                                              const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                              const enEdicion =
+                                                editandoCosto[clave];
+                                              if (enEdicion !== undefined)
+                                                return enEdicion;
+                                              const num = Number(
+                                                form?.costo_fabricacion,
+                                              );
+                                              return Number.isFinite(num) &&
+                                                num > 0
+                                                ? formatCOP(num)
+                                                : "";
+                                            })()}
+                                            onChange={(e) => {
+                                              const raw = e.target.value;
+                                              const form =
+                                                formularios[
+                                                  orden.id_orden_fabricacion
+                                                ] || {};
+                                              const clave = `${orden.id_orden_fabricacion}-${form?.articulo}-${form?.etapa}`;
+                                              if (!raw || raw.trim() === "") {
+                                                setEditandoCosto((prev) => ({
+                                                  ...prev,
+                                                  [clave]: "",
+                                                }));
+                                                actualizarFormulario(
+                                                  orden.id_orden_fabricacion,
+                                                  "costo_fabricacion",
+                                                  "",
+                                                );
+                                                return;
+                                              }
+                                              const num = cleanCOPFormat(raw);
+                                              costoManualEditado.current[
+                                                clave
+                                              ] = true;
+                                              setEditandoCosto((prev) => ({
+                                                ...prev,
+                                                [clave]: formatCOP(num),
+                                              }));
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "costo_fabricacion",
+                                                num,
+                                              );
+                                            }}
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                          />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-xs font-medium text-slate-500">
+                                            Observaciones
+                                          </label>
+                                          <input
+                                            type="text"
+                                            placeholder="Observaciones (opcional)"
+                                            value={
+                                              formularios[
+                                                orden.id_orden_fabricacion
+                                              ]?.observaciones || ""
+                                            }
+                                            onChange={(e) =>
+                                              actualizarFormulario(
+                                                orden.id_orden_fabricacion,
+                                                "observaciones",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div className="flex justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setMostrarFormularioAvance(null)
+                                          }
+                                          className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                        >
+                                          Cerrar
+                                        </button>
+                                        <button
+                                          type="submit"
+                                          className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
+                                        >
+                                          Registrar avance
+                                        </button>
+                                      </div>
+                                    </form>
+                                  </div>
+                                )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="7" className="text-center py-16">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <FiBox size={32} className="opacity-40" />
+                      <p className="text-sm font-medium">
+                        No se encontraron órdenes de fabricación
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Paginación */}
+        {!hayFiltro && (
+          <div className="border-t border-slate-200 px-4 py-3 bg-white">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">
+                Página{" "}
+                <span className="font-semibold text-slate-700">{page}</span> de{" "}
+                <span className="font-semibold text-slate-700">
+                  {totalPages}
+                </span>
+                {total > 0 && (
+                  <>
+                    {" "}
+                    —{" "}
+                    <span className="font-semibold text-slate-700">
+                      {total}
+                    </span>{" "}
+                    órdenes
+                  </>
+                )}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={!hasPrev || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  ← Anterior
+                </button>
+                <button
+                  disabled={!hasNext || loading}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  Siguiente →
+                </button>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(parseInt(e.target.value));
+                    setPage(1);
+                  }}
+                  className="px-2 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
+                >
+                  <option value={10}>10 / pág.</option>
+                  <option value={25}>25 / pág.</option>
+                  <option value={50}>50 / pág.</option>
+                </select>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Drawer de consumo de materia prima */}

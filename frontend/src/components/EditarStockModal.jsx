@@ -3,10 +3,19 @@ import formateaCantidad from "../utils/formateaCantidad";
 import { FiX, FiPackage, FiAlertTriangle } from "react-icons/fi";
 
 const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID(),
+  );
   const [stockDisponible, setStockDisponible] = useState(0);
   const [stockMinimo, setStockMinimo] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setIdempotencyKey(crypto.randomUUID());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (item) {
@@ -67,6 +76,7 @@ const EditarStockModal = ({ isOpen, onClose, item, onSave }) => {
         id_articulo: item.id_articulo,
         stock: stockValue,
         stock_minimo: stockMinValue,
+        idempotencyKey,
       });
       onClose();
     } catch (error) {

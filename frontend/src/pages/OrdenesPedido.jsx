@@ -8,6 +8,9 @@ import {
   FiPlus,
   FiDollarSign,
   FiEdit,
+  FiSearch,
+  FiChevronDown,
+  FiClipboard,
 } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
@@ -31,10 +34,9 @@ const Pedidos = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const role = user?.rol;
-  const canCreate = can(role, ACTIONS.SALES_CREATE);
-  const canEdit = can(role, ACTIONS.SALES_EDIT);
-  const canDelete = can(role, ACTIONS.SALES_DELETE);
+  const canCreate = can(user, ACTIONS.SALES_CREATE);
+  const canEdit = can(user, ACTIONS.SALES_EDIT);
+  const canDelete = can(user, ACTIONS.SALES_DELETE);
 
   useEffect(() => {
     const fetchPedidos = async () => {
@@ -224,259 +226,340 @@ const Pedidos = () => {
     }
   };
 
+  const ESTADO_BADGE = {
+    pendiente: "bg-amber-50 text-amber-700 border border-amber-200",
+    "listo para entrega":
+      "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    cancelado: "bg-red-50 text-red-700 border border-red-200",
+  };
+
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">
-          Pedidos
-        </h2>
-        <div className="flex w-full md:w-280 items-center gap-4">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Pedidos
+          </h1>
+          {total > 0 && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
+              {total}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={toggleMostrarCancelados}
+            className={`inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer ${
+              mostrarCancelados
+                ? "bg-red-600 hover:bg-red-500 text-white"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {mostrarCancelados ? "Ver activos" : "Ver cancelados"}
+          </button>
+          {canCreate && (
+            <button
+              onClick={handleCrear}
+              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <FiPlus size={16} />
+              Nuevo pedido
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+        <div className="relative">
+          <FiSearch
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
           <input
             type="text"
-            placeholder="Buscar por cliente o #ID"
+            placeholder="Buscar por cliente o #ID…"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
               setPage(1);
             }}
-            className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
+            className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
           />
-          {canCreate && (
-            <button
-              onClick={handleCrear}
-              className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-            >
-              <FiPlus size={20} />
-              Nuevo pedido
-            </button>
-          )}
-          <button
-            onClick={toggleMostrarCancelados}
-            className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-              mostrarCancelados
-                ? "bg-red-600 hover:bg-red-500 text-white"
-                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
-            }`}
-          >
-            {mostrarCancelados ? "Ver activos" : "Ver Cancelados"}
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiArrowLeft />
-            Volver
-          </button>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-          <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-            <tr>
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Monto Total</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan="6" className="text-center py-6 text-gray-500">
-                  Cargando...
-                </td>
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 w-8"></th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Cliente
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Estado
+                </th>
+                <th className="px-4 py-3 w-32"></th>
               </tr>
-            )}
-            {!loading && pedidos.length > 0
-              ? pedidos.map((pedido) => (
-                  <React.Fragment key={pedido.id_pedido}>
-                    <tr
-                      onClick={() => toggleExpand(pedido.id_pedido)}
-                      className={`cursor-pointer ${
-                        expandedId === pedido.id_pedido
-                          ? "bg-gray-200 hover:bg-gray-200"
-                          : "hover:bg-gray-200"
-                      } transition`}
-                    >
-                      <td className="px-4 py-3">{pedido.id_pedido}</td>
-                      <td className="px-4 py-3">{pedido.cliente_nombre}</td>
-                      <td className="px-4 py-3">
-                        {new Date(pedido.fecha_pedido).toLocaleDateString(
-                          "es-ES",
-                          {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          },
-                        )}
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    {Array.from({ length: 7 }).map((__, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="animate-pulse h-4 bg-slate-100 rounded w-full" />
                       </td>
-                      <td className="px-4 py-3">
-                        ${Number(pedido.monto_total || 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">{pedido.estado}</td>
-                      <td className="px-4 py-3 text-center flex gap-4">
-                        {!mostrarCancelados && pedido.estado == "pendiente" && (
-                          <button
-                            onClick={(e) =>
-                              handleCrearOrdenFabricacion(e, pedido.id_pedido)
-                            }
-                            className="text-green-600 hover:text-green-400 cursor-pointer"
-                            title="Crear orden de fabricación"
+                    ))}
+                  </tr>
+                ))
+              ) : pedidos.length > 0 ? (
+                pedidos.map((pedido) => {
+                  const isExpanded = expandedId === pedido.id_pedido;
+                  const badgeClass =
+                    ESTADO_BADGE[pedido.estado] ||
+                    "bg-slate-50 text-slate-600 border border-slate-200";
+
+                  return (
+                    <React.Fragment key={pedido.id_pedido}>
+                      <tr
+                        onClick={() => toggleExpand(pedido.id_pedido)}
+                        className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none group ${
+                          isExpanded
+                            ? "bg-indigo-50 border-l-2 border-l-indigo-400 hover:bg-indigo-50"
+                            : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <FiChevronDown
+                            size={14}
+                            className={`text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          />
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          #{pedido.id_pedido}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {pedido.cliente_nombre}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                          {pedido.fecha_pedido
+                            ? String(pedido.fecha_pedido)
+                                .substring(0, 10)
+                                .split("-")
+                                .reverse()
+                                .join("/")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">
+                          ${Number(pedido.monto_total || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClass}`}
                           >
-                            <FiPackage size={18} />
-                          </button>
-                        )}
-                        {!mostrarCancelados &&
-                          pedido.estado == "listo para entrega" && (
-                            <button
-                              onClick={(e) =>
-                                handleCrearOrdenVenta(e, pedido.id_pedido)
-                              }
-                              className="text-blue-600 hover:text-blue-400 cursor-pointer"
-                              title="Crear orden de venta"
-                            >
-                              <FiDollarSign size={18} />
-                            </button>
-                          )}
-                        {canEdit &&
-                          !mostrarCancelados &&
-                          pedido.estado == "pendiente" && (
-                            <button
-                              onClick={(e) => handleEdit(e, pedido)}
-                              className="text-yellow-600 hover:text-yellow-400 cursor-pointer"
-                              title="Editar pedido"
-                            >
-                              <FiEdit size={18} />
-                            </button>
-                          )}
-                        {canDelete && !mostrarCancelados && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(pedido.id_pedido);
-                            }}
-                            className="text-red-600 hover:text-red-400 cursor-pointer"
-                            title="Eliminar"
-                          >
-                            <FiTrash2 size={18} />
-                          </button>
-                        )}
-                        {!canEdit && !canDelete && (
-                          <span className="text-gray-400 italic select-none">
-                            Sin permisos
+                            {(pedido.estado || "—").toUpperCase()}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                    {expandedId === pedido.id_pedido && (
-                      <tr>
-                        <td
-                          colSpan="6"
-                          className="bg-gray-100 px-6 py-4 border-b"
-                        >
-                          <div className="mt-3">
-                            <table className="w-full text-sm">
-                              <thead className="bg-gray-200 text-gray-700">
-                                <tr>
-                                  <th className="px-2 py-2 border-b border-gray-300">
-                                    Artículo
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300">
-                                    Cantidad
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300">
-                                    Precio Unitario
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300">
-                                    Subtotal
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="hover:bg-gray-100">
-                                {pedido.detalles?.length > 0 ? (
-                                  pedido.detalles.map((d, i) => (
-                                    <tr key={i}>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        {d.descripcion}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        {d.cantidad}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        $
-                                        {Number(
-                                          d.precio_unitario,
-                                        ).toLocaleString()}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        ${Number(d.subtotal).toLocaleString()}
-                                      </td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td
-                                      colSpan="4"
-                                      className="text-center py-2 text-gray-500"
-                                    >
-                                      No hay detalles disponibles.
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            {!mostrarCancelados &&
+                              pedido.estado === "pendiente" && (
+                                <button
+                                  onClick={(e) =>
+                                    handleCrearOrdenFabricacion(
+                                      e,
+                                      pedido.id_pedido,
+                                    )
+                                  }
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                                  title="Crear orden de fabricación"
+                                >
+                                  <FiPackage size={14} />
+                                </button>
+                              )}
+                            {!mostrarCancelados &&
+                              pedido.estado === "listo para entrega" && (
+                                <button
+                                  onClick={(e) =>
+                                    handleCrearOrdenVenta(e, pedido.id_pedido)
+                                  }
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
+                                  title="Crear orden de venta"
+                                >
+                                  <FiDollarSign size={14} />
+                                </button>
+                              )}
+                            {canEdit &&
+                              !mostrarCancelados &&
+                              pedido.estado === "pendiente" && (
+                                <button
+                                  onClick={(e) => handleEdit(e, pedido)}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                                  title="Editar pedido"
+                                >
+                                  <FiEdit size={14} />
+                                </button>
+                              )}
+                            {canDelete && !mostrarCancelados && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(pedido.id_pedido);
+                                }}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))
-              : !loading && (
-                  <tr>
-                    <td colSpan="6" className="text-center py-6 text-gray-500">
-                      No se encontraron pedidos.
-                    </td>
-                  </tr>
-                )}
-          </tbody>
-        </table>
+
+                      {isExpanded && (
+                        <tr className="border-b border-slate-100">
+                          <td
+                            colSpan="7"
+                            className="px-6 pb-4 pt-2 bg-slate-50"
+                          >
+                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-200">
+                                    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                      Artículo
+                                    </th>
+                                    <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                      Cantidad
+                                    </th>
+                                    <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                      Precio unit.
+                                    </th>
+                                    <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                      Subtotal
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pedido.detalles?.length > 0 ? (
+                                    pedido.detalles.map((d, i) => (
+                                      <tr
+                                        key={i}
+                                        className="border-b border-slate-100 last:border-0"
+                                      >
+                                        <td className="px-4 py-2 text-slate-700">
+                                          {d.descripcion}
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums text-slate-600">
+                                          {d.cantidad}
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums text-slate-600">
+                                          $
+                                          {Number(
+                                            d.precio_unitario,
+                                          ).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-slate-800">
+                                          ${Number(d.subtotal).toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td
+                                        colSpan="4"
+                                        className="text-center py-4 text-slate-400 text-xs"
+                                      >
+                                        Sin detalles disponibles
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="7" className="text-center py-16">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <FiClipboard size={32} className="opacity-40" />
+                      <p className="text-sm font-medium">
+                        No se encontraron pedidos
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
         {/* Paginación */}
-        <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            Página {page} de {totalPages} {total ? `(total: ${total})` : ""}
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-700">Filas por página</label>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(parseInt(e.target.value, 10));
-                setPage(1);
-              }}
-              className="border border-gray-300 rounded-md px-2 py-1 h-[36px]"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <button
-              onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
-              disabled={!hasPrev || loading}
-              className={`px-3 py-2 rounded-md border ${hasPrev && !loading ? "bg-white hover:bg-slate-100 cursor-pointer" : "bg-gray-100 cursor-not-allowed"}`}
-            >
-              Anterior
-            </button>
-            <button
-              onClick={() => hasNext && setPage((p) => p + 1)}
-              disabled={!hasNext || loading}
-              className={`px-3 py-2 rounded-md border ${hasNext && !loading ? "bg-white hover:bg-slate-100 cursor-pointer" : "bg-gray-100 cursor-not-allowed"}`}
-            >
-              Siguiente
-            </button>
+        <div className="border-t border-slate-200 px-4 py-3 bg-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Página{" "}
+              <span className="font-semibold text-slate-700">{page}</span> de{" "}
+              <span className="font-semibold text-slate-700">{totalPages}</span>
+              {total > 0 && (
+                <>
+                  {" "}
+                  —{" "}
+                  <span className="font-semibold text-slate-700">
+                    {total}
+                  </span>{" "}
+                  pedidos
+                </>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={!hasPrev || loading}
+                onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                ← Anterior
+              </button>
+              <button
+                disabled={!hasNext || loading}
+                onClick={() => hasNext && setPage((p) => p + 1)}
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Siguiente →
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(parseInt(e.target.value, 10));
+                  setPage(1);
+                }}
+                className="px-2 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
+              >
+                <option value={10}>10 / pág.</option>
+                <option value={20}>20 / pág.</option>
+                <option value={50}>50 / pág.</option>
+                <option value={100}>100 / pág.</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

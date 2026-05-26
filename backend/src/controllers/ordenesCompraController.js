@@ -1,4 +1,5 @@
 const db = require("../database/db");
+const { getTenantPool } = require("../database/tenantDb");
 const ordenCompras = require("../models/ordenesCompraModel");
 const detalleOrdenCompra = require("../models/detalleOrdenCompraModel");
 const proveedorModel = require("../models/proveedoresModel");
@@ -98,8 +99,7 @@ const getOrdenCompraById = async (req, res) => {
       return res.status(404).json({ error: "Orden de compra no encontrada" });
     }
     const detalles = await detalleOrdenCompra.getByOrdenCompra(id);
-    // Obtener movimiento de tesorería y método de pago
-    const tesoreriaModel = require("../models/tesoreriaModel");
+
     const movimiento = await tesoreriaModel.getByDocumentoIdAndTipo(
       id,
       "orden_compra",
@@ -112,8 +112,7 @@ const getOrdenCompraById = async (req, res) => {
       );
       metodo_pago = metodos[0] || null;
     }
-    // Auditoría básica
-    console.log(`[AUDITORÍA] Consulta de orden #${id} por usuario`);
+
     const response = {
       ...orden,
       detalles,
@@ -184,7 +183,10 @@ async function createOrdenCompra(req, res) {
       });
     }
 
-    connection = await db.getConnection();
+    // Obtener pool explícitamente por db_name para no depender de AsyncLocalStorage
+    // (multer puede romper el contexto async cuando procesa el archivo)
+    const tenantPool = req.user?.db_name ? getTenantPool(req.user.db_name) : db;
+    connection = await tenantPool.getConnection();
     await connection.beginTransaction();
 
     if (!id_proveedor || !Array.isArray(items) || items.length === 0) {
@@ -394,26 +396,50 @@ async function confirmarRecepcion(req, res) {
       }
     }
 
-    // Crear movimiento de tesorería si se envía método de pago
+    // Crear/restaurar movimiento de tesorería
     const body = req.body || {};
-    const { id_metodo_pago, referencia, observaciones_pago } = body;
+    const { referencia, observaciones_pago } = body;
+    let { id_metodo_pago } = body;
     let movimientoTesoreriaCreado = false;
+
+    // Calcular total de la compra
+    let totalCompra = 0;
+    for (const item of detalles) {
+      totalCompra += Number(item.cantidad) * Number(item.precio_unitario || 0);
+    }
+
+    // Buscar si ya existe el movimiento de compra original (ciclo anterior)
+    const movimientoOriginal = await tesoreriaModel.getByDocumentoIdAndTipo(
+      id,
+      "orden_compra",
+      connection,
+    );
+
+    // Si no vino método de pago pero existe un movimiento original, reutilizar su método
+    if ((!id_metodo_pago || id_metodo_pago === "0") && movimientoOriginal) {
+      id_metodo_pago = movimientoOriginal.id_metodo_pago;
+    }
+
     if (id_metodo_pago && id_metodo_pago !== "0") {
-      let totalCompra = 0;
-      for (const item of detalles) {
-        totalCompra +=
-          Number(item.cantidad) * Number(item.precio_unitario || 0);
-      }
-      const movimientoData = {
-        id_documento: id,
-        tipo_documento: "orden_compra",
-        monto: -totalCompra,
-        id_metodo_pago: id_metodo_pago,
-        referencia: referencia || null,
-        observaciones: observaciones_pago || null,
-      };
-      await require("../models/tesoreriaModel").updateOrCreateMovimiento(
-        movimientoData,
+      // Eliminar la reversión previa si existe — fue anulada al re-confirmar.
+      // Es un asiento interno de corrección, no una transacción real: no debe quedar en el historial.
+      await connection.query(
+        "DELETE FROM movimientos_tesoreria WHERE id_documento = ? AND tipo_documento = ?",
+        [id, "reversion_orden_compra"],
+      );
+
+      // Crear o actualizar el único movimiento de egreso para esta OC
+      await tesoreriaModel.updateOrCreateMovimiento(
+        {
+          id_documento: id,
+          tipo_documento: "orden_compra",
+          fecha_movimiento: new Date(),
+          monto: -totalCompra,
+          id_metodo_pago: id_metodo_pago,
+          referencia: referencia || movimientoOriginal?.referencia || null,
+          observaciones:
+            observaciones_pago || movimientoOriginal?.observaciones || null,
+        },
         connection,
       );
       movimientoTesoreriaCreado = true;
@@ -636,6 +662,7 @@ async function updateOrdenCompra(req, res) {
       const movimientoData = {
         id_documento: id_orden_compra,
         tipo_documento: "orden_compra",
+        fecha_movimiento: new Date(),
         monto: -totalCompra,
         id_metodo_pago: id_metodo_pago,
         referencia: referencia || null,

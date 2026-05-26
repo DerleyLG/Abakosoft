@@ -10,313 +10,315 @@ import {
   LayoutDashboard,
   ChevronDown,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { FiDollarSign, FiCreditCard, FiCalendar } from "react-icons/fi";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
+import { usePlan } from "../hooks/usePlanApi";
+
+// Clases reutilizables para cada NavLink
+const navLinkClass = ({ isActive }) =>
+  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+    isActive
+      ? "bg-slate-700 text-white"
+      : "text-slate-400 hover:bg-slate-800 hover:text-white"
+  }`;
+
+const subNavLinkClass = ({ isActive }) =>
+  `block py-1.5 px-2.5 rounded-lg text-sm transition-all duration-200 ${
+    isActive
+      ? "bg-slate-700 text-white font-medium"
+      : "text-slate-400 hover:bg-slate-800 hover:text-white"
+  }`;
+
+// Etiqueta de sección
+const SectionLabel = ({ children }) => (
+  <p className="px-3 pt-5 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">
+    {children}
+  </p>
+);
 
 const Sidebar = ({ isOpen }) => {
   const [ordenesOpen, setOrdenesOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { features } = usePlan();
+  const navigate = useNavigate();
+
+  const hasAnyPermission = (...actions) => actions.some((a) => can(user, a));
+
+  const showOrdenes = hasAnyPermission(
+    ACTIONS.SALES_VIEW,
+    ACTIONS.ORDERS_VIEW,
+    ACTIONS.PURCHASES_VIEW,
+    ACTIONS.FABRICATION_VIEW,
+    ACTIONS.KANBAN_VIEW,
+    ACTIONS.PROGRESS_VIEW,
+  );
+
+  const showCatalogo = hasAnyPermission(
+    ACTIONS.ARTICLES_VIEW,
+    ACTIONS.CATEGORIES_VIEW,
+    ACTIONS.SUPPLIERS_VIEW,
+    ACTIONS.CLIENTS_VIEW,
+  );
+
+  const showOperaciones = hasAnyPermission(
+    ACTIONS.WORKERS_VIEW,
+    ACTIONS.PAYMENTS_VIEW,
+    ACTIONS.PAYMENTS_CREATE,
+    ACTIONS.INVENTORY_VIEW,
+  );
+
+  const showFinanzas = hasAnyPermission(
+    ACTIONS.INDIRECT_COSTS_VIEW,
+    ACTIONS.TREASURY_VIEW,
+    ACTIONS.CASH_CLOSINGS_VIEW,
+  );
+
+  const showSistema = hasAnyPermission(
+    ACTIONS.REPORTS_VIEW,
+    ACTIONS.USERS_MANAGE,
+  );
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const initial = user?.nombre_usuario?.charAt(0)?.toUpperCase() || "U";
+
   return (
     <aside
-      className="bg-slate-900 text-white h-screen w-64 fixed top-0 left-0 z-50 shadow-lg overflow-auto flex flex-col transition-transform duration-700 ease-in-out"
-      style={{
-        transform: isOpen ? "translateX(0)" : "translateX(-100%)",
-      }}
+      className="bg-slate-900 text-white h-screen w-64 fixed top-0 left-0 z-50 shadow-xl flex flex-col transition-transform duration-300 ease-in-out"
+      style={{ transform: isOpen ? "translateX(0)" : "translateX(-100%)" }}
     >
-        {" "}
-      <div className="flex flex-col flex-grow">
-           {" "}
-        <nav className="p-4 space-y-4">
-              {" "}
-          <div className="py-3 text-center text-xl font-bold border-b border-slate-700 select-none">
-                  PANEL     {" "}
-          </div>
-              {" "}
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <LayoutDashboard size={20} /> Dashboard     {" "}
-          </NavLink>
-              {" "}
-          <NavLink
-            to="/articulos"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <Package size={20} /> Artículos     {" "}
-          </NavLink>
-              {" "}
-          <NavLink
-            to="/proveedores"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <Users size={20} /> Proveedores     {" "}
-          </NavLink>
-              {" "}
-          <NavLink
-            to="/categorias"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <Boxes size={20} /> Categorías     {" "}
-          </NavLink>
-              {" "}
-          <NavLink
-            to="/clientes"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <Users size={20} /> Clientes     {" "}
-          </NavLink>
-              
-          {can(user?.rol, ACTIONS.WORKERS_VIEW) && (
-            <NavLink
-              to="/trabajadores"
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-300 hover:bg-slate-700"
-                }`
-              }
-            >
-              <Settings size={20} /> Trabajadores
-            </NavLink>
-          )}
-                   {" "}
-          {can(user?.rol, ACTIONS.PAYMENTS_VIEW) && (
-            <NavLink
-              to="/trabajadores/pagos"
-              className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-300 hover:bg-slate-700"
-                }`
-              }
-            >
-                     <FiCreditCard size={20} /> Pagos      {" "}
-            </NavLink>
-          )}
-              {" "}
-          <NavLink
-            to="/inventario"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <Warehouse size={20} /> Inventario     {" "}
-          </NavLink>
-               {/* Órdenes con submenú */}    {" "}
-          <div>
-                 {" "}
-            <button
-              onClick={() => setOrdenesOpen(!ordenesOpen)}
-              className="w-full flex items-center justify-between gap-2 p-2 rounded hover:bg-slate-700 text-gray-300 cursor-pointer"
-            >
-                    {" "}
-              <div className="flex items-center gap-2 cursor-pointer">
-                        <ClipboardList size={20} />       
-                Órdenes       {" "}
-              </div>
-                    {" "}
-              {ordenesOpen ? (
-                <ChevronDown size={16} className="transition-transform duration-300" />
-              ) : (
-                <ChevronRight size={16} className="transition-transform duration-300" />
-              )}
-                   {" "}
-            </button>
-
-            <div
-              className={`ml-7 border-l border-slate-700 pl-2 overflow-hidden transition-all duration-300 ease-in-out ${
-                ordenesOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              <NavLink
-                to="/ordenes_venta"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-               Órdenes Ventas
-              </NavLink>
-              <NavLink
-                to="/ordenes_pedido"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-                Órdenes Pedidos
-              </NavLink>
-              <NavLink
-                to="/ordenes_fabricacion"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-                Órdenes Fabricación
-              </NavLink>
-              <NavLink
-                to="/kanban"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-                Tablero Produccion
-              </NavLink>
-              <NavLink
-                to="/progreso-fabricacion"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-                Progreso Fabricacion
-              </NavLink>
-              <NavLink
-                to="/ordenes_compra"
-                className={({ isActive }) =>
-                  `block py-1.5 px-2 rounded text-sm transition-colors duration-200 ${
-                    isActive
-                      ? "bg-slate-800 text-white"
-                      : "text-gray-400 hover:bg-slate-700"
-                  }`
-                }
-              >
-               Órdenes Compras
-              </NavLink>
-            </div>
-          </div>
-
-          <NavLink
-            to="/costos_indirectos"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-                  <FiDollarSign size={20} /> Costos     {" "}
-          </NavLink>
-          <NavLink
-            to="/tesoreria"
-            className={({ isActive }) =>
-              `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                isActive
-                  ? "bg-slate-800 text-white"
-                  : "text-gray-300 hover:bg-slate-700"
-              }`
-            }
-          >
-            <FiDollarSign size={20} /> Tesorería
-          </NavLink>
-          {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
-            <NavLink
-              to="/cierres-caja"
-              className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-300 hover:bg-slate-700"
-                }`
-              }
-            >
-              <FiCalendar size={20} /> Cierres de Caja
-            </NavLink>
-          )}
-
-          {can(user?.rol, ACTIONS.REPORTS_VIEW) && (
-            <NavLink
-              to="/reportes"
-              className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-300 hover:bg-slate-700"
-                }`
-              }
-            >
-              <FileText size={20} /> Reportes
-            </NavLink>
-          )}
-
-          {user?.rol === "admin" && (
-            <NavLink
-              to="/gestionUsuarios"
-              className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded transition-colors duration-200 ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "text-gray-300 hover:bg-slate-700"
-                }`
-              }
-            >
-              <Users size={20} /> Gestión de Usuarios
-            </NavLink>
-          )}
-        </nav>
+      {/* Logo */}
+      <div className="px-5 py-4 border-b border-slate-800 shrink-0">
+        <span className="text-base font-bold tracking-[0.2em] text-white select-none justify-center flex">
+          PANEL
+        </span>
       </div>
 
-      <div className="p-4 border-t border-slate-700 text-center text-xs text-gray-400">
-        Abakosoft
+      {/* Navegación scrollable */}
+      <nav className="flex-1 overflow-y-auto px-2 pb-4 sidebar-scroll">
+        {/* ── Principal ───────────────────────────── */}
+        <SectionLabel>Principal</SectionLabel>
+        <NavLink to="/dashboard" className={navLinkClass}>
+          <LayoutDashboard size={17} /> Dashboard
+        </NavLink>
+
+        {/* ── Catálogo ────────────────────────────── */}
+        {showCatalogo && features.includes("inventario") && (
+          <>
+            <SectionLabel>Catálogo</SectionLabel>
+            {can(user, ACTIONS.ARTICLES_VIEW) && (
+              <NavLink to="/articulos" className={navLinkClass}>
+                <Package size={17} /> Artículos
+              </NavLink>
+            )}
+            {can(user, ACTIONS.CATEGORIES_VIEW) && (
+              <NavLink to="/categorias" className={navLinkClass}>
+                <Boxes size={17} /> Categorías
+              </NavLink>
+            )}
+            {can(user, ACTIONS.SUPPLIERS_VIEW) && (
+              <NavLink to="/proveedores" className={navLinkClass}>
+                <Users size={17} /> Proveedores
+              </NavLink>
+            )}
+            {can(user, ACTIONS.CLIENTS_VIEW) && (
+              <NavLink to="/clientes" className={navLinkClass}>
+                <Users size={17} /> Clientes
+              </NavLink>
+            )}
+          </>
+        )}
+
+        {/* ── Operaciones ─────────────────────────── */}
+        {showOperaciones &&
+          (features.includes("trabajadores") ||
+            features.includes("inventario")) && (
+            <>
+              <SectionLabel>Operaciones</SectionLabel>
+              {can(user, ACTIONS.WORKERS_VIEW) &&
+                features.includes("trabajadores") && (
+                  <NavLink to="/trabajadores" end className={navLinkClass}>
+                    <Settings size={17} /> Trabajadores
+                  </NavLink>
+                )}
+              {(can(user, ACTIONS.PAYMENTS_VIEW) ||
+                can(user, ACTIONS.PAYMENTS_CREATE)) &&
+                features.includes("pagos") && (
+                  <NavLink to="/trabajadores/pagos" className={navLinkClass}>
+                    <FiCreditCard size={17} /> Pagos
+                  </NavLink>
+                )}
+              {can(user, ACTIONS.INVENTORY_VIEW) &&
+                features.includes("inventario") && (
+                  <NavLink to="/inventario" className={navLinkClass}>
+                    <Warehouse size={17} /> Inventario
+                  </NavLink>
+                )}
+            </>
+          )}
+
+        {/* ── Órdenes (submenú) ───────────────────── */}
+        {showOrdenes &&
+          (features.includes("ventas") ||
+            features.includes("compras") ||
+            features.includes("fabricacion") ||
+            features.includes("kanban") ||
+            features.includes("progreso")) && (
+            <>
+              <SectionLabel>Órdenes</SectionLabel>
+              <button
+                onClick={() => setOrdenesOpen(!ordenesOpen)}
+                className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ClipboardList size={17} />
+                  Órdenes
+                </div>
+                {ordenesOpen ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+              </button>
+
+              <div
+                className={`ml-5 border-l border-slate-700 pl-3 overflow-hidden transition-all duration-300 ease-in-out ${
+                  ordenesOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                }`}
+              >
+                {can(user, ACTIONS.SALES_VIEW) &&
+                  features.includes("ventas") && (
+                    <NavLink to="/ordenes_venta" className={subNavLinkClass}>
+                      Ventas
+                    </NavLink>
+                  )}
+                {/* Pedidos solo si el plan incluye explícitamente 'ordenes_pedido' o 'pedidos' como feature */}
+                {can(user, ACTIONS.ORDERS_VIEW) &&
+                  (features.includes("ordenes_pedido") ||
+                    features.includes("pedidos")) && (
+                    <NavLink to="/ordenes_pedido" className={subNavLinkClass}>
+                      Pedidos
+                    </NavLink>
+                  )}
+                {can(user, ACTIONS.FABRICATION_VIEW) &&
+                  features.includes("fabricacion") && (
+                    <NavLink
+                      to="/ordenes_fabricacion"
+                      className={subNavLinkClass}
+                    >
+                      Fabricación
+                    </NavLink>
+                  )}
+                {can(user, ACTIONS.KANBAN_VIEW) &&
+                  features.includes("kanban") && (
+                    <NavLink to="/kanban" className={subNavLinkClass}>
+                      Tablero Producción
+                    </NavLink>
+                  )}
+                {can(user, ACTIONS.PROGRESS_VIEW) &&
+                  features.includes("progreso") && (
+                    <NavLink
+                      to="/progreso-fabricacion"
+                      className={subNavLinkClass}
+                    >
+                      Progreso Fabricación
+                    </NavLink>
+                  )}
+                {can(user, ACTIONS.PURCHASES_VIEW) &&
+                  features.includes("compras") && (
+                    <NavLink to="/ordenes_compra" className={subNavLinkClass}>
+                      Compras
+                    </NavLink>
+                  )}
+              </div>
+            </>
+          )}
+
+        {/* ── Finanzas ────────────────────────────── */}
+        {showFinanzas &&
+          (features.includes("costos") || features.includes("tesoreria")) && (
+            <>
+              <SectionLabel>Finanzas</SectionLabel>
+              {can(user, ACTIONS.INDIRECT_COSTS_VIEW) &&
+                features.includes("costos") && (
+                  <NavLink to="/costos_indirectos" className={navLinkClass}>
+                    <FiDollarSign size={17} /> Costos Indirectos
+                  </NavLink>
+                )}
+              {can(user, ACTIONS.TREASURY_VIEW) && (
+                <NavLink to="/tesoreria" className={navLinkClass}>
+                  <FiDollarSign size={17} /> Tesorería
+                </NavLink>
+              )}
+              {can(user, ACTIONS.CASH_CLOSINGS_VIEW) &&
+                features.includes("cierres_caja") && (
+                  <NavLink to="/cierres-caja" className={navLinkClass}>
+                    <FiCalendar size={17} /> Cierres de Caja
+                  </NavLink>
+                )}
+            </>
+          )}
+
+        {/* ── Sistema ─────────────────────────────── */}
+        {showSistema && (
+          <>
+            <SectionLabel>Sistema</SectionLabel>
+            {can(user, ACTIONS.REPORTS_VIEW) &&
+              features.includes("reportes") && (
+                <NavLink to="/reportes" className={navLinkClass}>
+                  <FileText size={17} /> Reportes
+                </NavLink>
+              )}
+            {can(user, ACTIONS.USERS_MANAGE) && (
+              <NavLink to="/gestionUsuarios" className={navLinkClass}>
+                <Users size={17} /> Gestión de Usuarios
+              </NavLink>
+            )}
+            {can(user, ACTIONS.PAYMENT_METHODS_MANAGE) && (
+              <NavLink to="/configuracion" className={navLinkClass}>
+                <Settings size={17} /> Configuración
+              </NavLink>
+            )}
+          </>
+        )}
+      </nav>
+
+      {/* ── Perfil de usuario ───────────────────────── */}
+      <div className="shrink-0 border-t border-slate-800 p-3">
+        <div className="flex items-center gap-3 px-1 py-1">
+          {/* Avatar con inicial */}
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-sm shrink-0 select-none shadow-inner">
+            {initial}
+          </div>
+
+          {/* Nombre y empresa */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white truncate leading-tight">
+              {user?.nombre_usuario || "Usuario"}
+            </p>
+            {user?.empresa_nombre && (
+              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">
+                {user.empresa_nombre}
+              </p>
+            )}
+          </div>
+
+          {/* Botón cerrar sesión */}
+          <button
+            onClick={handleLogout}
+            title="Cerrar sesión"
+            className="p-2 rounded-lg text-slate-500 hover:bg-red-500/15 hover:text-red-400 transition-all duration-200 cursor-pointer shrink-0"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </div>
     </aside>
   );

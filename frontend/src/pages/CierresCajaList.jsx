@@ -30,6 +30,8 @@ const CierresCajaList = () => {
     estado: "todos",
   });
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -122,10 +124,10 @@ const CierresCajaList = () => {
               <p class="text-sm mb-2"><strong> Resumen:</strong></p>
               <ul class="list-disc pl-5 text-sm space-y-1">
                 <li><strong>Primer movimiento:</strong> ${formatearFecha(
-                  estado.primera_fecha_movimiento
+                  estado.primera_fecha_movimiento,
                 )}</li>
                 <li><strong>Primer período:</strong> Desde ${formatearFecha(
-                  estado.primer_lunes
+                  estado.primer_lunes,
                 )}</li>
                 <li><strong>Total movimientos:</strong> ${
                   estado.cantidad_movimientos
@@ -208,7 +210,7 @@ const CierresCajaList = () => {
       if (ultimoCerradoBasico) {
         // Obtener detalle completo del último cierre
         ultimoCerrado = await cierresCajaService.getById(
-          ultimoCerradoBasico.id_cierre
+          ultimoCerradoBasico.id_cierre,
         );
 
         // Construir HTML de saldos (backend devuelve 'detalle_metodos')
@@ -223,8 +225,8 @@ const CierresCajaList = () => {
               return `<div class="flex justify-between text-xs py-1 border-b">
                 <span class="font-medium">${det.metodo_nombre}:</span>
                 <span class="font-bold ${colorClase}">${formatMonto(
-                det.saldo_final
-              )}</span>
+                  det.saldo_final,
+                )}</span>
               </div>`;
             })
             .join("");
@@ -255,7 +257,7 @@ const CierresCajaList = () => {
                   ultimoCerrado.id_cierre
                 }</p>
                 <p class="text-gray-600 mb-2">${formatFecha(
-                  ultimoCerrado.fecha_inicio
+                  ultimoCerrado.fecha_inicio,
                 )} - ${formatFecha(ultimoCerrado.fecha_fin)}</p>
                 <div class="border-t pt-2">
                   <p class="font-semibold mb-2 text-gray-700">Saldos Finales:</p>
@@ -342,95 +344,92 @@ const CierresCajaList = () => {
     return `${dias} día${dias !== 1 ? "s" : ""}`;
   };
 
+  // Paginación del histórico
+  const totalPaginas = Math.ceil(cierresFiltrados.length / pageSize);
+  const startIdx = (page - 1) * pageSize;
+  const cierresPaginados = cierresFiltrados.slice(
+    startIdx,
+    startIdx + pageSize,
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500 text-lg">Cargando cierres de caja...</div>
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Cargando cierres de caja...</p>
       </div>
     );
   }
 
-  // Si no hay cierres ni período abierto, mostrar pantalla de inicio
   if (!cierreAbierto && cierres.length === 0) {
     return (
-      <div className="p-6">
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 select-none">
         {mostrarModalIniciar && (
           <IniciarPeriodoModal
             onClose={() => setMostrarModalIniciar(false)}
             onSuccess={fetchData}
           />
         )}
-
-        <div className="flex items-center justify-center min-h-[80vh]">
-          <div className="text-center max-w-3xl">
-            <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-6 shadow-lg">
-              <FiCalendar className="text-blue-600" size={64} />
+        <div className="flex items-center justify-center min-h-[70vh]">
+          <div className="text-center max-w-2xl w-full">
+            <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto mb-6">
+              <FiCalendar size={36} className="text-slate-400" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
               Bienvenido al Control de Caja
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-slate-500 mb-8">
               Elige cómo deseas iniciar tu control de caja
             </p>
-
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              {/* Opción 1: Manual */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200 hover:border-blue-400 transition">
-                <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <FiPlus className="text-blue-600" size={32} />
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm text-left">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-4">
+                  <FiPlus size={18} className="text-slate-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                <h3 className="text-base font-bold text-slate-800 mb-1">
                   Inicio Manual
                 </h3>
-                <p className="text-gray-600 mb-4 text-sm">
-                  Crea un período desde hoy, ingresando los saldos iniciales de
-                  cada método de pago
+                <p className="text-slate-500 text-sm mb-4">
+                  Crea un período desde hoy ingresando los saldos iniciales por
+                  método de pago
                 </p>
                 <button
                   onClick={() => setMostrarModalIniciar(true)}
-                  className="cursor-pointer w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
                 >
-                  <FiPlus size={20} />
+                  <FiPlus size={14} />
                   Iniciar Manualmente
                 </button>
               </div>
-
-              {/* Opción 2: Automático */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-green-200 hover:border-green-400 transition">
-                <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <FiZap className="text-green-600" size={32} />
+              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm text-left">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">
+                  <FiZap size={18} className="text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">
+                <h3 className="text-base font-bold text-slate-800 mb-1">
                   Cálculo Automático
                 </h3>
-                <p className="text-gray-600 mb-4 text-sm">
-                  Sistema crea períodos semanales basándose en tus movimientos
-                  históricos
+                <p className="text-slate-500 text-sm mb-4">
+                  Crea períodos semanales basándose en los movimientos
+                  históricos existentes
                 </p>
                 <button
                   onClick={manejarMigracionAutomatica}
-                  className="cursor-pointer w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
                 >
-                  <FiZap size={20} />
+                  <FiZap size={14} />
                   Calcular Automático
                 </button>
               </div>
             </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
-              <p className="text-sm text-gray-700">
-                <strong>💡 ¿Cuál elegir?</strong>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 text-left text-sm text-slate-600 shadow-sm">
+              <p className="font-semibold text-slate-800 mb-1">¿Cuál elegir?</p>
+              <p>
+                <strong>Manual:</strong> Para empezar de cero o si no tienes
+                historial.
               </p>
-              <ul className="text-sm text-gray-600 mt-2 space-y-1">
-                <li>
-                  <strong>Manual:</strong> Para empezar de cero o si no tienes
-                  historial
-                </li>
-                <li>
-                  <strong>Automático:</strong> Si tienes movimientos registrados
-                  y quieres crear períodos retroactivos
-                </li>
-              </ul>
+              <p>
+                <strong>Automático:</strong> Si tienes movimientos y quieres
+                crear períodos retroactivos.
+              </p>
             </div>
           </div>
         </div>
@@ -439,7 +438,7 @@ const CierresCajaList = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6 select-none">
       {mostrarModalIniciar && (
         <IniciarPeriodoModal
           onClose={() => setMostrarModalIniciar(false)}
@@ -448,49 +447,83 @@ const CierresCajaList = () => {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Cierres de Caja</h1>
-          <p className="text-gray-600 mt-1">Gestión de períodos de caja</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Control de
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Cierres de Caja
+            </h1>
+          </div>
+          <span className="mt-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-500 text-[11px] font-bold rounded-lg shadow-sm">
+            {cierres.length} períodos
+          </span>
         </div>
+        {cierres.length === 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={manejarMigracionAutomatica}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
+            >
+              <FiZap size={14} />
+              Automático
+            </button>
+            <button
+              onClick={() => setMostrarModalIniciar(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
+            >
+              <FiPlus size={14} />
+              Nuevo Período
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Período Actual */}
+      {/* Período activo */}
       {cierreAbierto && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <FiClock className="text-green-600" size={24} />
-                <h2 className="text-xl font-bold text-green-800">
-                  Período Actual
-                </h2>
-                <span className="bg-green-200 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
-                  ABIERTO
-                </span>
+        <div className="bg-white border border-emerald-200 rounded-xl shadow-sm">
+          <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <FiClock size={18} className="text-emerald-600" />
               </div>
-              <p className="text-gray-700">
-                <span className="font-semibold">Desde:</span>{" "}
-                {formatFecha(cierreAbierto.fecha_inicio)}
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Período activo
+                  </p>
+                  <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold rounded-md">
+                    ABIERTO
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-slate-800 mt-0.5">
+                  Desde {formatFecha(cierreAbierto.fecha_inicio)} —{" "}
+                  {calcularDias(
+                    cierreAbierto.fecha_inicio,
+                    cierreAbierto.fecha_fin,
+                  )}
+                </p>
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() =>
                   navigate(`/cierres-caja/${cierreAbierto.id_cierre}`)
                 }
-                className="cursor-pointer flex items-center gap-2 bg-white border-2 border-green-600 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-50 transition"
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <FiEye />
-                Ver Detalle
+                <FiEye size={14} />
+                Ver detalle
               </button>
               <button
                 onClick={() =>
                   navigate(`/cierres-caja/${cierreAbierto.id_cierre}/cerrar`)
                 }
-                className="cursor-pointer flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer shadow-sm"
               >
-                <FiCheck />
+                <FiCheck size={14} />
                 Cerrar Período
               </button>
             </div>
@@ -499,231 +532,241 @@ const CierresCajaList = () => {
       )}
 
       {/* Gráfico de Tendencias */}
-      {cierres.length > 0 && (
-        <div className="mb-6">
-          <GraficoTendenciaCierres cierres={cierres} />
-        </div>
-      )}
+      {cierres.length > 0 && <GraficoTendenciaCierres cierres={cierres} />}
 
-      {/* Tabla de Histórico */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Histórico de Cierres
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={manejarLimpiarDatos}
-              className="cursor-pointer flex items-center gap-2 text-red-700 hover:text-red-900 px-3 py-2 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-300 transition"
-              title="Limpiar todos los datos"
-            >
-              <FiTrash2 />
-              Limpiar Datos
-            </button>
-            <button
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="cursor-pointer flex items-center gap-2 text-gray-700 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
-            >
-              <FiFilter />
-              {mostrarFiltros ? "Ocultar Filtros" : "Filtros"}
-            </button>
+      {/* Histórico */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+        {/* Header + filtros */}
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <h3 className="text-sm font-bold text-slate-900">Histórico</h3>
+            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 text-[11px] font-bold rounded-md">
+              {cierresFiltrados.length}
+            </span>
           </div>
+          <div className="flex flex-wrap items-center gap-2 flex-1">
+            <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                Desde
+              </span>
+              <input
+                type="date"
+                value={filtros.fechaInicio}
+                onChange={(e) => {
+                  setFiltros({ ...filtros, fechaInicio: e.target.value });
+                  setPage(1);
+                }}
+                className="flex-1 px-3 py-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                Hasta
+              </span>
+              <input
+                type="date"
+                value={filtros.fechaFin}
+                onChange={(e) => {
+                  setFiltros({ ...filtros, fechaFin: e.target.value });
+                  setPage(1);
+                }}
+                className="flex-1 px-3 py-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            </div>
+            <select
+              value={filtros.estado}
+              onChange={(e) => {
+                setFiltros({ ...filtros, estado: e.target.value });
+                setPage(1);
+              }}
+              className="flex-1 min-w-[140px] px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="abierto">Abierto</option>
+              <option value="cerrado">Cerrado</option>
+            </select>
+            {(filtros.fechaInicio ||
+              filtros.fechaFin ||
+              filtros.estado !== "todos") && (
+              <button
+                onClick={() => {
+                  limpiarFiltros();
+                  setPage(1);
+                }}
+                className="flex items-center gap-1 px-3 py-2 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <FiX size={12} />
+                Limpiar
+              </button>
+            )}
+          </div>
+          <button
+            onClick={manejarLimpiarDatos}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-rose-600 hover:text-rose-800 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer shrink-0"
+          >
+            <FiTrash2 size={13} />
+            Limpiar datos
+          </button>
         </div>
 
-        {/* Panel de Filtros */}
-        {mostrarFiltros && (
-          <div className="bg-gray-50 px-6 py-4 border-b">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Desde
-                </label>
-                <input
-                  type="date"
-                  value={filtros.fechaInicio}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, fechaInicio: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Hasta
-                </label>
-                <input
-                  type="date"
-                  value={filtros.fechaFin}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, fechaFin: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
-                <select
-                  value={filtros.estado}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, estado: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="abierto">Abiertos</option>
-                  <option value="cerrado">Cerrados</option>
-                </select>
-              </div>
-              <div className="flex items-end">
+        {/* Tabla */}
+        {cierresFiltrados.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+            <FiCalendar size={36} className="mb-3 opacity-40" />
+            <p className="text-sm">No hay cierres con los filtros actuales</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Período
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Inicio
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Fin
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Duración
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Ingresos
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Egresos
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Saldo Final
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {cierresPaginados.map((cierre) => {
+                    const numeroPeriodo =
+                      cierres.length -
+                      cierres.findIndex(
+                        (c) => c.id_cierre === cierre.id_cierre,
+                      );
+                    const esAbierto = cierre.estado === "abierto";
+                    return (
+                      <tr
+                        key={cierre.id_cierre}
+                        className={`hover:bg-slate-50/70 transition-colors ${esAbierto ? "border-l-2 border-l-emerald-400" : ""}`}
+                      >
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-bold text-slate-800">
+                            #{numeroPeriodo}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">
+                          {formatFecha(cierre.fecha_inicio)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">
+                          {cierre.fecha_fin ? (
+                            formatFecha(cierre.fecha_fin)
+                          ) : (
+                            <span className="text-emerald-500 font-semibold">
+                              En curso
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500">
+                          {calcularDias(cierre.fecha_inicio, cierre.fecha_fin)}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-emerald-700">
+                          {cierre.total_ingresos_total != null ? (
+                            formatMonto(cierre.total_ingresos_total)
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-rose-600">
+                          {cierre.total_egresos_total != null ? (
+                            formatMonto(cierre.total_egresos_total)
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-bold text-slate-800">
+                            {formatMonto(cierre.saldo_final_total)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${esAbierto ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}
+                          >
+                            {esAbierto ? (
+                              <FiClock size={10} />
+                            ) : (
+                              <FiCheck size={10} />
+                            )}
+                            {esAbierto ? "Abierto" : "Cerrado"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() =>
+                              navigate(`/cierres-caja/${cierre.id_cierre}`)
+                            }
+                            className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer border border-slate-200"
+                            title="Ver detalle"
+                          >
+                            <FiEye size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Paginación */}
+            <div className="px-6 py-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-xs text-slate-500">
+                Mostrando{" "}
+                <span className="font-semibold text-slate-700">
+                  {cierresFiltrados.length === 0 ? 0 : startIdx + 1}–
+                  {Math.min(startIdx + pageSize, cierresFiltrados.length)}
+                </span>{" "}
+                de{" "}
+                <span className="font-semibold text-slate-700">
+                  {cierresFiltrados.length}
+                </span>{" "}
+                períodos
+              </span>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={limpiarFiltros}
-                  className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
-                  <FiX />
-                  Limpiar
+                  ← Anterior
+                </button>
+                <span className="text-xs text-slate-500 px-1">
+                  Pág.{" "}
+                  <span className="font-semibold text-slate-700">{page}</span> /{" "}
+                  {totalPaginas || 1}
+                </span>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPaginas}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  Siguiente →
                 </button>
               </div>
             </div>
-            <div className="mt-3 text-sm text-gray-600">
-              Mostrando {cierresFiltrados.length} de {cierres.length} cierres
-            </div>
-          </div>
-        )}
-
-        {cierres.length === 0 ? (
-          <div className="text-center py-12">
-            <FiCalendar className="mx-auto text-gray-300 mb-4" size={48} />
-            <p className="text-gray-500 text-lg">No hay cierres registrados</p>
-          </div>
-        ) : (
-          <div className="p-6">
-            {/* Grid de Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cierresFiltrados.map((cierre, index) => {
-                const numeroPeriodo =
-                  cierres.length -
-                  cierres.findIndex((c) => c.id_cierre === cierre.id_cierre);
-                const esAbierto = cierre.estado === "abierto";
-
-                return (
-                  <div
-                    key={cierre.id_cierre}
-                    className={`bg-white rounded-lg border-2 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden ${
-                      esAbierto
-                        ? "border-green-400 hover:border-green-500"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    {/* Header de la Card */}
-                    <div
-                      className={`px-5 py-4 ${
-                        esAbierto
-                          ? "bg-gradient-to-r from-green-50 to-green-100"
-                          : "bg-gray-50"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-800">
-                            Período #{numeroPeriodo}
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {formatFecha(cierre.fecha_inicio)}
-                            {cierre.fecha_fin && (
-                              <> - {formatFecha(cierre.fecha_fin)}</>
-                            )}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                            esAbierto
-                              ? "bg-green-600 text-white"
-                              : "bg-gray-600 text-white"
-                          }`}
-                        >
-                          {esAbierto ? (
-                            <>
-                              <FiClock size={12} />
-                              Abierto
-                            </>
-                          ) : (
-                            <>
-                              <FiCheck size={12} />
-                              Cerrado
-                            </>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Body de la Card */}
-                    <div className="px-5 py-4">
-                      {/* Duración */}
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                        <FiCalendar size={16} className="text-gray-400" />
-                        <span>
-                          {calcularDias(cierre.fecha_inicio, cierre.fecha_fin)}
-                        </span>
-                      </div>
-
-                      {/* Saldo Final o Actual */}
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 mb-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FiDollarSign size={18} className="text-blue-600" />
-                          <span className="text-xs font-medium text-gray-600 uppercase">
-                            {esAbierto ? "Saldo Actual" : "Saldo Final"}
-                          </span>
-                        </div>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {formatMonto(cierre.saldo_final_total)}
-                        </p>
-                      </div>
-
-                      {/* Estadísticas Rápidas */}
-                      {cierre.total_ingresos !== undefined &&
-                        cierre.total_egresos !== undefined && (
-                          <div className="grid grid-cols-2 gap-3 mb-4">
-                            <div className="bg-green-50 rounded-lg p-3">
-                              <p className="text-xs text-gray-600 mb-1">
-                                Ingresos
-                              </p>
-                              <p className="text-sm font-semibold text-green-700">
-                                {formatMonto(cierre.total_ingresos)}
-                              </p>
-                            </div>
-                            <div className="bg-red-50 rounded-lg p-3">
-                              <p className="text-xs text-gray-600 mb-1">
-                                Egresos
-                              </p>
-                              <p className="text-sm font-semibold text-red-700">
-                                {formatMonto(cierre.total_egresos)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Botón de Acción */}
-                      <button
-                        onClick={() =>
-                          navigate(`/cierres-caja/${cierre.id_cierre}`)
-                        }
-                        className={`w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-all ${
-                          esAbierto
-                            ? "bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg"
-                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                        }`}
-                      >
-                        <FiEye size={18} />
-                        {esAbierto ? "Ver y Gestionar" : "Ver Detalle"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>

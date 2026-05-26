@@ -2,6 +2,39 @@ const usuariosModel = require("../models/usuariosModel");
 const trabajadoresModel = require("../models/trabajadoresModel");
 const rolesModel = require("../models/rolesModel");
 const bcrypt = require("bcrypt");
+const masterPool = require("../database/masterDb");
+const { getTenantPool } = require("../database/tenantDb");
+
+/**
+ * Verifica que el nombre_usuario no exista en NINGUNA base de datos de tenant activa.
+ * @param {string} nombre_usuario
+ * @param {number|null} excludeIdUsuario - ID a excluir (para actualizaciones del mismo usuario)
+ * @returns {Promise<boolean>} true si ya existe en algún tenant
+ */
+async function existeUsuarioGlobalmente(
+  nombre_usuario,
+  excludeIdUsuario = null,
+) {
+  const [empresas] = await masterPool.query(
+    `SELECT db_name FROM empresas WHERE estado = 'activa'`,
+  );
+  for (const empresa of empresas) {
+    try {
+      const pool = getTenantPool(empresa.db_name);
+      const query = excludeIdUsuario
+        ? `SELECT 1 FROM usuarios WHERE nombre_usuario = ? AND id_usuario != ? LIMIT 1`
+        : `SELECT 1 FROM usuarios WHERE nombre_usuario = ? LIMIT 1`;
+      const params = excludeIdUsuario
+        ? [nombre_usuario, excludeIdUsuario]
+        : [nombre_usuario];
+      const [rows] = await pool.query(query, params);
+      if (rows.length > 0) return true;
+    } catch (_) {
+      // BD inaccesible, ignorar
+    }
+  }
+  return false;
+}
 
 module.exports = {
   getAll: async (req, res) => {
@@ -39,7 +72,7 @@ module.exports = {
   create: async (req, res) => {
     try {
       const { nombre_usuario, pin, id_trabajador, id_rol } = req.body;
-      // id_trabajador es opcional: sólo validar si viene definido (no null/undefined)
+
       if (!nombre_usuario || !pin || !id_rol) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
       }
@@ -55,13 +88,11 @@ module.exports = {
         return res.status(400).json({ error: "El rol no existe" });
       }
 
-      const usuarioExistente = await usuariosModel.getByUsername(
-        nombre_usuario
-      );
-      if (usuarioExistente) {
+      const yaExiste = await existeUsuarioGlobalmente(nombre_usuario);
+      if (yaExiste) {
         return res
           .status(400)
-          .json({ error: "El nombre de usuario ya existe" });
+          .json({ error: "El nombre de usuario ya está en uso" });
       }
 
       const hashedPin = await bcrypt.hash(pin, 10);
@@ -97,7 +128,16 @@ module.exports = {
 
       const updateData = {};
       const { nombre_usuario, pin, id_trabajador, id_rol } = req.body;
-      if (nombre_usuario) updateData.nombre_usuario = nombre_usuario;
+      if (nombre_usuario) {
+        updateData.nombre_usuario = nombre_usuario;
+        // Validar unicidad global al cambiar nombre de usuario
+        const yaExiste = await existeUsuarioGlobalmente(nombre_usuario, id);
+        if (yaExiste) {
+          return res
+            .status(400)
+            .json({ error: "El nombre de usuario ya está en uso" });
+        }
+      }
       // Permitir desasignar trabajador enviando null explícito
       if (Object.prototype.hasOwnProperty.call(req.body, "id_trabajador")) {
         updateData.id_trabajador = id_trabajador ?? null;

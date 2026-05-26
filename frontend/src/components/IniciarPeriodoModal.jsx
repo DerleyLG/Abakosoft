@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { FiX, FiDollarSign, FiCalendar, FiCheckCircle } from "react-icons/fi";
 import toast from "react-hot-toast";
 import api from "../services/api";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const IniciarPeriodoModal = ({ onClose, onSuccess }) => {
+  const idempotencyKey = useIdempotencyKey();
   const [metodosPago, setMetodosPago] = useState([]);
   const [saldos, setSaldos] = useState({});
   const [loading, setLoading] = useState(true);
@@ -19,7 +21,7 @@ const IniciarPeriodoModal = ({ onClose, onSuccess }) => {
       const metodos = response.data.filter(
         (m) =>
           m.nombre.toLowerCase() !== "credito" &&
-          m.nombre.toLowerCase() !== "crédito"
+          m.nombre.toLowerCase() !== "crédito",
       );
 
       setMetodosPago(metodos);
@@ -86,13 +88,17 @@ const IniciarPeriodoModal = ({ onClose, onSuccess }) => {
         ([id_metodo_pago, saldo_inicial]) => ({
           id_metodo_pago: parseInt(id_metodo_pago),
           saldo_inicial,
-        })
+        }),
       );
 
-      await api.post("/cierres-caja", {
-        fecha_inicio,
-        saldos_iniciales,
-      });
+      await api.post(
+        "/cierres-caja",
+        {
+          fecha_inicio,
+          saldos_iniciales,
+        },
+        { headers: { "X-Idempotency-Key": idempotencyKey } },
+      );
 
       toast.success("Período iniciado exitosamente");
       onSuccess();

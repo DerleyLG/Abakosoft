@@ -1,7 +1,5 @@
 const db = require("../database/db");
 
-// models/TesoreriaModel.js
-
 function getTodayYMDForTZ(timeZone) {
   const tz =
     timeZone || process.env.APP_TZ || process.env.TZ || "America/Bogota";
@@ -107,7 +105,6 @@ const TesoreriaModel = {
       VALUES (?, ?, ?, ?, ?, ?, ?) `;
 
     // Normalizamos fecha_movimiento: si no viene, y es una venta (orden_venta/venta), tomamos la fecha de la OV asociada
-    // Determinar fecha final del movimiento
     let fechaFinal = fecha_movimiento;
     // Si viene string con hora, quedarnos con YYYY-MM-DD
     if (typeof fechaFinal === "string") {
@@ -117,7 +114,6 @@ const TesoreriaModel = {
       }
     }
     if (!fechaFinal) {
-      // Por defecto: hoy según TZ definida (no UTC) para todos los movimientos
       fechaFinal = getTodayYMDForTZ();
     }
 
@@ -298,7 +294,6 @@ const TesoreriaModel = {
       );
       return id_movimiento;
     } else {
-      // 3. Si no existe, lo insertamos
       return await TesoreriaModel.insertarMovimiento(movimientoData, conn);
     }
   },
@@ -341,9 +336,178 @@ const TesoreriaModel = {
     );
     return result[0].count;
   },
+
+  getResumenTarjetasDesdeCierre: async () => {
+    const [cierreRows] = await db.query(
+      `
+        SELECT
+          c.id_cierre,
+          c.fecha_inicio,
+          CAST(
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN LOWER(mp.nombre) LIKE '%efectivo%'
+                    THEN COALESCE(d.saldo_inicial, 0)
+                  ELSE 0
+                END
+              ),
+              0
+            ) AS DECIMAL(15,2)
+          ) AS saldo_inicial_efectivo,
+          CAST(
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN LOWER(mp.nombre) LIKE '%transferencia%'
+                    THEN COALESCE(d.saldo_inicial, 0)
+                  ELSE 0
+                END
+              ),
+              0
+            ) AS DECIMAL(15,2)
+          ) AS saldo_inicial_transferencia
+        FROM cierres_caja c
+        LEFT JOIN detalle_cierre_caja d ON d.id_cierre = c.id_cierre
+        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = d.id_metodo_pago
+        WHERE c.estado = 'abierto'
+        GROUP BY c.id_cierre, c.fecha_inicio
+        ORDER BY c.fecha_inicio DESC
+        LIMIT 1
+      `,
+    );
+
+    const cierre = cierreRows[0] || null;
+    const fechaInicio = cierre?.fecha_inicio || "1970-01-01";
+
+    const [movimientos] = await db.query(
+      `
+        SELECT
+          mt.monto,
+          mt.tipo_documento,
+          mp.nombre AS metodo_pago
+        FROM movimientos_tesoreria mt
+        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = mt.id_metodo_pago
+        WHERE DATE(mt.fecha_movimiento) >= DATE(?)
+      `,
+      [fechaInicio],
+    );
+
+    const resumen = {
+      fecha_inicio_periodo: fechaInicio,
+      id_cierre: cierre?.id_cierre || null,
+      saldoInicialEfectivo: Number(cierre?.saldo_inicial_efectivo || 0),
+      saldoInicialTransferencia: Number(
+        cierre?.saldo_inicial_transferencia || 0,
+      ),
+      ventasEfectivo: 0,
+      ventasTransferencia: 0,
+      comprasEfectivo: 0,
+      comprasTransferencia: 0,
+      costosEfectivo: 0,
+      costosTransferencia: 0,
+      pagosEfectivo: 0,
+      pagosTransferencia: 0,
+      anticiposEfectivo: 0,
+      anticiposTransferencia: 0,
+      abonosEfectivo: 0,
+      abonosTransferencia: 0,
+      transferenciasIngresoEfectivo: 0,
+      transferenciasEgresoEfectivo: 0,
+      transferenciasIngresoTransferencia: 0,
+      transferenciasEgresoTransferencia: 0,
+    };
+
+    const tipoNormalizado = (tipoDocumento) => {
+      const tipo = String(tipoDocumento || "").toLowerCase();
+      if (tipo.includes("venta")) return "venta";
+      if (tipo.includes("compra")) return "compra";
+      if (tipo === "abono_credito" || tipo.includes("abono"))
+        return "abono_credito";
+      if (tipo === "costo_indirecto" || tipo.includes("costo"))
+        return "costo_indirecto";
+      if (tipo === "pago_trabajador" || tipo.includes("pago"))
+        return "pago_trabajador";
+      if (tipo === "anticipo" || tipo.includes("anticipo")) return "anticipo";
+      if (tipo === "transferencia_fondos" || tipo.includes("transferencia"))
+        return "transferencia_fondos";
+      return "otro";
+    };
+
+    const esEfectivo = (metodo) =>
+      String(metodo || "")
+        .toLowerCase()
+        .includes("efectivo");
+    const esTransferencia = (metodo) =>
+      String(metodo || "")
+        .toLowerCase()
+        .includes("transferencia");
+
+    movimientos.forEach((mov) => {
+      const tipo = tipoNormalizado(mov.tipo_documento);
+      const metodo = mov.metodo_pago;
+      const monto = Number(mov.monto) || 0;
+      const montoAbs = Math.abs(monto);
+
+      if (tipo === "transferencia_fondos") {
+        if (esEfectivo(metodo)) {
+          if (monto > 0) resumen.transferenciasIngresoEfectivo += monto;
+          else resumen.transferenciasEgresoEfectivo += montoAbs;
+        } else if (esTransferencia(metodo)) {
+          if (monto > 0) resumen.transferenciasIngresoTransferencia += monto;
+          else resumen.transferenciasEgresoTransferencia += montoAbs;
+        }
+        return;
+      }
+
+      if (tipo === "venta") {
+        if (esEfectivo(metodo)) resumen.ventasEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.ventasTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "compra") {
+        if (esEfectivo(metodo)) resumen.comprasEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.comprasTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "costo_indirecto") {
+        if (esEfectivo(metodo)) resumen.costosEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.costosTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "pago_trabajador") {
+        if (esEfectivo(metodo)) resumen.pagosEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.pagosTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "anticipo") {
+        if (esEfectivo(metodo)) resumen.anticiposEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.anticiposTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "abono_credito") {
+        if (esEfectivo(metodo)) resumen.abonosEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.abonosTransferencia += montoAbs;
+      }
+    });
+
+    return resumen;
+  },
+
   async getVentasCobrosReport({ desde, hasta, id_cliente, estado_pago }) {
     const paramsOV = [];
-    const whereOV = ["1=1"]; // filtros sobre OV
+    const whereOV = ["1=1"];
 
     if (desde) {
       whereOV.push("ov.fecha >= ?");
@@ -359,7 +523,7 @@ const TesoreriaModel = {
     }
 
     const paramsCR = [];
-    const whereCR = ["vc.id_orden_venta IS NULL"]; // solo créditos manuales
+    const whereCR = ["vc.id_orden_venta IS NULL"];
     if (desde) {
       whereCR.push("vc.fecha >= ?");
       paramsCR.push(desde);
@@ -462,7 +626,7 @@ const TesoreriaModel = {
 
     const [rows] = await db.query(sql, [...paramsOV, ...paramsCR]);
 
-    // filtrar por estado_pago en HAVING equivalente (post-procesado para simplicidad)
+    // filtrar por estado_pago en HAVING equivalente
     if (
       estado_pago &&
       ["pendiente", "saldado"].includes(String(estado_pago).toLowerCase())

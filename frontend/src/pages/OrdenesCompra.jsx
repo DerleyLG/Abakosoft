@@ -1,4 +1,29 @@
-// Formatea cantidades: sin decimales si es entero, con decimales si los tiene
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+import {
+  FiEdit,
+  FiArrowLeft,
+  FiTrash2,
+  FiPlus,
+  FiCheckCircle,
+  FiArrowRight,
+  FiFileText,
+  FiExternalLink,
+  FiRefreshCw,
+  FiSearch,
+  FiChevronDown,
+  FiShoppingCart,
+} from "react-icons/fi";
+import React from "react";
+import { confirmAlert } from "react-confirm-alert";
+import "react-confirm-alert/src/react-confirm-alert.css";
+import "../styles/confirmAlert.css";
+import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { can, ACTIONS } from "../utils/permissions";
+import { usePlan } from "../hooks/usePlanApi";
+
 function formateaCantidad(valor) {
   if (valor === null || valor === undefined) return 0;
   const num = Number(valor);
@@ -9,28 +34,6 @@ function formateaCantidad(valor) {
     maximumFractionDigits: 3,
   });
 }
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../services/api"; // ajusta según tu estructura
-import {
-  FiEdit,
-  FiArrowLeft,
-  FiTrash2,
-  FiPlus,
-  FiCheckCircle,
-  FiArrowRight,
-  FiFileText,
-  FiDownload,
-  FiExternalLink,
-  FiRefreshCw,
-} from "react-icons/fi";
-import React from "react";
-import { confirmAlert } from "react-confirm-alert";
-import "react-confirm-alert/src/react-confirm-alert.css";
-import "../styles/confirmAlert.css";
-import toast from "react-hot-toast";
-import { useAuth } from "../context/AuthContext";
-import { can, ACTIONS } from "../utils/permissions";
 
 // Función para formatear fecha sin problemas de zona horaria
 const formatDateLocal = (dateString) => {
@@ -57,10 +60,10 @@ const OrdenesCompra = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const role = user?.rol;
-  const canCreate = can(role, ACTIONS.PURCHASES_CREATE);
-  const canEdit = can(role, ACTIONS.PURCHASES_EDIT);
-  const canDelete = can(role, ACTIONS.PURCHASES_DELETE);
+  const { features } = usePlan();
+  const canCreate = can(user, ACTIONS.PURCHASES_CREATE);
+  const canEdit = can(user, ACTIONS.PURCHASES_EDIT);
+  const canDelete = can(user, ACTIONS.PURCHASES_DELETE);
 
   useEffect(() => {
     const fetchOrdenes = async () => {
@@ -242,27 +245,89 @@ const OrdenesCompra = () => {
     return true;
   });
 
+  // ─── badges ───────────────────────────────────────────────────────
+  const ESTADO_MAP = {
+    pendiente: "bg-amber-50 text-amber-700 border border-amber-200",
+    completada: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    cancelada: "bg-red-50 text-red-600 border border-red-200",
+  };
+
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className="text-3xl font-bold text-gray-800 w-full md:w-auto">
-          Órdenes de Compra
-        </h2>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Órdenes de compra
+          </h1>
+          {total > 0 && (
+            <p className="text-xs text-slate-400 mt-0.5">{total} órdenes</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canCreate && (
+            <button
+              onClick={handleCrear}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-white shadow-sm transition-colors cursor-pointer"
+            >
+              <FiPlus size={14} /> Nueva orden
+            </button>
+          )}
+          {features && features.includes("tesoreria") && (
+            <button
+              onClick={() => navigate("/tesoreria")}
+              className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer"
+            >
+              <FiArrowRight size={14} /> Tesorería
+            </button>
+          )}
+          <button
+            onClick={toggleMostrarCanceladas}
+            className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border shadow-sm transition-colors cursor-pointer ${
+              mostrarCanceladas
+                ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+          >
+            <FiArrowLeft size={14} /> Volver
+          </button>
+        </div>
+      </div>
 
-        <div className="flex w-full md:w-250 items-center gap-4">
-          <input
-            type="text"
-            placeholder="Proveedor, fecha o #ID"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
-            }}
-            className="flex-grow border border-gray-500 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600 h-[42px]"
-          />
-
-          {/* Select para filtrar por estado (cliente-side) */}
-          <div>
+      {/* Filtros */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[180px] flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Buscar
+            </label>
+            <div className="relative">
+              <FiSearch
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={14}
+              />
+              <input
+                type="text"
+                placeholder="Proveedor, fecha o # orden…"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 placeholder:text-slate-400 transition"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Estado
+            </label>
             <select
               value={filtroEstado}
               onChange={(e) => {
@@ -270,246 +335,264 @@ const OrdenesCompra = () => {
                 setExpandedId(null);
                 setPage(1);
               }}
-              className="h-[42px] border border-gray-300 rounded-md px-3"
-              title="Filtrar por estado"
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition min-w-[150px]"
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Todos los estados</option>
               <option value="pendiente">Pendientes</option>
               <option value="completada">Completadas</option>
             </select>
           </div>
-
-          {canCreate && (
-            <button
-              onClick={handleCrear}
-              className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-            >
-              <FiPlus size={20} />
-              Nueva orden
-            </button>
-          )}
-
-          <button
-            onClick={() => navigate("/tesoreria")}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiArrowRight size={20} />
-            Ir a tesorería
-          </button>
-          <button
-            onClick={toggleMostrarCanceladas}
-            className={`h-[42px] flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition cursor-pointer ${
-              mostrarCanceladas
-                ? "bg-red-600 hover:bg-red-500 text-white"
-                : "bg-gray-300 hover:bg-gray-400 text-gray-800"
-            }`}
-          >
-            {mostrarCanceladas ? "Ver activas" : "Ver canceladas"}
-          </button>
-
-          <button
-            onClick={() => navigate(-1)}
-            className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiArrowLeft />
-            Volver
-          </button>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-          <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-            <tr>
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">Proveedor</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Método de Pago</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-center">Comprobante</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="8" className="text-center py-6 text-gray-500">
-                  Cargando…
-                </td>
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Proveedor
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Método de pago
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Doc.
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Acciones
+                </th>
               </tr>
-            ) : filteredOrdenes.length > 0 ? (
-              filteredOrdenes.map((orden) => (
-                <React.Fragment key={orden.id_orden_compra}>
-                  <tr
-                    onClick={() => toggleExpand(orden.id_orden_compra)}
-                    className={`cursor-pointer ${expandedId === orden.id_orden_compra ? "bg-gray-200 hover:bg-gray-200" : "hover:bg-gray-200"} transition`}
-                  >
-                    <td className="px-4 py-3">{orden.id_orden_compra}</td>
-                    <td className="px-4 py-3">{orden.proveedor_nombre}</td>
-                    <td className="px-4 py-3">
-                      {formatDateLocal(orden.fecha)}
-                    </td>
-                    <td className="px-4 py-3">
-                      ${Number(orden.monto_total || 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      {orden.metodo_pago ? (
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            orden.tipo_pago === "contado"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {orden.metodo_pago}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 italic">
-                          No registrado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{orden.estado}</td>
-                    <td className="px-4 py-3 text-center">
-                      {orden.comprobante_path ? (
-                        <a
-                          href={`http://localhost:3002/uploads/${orden.comprobante_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                          title={`Ver ${orden.comprobante_nombre_original || "comprobante"}`}
-                        >
-                          <FiFileText size={18} />
-                        </a>
-                      ) : (
-                        <span className="text-gray-400 text-xs italic">—</span>
-                      )}
-                    </td>
-                    <td className="pl-3 py-3 text-center flex gap-4">
-                      {/* Botón editar solo si puede editar y está pendiente */}
-                      {canEdit &&
-                        orden.estado === "pendiente" &&
-                        !mostrarCanceladas && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(
-                                `/ordenes_compra/editar/${orden.id_orden_compra}`,
-                              );
-                            }}
-                            className="text-blue-600 hover:text-blue-400 cursor-pointer"
-                            title="Editar Orden"
-                          >
-                            <FiEdit size={18} />
-                          </button>
-                        )}
-
-                      {/* Botón especial para admin para cambiar estado SOLO si está completada */}
-                      {role === "admin" &&
-                        orden.estado === "completada" &&
-                        !mostrarCanceladas && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              confirmAlert({
-                                title: "¿Actualizar estado de la orden?",
-                                message: `¿Seguro que quieres cambiar el estado de la orden #${orden.id_orden_compra} de COMPLETADA a PENDIENTE?`,
-                                buttons: [
-                                  {
-                                    label: "Sí, actualizar",
-                                    onClick: async () => {
-                                      try {
-                                        await api.put(
-                                          `/ordenes-compra/${orden.id_orden_compra}/estado`,
-                                          { estado: "pendiente" },
-                                        );
-                                        toast.success(
-                                          "Estado actualizado a pendiente",
-                                        );
-                                        setOrdenes((prev) =>
-                                          prev.map((o) =>
-                                            o.id_orden_compra ===
-                                            orden.id_orden_compra
-                                              ? { ...o, estado: "pendiente" }
-                                              : o,
-                                          ),
-                                        );
-                                      } catch (err) {
-                                        toast.error(
-                                          "No se pudo actualizar el estado",
-                                        );
-                                      }
-                                    },
-                                  },
-                                  {
-                                    label: "Cancelar",
-                                    onClick: () => {},
-                                  },
-                                ],
-                              });
-                            }}
-                            className="text-orange-600 hover:text-orange-400 cursor-pointer"
-                            title="Actualizar estado de la orden"
-                          >
-                            <FiRefreshCw size={18} />
-                          </button>
-                        )}
-
-                      {/* Botón para marcar como recibida si está pendiente */}
-                      {orden.estado === "pendiente" && !mostrarCanceladas && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfirmarRecepcion(orden.id_orden_compra);
-                          }}
-                          className="text-green-600 hover:text-green-400 cursor-pointer"
-                          title="Confirmar Recepción"
-                        >
-                          <FiCheckCircle size={18} />
-                        </button>
-                      )}
-                      {!canEdit && !canDelete && (
-                        <span className="text-gray-400 italic select-none">
-                          Sin permisos
-                        </span>
-                      )}
-
-                      {canDelete &&
-                        orden.estado !== "cancelada" &&
-                        !mostrarCanceladas && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(orden.id_orden_compra);
-                            }}
-                            className="text-red-600 hover:text-red-400 cursor-pointer"
-                            title="Cancelar Orden"
-                          >
-                            <FiTrash2 size={18} />
-                          </button>
-                        )}
-                    </td>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 8 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="animate-pulse h-3 bg-slate-100 rounded w-full" />
+                      </td>
+                    ))}
                   </tr>
+                ))
+              ) : filteredOrdenes.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-16">
+                    <FiShoppingCart
+                      size={32}
+                      className="mx-auto text-slate-300 mb-2"
+                    />
+                    <p className="text-sm font-semibold text-slate-500">
+                      Sin órdenes
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {searchTerm
+                        ? "No hay resultados para esa búsqueda"
+                        : "No hay órdenes registradas"}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filteredOrdenes.map((orden) => (
+                  <React.Fragment key={orden.id_orden_compra}>
+                    <tr
+                      onClick={() => toggleExpand(orden.id_orden_compra)}
+                      className={`group cursor-pointer transition-colors ${
+                        expandedId === orden.id_orden_compra
+                          ? "bg-indigo-50 border-l-2 border-l-indigo-400"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                        #{orden.id_orden_compra}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {orden.proveedor_nombre}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">
+                        {formatDateLocal(orden.fecha)}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        ${Number(orden.monto_total || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {orden.metodo_pago ? (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              orden.tipo_pago === "contado"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {orden.metodo_pago}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${ESTADO_MAP[orden.estado] || "bg-slate-50 text-slate-500 border border-slate-200"}`}
+                        >
+                          {(orden.estado || "—").toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {orden.comprobante_path ? (
+                          <a
+                            href={`http://localhost:3002/uploads/${orden.comprobante_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title={
+                              orden.comprobante_nombre_original || "Comprobante"
+                            }
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
+                          >
+                            <FiFileText size={13} />
+                          </a>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {canEdit &&
+                            orden.estado === "pendiente" &&
+                            !mostrarCanceladas && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(
+                                    `/ordenes_compra/editar/${orden.id_orden_compra}`,
+                                  );
+                                }}
+                                title="Editar"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                              >
+                                <FiEdit size={14} />
+                              </button>
+                            )}
+                          {user?.rol === "admin" &&
+                            orden.estado === "completada" &&
+                            !mostrarCanceladas && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  confirmAlert({
+                                    title: "¿Actualizar estado?",
+                                    message: `¿Cambiar orden #${orden.id_orden_compra} de COMPLETADA a PENDIENTE?`,
+                                    buttons: [
+                                      {
+                                        label: "Sí, actualizar",
+                                        onClick: async () => {
+                                          try {
+                                            await api.put(
+                                              `/ordenes-compra/${orden.id_orden_compra}/estado`,
+                                              { estado: "pendiente" },
+                                            );
+                                            toast.success(
+                                              "Estado actualizado a pendiente",
+                                            );
+                                            setOrdenes((prev) =>
+                                              prev.map((o) =>
+                                                o.id_orden_compra ===
+                                                orden.id_orden_compra
+                                                  ? {
+                                                      ...o,
+                                                      estado: "pendiente",
+                                                    }
+                                                  : o,
+                                              ),
+                                            );
+                                          } catch {
+                                            toast.error(
+                                              "No se pudo actualizar el estado",
+                                            );
+                                          }
+                                        },
+                                      },
+                                      { label: "Cancelar", onClick: () => {} },
+                                    ],
+                                  });
+                                }}
+                                title="Revertir a pendiente"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                              >
+                                <FiRefreshCw size={14} />
+                              </button>
+                            )}
+                          {orden.estado === "pendiente" &&
+                            !mostrarCanceladas && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConfirmarRecepcion(
+                                    orden.id_orden_compra,
+                                  );
+                                }}
+                                title="Confirmar recepción"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition cursor-pointer"
+                              >
+                                <FiCheckCircle size={14} />
+                              </button>
+                            )}
+                          {canDelete &&
+                            orden.estado !== "cancelada" &&
+                            !mostrarCanceladas && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(orden.id_orden_compra);
+                                }}
+                                title="Cancelar orden"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            )}
+                          <FiChevronDown
+                            size={13}
+                            className={`text-slate-300 ml-1 transition-transform duration-150 ${expandedId === orden.id_orden_compra ? "rotate-180" : ""}`}
+                          />
+                        </div>
+                      </td>
+                    </tr>
 
-                  {expandedId === orden.id_orden_compra && (
-                    <tr>
-                      <td colSpan="8" className="bg-gray-100 p-0 border-b">
-                        <div className="px-4 py-4">
-                          {orden.comprobante_path && (
-                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                              <div className="flex items-center justify-between">
+                    {expandedId === orden.id_orden_compra && (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="p-0 bg-indigo-50/60 border-b border-indigo-100"
+                        >
+                          <div className="px-6 py-4">
+                            {orden.comprobante_path && (
+                              <div className="mb-4 flex items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
                                 <div className="flex items-center gap-2">
-                                  <FiFileText
-                                    className="text-blue-600"
-                                    size={20}
-                                  />
+                                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                                    <FiFileText
+                                      size={14}
+                                      className="text-indigo-600"
+                                    />
+                                  </div>
                                   <div>
-                                    <p className="text-sm font-semibold text-gray-700">
+                                    <p className="text-xs font-semibold text-slate-700">
                                       Comprobante adjunto
                                     </p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-[11px] text-slate-400">
                                       {orden.comprobante_nombre_original}
                                     </p>
                                   </div>
@@ -518,124 +601,118 @@ const OrdenesCompra = () => {
                                   href={`http://localhost:3002/uploads/${orden.comprobante_path}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition"
                                 >
-                                  <FiExternalLink size={14} />
-                                  Ver archivo
+                                  <FiExternalLink size={12} /> Ver archivo
                                 </a>
                               </div>
-                            </div>
-                          )}
-                          <div className="max-h-96 overflow-y-auto">
-                            <table className="w-full text-sm">
-                              <thead className="sticky top-0 bg-gray-200">
-                                <tr className="text-gray-700">
-                                  <th className="px-2 py-2 border-b border-gray-300 text-left">
-                                    Artículo
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300 text-left">
-                                    Cantidad
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300 text-left">
-                                    Precio Unitario
-                                  </th>
-                                  <th className="px-2 py-2 border-b border-gray-300 text-left">
-                                    Subtotal
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white">
-                                {orden.detalles && orden.detalles.length > 0 ? (
-                                  orden.detalles.map((d, i) => (
-                                    <tr key={i} className="hover:bg-gray-50">
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        {d.descripcion_articulo}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        {formateaCantidad(d.cantidad)}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        $
-                                        {Number(
-                                          d.precio_unitario,
-                                        ).toLocaleString()}
-                                      </td>
-                                      <td className="px-2 py-2 border-b border-gray-300">
-                                        $
-                                        {Number(
-                                          d.cantidad * d.precio_unitario,
-                                        ).toLocaleString()}
+                            )}
+                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-100">
+                                    <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                                      Artículo
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                                      Cantidad
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                                      Precio unit.
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                                      Subtotal
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {orden.detalles &&
+                                  orden.detalles.length > 0 ? (
+                                    orden.detalles.map((d, i) => (
+                                      <tr key={i} className="hover:bg-slate-50">
+                                        <td className="px-3 py-2 text-slate-700">
+                                          {d.descripcion_articulo}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-slate-600">
+                                          {formateaCantidad(d.cantidad)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-slate-600">
+                                          $
+                                          {Number(
+                                            d.precio_unitario,
+                                          ).toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                                          $
+                                          {Number(
+                                            d.cantidad * d.precio_unitario,
+                                          ).toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td
+                                        colSpan="4"
+                                        className="text-center py-6 text-slate-400 text-xs"
+                                      >
+                                        Sin detalles disponibles
                                       </td>
                                     </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td
-                                      colSpan="4"
-                                      className="text-center py-2 text-gray-500"
-                                    >
-                                      No hay detalles disponibles.
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="8" className="text-center py-6 text-gray-500">
-                  No se encontraron órdenes que coincidan con la búsqueda.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
-              de{" "}
-              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
-              — <span className="font-semibold text-gray-800">{total}</span>{" "}
-              órdenes
-            </div>
-            <div className="flex items-center gap-3">
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Página{" "}
+              <span className="font-semibold text-slate-700">{page}</span> de{" "}
+              <span className="font-semibold text-slate-700">{totalPages}</span>
+              {total > 0 && (
+                <>
+                  {" "}
+                  —{" "}
+                  <span className="font-semibold text-slate-700">
+                    {total}
+                  </span>{" "}
+                  órdenes
+                </>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={!hasPrev}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 ← Anterior
               </button>
               <button
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={!hasNext}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 Siguiente →
               </button>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(parseInt(e.target.value));
-                  setPage(1);
-                }}
-                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-              >
-                <option value={10}>10 / página</option>
-                <option value={25}>25 / página</option>
-                <option value={50}>50 / página</option>
-              </select>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

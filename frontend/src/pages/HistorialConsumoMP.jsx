@@ -386,72 +386,71 @@ const HistorialConsumoMP = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/inventario")}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
+            >
+              <FiArrowLeft size={16} />
+            </button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-0.5">
+                Inventario
+              </p>
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
                 Historial de Consumo MP
               </h1>
-              <p className="text-slate-500 mt-1">
-                Registro, prorrateo y distribucion por ordenes de fabricacion
-              </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={cargarDatos}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
-              >
-                <FiRefreshCw size={18} />
-                <span className="hidden sm:inline">Actualizar</span>
-              </button>
-              <button
-                onClick={() => setDrawerConsumo(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-md cursor-pointer"
-              >
-                <FiPlus size={18} />
-                Registrar consumo
-              </button>
-              <button
-                onClick={async () => {
-                  setDrawerProrrateo({ open: true });
-                  await fetchCostosPorArticulo();
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md cursor-pointer"
-              >
-                <FiPieChart size={18} />
-                Ver prorrateo detallado
-              </button>
-              <button
-                onClick={() => navigate("/inventario")}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all shadow-md cursor-pointer"
-              >
-                <FiArrowLeft size={18} />
-                <span className="hidden sm:inline">Volver</span>
-              </button>
-            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={cargarDatos}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm inline-flex items-center gap-2"
+            >
+              <FiRefreshCw size={15} />
+              Actualizar
+            </button>
+            <button
+              onClick={() => setDrawerConsumo(true)}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm inline-flex items-center gap-2"
+            >
+              <FiPlus size={15} />
+              Registrar consumo
+            </button>
+            <button
+              onClick={async () => {
+                setDrawerProrrateo({ open: true });
+                await fetchCostosPorArticulo();
+              }}
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer shadow-sm inline-flex items-center gap-2"
+            >
+              <FiPieChart size={15} />
+              Ver prorrateo detallado
+            </button>
           </div>
         </div>
 
         {/* Selector de semana */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
           <div className="flex items-center justify-between">
             <button
               onClick={() => cambiarSemana(-1)}
-              className="p-2 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             >
-              <FiChevronLeft size={24} className="text-slate-600" />
+              <FiChevronLeft size={18} />
             </button>
             <div className="text-center">
-              <div className="flex items-center justify-center gap-2 text-lg font-semibold text-slate-800">
-                <FiCalendar className="text-emerald-500" />
-                {formatFecha(periodo.fechaInicio)} -{" "}
+              <div className="flex items-center justify-center gap-2 font-semibold text-slate-800">
+                <FiCalendar className="text-slate-400" size={16} />
+                {formatFecha(periodo.fechaInicio)} —{" "}
                 {formatFecha(periodo.fechaFin)}
               </div>
               {esSemanaActual() && (
-                <span className="inline-block mt-1 px-3 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg">
                   Semana actual
                 </span>
               )}
@@ -459,46 +458,44 @@ const HistorialConsumoMP = () => {
             <button
               onClick={() => cambiarSemana(1)}
               disabled={esSemanaActual()}
-              className="p-2 hover:bg-slate-100 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <FiChevronRight size={24} className="text-slate-600" />
+              <FiChevronRight size={18} />
             </button>
           </div>
         </div>
 
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-800" />
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <FiBox />
-                    Consumos de Materia Prima por Etapa
-                  </h3>
-                  <div className="text-right text-white">
-                    <p className="text-2xl font-bold">
-                      {formatMoneda(totales.costo_total)}
-                    </p>
-                    <p className="text-emerald-100 text-sm">
-                      {formatUnidadesPorTipo(totalesUnidadesPorTipo)}
-                    </p>
-                  </div>
+          <div className="space-y-6">
+            {/* Consumos por etapa */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <FiBox size={13} />
+                  Consumos de Materia Prima por Etapa
+                </h2>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-slate-900">
+                    {formatMoneda(totales.costo_total)}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {formatUnidadesPorTipo(totalesUnidadesPorTipo)}
+                  </p>
                 </div>
               </div>
-
               {resumen.length === 0 ? (
                 <div className="p-12 text-center">
                   <FiBox className="mx-auto text-4xl text-slate-300 mb-3" />
-                  <p className="text-slate-500">
-                    No hay consumos registrados en este periodo
+                  <p className="text-slate-500 font-medium">
+                    No hay consumos registrados en este período
                   </p>
                 </div>
               ) : (
-                <div className="p-4">
+                <div className="p-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {Object.entries(resumenPorEtapa).map(
                       ([etapaKey, etapa]) => {
@@ -506,50 +503,48 @@ const HistorialConsumoMP = () => {
                         return (
                           <div
                             key={etapaKey}
-                            className={`rounded-xl border ${colors.border} ${colors.bg} overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
+                            className={`rounded-xl border ${colors.border} overflow-hidden`}
                           >
                             <div
-                              className={`bg-gradient-to-r ${colors.gradient} px-3 py-2`}
+                              className={`px-3 py-2.5 ${colors.bg} border-b ${colors.border} flex items-center justify-between`}
                             >
-                              <div className="flex items-center justify-between text-white">
-                                <div className="flex items-center gap-1.5">
-                                  <FiBox className="text-sm" />
-                                  <span className="font-semibold text-sm">
-                                    {etapa.nombre_etapa}
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-bold text-sm">
-                                    {formatMoneda(etapa.total_costo)}
-                                  </p>
-                                </div>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`w-2 h-2 rounded-full ${colors.dot}`}
+                                />
+                                <span
+                                  className={`font-semibold text-sm ${colors.text}`}
+                                >
+                                  {etapa.nombre_etapa}
+                                </span>
                               </div>
+                              <span
+                                className={`font-bold text-sm ${colors.text}`}
+                              >
+                                {formatMoneda(etapa.total_costo)}
+                              </span>
                             </div>
-                            <div className="p-2 max-h-48 overflow-y-auto space-y-1.5">
+                            <div className="p-2 max-h-48 overflow-y-auto space-y-1.5 bg-white">
                               {etapa.articulos.map((item) => (
                                 <div
                                   key={item.id_articulo}
-                                  className="p-2 rounded-lg bg-white/60 border border-slate-200/50"
+                                  className="p-2 rounded-lg border border-slate-100"
                                 >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-start gap-1.5 min-w-0 flex-1">
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1 ${colors.dot}`}
-                                      ></span>
-                                      <div className="min-w-0">
-                                        <p className="text-xs text-slate-800 font-medium truncate leading-tight">
-                                          {item.descripcion}
-                                        </p>
-                                        <p className="text-[12px] text-slate-400 truncate">
-                                          Ref: {item.referencia || "N/A"} •
-                                          P.Costo:{" "}
-                                          {formatMoneda(item.precio_costo || 0)}
-                                        </p>
-                                      </div>
+                                  <div className="flex items-start gap-1.5">
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${colors.dot}`}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs text-slate-800 font-medium truncate leading-tight">
+                                        {item.descripcion}
+                                      </p>
+                                      <p className="text-[11px] text-slate-400">
+                                        Ref: {item.referencia || "N/A"}
+                                      </p>
                                     </div>
                                   </div>
-                                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/50">
-                                    <span className="text-[10px] text-slate-500">
+                                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100">
+                                    <span className="text-[11px] text-slate-500">
                                       {formateaCantidad(item.total_consumido)}{" "}
                                       {item.abreviatura_unidad || "uds"}
                                     </span>
@@ -571,61 +566,57 @@ const HistorialConsumoMP = () => {
               )}
             </div>
 
-            {/* SECCION 2: Ordenes de Fabricacion con Prorrateo */}
+            {/* Órdenes con prorrateo */}
             {Object.keys(ordenesProrrateo).length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-500 to-slate-600 px-6 py-4">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <FiTruck />
-                    Distribucion de Costos por Orden de Fabricacion
-                  </h3>
-                  <p className="text-slate-200 text-sm mt-1">
-                    El porcentaje de cada orden se calcula sumando el precio de
-                    venta × cantidad avanzada de sus artículos, dividido entre
-                    el total de todas las órdenes. Quien produce más valor,
-                    asume proporcionalmente más costo de materia prima.
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-8 py-5 border-b border-slate-200">
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <FiTruck size={13} />
+                    Distribución de Costos por Orden de Fabricación
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    El porcentaje de cada orden se calcula sumando precio de
+                    venta × cantidad avanzada, dividido entre el total de todas
+                    las órdenes.
                   </p>
                 </div>
-
-                <div className="p-4">
+                <div className="p-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {Object.values(ordenesProrrateo)
                       .sort((a, b) => b.porcentaje - a.porcentaje)
                       .map((orden) => (
                         <div
                           key={orden.id_orden_fabricacion}
-                          className="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all"
+                          className="border border-slate-200 rounded-xl overflow-hidden"
                         >
-                          {/* Header compacto con info principal */}
-                          <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 py-2.5 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <p className="font-bold text-white text-sm">
-                                  OF #{orden.id_orden_fabricacion}
-                                </p>
-                                <p className="text-slate-300 text-xs truncate max-w-[180px]">
-                                  {orden.nombre_cliente}
-                                </p>
-                              </div>
+                          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                            <div>
+                              <p className="font-bold text-slate-900 text-sm">
+                                OF #{orden.id_orden_fabricacion}
+                              </p>
+                              <p className="text-xs text-slate-500 truncate max-w-[200px]">
+                                {orden.nombre_cliente}
+                              </p>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
-                                <span className="text-xl font-bold text-white">
+                                <p className="text-xs text-slate-400">
+                                  Participación
+                                </p>
+                                <p className="font-bold text-slate-900 text-lg">
                                   {orden.porcentaje.toFixed(1)}%
-                                </span>
+                                </p>
                               </div>
-                              <div className="text-right border-l border-slate-600 pl-4">
-                                <p className="text-xs text-emerald-300">
+                              <div className="text-right border-l border-slate-200 pl-4">
+                                <p className="text-xs text-slate-400">
                                   Costo Est.
                                 </p>
-                                <p className="font-bold text-emerald-400">
+                                <p className="font-bold text-emerald-700">
                                   {formatMoneda(orden.totalCostoEstimado)}
                                 </p>
                               </div>
                             </div>
                           </div>
-
-                          {/* Etapas en layout horizontal */}
                           <div className="p-3">
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(orden.etapas)
@@ -637,16 +628,15 @@ const HistorialConsumoMP = () => {
                                   return (
                                     <div
                                       key={etapaNombre}
-                                      className={`flex-1 min-w-[200px] rounded-lg border ${colors.border} overflow-hidden`}
+                                      className={`flex-1 min-w-[160px] rounded-lg border ${colors.border} overflow-hidden`}
                                     >
-                                      {/* Header de etapa compacto */}
                                       <div
-                                        className={`px-2.5 py-1.5 ${colors.light} flex items-center justify-between`}
+                                        className={`px-2.5 py-1.5 ${colors.bg} flex items-center justify-between`}
                                       >
                                         <div className="flex items-center gap-1.5">
                                           <span
-                                            className={`w-2 h-2 rounded-full ${colors.dot}`}
-                                          ></span>
+                                            className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}
+                                          />
                                           <span
                                             className={`text-xs font-semibold ${colors.text}`}
                                           >
@@ -655,25 +645,24 @@ const HistorialConsumoMP = () => {
                                         </div>
                                         <div className="flex items-center gap-2 text-xs">
                                           <span
-                                            className={`font-bold ${colors.text}`}
+                                            className={`font-semibold ${colors.text}`}
                                           >
                                             ~
                                             {formatUnidadesPorTipo(
                                               etapaData.unidadesProrrateadas,
                                             )}
                                           </span>
-                                          <span className="text-slate-500">
+                                          <span className="text-slate-400">
                                             {etapaData.porcentaje.toFixed(1)}%
                                           </span>
                                         </div>
                                       </div>
-                                      {/* Artículos compactos */}
-                                      <div className="p-1.5 space-y-1 bg-white/50 max-h-28 overflow-y-auto">
+                                      <div className="p-1.5 space-y-1 bg-white max-h-28 overflow-y-auto">
                                         {Object.values(etapaData.articulos).map(
                                           (art) => (
                                             <div
                                               key={art.id_articulo}
-                                              className="px-2 py-1 rounded bg-white border border-slate-100 flex items-center justify-between gap-2"
+                                              className="px-2 py-1 rounded border border-slate-100 flex items-center justify-between gap-2"
                                             >
                                               <div className="min-w-0 flex-1">
                                                 <p className="text-[11px] text-slate-700 font-medium truncate">
@@ -685,13 +674,11 @@ const HistorialConsumoMP = () => {
                                                   {art.abreviatura_unidad}
                                                 </p>
                                               </div>
-                                              <div className="text-right flex-shrink-0">
-                                                <p className="text-[10px] font-semibold text-emerald-600">
-                                                  {formatMoneda(
-                                                    art.costoEstimado || 0,
-                                                  )}
-                                                </p>
-                                              </div>
+                                              <p className="text-[11px] font-semibold text-emerald-700 flex-shrink-0">
+                                                {formatMoneda(
+                                                  art.costoEstimado || 0,
+                                                )}
+                                              </p>
                                             </div>
                                           ),
                                         )}
@@ -699,13 +686,12 @@ const HistorialConsumoMP = () => {
                                     </div>
                                   );
                                 })}
-                              {/* Mensaje si no hay etapas con consumo */}
                               {Object.entries(orden.etapas).filter(
-                                ([_, etapaData]) => etapaData.tieneConsumo,
+                                ([_, d]) => d.tieneConsumo,
                               ).length === 0 && (
-                                <div className="w-full text-center py-3 text-slate-400 text-xs">
-                                  No hay etapas con consumo de MP registrado
-                                </div>
+                                <p className="w-full text-center py-3 text-slate-400 text-xs">
+                                  Sin etapas con consumo de MP registrado
+                                </p>
                               )}
                             </div>
                           </div>
@@ -717,22 +703,26 @@ const HistorialConsumoMP = () => {
             )}
           </div>
         )}
-
-        {/* Drawers */}
-        <ProrrateoOrdenDrawer
-          open={drawerProrrateo.open}
-          onClose={() => setDrawerProrrateo({ open: false })}
-          prorrateoPorArticulo={costosPorArticulo}
-          avancesReales={avancesReales}
-          resumen={resumen}
-          ordenes={ordenes}
-          totales={totales}
-        />
-        <ConsumoMateriaPrimaDrawer
-          isOpen={drawerConsumo}
-          onClose={() => setDrawerConsumo(false)}
-        />
       </div>
+
+      {/* Drawers */}
+      <ProrrateoOrdenDrawer
+        open={drawerProrrateo.open}
+        onClose={() => setDrawerProrrateo({ open: false })}
+        prorrateoPorArticulo={costosPorArticulo}
+        avancesReales={avancesReales}
+        resumen={resumen}
+        ordenes={ordenes}
+        totales={totales}
+      />
+      <ConsumoMateriaPrimaDrawer
+        isOpen={drawerConsumo}
+        onClose={() => setDrawerConsumo(false)}
+        onSuccess={() => {
+          setDrawerConsumo(false);
+          cargarDatos();
+        }}
+      />
     </div>
   );
 };

@@ -1,8 +1,15 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const detalleOrdenPedidoController = require('../controllers/detalleOrdenPedidoController');
+const detalleOrdenPedidoController = require("../controllers/detalleOrdenPedidoController");
+const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
 
-// Ruta para obtener detalles por orden de Pedido
-router.get('/:id', detalleOrdenPedidoController.getDetallePorPedido);
+router.use(verifyToken);
+
+router.get(
+  "/:id",
+  requirePermission(ACTIONS.ORDERS_VIEW),
+  detalleOrdenPedidoController.getDetallePorPedido,
+);
 
 module.exports = router;

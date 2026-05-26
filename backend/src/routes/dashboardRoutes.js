@@ -1,8 +1,15 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const dashboardController = require('../controllers/dashboardController');
+const dashboardController = require("../controllers/dashboardController");
+const verifyToken = require("../middlewares/verifyToken");
+const requirePlanFeature = require("./_requirePlanFeature");
 
-router.get('/', dashboardController.getDashboardData);
+router.use(verifyToken);
 
+router.get(
+  "/",
+  requirePlanFeature("dashboard"),
+  dashboardController.getDashboardData,
+);
 
 module.exports = router;

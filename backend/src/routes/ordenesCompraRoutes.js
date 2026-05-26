@@ -2,58 +2,65 @@ const ordenesCompraController = require("../controllers/ordenesCompraController"
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
 const upload = require("../config/multer");
+const requirePlanFeature = require("./_requirePlanFeature");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
-// Todas las rutas de órdenes de compra requieren autenticación
 router.use(verifyToken);
 
-// Listado y detalle: supervisor y admin
 router.get(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  ordenesCompraController.getOrdenesCompra
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_VIEW),
+  ordenesCompraController.getOrdenesCompra,
 );
 router.get(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  ordenesCompraController.getOrdenCompraById
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_VIEW),
+  ordenesCompraController.getOrdenCompraById,
 );
 
-// Crear/actualizar: supervisor y admin (con soporte para archivo)
 router.post(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_CREATE),
+  checkIdempotency,
   upload.single("comprobante"),
-  ordenesCompraController.createOrdenCompra
+  ordenesCompraController.createOrdenCompra,
 );
 
 router.put(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_EDIT),
+  checkIdempotency,
   upload.single("comprobante"),
-  ordenesCompraController.updateOrdenCompra
+  ordenesCompraController.updateOrdenCompra,
 );
 
-// Solo admin puede cambiar el estado de la orden
 router.put(
   "/:id/estado",
-  checkRole([ROLES.ADMIN]),
-  ordenesCompraController.updateEstadoOrdenCompra
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_EDIT),
+  checkIdempotency,
+  ordenesCompraController.updateEstadoOrdenCompra,
 );
 
-// Confirmar recepción: supervisor y admin
 router.post(
   "/:id/recibir",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  ordenesCompraController.confirmarRecepcion
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_CREATE),
+  checkIdempotency,
+  ordenesCompraController.confirmarRecepcion,
 );
 
 router.delete(
   "/:id",
-  checkRole([ROLES.ADMIN, ROLES.SUPERVISOR]),
-  ordenesCompraController.deleteOrdenCompra
+  requirePlanFeature("compras"),
+  requirePermission(ACTIONS.PURCHASES_DELETE),
+  ordenesCompraController.deleteOrdenCompra,
 );
 
 module.exports = router;

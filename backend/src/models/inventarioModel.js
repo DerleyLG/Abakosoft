@@ -104,9 +104,9 @@ module.exports = {
 
     const SORT_MAP = {
       descripcion: "a.descripcion",
-      stock_disponible: "i.stock",
-      stock_fabricado: "i.stock_fabricado",
-      stock_minimo: "i.stock_minimo",
+      stock_disponible: "stock_disponible",
+      stock_fabricado: "stock_fabricado",
+      stock_minimo: "stock_minimo",
       categoria: "c.nombre",
     };
     const sortCol = SORT_MAP[sortBy] || SORT_MAP.descripcion;
@@ -129,8 +129,11 @@ module.exports = {
     }
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
-    // Si es materia_prima, usar LEFT JOIN desde articulos para incluir todos aunque no tengan inventario
-    const usarLeftJoinDesdeArticulos = tipo_categoria === "materia_prima";
+    // Materias primas y costos de producción usan LEFT JOIN desde articulos
+    // para incluir todos los artículos aunque no tengan registro de inventario
+    const usarLeftJoinDesdeArticulos =
+      tipo_categoria === "materia_prima" ||
+      tipo_categoria === "costo_produccion";
 
     const baseSelect = usarLeftJoinDesdeArticulos
       ? `
@@ -148,6 +151,7 @@ module.exports = {
                 COALESCE(i.stock, 0) AS stock_disponible,
                 COALESCE(i.stock_fabricado, 0) AS stock_fabricado,
                 COALESCE(i.stock_minimo, 0) AS stock_minimo,
+                0 AS stock_en_proceso,
                 i.ultima_actualizacion
             FROM articulos a
             LEFT JOIN inventario i ON i.id_articulo = a.id_articulo

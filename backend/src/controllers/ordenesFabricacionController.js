@@ -35,7 +35,7 @@ module.exports = {
         return res.status(200).json({
           data: [],
           page: Math.max(1, parseInt(page) || 1),
-          pageSize: Math.min(100, Math.max(1, parseInt(pageSize) || 25)),
+          pageSize: Math.min(1000, Math.max(1, parseInt(pageSize) || 25)),
           total: 0,
           totalPages: 1,
           hasNext: false,
@@ -88,7 +88,7 @@ module.exports = {
       });
 
       const p = Math.max(1, parseInt(page) || 1);
-      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+      const ps = Math.min(1000, Math.max(1, parseInt(pageSize) || 25));
       const totalPages = Math.max(1, Math.ceil(total / ps));
 
       res.status(200).json({

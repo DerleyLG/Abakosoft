@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { FiX, FiMinus, FiCalendar, FiFileText } from "react-icons/fi";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const RegistrarConsumoModal = ({ isOpen, onClose, articulo, onSuccess }) => {
+  const idempotencyKey = useIdempotencyKey();
   const [cantidad, setCantidad] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [notas, setNotas] = useState("");
@@ -54,12 +56,16 @@ const RegistrarConsumoModal = ({ isOpen, onClose, articulo, onSuccess }) => {
 
     setLoading(true);
     try {
-      const res = await api.post("/consumos-materia-prima", {
-        fecha,
-        id_articulo: articulo.id_articulo,
-        cantidad: cantidadNum,
-        notas: notas || null,
-      });
+      const res = await api.post(
+        "/consumos-materia-prima",
+        {
+          fecha,
+          id_articulo: articulo.id_articulo,
+          cantidad: cantidadNum,
+          notas: notas || null,
+        },
+        { headers: { "X-Idempotency-Key": idempotencyKey } },
+      );
 
       toast.success(
         `Consumo registrado: ${cantidadNum} ${articulo.descripcion}. Stock: ${res.data.data.stock_anterior} → ${res.data.data.stock_nuevo}`,

@@ -2,57 +2,61 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/ordenesFabricacionController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
-
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
 router.use(verifyToken);
 
-
 router.get(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.getAll
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_VIEW),
+  controller.getAll,
 );
 
 router.get(
   "/existe/:id_pedido",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.existe
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_VIEW),
+  controller.existe,
 );
 
 router.get(
   "/estado-pedido/:id_pedido",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.getEstadoOFByPedidoId
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_VIEW),
+  controller.getEstadoOFByPedidoId,
 );
-
 
 router.get(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.getById
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_VIEW),
+  controller.getById,
 );
 
-// Crear una nueva orden de fabricación (supervisor y admin)
 router.post(
   "/",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN, ROLES.OPERARIO]),
-  controller.create
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_CREATE),
+  checkIdempotency,
+  controller.create,
 );
 
-// Actualizar una orden de fabricación existente (supervisor y admin)
 router.put(
   "/:id",
-  checkRole([ROLES.SUPERVISOR, ROLES.ADMIN]),
-  controller.update
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_EDIT),
+  checkIdempotency,
+  controller.update,
 );
 
-// Eliminar una orden de fabricación (solo admin)
 router.delete(
   "/:id",
-  checkRole([ROLES.ADMIN, ROLES.SUPERVISOR]),
-  controller.delete
+  requirePlanFeature("fabricacion"),
+  requirePermission(ACTIONS.FABRICATION_DELETE),
+  controller.delete,
 );
 
 module.exports = router;

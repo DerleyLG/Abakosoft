@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { FiPlus, FiEye, FiArrowLeft, FiTrash2 } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiChevronDown } from "react-icons/fi";
 import React from "react";
-import Swal from "sweetalert2";
 import toast from "react-hot-toast";
+import { confirmAlert } from "react-confirm-alert";
+import "react-confirm-alert/src/react-confirm-alert.css";
+import "../styles/confirmAlert.css";
 
 const PagosTrabajadores = () => {
   const [pagos, setPagos] = useState([]);
@@ -84,46 +86,47 @@ const PagosTrabajadores = () => {
     setExpandedPago(id_pago);
   };
 
-  const handleDeletePago = async (id_pago, trabajador) => {
-    const result = await Swal.fire({
-      title: "¿Estás seguro?",
-      html: `Esto eliminará el pago del trabajador <strong>${trabajador}</strong>.<br>Los avances volverán a estado "pendiente de pago".`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const { data } = await api.delete(`/pagos/${id_pago}`);
-        toast.success("Pago eliminado correctamente");
-        if (data.tesoreriaEliminada) {
-          toast.success("Movimiento de tesorería asociado eliminado");
-        }
-
-        const resPagos = await api.get("/pagos", {
-          params: {
-            page,
-            pageSize,
-            sortBy: "fecha_pago",
-            sortDir: "desc",
-            trabajadorId: trabajadorFiltro || undefined,
+  const handleDeletePago = (id_pago, trabajador) => {
+    confirmAlert({
+      title: "Eliminar pago",
+      message: `¿Seguro que quieres eliminar el pago de ${trabajador}? Los avances volverán a estado "pendiente de pago".`,
+      buttons: [
+        {
+          label: "Sí, eliminar",
+          onClick: async () => {
+            try {
+              const { data } = await api.delete(`/pagos/${id_pago}`);
+              toast.success("Pago eliminado correctamente");
+              if (data.tesoreriaEliminada) {
+                toast.success("Movimiento de tesorería asociado eliminado");
+              }
+              const resPagos = await api.get("/pagos", {
+                params: {
+                  page,
+                  pageSize,
+                  sortBy: "fecha_pago",
+                  sortDir: "desc",
+                  trabajadorId: trabajadorFiltro || undefined,
+                },
+              });
+              const payload = resPagos.data || {};
+              setPagos(Array.isArray(payload.data) ? payload.data : []);
+              setTotalPages(Number(payload.totalPages) || 1);
+              setTotal(Number(payload.total) || 0);
+              setHasNext(Boolean(payload.hasNext));
+              setHasPrev(Boolean(payload.hasPrev));
+            } catch (error) {
+              console.error("Error eliminando pago:", error);
+              toast.error("Error al eliminar el pago");
+            }
           },
-        });
-        const payload = resPagos.data || {};
-        setPagos(Array.isArray(payload.data) ? payload.data : []);
-        setTotalPages(Number(payload.totalPages) || 1);
-        setTotal(Number(payload.total) || 0);
-        setHasNext(Boolean(payload.hasNext));
-        setHasPrev(Boolean(payload.hasPrev));
-      } catch (error) {
-        console.error("Error eliminando pago:", error);
-        toast.error("Error al eliminar el pago");
-      }
-    }
+        },
+        {
+          label: "Cancelar",
+          onClick: () => {},
+        },
+      ],
+    });
   };
 
   const onTrabajadorChange = (e) => {
@@ -132,216 +135,260 @@ const PagosTrabajadores = () => {
   };
 
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Pagos</h2>
-        <div className="flex gap-4 items-center">
-          <div className="">
-            <label className="text-gray-700 font-semibold mr-2">
-              Filtrar por trabajador:
-            </label>
-            <select
-              className="border border-gray-300 rounded-md px-4 py-2"
-              value={trabajadorFiltro}
-              onChange={onTrabajadorChange}
-            >
-              <option value="">Todos</option>
-              {trabajadores.map((t) => (
-                <option key={t.id_trabajador} value={t.id_trabajador}>
-                  {t.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Pagos
+          </h1>
+          {total > 0 && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
+              {total}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => navigate("/avances_fabricacion")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
           >
-            Avances de fabricacion
+            Avances de fabricación
           </button>
           <button
             onClick={() => navigate("/pagos_anticipados")}
-            className="bg-slate-800 hover:bg-slate-600 text-white px-4 py-2 rounded-md font-semibold h-[42px] flex items-center gap-2 cursor-pointer"
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
           >
             Anticipos
           </button>
           <button
             onClick={() => navigate("/pagos/nuevo")}
-            className="h-[42px] flex items-center gap-2 bg-slate-800 hover:bg-slate-600 hover:text-slate-400 text-white px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-            title="Crear nuevo trabajador"
+            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
-            <FiPlus size={20} />
+            <FiPlus size={16} />
             Registrar pago
-          </button>
-          <button
-            onClick={() => navigate("/Trabajadores")}
-            className="h-[42px] flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-bg-slate-800 px-4 py-2 rounded-md font-semibold transition cursor-pointer"
-          >
-            <FiArrowLeft />
-            Volver
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
-          <thead className="bg-slate-200 text-gray-700 uppercase font-semibold select-none">
-            <tr>
-              <th className="px-4 py-3">Trabajador</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Monto Total</th>
-              <th className="px-4 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan="4" className="text-center py-6 text-gray-500">
-                  Cargando...
-                </td>
-              </tr>
-            )}
-            {!loading && pagos.length === 0 && (
-              <tr>
-                <td colSpan="4" className="text-center py-6 text-gray-500">
-                  No se encontraron pagos.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              pagos.length > 0 &&
-              pagos.map((pago) => (
-                <React.Fragment key={pago.id_pago}>
-                  <tr
-                    onClick={() => toggleExpand(pago.id_pago)}
-                    className={`cursor-pointer ${
-                      expandedPago === pago.id_pago
-                        ? "bg-gray-200 hover:bg-gray-200"
-                        : "hover:bg-gray-200"
-                    }`}
-                  >
-                    <td className="px-4 py-3">{pago.trabajador}</td>
-                    <td className="px-4 py-3">
-                      {pago.fecha_pago
-                        ? (() => {
-                            // Extraer solo la parte de fecha YYYY-MM-DD del string
-                            const fechaStr = String(pago.fecha_pago)
-                              .split("T")[0]
-                              .split(" ")[0];
-                            const [year, month, day] = fechaStr.split("-");
-                            return `${day}/${month}/${year}`;
-                          })()
-                        : "N/A"}
-                    </td>
-                    <td className="px-4 py-3">
-                      ${Number(pago.total).toLocaleString("es-CO") || "0.00"}
-                    </td>
+      {/* Filtro */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">
+          Filtrar por trabajador:
+        </label>
+        <select
+          className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent cursor-pointer min-w-[160px]"
+          value={trabajadorFiltro}
+          onChange={onTrabajadorChange}
+        >
+          <option value="">Todos</option>
+          {trabajadores.map((t) => (
+            <option key={t.id_trabajador} value={t.id_trabajador}>
+              {t.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
 
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePago(pago.id_pago, pago.trabajador);
-                          }}
-                          className="text-red-600 hover:text-red-400 transition cursor-pointer"
-                          title="Eliminar pago"
-                        >
-                          <FiTrash2 size={20} />
-                        </button>
-                      </div>
-                    </td>
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Trabajador
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Monto total
+                </th>
+                <th className="px-4 py-3 w-24">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    {Array.from({ length: 4 }).map((__, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-3.5 bg-slate-100 rounded w-full animate-pulse" />
+                      </td>
+                    ))}
                   </tr>
-                  {expandedPago === pago.id_pago && (
-                    <tr>
-                      <td
-                        colSpan="5"
-                        className="px-2 py-2 border-b border-gray-300"
-                      >
-                        <strong>Observaciones:</strong>{" "}
-                        {pago.observaciones || "Ninguna"}
-                        <div className="mt-3">
-                          <table className="w-full text-sm border-separate border-spacing-0 border border-gray-300 rounded-lg overflow-hidden mt-2">
-                            <thead className="bg-gray-200 text-gray-700">
-                              <tr className="px-2 py-2 border-b border-gray-300">
-                                <th className="px-2 py-2 border-b border-gray-300">
-                                  Orden de fabricacion - etapa
-                                </th>
-                                <th className="px-2 py-2 border-b border-gray-300">
-                                  Cantidad
-                                </th>
-                                <th className="px-2 py-2 border-b border-gray-300">
-                                  Pago Unitario
-                                </th>
-                                <th className="ppx-2 py-2 border-b border-gray-300">
-                                  Subtotal
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="hover:bg-gray-50">
-                              {pago.detalles && pago.detalles.length > 0 ? (
-                                pago.detalles.map((d, index) => (
-                                  <tr key={index}>
-                                    <td className="px-2 py-2 border-b border-gray-300">
-                                      {parseInt(d.es_descuento) === 1
-                                        ? "Descuento por anticipo"
-                                        : `#${d.id_orden_fabricacion}  -  ${d.nombre_cliente} --- ${d.nombre_etapa}`}
-                                    </td>
-                                    <td className="px-2 py-2 border-b border-gray-300">
-                                      {d.cantidad}
-                                    </td>
-                                    <td className="px-2 py-2 border-b border-gray-300">
-                                      $
-                                      {Number(d.pago_unitario).toLocaleString()}
-                                    </td>
-                                    <td className="px-2 py-2 border-b border-gray-300">
-                                      ${Number(d.subtotal).toLocaleString()}
-                                    </td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr>
-                                  <td
-                                    colSpan="4"
-                                    className="text-center py-2 text-gray-500"
-                                  >
-                                    No hay detalles disponibles.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                ))
+              ) : pagos.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center py-16">
+                    <p className="text-sm font-medium text-slate-400">
+                      No se encontraron pagos.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                pagos.map((pago) => (
+                  <React.Fragment key={pago.id_pago}>
+                    <tr
+                      onClick={() => toggleExpand(pago.id_pago)}
+                      className={`border-b border-slate-100 cursor-pointer transition-colors select-none group ${
+                        expandedPago === pago.id_pago
+                          ? "bg-slate-50"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {pago.trabajador}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {pago.fecha_pago
+                          ? (() => {
+                              // Extraer solo la parte de fecha YYYY-MM-DD del string
+                              const fechaStr = String(pago.fecha_pago)
+                                .split("T")[0]
+                                .split(" ")[0];
+                              const [year, month, day] = fechaStr.split("-");
+                              return `${day}/${month}/${year}`;
+                            })()
+                          : "N/A"}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        ${Number(pago.total).toLocaleString("es-CO") || "0.00"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <span
+                            className={`text-slate-400 transition-transform duration-200 ${
+                              expandedPago === pago.id_pago ? "rotate-180" : ""
+                            }`}
+                          >
+                            <FiChevronDown size={15} />
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePago(pago.id_pago, pago.trabajador);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                            title="Eliminar pago"
+                          >
+                            <FiTrash2 size={15} />
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
-          </tbody>
-        </table>
+                    {expandedPago === pago.id_pago && (
+                      <tr>
+                        <td
+                          colSpan="4"
+                          className="px-6 py-4 bg-slate-50/60 border-b border-slate-100"
+                        >
+                          {pago.observaciones && (
+                            <p className="text-xs text-slate-500 mb-3">
+                              <span className="font-semibold text-slate-600">
+                                Observaciones:
+                              </span>{" "}
+                              {pago.observaciones}
+                            </p>
+                          )}
+                          <div className="rounded-xl border border-slate-200 overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-slate-100 border-b border-slate-200">
+                                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                    Orden / Etapa
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                    Cantidad
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                    Pago unitario
+                                  </th>
+                                  <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                    Subtotal
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {pago.detalles && pago.detalles.length > 0 ? (
+                                  pago.detalles.map((d, index) => (
+                                    <tr
+                                      key={index}
+                                      className="border-b border-slate-100 last:border-0"
+                                    >
+                                      <td className="px-3 py-2 text-slate-700">
+                                        {parseInt(d.es_descuento) === 1
+                                          ? "Descuento por anticipo"
+                                          : `#${d.id_orden_fabricacion} — ${d.nombre_cliente} · ${d.nombre_etapa}`}
+                                      </td>
+                                      <td className="px-3 py-2 text-slate-600">
+                                        {d.cantidad}
+                                      </td>
+                                      <td className="px-3 py-2 text-slate-600">
+                                        $
+                                        {Number(
+                                          d.pago_unitario,
+                                        ).toLocaleString()}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                                        ${Number(d.subtotal).toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td
+                                      colSpan="4"
+                                      className="text-center py-4 text-slate-400 text-xs"
+                                    >
+                                      No hay detalles disponibles.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
         {/* Paginación */}
-        <div className="mt-4 bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 font-medium">
-              Página <span className="font-semibold text-gray-800">{page}</span>{" "}
-              de{" "}
-              <span className="font-semibold text-gray-800">{totalPages}</span>{" "}
-              {total ? `— ` : ""}
-              <span className="font-semibold text-gray-800">{total || ""}</span>
-              {total ? ` pagos` : ""}
-            </div>
-            <div className="flex items-center gap-3">
+        <div className="border-t border-slate-200 px-4 py-3 bg-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Página{" "}
+              <span className="font-semibold text-slate-700">{page}</span> de{" "}
+              <span className="font-semibold text-slate-700">{totalPages}</span>
+              {total > 0 && (
+                <>
+                  {" "}
+                  —{" "}
+                  <span className="font-semibold text-slate-700">
+                    {total}
+                  </span>{" "}
+                  pagos en total
+                </>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => hasPrev && setPage((p) => Math.max(1, p - 1))}
                 disabled={!hasPrev || loading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 ← Anterior
               </button>
               <button
                 onClick={() => hasNext && setPage((p) => p + 1)}
                 disabled={!hasNext || loading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 Siguiente →
               </button>
@@ -351,12 +398,12 @@ const PagosTrabajadores = () => {
                   setPageSize(parseInt(e.target.value, 10));
                   setPage(1);
                 }}
-                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="px-2 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <option value={10}>10 / página</option>
-                <option value={20}>20 / página</option>
-                <option value={50}>50 / página</option>
-                <option value={100}>100 / página</option>
+                <option value={10}>10 / pág.</option>
+                <option value={20}>20 / pág.</option>
+                <option value={50}>50 / pág.</option>
+                <option value={100}>100 / pág.</option>
               </select>
             </div>
           </div>

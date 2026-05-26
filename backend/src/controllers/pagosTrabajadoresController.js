@@ -489,11 +489,10 @@ module.exports = {
       }
 
       // Validar campos obligatorios
-      if (!id_trabajador || !id_orden_fabricacion || !monto || !fecha) {
+      if (!id_trabajador || !monto || !fecha) {
         await connection.rollback();
         return res.status(400).json({
-          error:
-            "Faltan campos obligatorios: id_trabajador, id_orden_fabricacion, monto, fecha",
+          error: "Faltan campos obligatorios: id_trabajador, monto, fecha",
         });
       }
 
@@ -523,7 +522,7 @@ module.exports = {
       // Crear anticipo
       const id_anticipo = await AnticiposModel.create({
         id_trabajador,
-        id_orden_fabricacion,
+        id_orden_fabricacion: id_orden_fabricacion || null,
         monto,
         observaciones,
         fecha,

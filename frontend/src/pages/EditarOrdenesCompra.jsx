@@ -20,6 +20,7 @@ import {
   FiUpload,
 } from "react-icons/fi";
 import { format } from "date-fns";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const formatCurrency = (value) => {
   if (value === null || value === undefined || isNaN(value)) {
@@ -92,6 +93,7 @@ const EditarOrdenCompra = () => {
   );
   const { id } = useParams();
   const navigate = useNavigate();
+  const idempotencyKey = useIdempotencyKey();
 
   const [ordenData, setOrdenData] = useState({
     id_proveedor: "",
@@ -465,6 +467,7 @@ const EditarOrdenCompra = () => {
         response = await api.put(`/ordenes-compra/${id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
+            "X-Idempotency-Key": idempotencyKey,
           },
         });
       } else if (eliminarComprobanteActual) {
@@ -476,7 +479,9 @@ const EditarOrdenCompra = () => {
           eliminar_comprobante: true,
           estado: estadoPendiente,
         };
-        response = await api.put(`/ordenes-compra/${id}`, dataToSend);
+        response = await api.put(`/ordenes-compra/${id}`, dataToSend, {
+          headers: { "X-Idempotency-Key": idempotencyKey },
+        });
       } else {
         // Envío normal sin cambios en comprobante
         const dataToSend = {
@@ -485,7 +490,9 @@ const EditarOrdenCompra = () => {
           detalles: detalles,
           estado: estadoPendiente,
         };
-        response = await api.put(`/ordenes-compra/${id}`, dataToSend);
+        response = await api.put(`/ordenes-compra/${id}`, dataToSend, {
+          headers: { "X-Idempotency-Key": idempotencyKey },
+        });
       }
       // Sincronizar datos tras la acción
       await fetchOrdenData();
@@ -520,202 +527,209 @@ const EditarOrdenCompra = () => {
     }
   };
 
+  const inputCls = (editable = true) =>
+    `w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 placeholder:text-slate-400 transition ${!editable ? "bg-slate-50 text-slate-400 cursor-not-allowed" : "bg-white"}`;
+  const labelCls =
+    "text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block";
+
   if (loading) {
     return (
-      <div className="text-center py-10 text-xl font-medium text-slate-700">
-        Cargando orden de compra...
+      <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
+        <p className="text-sm text-slate-500 animate-pulse">
+          Cargando orden de compra…
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-          Editar Orden de Compra{" "}
-          <span className="text-slate-500 font-normal">#{id}</span>
-          {!isEditable && (
-            <span className="text-base text-red-500 ml-4 p-1 border border-red-500 rounded font-semibold">
-              (Solo Lectura)
-            </span>
-          )}
-        </h2>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight flex items-center gap-2">
+            Editar orden de compra
+            <span className="text-slate-400 font-normal text-lg">#{id}</span>
+            {!isEditable && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 normal-case">
+                Solo lectura
+              </span>
+            )}
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {isEditable
+              ? "Modifica los datos de la orden"
+              : "Esta orden no puede editarse en su estado actual"}
+          </p>
+        </div>
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="cursor-pointer flex items-center bg-gray-300 hover:bg-gray-400 gap-2 text-slate-800 px-4 py-2 rounded-lg font-semibold transition"
+          className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
         >
-          <FiArrowLeft />
-          Volver
+          <FiArrowLeft size={14} /> Volver
         </button>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-xl shadow-2xl"
-      >
-        {/* INFORMACIÓN GENERAL */}
-        <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700">
-          Información General
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="flex flex-col">
-            <label
-              htmlFor="id_proveedor"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Proveedor
-            </label>
-            <select
-              id="id_proveedor"
-              name="id_proveedor"
-              value={ordenData.id_proveedor}
-              onChange={handleOrdenChange}
-              required
-              disabled={!isEditable}
-              className="border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">Selecciona un proveedor</option>
-              {allProveedores.map((p) => (
-                <option key={p.id_proveedor} value={p.id_proveedor}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label htmlFor="estado" className="mb-2 font-medium text-slate-600">
-              Estado
-            </label>
-            <select
-              id="estado"
-              name="estado"
-              value={ordenData.estado}
-              disabled={true}
-              className="border border-gray-300 rounded-lg px-3 py-2.5 bg-gray-100 text-gray-500 focus:outline-none"
-            >
-              <option value="pendiente">Pendiente</option>
-              <option value="recibida">Recibida</option>
-              <option value="cancelada">Cancelada</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label htmlFor="fecha" className="mb-2 font-medium text-slate-600">
-              Fecha de la Orden
-            </label>
-            <input
-              type="date"
-              id="fecha"
-              name="fecha"
-              value={ordenData.fecha}
-              onChange={handleOrdenChange}
-              disabled={!isEditable}
-              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label
-              htmlFor="id_metodo_pago"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Método de Pago
-            </label>
-            <select
-              id="id_metodo_pago"
-              name="id_metodo_pago"
-              value={pagoData.id_metodo_pago}
-              onChange={handlePagoChange}
-              disabled={!isEditable}
-              className="border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">Selecciona método (Opcional)</option>
-              {allMetodosPago.map((m) => (
-                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="referencia"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Referencia / No. Transacción
-            </label>
-            <input
-              type="text"
-              id="referencia"
-              name="referencia"
-              value={pagoData.referencia}
-              onChange={handlePagoChange}
-              disabled={!isEditable}
-              placeholder="Ej: Cheque #123, Transf. 5894, N/A"
-              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label
-              htmlFor="observaciones_pago"
-              className="mb-2 font-medium text-slate-600"
-            >
-              Observaciones del Pago
-            </label>
-            <input
-              type="text"
-              id="observaciones_pago"
-              name="observaciones_pago"
-              value={pagoData.observaciones_pago}
-              onChange={handlePagoChange}
-              disabled={!isEditable}
-              placeholder="Notas sobre la transacción"
-              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-            />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Card: Información general */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
+            Información general
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="id_proveedor" className={labelCls}>
+                Proveedor
+              </label>
+              <select
+                id="id_proveedor"
+                name="id_proveedor"
+                value={ordenData.id_proveedor}
+                onChange={handleOrdenChange}
+                required
+                disabled={!isEditable}
+                className={inputCls(isEditable)}
+              >
+                <option value="">Selecciona un proveedor</option>
+                {allProveedores.map((p) => (
+                  <option key={p.id_proveedor} value={p.id_proveedor}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="fecha" className={labelCls}>
+                Fecha de la orden
+              </label>
+              <input
+                type="date"
+                id="fecha"
+                name="fecha"
+                value={ordenData.fecha}
+                onChange={handleOrdenChange}
+                disabled={!isEditable}
+                className={inputCls(isEditable) + " cursor-pointer"}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="estado" className={labelCls}>
+                Estado
+              </label>
+              <select
+                id="estado"
+                name="estado"
+                value={ordenData.estado}
+                disabled
+                className={inputCls(false)}
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="completada">Completada</option>
+                <option value="cancelada">Cancelada</option>
+              </select>
+            </div>
+            <div className="flex flex-col lg:col-span-3">
+              <label htmlFor="categoria_costo" className={labelCls}>
+                Categoría de costo
+              </label>
+              <input
+                id="categoria_costo"
+                name="categoria_costo"
+                type="text"
+                value={ordenData.categoria_costo}
+                onChange={handleOrdenChange}
+                disabled={!isEditable}
+                placeholder="Ej: Materia prima, Suministros de oficina…"
+                className={inputCls(isEditable)}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col mb-8">
-          <label
-            htmlFor="categoria_costo"
-            className="mb-2 font-medium text-slate-600"
-          >
-            Categoría de Costo
-          </label>
-          <input
-            id="categoria_costo"
-            name="categoria_costo"
-            type="text"
-            value={ordenData.categoria_costo}
-            onChange={handleOrdenChange}
-            disabled={!isEditable}
-            placeholder="Ej: Materia prima, Compra de artículos ya fabricados, Suministros de oficina"
-            className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:bg-gray-100 disabled:text-gray-500"
-          />
+        {/* Card: Pago */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+            Datos de pago
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <label htmlFor="id_metodo_pago" className={labelCls}>
+                Método de pago
+              </label>
+              <select
+                id="id_metodo_pago"
+                name="id_metodo_pago"
+                value={pagoData.id_metodo_pago}
+                onChange={handlePagoChange}
+                disabled={!isEditable}
+                className={inputCls(isEditable)}
+              >
+                <option value="">Sin especificar</option>
+                {allMetodosPago.map((m) => (
+                  <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="referencia" className={labelCls}>
+                Referencia / Nº transacción
+              </label>
+              <input
+                type="text"
+                id="referencia"
+                name="referencia"
+                value={pagoData.referencia}
+                onChange={handlePagoChange}
+                disabled={!isEditable}
+                placeholder="Ej: Cheque #123, Transferencia 5894"
+                className={inputCls(isEditable)}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="observaciones_pago" className={labelCls}>
+                Observaciones del pago
+              </label>
+              <input
+                type="text"
+                id="observaciones_pago"
+                name="observaciones_pago"
+                value={pagoData.observaciones_pago}
+                onChange={handlePagoChange}
+                disabled={!isEditable}
+                placeholder="Notas sobre la transacción"
+                className={inputCls(isEditable)}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* SECCIÓN DE COMPROBANTE */}
-        <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700">
-          Comprobante / Factura
-        </h3>
+        {/* Card: Comprobante */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+            Comprobante / factura
+          </h2>
 
-        {/* Mostrar comprobante actual si existe */}
-        {comprobanteActual && !eliminarComprobanteActual && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FiFileText size={24} className="text-blue-600" />
+          {comprobanteActual && !eliminarComprobanteActual ? (
+            <div className="flex items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <FiFileText size={14} className="text-indigo-600" />
+                </div>
                 <div>
-                  <p className="font-semibold text-slate-700">
+                  <p className="text-xs font-semibold text-slate-700">
                     Comprobante adjunto
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-[11px] text-slate-400">
                     {comprobanteActual.nombre_original}
                   </p>
                   {comprobanteActual.fecha_subida && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-[10px] text-slate-400">
                       Subido:{" "}
                       {new Date(
                         comprobanteActual.fecha_subida,
@@ -724,52 +738,45 @@ const EditarOrdenCompra = () => {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <a
                   href={`http://localhost:3002/uploads/${comprobanteActual.path}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition"
                 >
-                  Ver archivo
+                  <FiFileText size={11} /> Ver archivo
                 </a>
                 {isEditable && (
                   <button
                     type="button"
                     onClick={handleEliminarComprobanteActual}
-                    className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition cursor-pointer"
                   >
-                    Eliminar
+                    <FiX size={11} /> Eliminar
                   </button>
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Opción para adjuntar nuevo comprobante */}
-        {isEditable && (!comprobanteActual || eliminarComprobanteActual) && (
-          <div className="mb-6">
-            <label className="flex items-center gap-2 cursor-pointer mb-3">
-              <input
-                type="checkbox"
-                checked={adjuntarComprobante}
-                onChange={handleCheckAdjuntar}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="font-medium text-slate-700">
-                {eliminarComprobanteActual
-                  ? "Adjuntar nuevo comprobante"
-                  : "Adjuntar comprobante / factura"}
-              </span>
-            </label>
-
-            {adjuntarComprobante && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition cursor-pointer">
-                    <FiUpload size={18} />
-                    Seleccionar archivo
+          ) : isEditable ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  checked={adjuntarComprobante}
+                  onChange={handleCheckAdjuntar}
+                  className="w-4 h-4 rounded border-slate-300 text-slate-700 cursor-pointer"
+                />
+                <span className="text-sm text-slate-600 cursor-pointer">
+                  {eliminarComprobanteActual
+                    ? "Adjuntar nuevo comprobante"
+                    : "Adjuntar comprobante / factura"}
+                </span>
+              </div>
+              {adjuntarComprobante && (
+                <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50">
+                  <label className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg w-fit hover:bg-slate-700 transition cursor-pointer">
+                    <FiUpload size={12} /> Seleccionar archivo
                     <input
                       type="file"
                       accept="image/jpeg,image/jpg,image/png,application/pdf"
@@ -777,204 +784,232 @@ const EditarOrdenCompra = () => {
                       className="hidden"
                     />
                   </label>
+                  <p className="mt-2 text-xs text-slate-400">
+                    JPG, PNG o PDF · máx 5 MB
+                  </p>
                   {archivoComprobante && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-700">
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-slate-700 truncate">
                         {archivoComprobante.name}
                       </span>
                       <button
                         type="button"
                         onClick={eliminarArchivo}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 cursor-pointer flex-shrink-0"
                       >
-                        <FiX size={20} />
+                        <FiX size={14} />
                       </button>
                     </div>
                   )}
-                </div>
-
-                {/* Preview para imágenes */}
-                {previewUrl && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-600 mb-2">
-                      Vista previa:
-                    </p>
+                  {previewUrl && (
                     <img
                       src={previewUrl}
-                      alt="Preview comprobante"
-                      className="max-w-xs border border-gray-300 rounded-lg shadow-sm"
+                      alt="Preview"
+                      className="mt-3 max-h-40 rounded-lg border border-slate-200"
                     />
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">
+              Sin comprobante adjunto
+            </p>
+          )}
+        </div>
 
-                <p className="text-sm text-gray-500">
-                  Formatos permitidos: JPG, PNG, PDF. Tamaño máximo: 5MB.
-                </p>
-              </div>
+        {/* Card: Artículos */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+              Artículos a comprar
+            </h2>
+            {isEditable && (
+              <button
+                type="button"
+                onClick={handleAddDetalle}
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-white transition cursor-pointer"
+              >
+                <FiPlus size={12} /> Añadir artículo
+              </button>
             )}
           </div>
-        )}
 
-        <h3 className="text-2xl font-semibold mb-4 border-b pb-2 text-slate-700 mt-10">
-          Detalles (Artículos a Comprar)
-        </h3>
-        <div className="space-y-6 mb-8">
-          {detalles.map((detalle, index) => (
-            <div
-              key={index}
-              className="w-full grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-end p-5 border border-gray-200 rounded-lg bg-gray-50 shadow-sm"
-            >
-              {/* Artículo */}
-              <div className="col-span-1 md:col-span-5 flex flex-col">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Artículo
-                </label>
-                <div className="flex items-center gap-2">
-                  <AsyncSelect
-                    cacheOptions
-                    loadOptions={loadArticulosOptions}
-                    defaultOptions={articulosOptions}
-                    value={
-                      articulosOptions.find(
-                        (opt) => opt.value === detalle.id_articulo,
-                      ) || null
-                    }
-                    onChange={(option) => {
-                      const syntheticEvent = {
-                        target: {
-                          name: "id_articulo",
-                          value: option ? option.value : "",
-                        },
-                      };
-                      handleDetalleChange(index, syntheticEvent);
-                    }}
-                    placeholder="Busca o selecciona un artículo..."
-                    isClearable
-                    isDisabled={!isEditable}
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderColor: "#d1d5db",
-                        boxShadow: "none",
-                        "&:hover": { borderColor: "#64748b" },
-                        borderRadius: "0.5rem",
-                      }),
-                      menuList: (base) => ({
-                        ...base,
-                        maxHeight: "250px",
-                      }),
-                    }}
-                    noOptionsMessage={() => "No se encontraron artículos"}
-                    loadingMessage={() => "Cargando artículos..."}
-                  />
-                  {detalle.precio_unitario !== detalle.precio_costo_original &&
-                    detalle.precio_costo_original !== undefined && (
-                      <span
-                        className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 pointer-events-none shadow-sm"
-                        title={`Precio costo actual: ${formatCurrency(detalle.precio_costo_original)}`}
-                      >
-                        se actualizará costo
-                      </span>
-                    )}
-                </div>
-              </div>
-
-              {/* Cantidad */}
-              <div className="col-span-1 md:col-span-1 flex flex-col">
-                <label className="mb-1 font-medium text-sm text-slate-700">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  name="cantidad"
-                  value={detalle.cantidad}
-                  onChange={(e) => handleDetalleChange(index, e)}
-                  min="1"
-                  required
-                  disabled={!isEditable}
-                  className="border border-gray-300 rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-[70px]"
-                />
-              </div>
-
-              {/* Precio Unitario y Subtotal en fila con espacio */}
-              <div className="col-span-2 md:col-span-4 flex flex-row gap-6 items-end">
-                <div className="flex flex-col flex-1 justify-end">
-                  <label className="mb-1 font-medium text-sm text-slate-700">
-                    Precio Unitario (COP)
-                  </label>
-                  <div className="relative flex items-center">
-                    <span className="absolute left-3 text-gray-400 flex items-center h-full">
-                      <FiDollarSign size={18} />
-                    </span>
-                    <input
-                      type="text"
-                      name="precio_unitario"
-                      value={formatCurrency(detalle.precio_unitario)}
-                      onChange={(e) => handleDetalleChange(index, e)}
-                      required
-                      disabled={!isEditable}
-                      style={{ paddingLeft: 36 }}
-                      className="border border-gray-300 rounded-lg pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right w-full h-[44px] min-w-[250px]"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col flex-1 justify-end">
-                  <label className="mb-1 font-medium text-sm text-slate-700">
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Artículo
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">
+                    Cantidad
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Precio unit. (COP)
+                  </th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                     Subtotal
-                  </label>
-                  <p className="border border-gray-300 rounded-lg pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-right h-[44px] overflow-x-auto overflow-y-hidden whitespace-nowrap select-none min-w-[300px] max-w-[450px]">
-                    {formatCurrency(
-                      calcularSubtotal(
-                        detalle.cantidad,
-                        detalle.precio_unitario,
-                      ),
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <div className="col-span-1 md:col-span-2 flex items-stretch justify-end ">
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDetalle(index)}
-                  disabled={detalles.length === 1 || !isEditable}
-                  className="cursor-pointer bg-red-500 text-white w-[44px] h-[44px] rounded-lg hover:bg-red-600 disabled:bg-red-300 transition shadow-md flex items-center justify-center ml-auto"
-                  title="Eliminar artículo"
-                >
-                  <FiTrash2 size={20} />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={handleAddDetalle}
-            disabled={!isEditable}
-            className="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg font-semibold transition mt-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <FiPlus size={20} />
-            Agregar Artículo
-          </button>
-        </div>
-
-        <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-10">
-          <div className="text-xl font-bold text-slate-700">
-            Total General:{" "}
-            <span className="text-3xl text-green-700 ml-2">
-              {formatCurrency(totalGeneral)}
-            </span>
+                  </th>
+                  {isEditable && <th className="px-3 py-2 w-10" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {detalles.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={isEditable ? 5 : 4}
+                      className="text-center py-10 text-slate-400 text-xs"
+                    >
+                      Agrega artículos con el botón de arriba
+                    </td>
+                  </tr>
+                ) : (
+                  detalles.map((detalle, index) => (
+                    <tr key={index} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 min-w-[220px]">
+                        <div className="flex items-center gap-2">
+                          <AsyncSelect
+                            cacheOptions
+                            loadOptions={loadArticulosOptions}
+                            defaultOptions={articulosOptions}
+                            value={
+                              articulosOptions.find(
+                                (opt) => opt.value === detalle.id_articulo,
+                              ) || null
+                            }
+                            onChange={(option) => {
+                              handleDetalleChange(index, {
+                                target: {
+                                  name: "id_articulo",
+                                  value: option ? option.value : "",
+                                },
+                              });
+                            }}
+                            placeholder="Busca un artículo…"
+                            isClearable
+                            isDisabled={!isEditable}
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                borderColor: "#e2e8f0",
+                                boxShadow: "none",
+                                "&:hover": { borderColor: "#94a3b8" },
+                                borderRadius: "0.5rem",
+                                minHeight: "34px",
+                                fontSize: "12px",
+                              }),
+                              menuList: (base) => ({
+                                ...base,
+                                maxHeight: "220px",
+                              }),
+                            }}
+                            noOptionsMessage={() =>
+                              "No se encontraron artículos"
+                            }
+                            loadingMessage={() => "Cargando…"}
+                          />
+                          {detalle.precio_unitario !==
+                            detalle.precio_costo_original &&
+                            detalle.precio_costo_original !== undefined && (
+                              <span
+                                className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap"
+                                title={`Precio costo actual: ${formatCurrency(detalle.precio_costo_original)}`}
+                              >
+                                actualizará costo
+                              </span>
+                            )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <input
+                          type="number"
+                          name="cantidad"
+                          value={detalle.cantidad}
+                          onChange={(e) => handleDetalleChange(index, e)}
+                          min="1"
+                          required
+                          disabled={!isEditable}
+                          className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="relative inline-flex items-center">
+                          <span className="absolute left-2 text-slate-400 text-xs">
+                            <FiDollarSign size={11} />
+                          </span>
+                          <input
+                            type="text"
+                            name="precio_unitario"
+                            value={formatCurrency(detalle.precio_unitario)}
+                            onChange={(e) => handleDetalleChange(index, e)}
+                            disabled={!isEditable}
+                            className="w-32 border border-slate-200 rounded-lg pl-6 pr-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-800">
+                        {formatCurrency(
+                          calcularSubtotal(
+                            detalle.cantidad,
+                            detalle.precio_unitario,
+                          ),
+                        )}
+                      </td>
+                      {isEditable && (
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDetalle(index)}
+                            className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
+                          >
+                            <FiTrash2 size={13} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {detalles.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-slate-100 bg-slate-50">
+                    <td
+                      colSpan={isEditable ? 3 : 3}
+                      className="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                    >
+                      Total
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-bold text-slate-900">
+                      {formatCurrency(totalGeneral)}
+                    </td>
+                    {isEditable && <td />}
+                  </tr>
+                </tfoot>
+              )}
+            </table>
           </div>
-
-          <button
-            type="submit"
-            disabled={!isEditable}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg cursor-pointer"
-          >
-            <FiSave size={20} />
-            Guardar Cambios
-          </button>
         </div>
+
+        {/* Acciones */}
+        {isEditable && (
+          <div className="flex items-center justify-end gap-3 pb-4">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold bg-slate-900 hover:bg-slate-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <FiSave size={13} /> Guardar cambios
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

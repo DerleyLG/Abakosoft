@@ -233,7 +233,7 @@ const ProrrateoOrdenDrawer = ({
       />
       <div className="relative ml-auto w-full max-w-6xl bg-gradient-to-br from-slate-50 to-white h-full shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 px-8 py-5 flex-shrink-0">
+        <div className=" bg-indigo-400  px-8 py-5 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="bg-white/20 rounded-2xl p-3">
@@ -272,7 +272,7 @@ const ProrrateoOrdenDrawer = ({
               <FiPackage className="text-6xl mb-4" />
               <p className="text-xl font-medium">No hay datos de avances</p>
               <p className="text-sm">
-                Registra avances de produccion para ver el prorrateo
+                Registra avances de producción para ver el prorrateo
               </p>
             </div>
           ) : (
@@ -553,7 +553,7 @@ const ProrrateoOrdenDrawer = ({
                           </div>
                         </div>
                       ))}
-                  </div>
+                  </div>    
                 </div>
               )}
 
@@ -565,7 +565,7 @@ const ProrrateoOrdenDrawer = ({
                   </div>
                   <div className="flex-1">
                     <h4 className="font-bold text-slate-800 mb-3">
-                      ¿Cómo se calcula el prorrateo?
+                      ¿Có¿Cómo se calcula el prorrateo?
                     </h4>
                     <div className="space-y-3 text-xs text-slate-600">
                       <div className="bg-white/60 rounded-lg p-3 border border-blue-100">

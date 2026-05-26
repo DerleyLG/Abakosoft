@@ -20,26 +20,6 @@ const kanbanModel = {
         
         GROUP_CONCAT(DISTINCT CONCAT(a.referencia, ' - ', a.descripcion, ' (x', dof.cantidad, ')') SEPARATOR ', ') as productos,
         
-        -- Etapa actualmente en proceso (de avances registrados)
-        MAX(CASE WHEN aep.estado = 'en proceso' THEN aep.id_etapa_produccion ELSE NULL END) as etapa_en_proceso_id,
-        MAX(CASE WHEN aep.estado = 'en proceso' THEN ep_avances.nombre ELSE NULL END) as etapa_en_proceso_nombre,
-        
-        -- Última etapa completada (de avances registrados) - Por FECHA, no por ID
-        (SELECT aep2.id_etapa_produccion 
-         FROM avance_etapas_produccion aep2 
-         WHERE aep2.id_orden_fabricacion = ofa.id_orden_fabricacion 
-           AND aep2.estado = 'completado'
-         ORDER BY aep2.fecha_registro DESC 
-         LIMIT 1) as ultima_etapa_id,
-        
-        -- Fecha de completado de la última etapa
-        (SELECT aep2.fecha_registro 
-         FROM avance_etapas_produccion aep2 
-         WHERE aep2.id_orden_fabricacion = ofa.id_orden_fabricacion 
-           AND aep2.estado = 'completado'
-         ORDER BY aep2.fecha_registro DESC 
-         LIMIT 1) as fecha_ultima_etapa_completada,
-        
         -- Trabajador actual (último que trabajó)
         MAX(t.nombre) as nombre_trabajador,
         
@@ -81,6 +61,25 @@ const kanbanModel = {
     `;
 
     const [rows] = await db.query(query);
+
+    // Obtener avances individuales por orden para determinar la etapa actual correctamente
+    const [todosAvances] = await db.query(`
+      SELECT aep.id_orden_fabricacion, aep.id_etapa_produccion, aep.estado, aep.fecha_registro,
+             ep.orden as orden_etapa
+      FROM avance_etapas_produccion aep
+      JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+      ORDER BY ep.orden DESC, aep.fecha_registro DESC
+    `);
+
+    // Agrupar avances por orden de fabricación
+    const avancesPorOrden = {};
+    todosAvances.forEach((av) => {
+      if (!avancesPorOrden[av.id_orden_fabricacion]) {
+        avancesPorOrden[av.id_orden_fabricacion] = [];
+      }
+      avancesPorOrden[av.id_orden_fabricacion].push(av);
+    });
+
     // Importar el modelo de detalles para obtener todas las etapas finales requeridas
     const detalleOrdenFabricacionModel = require("./detalleOrdenFabricacionModel");
 
@@ -106,12 +105,13 @@ const kanbanModel = {
       etapaOrdenMap[e.id_etapa] = e.orden;
     });
 
-    // Crear mapa de siguiente etapa basado en el orden
+    // Crear mapa de siguiente etapa: salta al primer id con un orden SUPERIOR
+    // Etapas paralelas (mismo orden) apuntan todas al mismo siguiente
     const siguienteMap = {};
-    for (let i = 0; i < etapasDB.length - 1; i++) {
-      siguienteMap[etapasDB[i].id_etapa] = etapasDB[i + 1].id_etapa;
+    for (const etapa of etapasDB) {
+      const siguiente = etapasDB.find((e) => e.orden > etapa.orden);
+      siguienteMap[etapa.id_etapa] = siguiente ? siguiente.id_etapa : null;
     }
-    siguienteMap[etapasDB[etapasDB.length - 1].id_etapa] = null; // Última etapa no tiene siguiente
 
     // Primera etapa del flujo
     const primeraEtapaId = etapasDB.length > 0 ? etapasDB[0].id_etapa : null;
@@ -142,20 +142,52 @@ const kanbanModel = {
       const maxOrdenEtapaFinal =
         ordenesFinales.length > 0 ? Math.max(...ordenesFinales) : -1;
 
-      // Encontrar el id de la etapa con el máximo orden
-      const maxEtapaFinal =
-        etapasDB.find((e) => e.orden === maxOrdenEtapaFinal)?.id_etapa || null;
+      // Obtener avances de esta orden
+      const avancesOrden = avancesPorOrden[orden.id_orden_fabricacion] || [];
 
-      // Orden de la última etapa completada
-      const orden_ultima_completada = orden.ultima_etapa_id
-        ? etapaOrdenMap[orden.ultima_etapa_id]
+      // Etapa en proceso más TEMPRANA (cuello de botella: dónde hay trabajo pendiente)
+      // Si hay empate de orden, elegir la más reciente por fecha
+      const enProceso = avancesOrden
+        .filter((av) => av.estado === "en proceso")
+        .sort(
+          (a, b) =>
+            a.orden_etapa - b.orden_etapa ||
+            new Date(b.fecha_registro) - new Date(a.fecha_registro),
+        );
+      const etapaEnProcesoActual = enProceso.length > 0 ? enProceso[0] : null;
+
+      // Última etapa completada más avanzada (por campo orden, luego fecha)
+      const completadas = avancesOrden
+        .filter((av) => av.estado === "completado")
+        .sort(
+          (a, b) =>
+            b.orden_etapa - a.orden_etapa ||
+            new Date(b.fecha_registro) - new Date(a.fecha_registro),
+        );
+      const ultimaCompletada = completadas.length > 0 ? completadas[0] : null;
+
+      const orden_ultima_completada = ultimaCompletada
+        ? ultimaCompletada.orden_etapa
         : -1;
 
-      // Solo es finalizada si la última etapa completada alcanzó o superó la etapa final máxima requerida
+      // Verificar si TODOS los avances de la etapa final están completados
+      // No basta con que UN artículo haya llegado a la etapa final
+      const avancesEnEtapaFinal = avancesOrden.filter((av) => {
+        const ordenEtapa = av.orden_etapa;
+        return ordenEtapa >= maxOrdenEtapaFinal;
+      });
+      const todosAvancesFinalesCompletados =
+        avancesEnEtapaFinal.length > 0 &&
+        avancesEnEtapaFinal.every((av) => av.estado === "completado");
+      const hayAvancesEnProceso = enProceso.length > 0;
+
+      // Solo es finalizada si no hay avances en proceso Y la etapa final fue alcanzada y completada
       const todasFinalizadas =
         maxOrdenEtapaFinal >= 0 &&
         orden_ultima_completada >= 0 &&
-        orden_ultima_completada >= maxOrdenEtapaFinal;
+        orden_ultima_completada >= maxOrdenEtapaFinal &&
+        !hayAvancesEnProceso &&
+        todosAvancesFinalesCompletados;
 
       // Prioridad 1: Si estado es 'entregada', va a la columna entregada
       if (orden.estado_orden === "entregada") {
@@ -168,12 +200,12 @@ const kanbanModel = {
       // Prioridad 3: Si todas las etapas requeridas fueron completadas
       else if (todasFinalizadas) {
         columna = "finalizada";
-      } else if (orden.etapa_en_proceso_id) {
-        columna = `etapa_${orden.etapa_en_proceso_id}`;
+      } else if (etapaEnProcesoActual) {
+        columna = `etapa_${etapaEnProcesoActual.id_etapa_produccion}`;
         estado_etapa = "en_proceso";
       } else {
-        if (orden.ultima_etapa_id) {
-          const proxima = siguienteMap[orden.ultima_etapa_id];
+        if (ultimaCompletada) {
+          const proxima = siguienteMap[ultimaCompletada.id_etapa_produccion];
           const orden_proxima = proxima ? etapaOrdenMap[proxima] : -1;
           // Verificar si la próxima etapa está dentro del rango requerido (usando campo orden)
           if (

@@ -7,21 +7,12 @@ const { requirePermission } = require("../middlewares/permissions");
 // Todas las rutas requieren autenticación
 router.use(verifyToken);
 
-// ===================================
-// TODAS LAS RUTAS SOLO PARA ADMINISTRADOR
-// ===================================
 
-/**
- * GET /api/cierres-caja
- * Obtener histórico de cierres
- * Requiere: solo admin
- */
+
 router.get("/", requirePermission(["admin"]), cierresCajaController.getAll);
 
 /**
- * GET /api/cierres-caja/estado-sistema
  * Verificar si el sistema necesita migración
- * Requiere: solo admin
  */
 router.get(
   "/estado-sistema",
@@ -30,9 +21,7 @@ router.get(
 );
 
 /**
- * GET /api/cierres-caja/abierto
  * Obtener cierre actual (abierto)
- * Requiere: solo admin
  */
 router.get(
   "/abierto",
@@ -41,16 +30,13 @@ router.get(
 );
 
 /**
- * GET /api/cierres-caja/:id
+ 
  * Obtener detalle completo de un cierre
- * Requiere: solo admin
  */
 router.get("/:id", requirePermission(["admin"]), cierresCajaController.getById);
 
 /**
- * GET /api/cierres-caja/:id/movimientos
  * Obtener movimientos detallados del período
- * Requiere: solo admin
  */
 router.get(
   "/:id/movimientos",
@@ -59,16 +45,12 @@ router.get(
 );
 
 /**
- * POST /api/cierres-caja
  * Crear nuevo período (solo primera vez)
- * Requiere: solo admin
  */
 router.post("/", requirePermission(["admin"]), cierresCajaController.create);
 
 /**
- * POST /api/cierres-caja/:id/cerrar
  * Cerrar un período
- * Requiere: solo admin
  */
 router.post(
   "/:id/cerrar",
@@ -77,9 +59,7 @@ router.post(
 );
 
 /**
- * POST /api/cierres-caja/validar-fecha
  * Validar si una fecha está en un período cerrado
- * Requiere: solo admin
  */
 router.post(
   "/validar-fecha",
@@ -88,9 +68,7 @@ router.post(
 );
 
 /**
- * POST /api/cierres-caja/:id/validar
  * Validar un período antes de cerrarlo
- * Requiere: solo admin
  */
 router.post(
   "/:id/validar",
@@ -99,9 +77,7 @@ router.post(
 );
 
 /**
- * PUT /api/cierres-caja/:id/saldos-iniciales
  * Actualizar saldos iniciales de un período abierto
- * Requiere: solo admin
  */
 router.put(
   "/:id/saldos-iniciales",
@@ -110,9 +86,7 @@ router.put(
 );
 
 /**
- * POST /api/cierres-caja/migrar-historicos
  * Crear períodos históricos automáticamente
- * Requiere: solo admin
  */
 router.post(
   "/migrar-historicos",
@@ -121,9 +95,7 @@ router.post(
 );
 
 /**
- * POST /api/cierres-caja/recalcular-historicos
  * Recalcular totales de períodos históricos cerrados
- * Requiere: solo admin
  */
 router.post(
   "/recalcular-historicos",

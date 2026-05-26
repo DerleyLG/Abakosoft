@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { FiDollarSign } from "react-icons/fi";
+import React, { useState, useEffect, useRef } from "react";
+import { FiArrowLeft } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import AsyncSelect from "react-select/async";
+import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
 const CostosIndirectosNuevo = () => {
+  const idempotencyKey = useIdempotencyKey();
   const [allMetodosPago, setAllMetodosPago] = useState([]);
   const [pagoData, setPagoData] = useState({
     id_metodo_pago: "",
@@ -16,6 +18,9 @@ const CostosIndirectosNuevo = () => {
   const location = useLocation();
 
   const [usarPeriodo, setUsarPeriodo] = useState(false);
+  const [fechaRegistro, setFechaRegistro] = useState(
+    new Date().toISOString().split("T")[0],
+  );
 
   const [tipoCosto, setTipoCosto] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
@@ -31,6 +36,7 @@ const CostosIndirectosNuevo = () => {
   // Sugerencias (vista previa) para auto-distribución por driver
   const [sugerencias, setSugerencias] = useState([]); // [{ id_orden_fabricacion, driver_valor, peso, valor_asignado? }]
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
+  const ofCardRef = useRef(null);
 
   // Cargar métodos de pago (hook separado y al tope)
   useEffect(() => {
@@ -125,7 +131,7 @@ const CostosIndirectosNuevo = () => {
       }
       if (new Date(fechaInicio) > new Date(fechaFin)) {
         toast.error(
-          "La fecha de inicio no puede ser posterior a la fecha de fin."
+          "La fecha de inicio no puede ser posterior a la fecha de fin.",
         );
         return;
       }
@@ -145,17 +151,15 @@ const CostosIndirectosNuevo = () => {
       return;
     }
 
-    // Preparar payload con opciones de asignación y datos de pago
-    // Fecha actual en formato YYYY-MM-DD (local)
-    // Esta es la fecha de registro que se valida contra períodos cerrados
-    const hoy = new Date();
-    const fechaActual = `${hoy.getFullYear()}-${String(
-      hoy.getMonth() + 1
-    ).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+    // Validar que se haya ingresado fecha de registro
+    if (!fechaRegistro) {
+      toast.error("Por favor, selecciona una fecha de registro.");
+      return;
+    }
 
     const payload = {
       tipo_costo: tipoCosto,
-      fecha: fechaActual, // Siempre usar fecha actual para registro y tesorería
+      fecha: fechaRegistro, // Fecha ingresada por el usuario en el formulario
       fecha_inicio: usarPeriodo ? fechaInicio : null, // Fechas de vigencia (solo referencia)
       fecha_fin: usarPeriodo ? fechaFin : null, // Fechas de vigencia (solo referencia)
       valor: Number(valorNumerico),
@@ -187,11 +191,11 @@ const CostosIndirectosNuevo = () => {
     if (asignarAOF && asignacionMultiple) {
       const suma = (payload.asignaciones || []).reduce(
         (acc, a) => acc + Number(a.valor_asignado || 0),
-        0
+        0,
       );
       if (suma !== valorNumerico) {
         toast.error(
-          "La suma de los valores asignados debe ser exactamente igual al valor del costo."
+          "La suma de los valores asignados debe ser exactamente igual al valor del costo.",
         );
         return;
       }
@@ -202,189 +206,190 @@ const CostosIndirectosNuevo = () => {
     }
 
     try {
-      await api.post("/costos-indirectos", payload);
+      await api.post("/costos-indirectos", payload, { headers: { "X-Idempotency-Key": idempotencyKey } });
       toast.success("Costo indirecto registrado correctamente");
       navigate("/costos_indirectos");
     } catch (error) {
       console.error(
         "Error al registrar el costo indirecto:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       toast.error(
         error.response?.data?.error ||
           error.response?.data?.message ||
-          "Error al registrar el costo indirecto."
+          "Error al registrar el costo indirecto.",
       );
     }
   };
 
-  return (
-    <div className="w-full px-4 md:px-12 lg:px-20 py-10">
-      <div className="bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800 border-b pb-4">
-          Registrar nuevo costo
-        </h2>
+  const labelCls =
+    "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1";
+  const inputCls =
+    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition placeholder:text-slate-400";
+  const selectCls =
+    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition";
 
-        <div className="mb-6 flex items-center">
-          <input
-            type="checkbox"
-            id="usarPeriodo"
-            checked={usarPeriodo}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setUsarPeriodo(checked);
-              // Limpiar fechas al cambiar de modo
-              if (!checked) {
-                setFechaInicio("");
-                setFechaFin("");
-              }
-            }}
-            className="cursor-pointer h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
-          />
-          <label
-            htmlFor="usarPeriodo"
-            className="cursor-pointer ml-2 block text-lg font-medium text-gray-700"
-          >
-            Registrar con fecha de inicio y fecha de fin
-          </label>
+  return (
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+            Registrar costo indirecto
+          </h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+        >
+          <FiArrowLeft size={14} /> Volver
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Card 1 — Datos del costo */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+            <h2 className="text-sm font-semibold text-slate-700">
+              Datos del costo
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>
+                Tipo de costo <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={tipoCosto}
+                onChange={(e) => setTipoCosto(e.target.value)}
+                required
+                placeholder="Ej: Arrendamiento, Servicios públicos…"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>
+                Valor <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={valor}
+                onChange={(e) => {
+                  const num = cleanCOP(e.target.value);
+                  setValor(num ? formatCOP(num) : "");
+                }}
+                placeholder="$ 0"
+                inputMode="numeric"
+                required
+                className={inputCls}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelCls}>Observaciones</label>
+              <textarea
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                rows="2"
+                className={inputCls}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="usarPeriodo"
+                  checked={usarPeriodo}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setUsarPeriodo(checked);
+                    if (!checked) {
+                      setFechaInicio("");
+                      setFechaFin("");
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-400 cursor-pointer"
+                />
+                <span className="text-sm text-slate-700 font-medium">
+                  Registrar con período de vigencia (fecha inicio y fecha fin)
+                </span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          {/* Información de Pago */}
-
-          {/* Campos de fecha según modo */}
-          {usarPeriodo && (
-            <>
+        {/* Card 2 — Fechas */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <h2 className="text-sm font-semibold text-slate-700">
+              {usarPeriodo ? "Período de vigencia" : "Fecha de registro"}
+            </h2>
+          </div>
+          {!usarPeriodo ? (
+            <div className="max-w-xs">
+              <label className={labelCls}>
+                Fecha de registro <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="date"
+                value={fechaRegistro}
+                onChange={(e) => setFechaRegistro(e.target.value)}
+                required
+                className={inputCls}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block font-medium mb-1">
-                  Fecha Inicio <span className="text-red-500">*</span>
+                <label className={labelCls}>
+                  Fecha inicio <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block font-medium mb-1">
-                  Fecha Fin <span className="text-red-500">*</span>
+                <label className={labelCls}>
+                  Fecha fin <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="date"
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                  className={inputCls}
                 />
               </div>
-            </>
-          )}
-
-          {/* Formulario de Costo Indirecto */}
-          {/* Formulario de Costo Indirecto Tradicional */}
-          <div>
-            <label className="block font-medium mb-1">
-              Tipo de costo <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={tipoCosto}
-              onChange={(e) => setTipoCosto(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-            />
-            <div className="mt-3">
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={asignarAOF}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAsignarAOF(checked);
-                    if (!checked) {
-                      // limpiar selección y montos si se desactiva
-                      setAsignacionMultiple(false);
-                      setOfSeleccionada(null);
-                      setOfsSeleccionadas([]);
-                      setMontosAsignados({});
-                    }
-                  }}
-                  className="cursor-pointer h-5 w-5 text-slate-600 rounded focus:ring-slate-500"
-                />
-                <span className="cursor-pointer block font-medium">
-                  Asignar a una Orden de Fabricación
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-medium mb-1">
-              Valor <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={valor}
-              onChange={(e) => {
-                const num = cleanCOP(e.target.value);
-                setValor(num ? formatCOP(num) : "");
-              }}
-              placeholder="$ 0"
-              inputMode="numeric"
-              required
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-            />
-          </div>
-
-          {asignarAOF && (
-            <div className="md:col-span-2 flex items-center gap-6">
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="modo_asignacion"
-                  checked={!asignacionMultiple}
-                  onChange={() => {
-                    setAsignacionMultiple(false);
-                    // limpiar múltiples si veníamos de múltiple
-                    setOfsSeleccionadas([]);
-                    setMontosAsignados({});
-                  }}
-                />
-                <span>Una sola OF</span>
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="modo_asignacion"
-                  checked={asignacionMultiple}
-                  onChange={() => {
-                    setAsignacionMultiple(true);
-                    // limpiar selección única si veníamos de única
-                    setOfSeleccionada(null);
-                  }}
-                />
-                <span>Varias OF</span>
-              </label>
+              <p className="md:col-span-2 text-xs text-slate-400 -mt-1">
+                Al usar período, la fecha de registro se toma automáticamente
+                como la fecha de inicio.
+              </p>
             </div>
           )}
+        </div>
 
-          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="flex flex-col">
-              <label
-                htmlFor="id_metodo_pago"
-                className="mb-2 font-medium text-slate-600"
-              >
-                Método de Pago <span className="text-red-500">*</span>
+        {/* Card 3 — Datos de pago */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <h2 className="text-sm font-semibold text-slate-700">
+              Datos de pago
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className={labelCls}>
+                Método de pago <span className="text-red-400">*</span>
               </label>
               <select
-                id="id_metodo_pago"
-                name="id_metodo_pago"
                 value={pagoData.id_metodo_pago}
                 onChange={(e) =>
                   setPagoData((prev) => ({
@@ -392,10 +397,10 @@ const CostosIndirectosNuevo = () => {
                     id_metodo_pago: e.target.value,
                   }))
                 }
-                className="border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-slate-600"
                 required
+                className={selectCls}
               >
-                <option value="">Selecciona método de pago</option>
+                <option value="">Selecciona método…</option>
                 {allMetodosPago.map((m) => (
                   <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
                     {m.nombre}
@@ -403,17 +408,10 @@ const CostosIndirectosNuevo = () => {
                 ))}
               </select>
             </div>
-            <div className="flex flex-col">
-              <label
-                htmlFor="referencia"
-                className="mb-2 font-medium text-slate-600"
-              >
-                Referencia / No. Transacción
-              </label>
+            <div>
+              <label className={labelCls}>Referencia / No. transacción</label>
               <input
                 type="text"
-                id="referencia"
-                name="referencia"
                 value={pagoData.referencia}
                 onChange={(e) =>
                   setPagoData((prev) => ({
@@ -422,20 +420,13 @@ const CostosIndirectosNuevo = () => {
                   }))
                 }
                 placeholder="Ej: No. de cuenta"
-                className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                className={inputCls}
               />
             </div>
-            <div className="flex flex-col">
-              <label
-                htmlFor="observaciones_pago"
-                className="mb-2 font-medium text-slate-600"
-              >
-                Observaciones del Pago
-              </label>
+            <div>
+              <label className={labelCls}>Observaciones del pago</label>
               <input
                 type="text"
-                id="observaciones_pago"
-                name="observaciones_pago"
                 value={pagoData.observaciones_pago}
                 onChange={(e) =>
                   setPagoData((prev) => ({
@@ -444,338 +435,414 @@ const CostosIndirectosNuevo = () => {
                   }))
                 }
                 placeholder="Opcional"
-                className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-600"
+                className={inputCls}
               />
             </div>
           </div>
+        </div>
 
-          {asignarAOF && !asignacionMultiple && (
-            <div className="md:col-span-2">
-              <label className="block font-medium mb-1">
-                Orden de Fabricación
-              </label>
-              <AsyncSelect
-                cacheOptions
-                defaultOptions
-                loadOptions={cargarOFs}
-                value={ofSeleccionada}
-                onChange={(opt) => setOfSeleccionada(opt)}
-                isClearable
-                placeholder="Escribe el nombre del cliente para buscar…"
-                classNamePrefix="react-select"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#d1d5db",
-                    boxShadow: "none",
-                    "&:hover": { borderColor: "#64748b" },
-                    borderRadius: "0.375rem",
-                  }),
-                }}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Tip: también puedes llegar aquí desde la OF y se prellenará
-                automáticamente.
-              </p>
-            </div>
-          )}
+        {/* Card 4 — Asignación a OF */}
+        <div ref={ofCardRef} className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-700">
+              Asignación a Orden de Fabricación
+            </h2>
+          </div>
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none mb-4">
+            <input
+              type="checkbox"
+              checked={asignarAOF}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAsignarAOF(checked);
+                if (checked) {
+                  setTimeout(() => ofCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                } else {
+                  setAsignacionMultiple(false);
+                  setOfSeleccionada(null);
+                  setOfsSeleccionadas([]);
+                  setMontosAsignados({});
+                }
+              }}
+              className="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-400 cursor-pointer"
+            />
+            <span className="text-sm text-slate-700 font-medium">
+              Asignar este costo a una Orden de Fabricación
+            </span>
+          </label>
 
-          {asignarAOF && asignacionMultiple && (
-            <div className="md:col-span-2">
-              <label className="block font-medium mb-1">
-                Órdenes de Fabricación
-              </label>
-              <AsyncSelect
-                isMulti
-                cacheOptions
-                defaultOptions
-                loadOptions={cargarOFs}
-                value={ofsSeleccionadas}
-                onChange={(opts) => {
-                  setOfsSeleccionadas(opts || []);
-                  const allowed = new Set((opts || []).map((o) => o.value));
-                  setMontosAsignados((prev) =>
-                    Object.fromEntries(
-                      Object.entries(prev).filter(([k]) =>
-                        allowed.has(Number(k))
-                      )
-                    )
-                  );
-                }}
-                placeholder="Escribe el nombre del cliente para buscar…"
-                classNamePrefix="react-select"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#d1d5db",
-                    boxShadow: "none",
-                    "&:hover": { borderColor: "#64748b" },
-                    borderRadius: "0.375rem",
-                  }),
-                }}
-              />
-              {/* Barra de auto-distribución por driver */}
-              <div className="mt-3 flex items-center gap-3">
-                <label className="text-sm text-gray-700">Driver</label>
-                <select
-                  className="border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                  value={driver}
-                  onChange={(e) => setDriver(e.target.value)}
-                >
-                  <option value="cantidad">Cantidad</option>
-                  <option value="avances"># Avances</option>
-                  <option value="costo">Costo de fabricación</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      if (!fecha) {
-                        toast.error("Selecciona primero la fecha del costo.");
-                        return;
-                      }
-                      const total = valorNumerico;
-                      if (!total || total <= 0) {
-                        toast.error(
-                          "Define el valor total del costo para poder distribuir."
-                        );
-                        return;
-                      }
-                      const d = new Date(fecha);
-                      const anio = d.getFullYear();
-                      const mes = d.getMonth() + 1;
-                      const params = {
-                        anio,
-                        mes,
-                        driver,
-                        total,
-                        estados: "pendiente,en proceso",
-                      };
-                      const resp = await api.get(
-                        "/costos-indirectos-asignados/sugerencias",
-                        { params }
-                      );
-                      const sugerencias = Array.isArray(resp.data)
-                        ? resp.data
-                        : [];
-                      if (sugerencias.length === 0) {
-                        toast(
-                          "No hay avances en ese mes para sugerir distribución."
-                        );
-                        return;
-                      }
-                      setSugerencias(sugerencias);
-                      setMostrarDetalle(true);
-                      toast.success(
-                        "Sugerencias calculadas. Revisa el detalle antes de aplicar."
-                      );
-                    } catch (err) {
-                      console.error("Error obteniendo sugerencias:", err);
-                      toast.error("No fue posible obtener las sugerencias.");
-                    }
-                  }}
-                  className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1 rounded-md text-sm"
-                >
-                  Auto-distribuir
-                </button>
+          {asignarAOF && (
+            <div className="flex flex-col gap-4">
+              {/* Modo: una sola / varias */}
+              <div className="flex items-center gap-6">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name="modo_asignacion"
+                    checked={!asignacionMultiple}
+                    onChange={() => {
+                      setAsignacionMultiple(false);
+                      setOfsSeleccionadas([]);
+                      setMontosAsignados({});
+                    }}
+                    className="h-4 w-4 border-slate-300 text-slate-700 focus:ring-slate-400"
+                  />
+                  Una sola OF
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name="modo_asignacion"
+                    checked={asignacionMultiple}
+                    onChange={() => {
+                      setAsignacionMultiple(true);
+                      setOfSeleccionada(null);
+                    }}
+                    className="h-4 w-4 border-slate-300 text-slate-700 focus:ring-slate-400"
+                  />
+                  Varias OF
+                </label>
               </div>
-              {mostrarDetalle && sugerencias.length > 0 && (
-                <div className="mt-3 border border-slate-200 rounded-md overflow-hidden">
-                  <div className="px-3 py-2 bg-slate-50 flex items-center justify-between">
-                    <div className="text-sm font-medium text-slate-700">
-                      Detalle de distribución por driver ({driver})
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Aplicar sugerencias a selección y montos
-                          const nuevasSeleccionadas = sugerencias
-                            .filter((s) => Number(s.valor_asignado || 0) > 0)
-                            .map((s) => ({
-                              value: s.id_orden_fabricacion,
-                              label: `OF #${s.id_orden_fabricacion}`,
-                            }));
-                          const nuevosMontos = Object.fromEntries(
-                            sugerencias.map((s) => [
-                              s.id_orden_fabricacion,
-                              Number(s.valor_asignado || 0),
-                            ])
-                          );
-                          setOfsSeleccionadas(nuevasSeleccionadas);
-                          setMontosAsignados(nuevosMontos);
-                          setMostrarDetalle(false);
-                          toast.success("Sugerencias aplicadas.");
-                        }}
-                        className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1 rounded-md text-xs"
-                      >
-                        Aplicar sugerencias
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSugerencias([]);
-                          setMostrarDetalle(false);
-                        }}
-                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-md text-xs"
-                      >
-                        Descartar
-                      </button>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-white border-b">
-                        <tr>
-                          <th className="text-left px-3 py-2 font-medium text-slate-700">
-                            OF
-                          </th>
-                          <th className="text-right px-3 py-2 font-medium text-slate-700">
-                            Driver
-                          </th>
-                          <th className="text-right px-3 py-2 font-medium text-slate-700">
-                            %
-                          </th>
-                          <th className="text-right px-3 py-2 font-medium text-slate-700">
-                            Sugerido
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sugerencias.map((s) => {
-                          const driverVal = Number(s.driver_valor || 0);
-                          const peso = Number(s.peso || 0);
-                          const sugerido = Number(
-                            s.valor_asignado ?? Math.floor(peso * valorNumerico)
-                          );
-                          const fmtDriver =
-                            driver === "costo"
-                              ? formatCOP(driverVal)
-                              : new Intl.NumberFormat("es-CO").format(
-                                  driverVal
-                                );
-                          return (
-                            <tr
-                              key={s.id_orden_fabricacion}
-                              className="border-t"
-                            >
-                              <td className="px-3 py-2">
-                                OF #{s.id_orden_fabricacion}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {fmtDriver}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {(peso * 100).toFixed(2)}%
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {formatCOP(sugerido)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="px-3 py-2 bg-slate-50 flex items-center justify-end gap-4 text-xs text-slate-700">
-                    <div>
-                      Total sugerido:{" "}
-                      <strong>
-                        {formatCOP(
-                          sugerencias.reduce(
-                            (acc, s) => acc + Number(s.valor_asignado || 0),
-                            0
-                          )
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      Total costo: <strong>{formatCOP(valorNumerico)}</strong>
-                    </div>
-                  </div>
+
+              {/* Una sola OF */}
+              {!asignacionMultiple && (
+                <div>
+                  <label className={labelCls}>Orden de fabricación</label>
+                  <AsyncSelect
+                    cacheOptions
+                    defaultOptions
+                    loadOptions={cargarOFs}
+                    value={ofSeleccionada}
+                    onChange={(opt) => setOfSeleccionada(opt)}
+                    isClearable
+                    placeholder="Escribe el nombre del cliente para buscar…"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderColor: "#e2e8f0",
+                        boxShadow: "none",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                        "&:hover": { borderColor: "#94a3b8" },
+                      }),
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Tip: también puedes llegar desde la OF y se prellenará
+                    automáticamente.
+                  </p>
                 </div>
               )}
-              {ofsSeleccionadas.length > 0 && !mostrarDetalle && (
-                <div className="mt-4 border rounded-md border-slate-200 divide-y">
-                  {ofsSeleccionadas.map((opt) => {
-                    const id = opt.value;
-                    const val = montosAsignados[id] || 0;
-                    return (
-                      <div
-                        key={id}
-                        className="flex items-center justify-between gap-4 p-3"
-                      >
-                        <div className="text-sm text-gray-700">{opt.label}</div>
+
+              {/* Varias OF */}
+              {asignacionMultiple && (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className={labelCls}>Órdenes de fabricación</label>
+                    <AsyncSelect
+                      isMulti
+                      cacheOptions
+                      defaultOptions
+                      loadOptions={cargarOFs}
+                      value={ofsSeleccionadas}
+                      onChange={(opts) => {
+                        setOfsSeleccionadas(opts || []);
+                        const allowed = new Set(
+                          (opts || []).map((o) => o.value),
+                        );
+                        setMontosAsignados((prev) =>
+                          Object.fromEntries(
+                            Object.entries(prev).filter(([k]) =>
+                              allowed.has(Number(k)),
+                            ),
+                          ),
+                        );
+                      }}
+                      placeholder="Escribe el nombre del cliente para buscar…"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#e2e8f0",
+                          boxShadow: "none",
+                          borderRadius: "0.5rem",
+                          fontSize: "0.875rem",
+                          "&:hover": { borderColor: "#94a3b8" },
+                        }),
+                      }}
+                    />
+                  </div>
+
+                  {/* Auto-distribución por driver */}
+                  <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Auto-distribución
+                    </span>
+                    <select
+                      className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition"
+                      value={driver}
+                      onChange={(e) => setDriver(e.target.value)}
+                    >
+                      <option value="cantidad">Cantidad</option>
+                      <option value="avances"># Avances</option>
+                      <option value="costo">Costo de fabricación</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          if (!fechaRegistro) {
+                            toast.error(
+                              "Selecciona primero la fecha del costo.",
+                            );
+                            return;
+                          }
+                          const total = valorNumerico;
+                          if (!total || total <= 0) {
+                            toast.error(
+                              "Define el valor total del costo para poder distribuir.",
+                            );
+                            return;
+                          }
+                          const d = new Date(fechaRegistro);
+                          const resp = await api.get(
+                            "/costos-indirectos-asignados/sugerencias",
+                            {
+                              params: {
+                                anio: d.getFullYear(),
+                                mes: d.getMonth() + 1,
+                                driver,
+                                total,
+                                estados: "pendiente,en proceso",
+                              },
+                            },
+                          );
+                          const sugs = Array.isArray(resp.data)
+                            ? resp.data
+                            : [];
+                          if (sugs.length === 0) {
+                            toast(
+                              "No hay datos en ese mes para sugerir distribución.",
+                            );
+                            return;
+                          }
+                          setSugerencias(sugs);
+                          setMostrarDetalle(true);
+                          toast.success(
+                            "Sugerencias calculadas. Revisa el detalle antes de aplicar.",
+                          );
+                        } catch (err) {
+                          console.error("Error obteniendo sugerencias:", err);
+                          toast.error(
+                            "No fue posible obtener las sugerencias.",
+                          );
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-white transition cursor-pointer"
+                    >
+                      Calcular sugerencias
+                    </button>
+                  </div>
+
+                  {/* Tabla de sugerencias */}
+                  {mostrarDetalle && sugerencias.length > 0 && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="px-4 py-3 bg-slate-50 flex items-center justify-between border-b border-slate-200">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Distribución sugerida — driver: {driver}
+                        </p>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">Valor</span>
-                          <input
-                            type="text"
-                            value={val ? formatCOP(val) : ""}
-                            onChange={(e) => {
-                              const num = cleanCOP(e.target.value);
-                              setMontosAsignados((prev) => ({
-                                ...prev,
-                                [id]: num,
-                              }));
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nuevasSeleccionadas = sugerencias
+                                .filter(
+                                  (s) => Number(s.valor_asignado || 0) > 0,
+                                )
+                                .map((s) => ({
+                                  value: s.id_orden_fabricacion,
+                                  label: `OF #${s.id_orden_fabricacion}`,
+                                }));
+                              setOfsSeleccionadas(nuevasSeleccionadas);
+                              setMontosAsignados(
+                                Object.fromEntries(
+                                  sugerencias.map((s) => [
+                                    s.id_orden_fabricacion,
+                                    Number(s.valor_asignado || 0),
+                                  ]),
+                                ),
+                              );
+                              setMostrarDetalle(false);
+                              toast.success("Sugerencias aplicadas.");
                             }}
-                            placeholder="$ 0"
-                            inputMode="numeric"
-                            className="w-40 border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-slate-600"
-                          />
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-white transition cursor-pointer"
+                          >
+                            Aplicar sugerencias
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSugerencias([]);
+                              setMostrarDetalle(false);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            Descartar
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-end p-3 bg-slate-50">
-                    <div className="text-sm">
-                      <span className="text-gray-600 mr-2">Asignado:</span>
-                      <strong>
-                        {formatCOP(
-                          Object.values(montosAsignados).reduce(
-                            (a, b) => a + (Number(b) || 0),
-                            0
-                          )
-                        )}
-                      </strong>
-                      <span className="text-gray-600 mx-2">/</span>
-                      <span className="text-gray-800">
-                        {formatCOP(valorNumerico)}
-                      </span>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-100 bg-white">
+                              <th className="text-left px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                OF
+                              </th>
+                              <th className="text-right px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                Driver
+                              </th>
+                              <th className="text-right px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                %
+                              </th>
+                              <th className="text-right px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                Sugerido
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {sugerencias.map((s) => {
+                              const driverVal = Number(s.driver_valor || 0);
+                              const peso = Number(s.peso || 0);
+                              const sugerido = Number(
+                                s.valor_asignado ??
+                                  Math.floor(peso * valorNumerico),
+                              );
+                              const fmtDriver =
+                                driver === "costo"
+                                  ? formatCOP(driverVal)
+                                  : new Intl.NumberFormat("es-CO").format(
+                                      driverVal,
+                                    );
+                              return (
+                                <tr key={s.id_orden_fabricacion}>
+                                  <td className="px-4 py-2 font-mono text-xs text-slate-500">
+                                    OF #{s.id_orden_fabricacion}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-xs text-slate-600">
+                                    {fmtDriver}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-xs text-slate-600">
+                                    {(peso * 100).toFixed(2)}%
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-xs font-semibold text-slate-800">
+                                    {formatCOP(sugerido)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="px-4 py-2 bg-slate-50 flex items-center justify-end gap-4 text-xs text-slate-600 border-t border-slate-100">
+                        <span>
+                          Total sugerido:{" "}
+                          <strong>
+                            {formatCOP(
+                              sugerencias.reduce(
+                                (a, s) => a + Number(s.valor_asignado || 0),
+                                0,
+                              ),
+                            )}
+                          </strong>
+                        </span>
+                        <span>
+                          Total costo:{" "}
+                          <strong>{formatCOP(valorNumerico)}</strong>
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Montos por OF */}
+                  {ofsSeleccionadas.length > 0 && !mostrarDetalle && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="divide-y divide-slate-100">
+                        {ofsSeleccionadas.map((opt) => {
+                          const id = opt.value;
+                          const val = montosAsignados[id] || 0;
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center justify-between gap-4 px-4 py-3"
+                            >
+                              <span className="text-sm text-slate-700">
+                                {opt.label}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-400">
+                                  Valor
+                                </span>
+                                <input
+                                  type="text"
+                                  value={val ? formatCOP(val) : ""}
+                                  onChange={(e) => {
+                                    const num = cleanCOP(e.target.value);
+                                    setMontosAsignados((prev) => ({
+                                      ...prev,
+                                      [id]: num,
+                                    }));
+                                  }}
+                                  placeholder="$ 0"
+                                  inputMode="numeric"
+                                  className="w-40 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 transition"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center justify-end px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-sm">
+                        <span className="text-slate-500 mr-2">Asignado:</span>
+                        <strong className="text-slate-900">
+                          {formatCOP(
+                            Object.values(montosAsignados).reduce(
+                              (a, b) => a + (Number(b) || 0),
+                              0,
+                            ),
+                          )}
+                        </strong>
+                        <span className="text-slate-400 mx-2">/</span>
+                        <span className="text-slate-700">
+                          {formatCOP(valorNumerico)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
+        </div>
 
-          <div className="md:col-span-2">
-            <label className="block font-medium mb-1">Observaciones</label>
-            <textarea
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              rows="3"
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-600"
-              placeholder="Opcional"
-            />
-          </div>
-
-          <div className="md:col-span-2 flex justify-end gap-4 pt-4">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition shadow-sm cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition shadow-lg cursor-pointer"
-            >
-              Registrar Costo
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Botones */}
+        <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 py-3 px-1 bg-slate-50 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-white shadow-sm transition-colors cursor-pointer"
+          >
+            Registrar costo
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

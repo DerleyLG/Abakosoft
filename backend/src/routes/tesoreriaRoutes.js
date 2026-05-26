@@ -1,39 +1,91 @@
 const express = require("express");
 const TesoreriaController = require("../controllers/tesoreriaController");
 const router = express.Router();
+const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
 
-// Ruta para obtener todos los métodos de pago
+router.use(verifyToken);
+
+// Métodos de pago: dato de referencia usado en múltiples formularios (sin restricción de plan)
 router.get("/metodos-pago", TesoreriaController.getMetodosPago);
-
-// Ruta para obtener todos los movimientos de tesorería
 router.get(
   "/movimientos-tesoreria",
-  TesoreriaController.getMovimientosTesoreria
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getMovimientosTesoreria,
 );
-
-// Ruta para crear un movimiento de tesorería (POST)
-router.post("/movimientos", TesoreriaController.createMovimiento);
-
-// Ruta para transferencias entre métodos de pago
+router.post(
+  "/movimientos",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_MANAGE),
+  TesoreriaController.createMovimiento,
+);
 router.post(
   "/transferencia-metodos",
-  TesoreriaController.transferirEntreMetodos
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_MANAGE),
+  TesoreriaController.transferirEntreMetodos,
 );
-
-router.get("/ingresos-summary", TesoreriaController.getIngresosSummary);
-router.get("/egresos-summary", TesoreriaController.getEgresosSummary);
+router.get(
+  "/ingresos-summary",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getIngresosSummary,
+);
+router.get(
+  "/egresos-summary",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getEgresosSummary,
+);
 router.get(
   "/pagos-trabajadores/count",
-  TesoreriaController.getPagosTrabajadoresCount
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getPagosTrabajadoresCount,
 );
-router.get("/ordenes-compra/count", TesoreriaController.getOrdenesCompraCount);
-router.get("/costos/count", TesoreriaController.getCostosIndirectosCount);
-router.get("/materia-prima/count", TesoreriaController.getMateriaPrimaCount);
-router.get("/anticipos/count", TesoreriaController.getAnticiposCount);
-router.get("/ventas-cobros", TesoreriaController.getVentasCobrosReport);
+router.get(
+  "/ordenes-compra/count",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getOrdenesCompraCount,
+);
+router.get(
+  "/costos/count",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getCostosIndirectosCount,
+);
+router.get(
+  "/materia-prima/count",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getMateriaPrimaCount,
+);
+router.get(
+  "/anticipos/count",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getAnticiposCount,
+);
+router.get(
+  "/resumen-tarjetas",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getResumenTarjetas,
+);
+router.get(
+  "/ventas-cobros",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getVentasCobrosReport,
+);
+// Dato de referencia: consulta de pago asociado a un documento (compra/venta), sin restricción de plan
 router.get(
   "/:documento/:idDocumento",
-  TesoreriaController.getMovimientoByDocumento
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getMovimientoByDocumento,
 );
 
 module.exports = router;

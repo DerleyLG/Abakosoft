@@ -1,21 +1,45 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const clienteController = require('../controllers/clientesController');
+const clienteController = require("../controllers/clientesController");
+const verifyToken = require("../middlewares/verifyToken");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const { checkIdempotency } = require("../middlewares/idempotency");
 
+router.use(verifyToken);
 
-// GET    /api/clientes
-router.get('/', clienteController.getClientes);
+const requirePlanFeature = require("./_requirePlanFeature");
 
-// GET    /api/clientes/:id
-router.get('/:id', clienteController.getClienteById);
-
-// POST   /api/clientes
-router.post('/', clienteController.createCliente);
-
-// PUT    /api/clientes/:id
-router.put('/:id', clienteController.updateCliente);
-
-// DELETE /api/clientes/:id
-router.delete('/:id', clienteController.deleteCliente);
+router.get(
+  "/",
+  requirePlanFeature("clientes"),
+  requirePermission(ACTIONS.CLIENTS_VIEW),
+  clienteController.getClientes,
+);
+router.get(
+  "/:id",
+  requirePlanFeature("clientes"),
+  requirePermission(ACTIONS.CLIENTS_VIEW),
+  clienteController.getClienteById,
+);
+router.post(
+  "/",
+  requirePlanFeature("clientes"),
+  requirePermission(ACTIONS.CLIENTS_CREATE),
+  checkIdempotency,
+  clienteController.createCliente,
+);
+router.put(
+  "/:id",
+  requirePlanFeature("clientes"),
+  requirePermission(ACTIONS.CLIENTS_EDIT),
+  checkIdempotency,
+  clienteController.updateCliente,
+);
+router.delete(
+  "/:id",
+  requirePlanFeature("clientes"),
+  requirePermission(ACTIONS.CLIENTS_DELETE),
+  clienteController.deleteCliente,
+);
 
 module.exports = router;

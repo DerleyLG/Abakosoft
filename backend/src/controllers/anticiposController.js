@@ -3,8 +3,28 @@ const AnticiposModel = require("../models/anticiposModel");
 module.exports = {
   getAllAnticipos: async (req, res) => {
     try {
-      const anticipos = await AnticiposModel.getAll();
-      res.json(anticipos);
+      const { page, pageSize, sortBy, sortDir } = req.query;
+      const pg = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 20));
+
+      const { data, total } = await AnticiposModel.getAllPaginated({
+        page: pg,
+        pageSize: ps,
+        sortBy,
+        sortDir,
+      });
+
+      const totalPages = Math.ceil(total / ps) || 1;
+
+      res.json({
+        data,
+        page: pg,
+        pageSize: ps,
+        total,
+        totalPages,
+        hasNext: pg < totalPages,
+        hasPrev: pg > 1,
+      });
     } catch (error) {
       console.error("Error al listar anticipos:", error);
       res.status(500).json({ error: "Error al obtener anticipos" });
@@ -21,13 +41,13 @@ module.exports = {
         fecha,
       } = req.body;
 
-      if (!id_trabajador || !id_orden_fabricacion || !monto || !fecha) {
+      if (!id_trabajador || !monto || !fecha) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
       }
 
       const id = await AnticiposModel.crear({
         id_trabajador,
-        id_orden_fabricacion,
+        id_orden_fabricacion: id_orden_fabricacion || null,
         monto,
         observaciones,
         fecha,

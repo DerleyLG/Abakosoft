@@ -21,14 +21,14 @@ router.get(
   movimientosInventarioController.getMovimientoById
 );
 
-// Actualizar movimiento (no permitido por diseño)
+// Actualizar movimiento 
 router.put(
   "/:id",
   requirePermission(ACTIONS.MOVEMENTS_VIEW),
   movimientosInventarioController.updateMovimiento
 );
 
-// Eliminar movimiento (no permitido por diseño)
+// Eliminar movimiento 
 router.delete(
   "/:id",
   requirePermission(ACTIONS.MOVEMENTS_VIEW),

@@ -1,11 +1,9 @@
-
-
 services:
   frontend:
-    build: 
+    build:
       context: ./frontend
-      dockerfile: Dockerfile 
-     
+      dockerfile: Dockerfile
+
     ports:
       - "3001:80"
     depends_on:
@@ -20,30 +18,38 @@ services:
     environment:
       DB_HOST: db
       DB_USER: root
-      DB_PASSWORD: masterkey
-      DB_NAME: gestion_abako
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
       DB_PORT: 3306
-      PORT: 3000
-      JWT_SECRET: Masterkey
+      PORT: ${PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      MASTER_DB_NAME: ${MASTER_DB_NAME}
+      SAAS_JWT_SECRET: ${SAAS_JWT_SECRET}
+      SAAS_REFRESH_JWT_SECRET: ${SAAS_REFRESH_JWT_SECRET}
+      SAAS_SEED_ADMIN_PASSWORD: ${SAAS_SEED_ADMIN_PASSWORD}
+      FRONTEND_URLS: ${FRONTEND_URLS}
+      SAAS_COOKIE_SAMESITE: ${SAAS_COOKIE_SAMESITE}
+      SAAS_COOKIE_SECURE: ${SAAS_COOKIE_SECURE}
     volumes:
       - uploads_data:/app/uploads
 
   db:
     image: mysql:8.0
     restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: masterkey
-      MYSQL_DATABASE: gestion_abako
-      TZ: America/Bogota
-     # MYSQL_USER: root
-     # MYSQL_PASSWORD: masterkey
     ports:
       - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      TZ: America/Bogota
+      # MYSQL_USER: root
+      # MYSQL_PASSWORD: masterkey
+
     command: --default-time-zone=America/Bogota
     volumes:
       - db_data:/var/lib/mysql
       - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql
-      
+
 volumes:
   db_data:
   uploads_data:

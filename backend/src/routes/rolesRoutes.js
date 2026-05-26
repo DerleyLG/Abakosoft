@@ -1,18 +1,56 @@
 const express = require("express");
 const router = express.Router();
-const rolesModel = require("../models/rolesModel");
+const rolesController = require("../controllers/rolesController");
 const verifyToken = require("../middlewares/verifyToken");
-const checkRole = require("../middlewares/checkRole");
-const { ROLES } = require("../constants/roles");
+const { ACTIONS, requirePermission } = require("../utils/permissions");
+const requirePlanFeature = require("./_requirePlanFeature");
 
-router.get("/", verifyToken, checkRole([ROLES.ADMIN]), async (req, res) => {
-  try {
-    const roles = await rolesModel.getAll();
-    res.json(roles);
-  } catch (err) {
-    console.error("Error al obtener roles:", err);
-    res.status(500).json({ error: "Error al obtener roles" });
-  }
-});
+router.get(
+  "/",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.getAll,
+);
+
+router.get(
+  "/:id",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.getById,
+);
+
+router.post(
+  "/",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.create,
+);
+
+router.put(
+  "/:id",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.update,
+);
+
+router.delete(
+  "/:id",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.delete,
+);
+
+router.get(
+  "/:id/permisos",
+  verifyToken,
+  requirePlanFeature("roles"),
+  requirePermission(ACTIONS.USERS_MANAGE),
+  rolesController.getPermisos,
+);
 
 module.exports = router;

@@ -36,16 +36,22 @@ const cierresCajaService = {
   /**
    * Crear nuevo período inicial
    */
-  create: async (data) => {
-    const response = await api.post("/cierres-caja", data);
+  create: async (data, idempotencyKey) => {
+    const config = idempotencyKey
+      ? { headers: { "X-Idempotency-Key": idempotencyKey } }
+      : {};
+    const response = await api.post("/cierres-caja", data, config);
     return response.data;
   },
 
   /**
    * Cerrar un período
    */
-  cerrar: async (id, data) => {
-    const response = await api.post(`/cierres-caja/${id}/cerrar`, data);
+  cerrar: async (id, data, idempotencyKey) => {
+    const config = idempotencyKey
+      ? { headers: { "X-Idempotency-Key": idempotencyKey } }
+      : {};
+    const response = await api.post(`/cierres-caja/${id}/cerrar`, data, config);
     return response.data;
   },
 

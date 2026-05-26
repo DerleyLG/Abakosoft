@@ -29,8 +29,30 @@ const VentasCreditoController = {
   },
   getAll: async (req, res) => {
     try {
-      const creditos = await VentasCreditoModel.obtenerVentasCredito();
-      res.status(200).json(creditos);
+      const { buscar = "", estado = "", page = 1, pageSize = 25 } = req.query;
+
+      const p = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+
+      const { data, total } =
+        await VentasCreditoModel.obtenerVentasCreditoPaginado({
+          buscar,
+          estado,
+          page: p,
+          pageSize: ps,
+        });
+
+      const totalPages = Math.max(1, Math.ceil(total / ps));
+
+      res.status(200).json({
+        data,
+        page: p,
+        pageSize: ps,
+        total,
+        totalPages,
+        hasNext: p < totalPages,
+        hasPrev: p > 1,
+      });
     } catch (error) {
       console.error("Error al obtener créditos:", error);
       res.status(500).json({ error: "Error interno al obtener créditos" });
@@ -86,6 +108,21 @@ const VentasCreditoController = {
     } catch (error) {
       console.error("Error al obtener crédito por id:", error);
       res.status(500).json({ error: "Error interno al obtener crédito" });
+    }
+  },
+
+  // Buscar crédito por id_documento (puede ser id_venta_credito o id_orden_venta)
+  buscarPorDocumento: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const credito = await VentasCreditoModel.buscarCreditoPorDocumento(id);
+      if (!credito) {
+        return res.status(404).json({ message: "Crédito no encontrado" });
+      }
+      res.status(200).json(credito);
+    } catch (error) {
+      console.error("Error al buscar crédito por documento:", error);
+      res.status(500).json({ error: "Error interno al buscar crédito" });
     }
   },
 };
