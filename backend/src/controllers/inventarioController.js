@@ -192,7 +192,7 @@ module.exports = {
         await InventarioModel.obtenerInventarioPorArticulo(id);
       if (!inventarioActual) {
         return res.status(404).json({
-          error: "Artículo no encontrado en inventario para actualizar.",
+          error: "Este artículo aún no ha sido inicializado en inventario. Ingrésalo primero con un movimiento inicial.",
         });
       }
 

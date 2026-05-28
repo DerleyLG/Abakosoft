@@ -80,7 +80,8 @@ const Inventario = () => {
             page,
             pageSize,
             buscar: searchTerm || undefined,
-            tipo_categoria: activeTab || undefined,
+            // búsqueda global cuando hay texto; filtro por tab cuando no hay
+            tipo_categoria: searchTerm ? undefined : (activeTab || undefined),
             id_categoria: categoriaSeleccionada || undefined,
             stock_fabricado: stockFabricadoFilter || undefined,
             stock_en_proceso: stockProcesoFilter || undefined,
@@ -212,7 +213,7 @@ const Inventario = () => {
   };
 
   const getCategoriasFiltradas = () => {
-    return categorias.filter((cat) => cat.tipo === activeTab);
+    return categorias.filter((cat) => cat.tipo === inferredTab);
   };
 
   const tabsConfig = {
@@ -236,7 +237,14 @@ const Inventario = () => {
     },
   };
 
-  const filteredItems = inventario;
+  const inferredTab =
+    searchTerm && inventario.length > 0
+      ? inventario[0].tipo_categoria || activeTab
+      : activeTab;
+
+  const filteredItems = searchTerm
+    ? inventario.filter((i) => i.tipo_categoria === inferredTab)
+    : inventario;
 
   return (
     <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-4">
@@ -286,7 +294,7 @@ const Inventario = () => {
       <div className="bg-slate-100 p-1 rounded-xl w-fit border border-slate-200 flex gap-1">
         {Object.entries(tabsConfig).map(([key, config]) => {
           const Icon = config.icon;
-          const isActive = activeTab === key;
+          const isActive = inferredTab === key;
           return (
             <button
               key={key}
@@ -492,7 +500,7 @@ const Inventario = () => {
                           >
                             <FiEye size={14} />
                           </button>
-                          {canEdit && (
+                          {canEdit && item.id_inventario && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -121,38 +121,7 @@ module.exports = {
     }
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
-    // Materias primas y costos de producción usan LEFT JOIN desde articulos
-    // para incluir todos los artículos aunque no tengan registro de inventario
-    const usarLeftJoinDesdeArticulos =
-      tipo_categoria === "materia_prima" ||
-      tipo_categoria === "costo_produccion";
-
-    const baseSelect = usarLeftJoinDesdeArticulos
-      ? `
-            SELECT
-                i.id_inventario,
-                a.id_articulo,
-                a.descripcion,
-                a.referencia,
-                a.id_categoria,
-                a.precio_costo,
-                c.nombre AS nombre_categoria,
-                u.nombre AS nombre_unidad,
-                u.abreviatura AS abreviatura_unidad,
-                e.nombre AS nombre_etapa,
-                COALESCE(i.stock, 0) AS stock_disponible,
-                COALESCE(i.stock_fabricado, 0) AS stock_fabricado,
-                COALESCE(i.stock_minimo, 0) AS stock_minimo,
-                0 AS stock_en_proceso,
-                i.ultima_actualizacion
-            FROM articulos a
-            LEFT JOIN inventario i ON i.id_articulo = a.id_articulo
-            LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
-            LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
-            LEFT JOIN etapas_produccion e ON a.id_etapa = e.id_etapa
-            ${whereClause}
-        `
-      : `
+    const baseSelect = `
             SELECT
                 i.id_inventario,
                 i.id_articulo,
@@ -161,12 +130,13 @@ module.exports = {
                 a.id_categoria,
                 a.precio_costo,
                 c.nombre AS nombre_categoria,
+                c.tipo AS tipo_categoria,
                 u.nombre AS nombre_unidad,
                 u.abreviatura AS abreviatura_unidad,
                 e.nombre AS nombre_etapa,
                 i.stock AS stock_disponible,
-                i.stock_fabricado,
-                i.stock_minimo,
+                COALESCE(i.stock_fabricado, 0) AS stock_fabricado,
+                COALESCE(i.stock_minimo, 0) AS stock_minimo,
                 i.ultima_actualizacion,
                 COALESCE(dof_agg.total_solicitado, 0) - COALESCE(lf_agg.total_fabricado, 0) AS stock_en_proceso
             FROM inventario i
