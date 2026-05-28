@@ -1,6 +1,6 @@
 const InventarioModel = require("../models/inventarioModel");
 const db = require("../database/db");
-const articuloModel = require("../models/articulosModel"); 
+const articuloModel = require("../models/articulosModel");
 
 module.exports = {
   registrarMovimiento: async (req, res) => {
@@ -106,7 +106,7 @@ module.exports = {
         stock_en_proceso = "",
         stock_disponible = "",
       } = req.query;
-   
+
       const { data, total } = await InventarioModel.obtenerPaginado({
         buscar,
         id_categoria,
@@ -120,9 +120,6 @@ module.exports = {
         stock_disponible,
       });
 
-      
-
-      
       const p = Math.max(1, parseInt(page) || 1);
       const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
       const totalPages = Math.ceil(total / ps) || 1;
@@ -144,10 +141,8 @@ module.exports = {
   },
 
   getById: async (req, res) => {
-   
     const { id } = req.params;
     const id_articulo = id;
-   
 
     try {
       const articulo =
@@ -192,7 +187,8 @@ module.exports = {
         await InventarioModel.obtenerInventarioPorArticulo(id);
       if (!inventarioActual) {
         return res.status(404).json({
-          error: "Este artículo aún no ha sido inicializado en inventario. Ingrésalo primero con un movimiento inicial.",
+          error:
+            "Este artículo aún no ha sido inicializado en inventario. Ingrésalo primero con un movimiento inicial.",
         });
       }
 
@@ -327,8 +323,6 @@ module.exports = {
           message: `El artículo "${articuloInfo.descripcion}" (ID: ${id_articulo}) ya está inicializado en el inventario.`,
         });
       }
-
-   
 
       // Llamar a tu función processInventoryMovement para insertar el registro inicial
       await InventarioModel.processInventoryMovement(
