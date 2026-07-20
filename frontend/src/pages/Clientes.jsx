@@ -2,15 +2,33 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import { FiTrash2, FiPlus, FiSearch, FiUsers } from "react-icons/fi";
+import {
+  FiTrash2,
+  FiPlus,
+  FiSearch,
+  FiUsers,
+  FiDollarSign,
+  FiClock,
+} from "react-icons/fi";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
 import "../styles/confirmAlert.css";
+import SaldoFavorDrawer from "../components/SaldoFavorDrawer";
+import HistorialSaldoDrawer from "../components/HistorialSaldoDrawer";
+
+const formatCurrency = (v) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(Number(v || 0));
 
 const ListaClientes = () => {
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
+  const [drawerCliente, setDrawerCliente] = useState(null);
+  const [historialCliente, setHistorialCliente] = useState(null);
   const navigate = useNavigate();
 
   const cargarClientes = async () => {
@@ -25,10 +43,6 @@ const ListaClientes = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    cargarClientes();
-  }, []);
 
   const handleDelete = (id_cliente) => {
     confirmAlert({
@@ -57,6 +71,10 @@ const ListaClientes = () => {
       ],
     });
   };
+
+  useEffect(() => {
+    cargarClientes();
+  }, []);
 
   const handleRowDoubleClick = (id) => navigate(`/clientes/editar/${id}`);
   const handleCrearClick = () => navigate("/clientes/nuevo");
@@ -121,10 +139,10 @@ const ListaClientes = () => {
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Ciudad
                 </th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Departamento
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Saldo a favor
                 </th>
-                <th className="px-4 py-3 w-16">&nbsp;</th>
+                <th className="px-4 py-3 w-32">&nbsp;</th>
               </tr>
             </thead>
             <tbody>
@@ -159,20 +177,55 @@ const ListaClientes = () => {
                     <td className="px-4 py-3 text-slate-600">
                       {cli.ciudad || "—"}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {cli.departamento || "—"}
+                    <td className="px-4 py-3 text-right">
+                      {Number(cli.saldo_favor) > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-xs">
+                          <FiDollarSign size={12} />
+                          {formatCurrency(cli.saldo_favor)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(cli.id_cliente);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
-                        title="Eliminar cliente"
-                      >
-                        <FiTrash2 size={15} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDrawerCliente(cli);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                          title="Abonar saldo a favor"
+                        >
+                          <FiDollarSign size={13} />
+                          Saldo
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHistorialCliente({
+                              value: cli.id_cliente,
+                              label: cli.nombre,
+                              ...cli,
+                            });
+                          }}
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-500 hover:bg-slate-100 transition-all cursor-pointer"
+                          title="Ver historial de saldo a favor"
+                        >
+                          <FiClock size={13} />
+                          Historial
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(cli.id_cliente);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                          title="Eliminar cliente"
+                        >
+                          <FiTrash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -197,6 +250,30 @@ const ListaClientes = () => {
           </table>
         </div>
       </div>
+
+      <SaldoFavorDrawer
+        isOpen={!!drawerCliente}
+        onClose={() => {
+          setDrawerCliente(null);
+          cargarClientes();
+        }}
+        clienteInicial={
+          drawerCliente
+            ? {
+                value: drawerCliente.id_cliente,
+                label: drawerCliente.nombre,
+                ...drawerCliente,
+              }
+            : null
+        }
+        onSuccess={() => cargarClientes()}
+      />
+
+      <HistorialSaldoDrawer
+        isOpen={!!historialCliente}
+        onClose={() => setHistorialCliente(null)}
+        cliente={historialCliente}
+      />
     </div>
   );
 };

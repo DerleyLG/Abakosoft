@@ -7,6 +7,7 @@ export const ROLES = {
 
 export const ACTIONS = {
   // Artículos
+
   ARTICLES_VIEW: "articles:view",
   ARTICLES_CREATE: "articles:create",
   ARTICLES_EDIT: "articles:edit",
@@ -50,6 +51,18 @@ export const ACTIONS = {
   SALES_CREATE: "sales:create",
   SALES_EDIT: "sales:edit",
   SALES_DELETE: "sales:delete",
+
+  RETURNS_VIEW: "returns:view",
+  RETURNS_CREATE: "returns:create",
+  RETURNS_CANCEL: "returns:cancel",
+
+  // Reparaciones
+  REPAIRS_VIEW: "repairs:view",
+  REPAIRS_CREATE: "repairs:create",
+  REPAIRS_DIAGNOSE: "repairs:diagnose",
+  REPAIRS_MANAGE: "repairs:manage",
+  REPAIRS_DELIVER: "repairs:deliver",
+  REPAIRS_CANCEL: "repairs:cancel",
 
   // Órdenes de Pedido
   ORDERS_VIEW: "orders:view",
@@ -255,10 +268,33 @@ export const PERMISSION_GROUPS = {
   "Unidades de Medida": [ACTIONS.UNITS_VIEW, ACTIONS.UNITS_MANAGE],
   Reportes: [ACTIONS.REPORTS_VIEW],
   "Gestión de Usuarios": [ACTIONS.USERS_MANAGE],
+
+  Devoluciones: [
+    ACTIONS.RETURNS_VIEW,
+    ACTIONS.RETURNS_CREATE,
+    ACTIONS.RETURNS_CANCEL,
+  ],
+  Reparaciones: [
+    ACTIONS.REPAIRS_VIEW,
+    ACTIONS.REPAIRS_CREATE,
+    ACTIONS.REPAIRS_DIAGNOSE,
+    ACTIONS.REPAIRS_MANAGE,
+    ACTIONS.REPAIRS_DELIVER,
+    ACTIONS.REPAIRS_CANCEL,
+  ],
 };
 
 // Etiquetas legibles para cada acción
 export const ACTION_LABELS = {
+  [ACTIONS.RETURNS_VIEW]: "Ver devoluciones",
+  [ACTIONS.RETURNS_CREATE]: "Registrar devoluciones",
+  [ACTIONS.RETURNS_CANCEL]: "Anular devoluciones",
+  [ACTIONS.REPAIRS_VIEW]: "Ver órdenes de reparación",
+  [ACTIONS.REPAIRS_CREATE]: "Crear órdenes de reparación",
+  [ACTIONS.REPAIRS_DIAGNOSE]: "Realizar diagnóstico",
+  [ACTIONS.REPAIRS_MANAGE]: "Gestionar materiales",
+  [ACTIONS.REPAIRS_DELIVER]: "Entregar reparaciones",
+  [ACTIONS.REPAIRS_CANCEL]: "Cancelar reparaciones",
   [ACTIONS.ARTICLES_VIEW]: "Ver artículos",
   [ACTIONS.ARTICLES_CREATE]: "Crear artículos",
   [ACTIONS.ARTICLES_EDIT]: "Editar artículos",
@@ -348,6 +384,27 @@ export const PERMISSION_DEPENDENCIES = {
     ACTIONS.CATEGORIES_VIEW,
     ACTIONS.UNITS_VIEW,
   ],
+
+  [ACTIONS.RETURNS_CREATE]: [
+    ACTIONS.RETURNS_VIEW,
+    ACTIONS.SALES_VIEW,
+    ACTIONS.CLIENTS_VIEW,
+    ACTIONS.ARTICLES_VIEW,
+  ],
+
+  [ACTIONS.RETURNS_CANCEL]: [ACTIONS.RETURNS_VIEW],
+
+  // Reparaciones
+  [ACTIONS.REPAIRS_CREATE]: [
+    ACTIONS.REPAIRS_VIEW,
+    ACTIONS.CLIENTS_VIEW,
+    ACTIONS.ARTICLES_VIEW,
+  ],
+  [ACTIONS.REPAIRS_DIAGNOSE]: [ACTIONS.REPAIRS_VIEW],
+  [ACTIONS.REPAIRS_MANAGE]: [ACTIONS.REPAIRS_VIEW, ACTIONS.INVENTORY_VIEW],
+  [ACTIONS.REPAIRS_DELIVER]: [ACTIONS.REPAIRS_VIEW, ACTIONS.TREASURY_VIEW],
+  [ACTIONS.REPAIRS_CANCEL]: [ACTIONS.REPAIRS_VIEW],
+
   [ACTIONS.ARTICLES_EDIT]: [
     ACTIONS.ARTICLES_VIEW,
     ACTIONS.CATEGORIES_VIEW,

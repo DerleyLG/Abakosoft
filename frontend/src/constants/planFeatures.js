@@ -27,6 +27,7 @@ export const PLAN_FEATURES = {
     "reportes",
   ],
   pro: [
+    "devoluciones",
     "articulos",
     "dashboard",
     "inventario",
@@ -109,6 +110,12 @@ export const PERMISSION_TO_FEATURE = {
   "sales:create": "ventas",
   "sales:edit": "ventas",
   "sales:delete": "ventas",
+
+  // Devoluciones
+"returns:view": "devoluciones",
+"returns:create": "devoluciones",
+"returns:cancel": "devoluciones",
+
   // Órdenes de Pedido
   "orders:view": "ordenes",
   "orders:create": "ordenes",

@@ -319,33 +319,49 @@ module.exports = {
       [idArticulo],
     );
 
-    let stockActualNum = stockActual?.stock_actual || 0;
+    // Obtener TODOS los movimientos (sin filtro) para calcular stock correctamente
+    const [todosMovimientos] = await db.query(
+      `SELECT id_movimiento, tipo_movimiento, cantidad_movida
+       FROM movimientos_inventario
+       WHERE id_articulo = ?
+       ORDER BY fecha_movimiento DESC, id_movimiento DESC`,
+      [idArticulo],
+    );
 
-    // Procesar los movimientos para agregar stock_antes y stock_despues
-    // Los movimientos vienen ordenados DESC (más reciente primero)
-    const movimientosConStock = rows.map((mov, index) => {
-      // Forzar a número para evitar errores de concatenación o strings mal formateados
-      const cantidadMovida = Number(mov.cantidad_movida) || 0;
-      const stockDespues = Number(stockActualNum) || 0;
+    // Calcular stock_antes/stock_despues para cada movimiento (hacia atrás desde stock actual)
+    const stockMap = new Map();
+    let stockTemporal = Number(stockActual?.stock_actual || 0);
 
-      // Calcular stock antes según el tipo de movimiento
+    for (const mov of todosMovimientos) {
+      const stockDespues = Number(stockTemporal);
       let stockAntes;
+
       if (mov.tipo_movimiento === "entrada") {
-        stockAntes = stockDespues - cantidadMovida;
+        stockAntes = stockDespues - Number(mov.cantidad_movida);
       } else if (mov.tipo_movimiento === "salida") {
-        stockAntes = stockDespues + cantidadMovida;
+        stockAntes = stockDespues + Number(mov.cantidad_movida);
       } else if (mov.tipo_movimiento === "ajuste") {
-        stockAntes = stockDespues - cantidadMovida;
+        stockAntes = stockDespues - Number(mov.cantidad_movida);
       } else {
         stockAntes = stockDespues;
       }
 
-      stockActualNum = stockAntes;
+      stockMap.set(mov.id_movimiento, {
+        stock_antes: stockAntes,
+        stock_despues: stockDespues,
+      });
+
+      stockTemporal = stockAntes;
+    }
+
+    // Aplicar los stocks calculados solo a los movimientos de la página (con filtro)
+    const movimientosConStock = rows.map((mov) => {
+      const stockInfo = stockMap.get(mov.id_movimiento);
 
       return {
         ...mov,
-        stock_antes: stockAntes,
-        stock_despues: stockDespues,
+        stock_antes: stockInfo?.stock_antes ?? 0,
+        stock_despues: stockInfo?.stock_despues ?? 0,
         // Determinar entidad relacionada y valor
         entidad:
           mov.cliente_venta ||
@@ -593,8 +609,9 @@ module.exports = {
     );
 
     // Para calcular stock_antes y stock_despues correctamente,
-    // necesitamos procesar los movimientos considerando todos los movimientos
-    // posteriores de cada artículo (los que vinieron después en el tiempo)
+    // procesamos TODOS los movimientos de cada artículo (sin filtro de fecha)
+    // desde el stock actual hacia atrás, así garantizamos consistencia
+    // incluso cuando hay paginación o filtros de por medio.
 
     // Primero, obtener los IDs de artículos únicos en esta página
     const articulosEnPagina = [...new Set(rows.map((r) => r.id_articulo))];
@@ -610,7 +627,7 @@ module.exports = {
         [idArticulo],
       );
       stockPorArticulo[idArticulo] = {
-        stockActual: stockActual?.stock || 0,
+        stockActual: Number(stockActual?.stock || 0),
         movimientosProcesados: new Map(),
       };
 
@@ -618,35 +635,32 @@ module.exports = {
       const movsDeArticulo = rows.filter((r) => r.id_articulo === idArticulo);
       if (movsDeArticulo.length === 0) continue;
 
-      // Obtener el movimiento más antiguo de esta página para este artículo
-      const movMasAntiguo = movsDeArticulo[movsDeArticulo.length - 1];
-
-      // Obtener TODOS los movimientos de este artículo desde el más antiguo de la página
-      // hasta el más reciente, para poder calcular stock correctamente
+      // Obtener TODOS los movimientos de este artículo (sin filtro de fecha)
+      // para calcular el stock correctamente desde el stock actual hacia atrás
       const [todosMovsPosteriores] = await db.query(
         `SELECT id_movimiento, tipo_movimiento, cantidad_movida, fecha_movimiento
          FROM movimientos_inventario
-         WHERE id_articulo = ? AND fecha_movimiento >= ?
+         WHERE id_articulo = ?
          ORDER BY fecha_movimiento DESC, id_movimiento DESC`,
-        [idArticulo, movMasAntiguo.fecha],
+        [idArticulo],
       );
 
       // Calcular stock para cada movimiento de este artículo
       let stockTemporal = stockPorArticulo[idArticulo].stockActual;
 
       for (const mov of todosMovsPosteriores) {
-        const stockDespues = stockTemporal;
+        const stockDespues = Number(stockTemporal);
         let stockAntes;
 
         if (mov.tipo_movimiento === "entrada") {
           // Entrada: el stock aumentó, antes tenía menos
-          stockAntes = stockDespues - mov.cantidad_movida;
+          stockAntes = stockDespues - Number(mov.cantidad_movida);
         } else if (mov.tipo_movimiento === "salida") {
           // Salida: el stock disminuyó, antes tenía más
-          stockAntes = stockDespues + mov.cantidad_movida;
+          stockAntes = stockDespues + Number(mov.cantidad_movida);
         } else if (mov.tipo_movimiento === "ajuste") {
           // Ajuste: cantidad_movida ya tiene el signo correcto (+/-)
-          stockAntes = stockDespues - mov.cantidad_movida;
+          stockAntes = stockDespues - Number(mov.cantidad_movida);
         } else {
           stockAntes = stockDespues;
         }

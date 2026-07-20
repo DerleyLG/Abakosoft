@@ -23,6 +23,7 @@ const PLAN_FEATURES = {
     "dashboard",
     "tesoreria",
     "reportes",
+    "devoluciones",
   ],
   básico: [
     // Módulos permitidos para plan básico (nombre con tilde)
@@ -41,6 +42,7 @@ const PLAN_FEATURES = {
     "dashboard",
     "tesoreria",
     "reportes",
+    "devoluciones",
   ],
   pro: [
     // Acceso total a todos los módulos
@@ -74,6 +76,7 @@ const PLAN_FEATURES = {
     "avances",
     "ordenes",
     "ordenes_pedido",
+    "devoluciones",
   ],
   pro: [
     // Acceso total a todos los módulos
@@ -107,6 +110,7 @@ const PLAN_FEATURES = {
     "avances",
     "ordenes",
     "ordenes_pedido",
+    "devoluciones",
   ],
 };
 

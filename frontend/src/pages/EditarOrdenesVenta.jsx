@@ -42,6 +42,13 @@ const OrdenVentaEdit = () => {
   const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
   const [focusedPrice, setFocusedPrice] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Saldo a favor
+  const [usarSaldoFavor, setUsarSaldoFavor] = useState(false);
+  const [montoSaldoFavor, setMontoSaldoFavor] = useState("");
+  const [saldoAplicado, setSaldoAplicado] = useState(false);
+  const [saldoFavorDisponible, setSaldoFavorDisponible] = useState(0);
+
   const estados = [
     { id: "pendiente", nombre: "Pendiente" },
     { id: "completada", nombre: "Completada" },
@@ -214,7 +221,19 @@ const OrdenVentaEdit = () => {
         const clienteExistente = clientesAPI.find(
           (c) => c.id_cliente === ordenData.id_cliente,
         );
-        if (clienteExistente) setCliente(clienteExistente);
+        if (clienteExistente) {
+          setCliente(clienteExistente);
+          setSaldoFavorDisponible(Number(clienteExistente.saldo_favor) || 0);
+          // Si la orden ya tenía saldo a favor aplicado
+          const totalOrd = Number(ordenData.total || 0);
+          const montoOrd = Number(ordenData.monto || 0);
+          if (montoOrd < totalOrd) {
+            const saldoUsado = totalOrd - montoOrd;
+            setUsarSaldoFavor(true);
+            setSaldoAplicado(true);
+            setMontoSaldoFavor(String(saldoUsado));
+          }
+        }
 
         await fetchMetodoPago(id, metodosPagoAPI, ordenData);
 
@@ -251,6 +270,13 @@ const OrdenVentaEdit = () => {
       cargarDatosYFormulario();
     }
   }, [id, navigate]);
+
+  // Al cambiar cliente, actualizar saldo disponible
+  useEffect(() => {
+    if (cliente?.id_cliente) {
+      setSaldoFavorDisponible(Number(cliente.saldo_favor) || 0);
+    }
+  }, [cliente]);
 
   const validarFormulario = () => {
     if (!cliente) {
@@ -297,6 +323,8 @@ const OrdenVentaEdit = () => {
       precio_unitario: a.precio_unitario,
     }));
 
+    const montoSF = usarSaldoFavor && saldoAplicado ? Math.min(Number(montoSaldoFavor) || 0, saldoFavorDisponible, totalGeneral) : 0;
+
     const payload = {
       id_orden_venta: id,
       id_cliente: cliente.id_cliente,
@@ -305,6 +333,7 @@ const OrdenVentaEdit = () => {
       id_metodo_pago: metodoPago.id_metodo_pago,
       referencia,
       observaciones_pago: observaciones,
+      monto_saldo_favor: montoSF,
     };
 
     try {
@@ -509,6 +538,77 @@ const OrdenVentaEdit = () => {
               </div>
             </div>
           </div>
+
+          {/* ── Saldo a favor ── */}
+          {cliente && saldoFavorDisponible > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Saldo a favor</p>
+                    <p className="text-xs text-slate-400">{cliente.nombre} — {formatCurrency(saldoFavorDisponible)}</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={usarSaldoFavor}
+                    onChange={(e) => {
+                      setUsarSaldoFavor(e.target.checked);
+                      setSaldoAplicado(false);
+                      if (!e.target.checked) setMontoSaldoFavor("");
+                      else setMontoSaldoFavor(String(Math.min(saldoFavorDisponible, totalGeneral)));
+                    }}
+                  />
+                  <div className="w-9 h-5 bg-slate-200 rounded-full peer-checked:bg-slate-800 transition-colors" />
+                  <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${usarSaldoFavor ? "translate-x-4" : ""}`} />
+                </label>
+              </div>
+
+              {usarSaldoFavor && (
+                <div className="mt-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-slate-100">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">¿Cuánto deseas usar?</p>
+                    <div className="flex items-center gap-2">
+                      {[25, 50, 75, 100].map((pct) => {
+                        const montoPct = Math.min(Math.round((saldoFavorDisponible * pct) / 100), totalGeneral);
+                        return (
+                          <button key={pct} type="button" onClick={() => { setMontoSaldoFavor(String(montoPct)); setSaldoAplicado(true); }}
+                            className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all cursor-pointer ${Number(montoSaldoFavor) === montoPct ? "bg-slate-800 text-white border-slate-800 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"}`}>
+                            {pct}%
+                          </button>
+                        );
+                      })}
+                      <div className="relative flex-[2]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">$</span>
+                        <input type="text" inputMode="numeric" value={Number(montoSaldoFavor) > 0 ? Number(montoSaldoFavor).toLocaleString("es-CO") : ""}
+                          onChange={(e) => { const raw = e.target.value.replace(/[^0-9]/g, ""); const num = Number(raw) || 0; setMontoSaldoFavor(String(Math.min(num, saldoFavorDisponible, totalGeneral))); setSaldoAplicado(true); }}
+                          className="w-full pl-7 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition placeholder:text-slate-300" placeholder="Otro valor" />
+                      </div>
+                      {Number(montoSaldoFavor) > 0 && (
+                        <button type="button" onClick={() => { setMontoSaldoFavor(""); setSaldoAplicado(false); }}
+                          className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer" title="Limpiar">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 grid grid-cols-4 gap-4 bg-slate-50">
+                    <div className="text-center"><p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total</p><p className="text-sm font-bold text-slate-800 mt-0.5">{formatCurrency(totalGeneral)}</p></div>
+                    <div className="text-center"><p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Saldo</p><p className="text-sm font-bold text-emerald-600 mt-0.5">{formatCurrency(saldoFavorDisponible)}</p></div>
+                    <div className="text-center"><p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descuento</p><p className={`text-sm font-bold mt-0.5 ${Number(montoSaldoFavor) > 0 ? "text-amber-600" : "text-slate-300"}`}>{Number(montoSaldoFavor) > 0 ? `-${formatCurrency(Number(montoSaldoFavor))}` : "—"}</p></div>
+                    <div className="text-center"><p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Neto</p><p className="text-sm font-bold text-slate-800 mt-0.5">{formatCurrency(Math.max(0, totalGeneral - (Number(montoSaldoFavor) || 0)))}</p></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Artículos */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">

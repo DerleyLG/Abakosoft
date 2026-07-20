@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import {
   Boxes,
   ClipboardList,
@@ -8,6 +8,14 @@ import {
   FileText,
   Settings,
   LayoutDashboard,
+  ShoppingCart,
+  RotateCcw,
+  Wrench,
+  FilePlus2,
+  Factory,
+  Kanban,
+  TrendingUp,
+  Truck,
   ChevronDown,
   ChevronRight,
   LogOut,
@@ -26,12 +34,18 @@ const navLinkClass = ({ isActive }) =>
       : "text-slate-400 hover:bg-slate-800 hover:text-white"
   }`;
 
-const subNavLinkClass = ({ isActive }) =>
-  `block py-1.5 px-2.5 rounded-lg text-sm transition-all duration-200 ${
+const subLinkClass = ({ isActive }) =>
+  `flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
     isActive
       ? "bg-slate-700 text-white font-medium"
       : "text-slate-400 hover:bg-slate-800 hover:text-white"
   }`;
+
+const MiniLabel = ({ children }) => (
+  <p className="px-3 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-widest text-slate-600 select-none">
+    {children}
+  </p>
+);
 
 // Etiqueta de sección
 const SectionLabel = ({ children }) => (
@@ -42,9 +56,24 @@ const SectionLabel = ({ children }) => (
 
 const Sidebar = ({ isOpen }) => {
   const [ordenesOpen, setOrdenesOpen] = useState(false);
+  const navRef = useRef(null);
   const { user, logout } = useAuth();
   const { features } = usePlan();
   const navigate = useNavigate();
+
+  // Scroll suave al desplegar Órdenes
+  useEffect(() => {
+    if (ordenesOpen && navRef.current) {
+      // Pequeña pausa para que el DOM se expanda, luego scroll suave al fondo
+      const timer = setTimeout(() => {
+        navRef.current.scrollTo({
+          top: navRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [ordenesOpen]);
 
   const hasAnyPermission = (...actions) => actions.some((a) => can(user, a));
 
@@ -55,6 +84,8 @@ const Sidebar = ({ isOpen }) => {
     ACTIONS.FABRICATION_VIEW,
     ACTIONS.KANBAN_VIEW,
     ACTIONS.PROGRESS_VIEW,
+    ACTIONS.RETURNS_VIEW,
+    ACTIONS.REPAIRS_VIEW,
   );
 
   const showCatalogo = hasAnyPermission(
@@ -102,7 +133,10 @@ const Sidebar = ({ isOpen }) => {
       </div>
 
       {/* Navegación scrollable */}
-      <nav className="flex-1 overflow-y-auto px-2 pb-4 sidebar-scroll">
+      <nav
+        ref={navRef}
+        className="flex-1 overflow-y-auto px-2 pb-4 sidebar-scroll"
+      >
         {/* ── Principal ───────────────────────────── */}
         <SectionLabel>Principal</SectionLabel>
         <NavLink to="/dashboard" className={navLinkClass}>
@@ -164,13 +198,17 @@ const Sidebar = ({ isOpen }) => {
             </>
           )}
 
-        {/* ── Órdenes (submenú) ───────────────────── */}
+        {/* ── Órdenes (colapsable con grupos) ────── */}
         {showOrdenes &&
           (features.includes("ventas") ||
+            features.includes("devoluciones") ||
             features.includes("compras") ||
             features.includes("fabricacion") ||
             features.includes("kanban") ||
-            features.includes("progreso")) && (
+            features.includes("progreso") ||
+            features.includes("ordenes_pedido") ||
+            features.includes("pedidos") ||
+            can(user, ACTIONS.REPAIRS_VIEW)) && (
             <>
               <SectionLabel>Órdenes</SectionLabel>
               <button
@@ -189,54 +227,92 @@ const Sidebar = ({ isOpen }) => {
               </button>
 
               <div
-                className={`ml-5 border-l border-slate-700 pl-3 overflow-hidden transition-all duration-300 ease-in-out ${
-                  ordenesOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                className={`ml-2 overflow-hidden transition-all duration-300 ease-in-out ${
+                  ordenesOpen
+                    ? "max-h-[1000px] opacity-100"
+                    : "max-h-0 opacity-0"
                 }`}
               >
-                {can(user, ACTIONS.SALES_VIEW) &&
-                  features.includes("ventas") && (
-                    <NavLink to="/ordenes_venta" className={subNavLinkClass}>
-                      Ventas
-                    </NavLink>
+                <div className="ml-3 border-l border-slate-700 pl-3 pb-1 space-y-0.5">
+                  {/* ── Ventas ── */}
+                  {(can(user, ACTIONS.SALES_VIEW) ||
+                    can(user, ACTIONS.RETURNS_VIEW) ||
+                    can(user, ACTIONS.REPAIRS_VIEW) ||
+                    can(user, ACTIONS.ORDERS_VIEW)) && (
+                    <>
+                      <MiniLabel>Comercial</MiniLabel>
+                      {can(user, ACTIONS.SALES_VIEW) &&
+                        features.includes("ventas") && (
+                          <NavLink to="/ordenes_venta" className={subLinkClass}>
+                            <ShoppingCart size={14} /> Ventas
+                          </NavLink>
+                        )}
+                      {can(user, ACTIONS.RETURNS_VIEW) &&
+                        features.includes("devoluciones") && (
+                          <NavLink to="/devoluciones" className={subLinkClass}>
+                            <RotateCcw size={14} /> Devoluciones
+                          </NavLink>
+                        )}
+                      {can(user, ACTIONS.REPAIRS_VIEW) && (
+                        <NavLink to="/reparaciones" className={subLinkClass}>
+                          <Wrench size={14} /> Reparaciones
+                        </NavLink>
+                      )}
+                      {can(user, ACTIONS.ORDERS_VIEW) &&
+                        (features.includes("ordenes_pedido") ||
+                          features.includes("pedidos")) && (
+                          <NavLink
+                            to="/ordenes_pedido"
+                            className={subLinkClass}
+                          >
+                            <FilePlus2 size={14} /> Pedidos
+                          </NavLink>
+                        )}
+                    </>
                   )}
-                {/* Pedidos solo si el plan incluye explícitamente 'ordenes_pedido' o 'pedidos' como feature */}
-                {can(user, ACTIONS.ORDERS_VIEW) &&
-                  (features.includes("ordenes_pedido") ||
-                    features.includes("pedidos")) && (
-                    <NavLink to="/ordenes_pedido" className={subNavLinkClass}>
-                      Pedidos
-                    </NavLink>
-                  )}
-                {can(user, ACTIONS.FABRICATION_VIEW) &&
-                  features.includes("fabricacion") && (
-                    <NavLink
-                      to="/ordenes_fabricacion"
-                      className={subNavLinkClass}
-                    >
-                      Fabricación
-                    </NavLink>
-                  )}
-                {can(user, ACTIONS.KANBAN_VIEW) &&
-                  features.includes("kanban") && (
-                    <NavLink to="/kanban" className={subNavLinkClass}>
-                      Tablero Producción
-                    </NavLink>
-                  )}
-                {can(user, ACTIONS.PROGRESS_VIEW) &&
-                  features.includes("progreso") && (
-                    <NavLink
-                      to="/progreso-fabricacion"
-                      className={subNavLinkClass}
-                    >
-                      Progreso Fabricación
-                    </NavLink>
-                  )}
-                {can(user, ACTIONS.PURCHASES_VIEW) &&
-                  features.includes("compras") && (
-                    <NavLink to="/ordenes_compra" className={subNavLinkClass}>
-                      Compras
-                    </NavLink>
-                  )}
+
+                  {/* ── Compras ── */}
+                  {can(user, ACTIONS.PURCHASES_VIEW) &&
+                    features.includes("compras") && (
+                      <>
+                        <MiniLabel>Abastecimiento</MiniLabel>
+                        <NavLink to="/ordenes_compra" className={subLinkClass}>
+                          <Truck size={14} /> Compras
+                        </NavLink>
+                      </>
+                    )}
+
+                  {/* ── Producción ── */}
+                  {can(user, ACTIONS.FABRICATION_VIEW) &&
+                    features.includes("fabricacion") && (
+                      <>
+                        <MiniLabel>Producción</MiniLabel>
+                        {can(user, ACTIONS.FABRICATION_VIEW) && (
+                          <NavLink
+                            to="/ordenes_fabricacion"
+                            className={subLinkClass}
+                          >
+                            <Factory size={14} /> Fabricación
+                          </NavLink>
+                        )}
+                        {can(user, ACTIONS.KANBAN_VIEW) &&
+                          features.includes("kanban") && (
+                            <NavLink to="/kanban" className={subLinkClass}>
+                              <Kanban size={14} /> Tablero
+                            </NavLink>
+                          )}
+                        {can(user, ACTIONS.PROGRESS_VIEW) &&
+                          features.includes("progreso") && (
+                            <NavLink
+                              to="/progreso-fabricacion"
+                              className={subLinkClass}
+                            >
+                              <TrendingUp size={14} /> Progreso
+                            </NavLink>
+                          )}
+                      </>
+                    )}
+                </div>
               </div>
             </>
           )}

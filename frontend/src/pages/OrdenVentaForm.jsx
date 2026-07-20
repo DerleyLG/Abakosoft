@@ -55,11 +55,27 @@ const OrdenVentaForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { pedidoData } = location.state || {};
 
+  // Saldo a favor
+  const [usarSaldoFavor, setUsarSaldoFavor] = useState(false);
+  const [montoSaldoFavor, setMontoSaldoFavor] = useState("");
+  const [saldoAplicado, setSaldoAplicado] = useState(false);
+  const [saldoFavorDisponible, setSaldoFavorDisponible] = useState(0);
+
   const estados = [
     { id: "pendiente", nombre: "Pendiente" },
     { id: "completada", nombre: "Completada" },
     { id: "anulada", nombre: "Anulada" },
   ];
+
+  // Al seleccionar cliente, obtener su saldo a favor
+  useEffect(() => {
+    if (cliente?.id_cliente) {
+      setSaldoFavorDisponible(Number(cliente.saldo_favor) || 0);
+      setUsarSaldoFavor(false);
+      setMontoSaldoFavor("");
+      setSaldoAplicado(false);
+    }
+  }, [cliente]);
 
   // Formateo en vivo tipo máscara para precio unitario
   const handlePriceChange = (id_articulo, value) => {
@@ -312,6 +328,15 @@ const OrdenVentaForm = () => {
 
     setIsSubmitting(true);
 
+    const montoSF =
+      usarSaldoFavor && saldoAplicado
+        ? Math.min(
+            Number(montoSaldoFavor) || 0,
+            saldoFavorDisponible,
+            totalGeneral,
+          )
+        : 0;
+
     const payload = {
       id_cliente: cliente.id_cliente,
       // fecha se determina en el backend (ignora inputs del cliente)
@@ -326,6 +351,7 @@ const OrdenVentaForm = () => {
       referencia,
       observaciones_pago: observaciones,
       id_pedido: pedidoData?.id_pedido || null,
+      monto_saldo_favor: montoSF,
     };
 
     try {
@@ -425,7 +451,7 @@ const OrdenVentaForm = () => {
                       className="text-slate-400 flex-shrink-0"
                     />
                   </Listbox.Button>
-                  <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-sm">
+                  <Listbox.Options className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-sm">
                     {Array.isArray(clientes) && clientes.length > 0 ? (
                       clientes.map((c) => (
                         <Listbox.Option
@@ -488,7 +514,7 @@ const OrdenVentaForm = () => {
                       className="text-slate-400 flex-shrink-0"
                     />
                   </Listbox.Button>
-                  <Listbox.Options className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-sm">
+                  <Listbox.Options className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-sm">
                     {Array.isArray(metodosPago) && metodosPago.length > 0 ? (
                       metodosPago.map((m) => (
                         <Listbox.Option
@@ -539,6 +565,251 @@ const OrdenVentaForm = () => {
               />
             </div>
           </div>
+
+          {/* ── Saldo a favor ── */}
+          {cliente && saldoFavorDisponible > 0 && (
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                    <svg
+                      className="w-4 h-4 text-slate-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">
+                      Saldo a favor
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {cliente.nombre} — {formatCurrency(saldoFavorDisponible)}
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={usarSaldoFavor}
+                    onChange={(e) => {
+                      setUsarSaldoFavor(e.target.checked);
+                      setSaldoAplicado(false);
+                      if (!e.target.checked) setMontoSaldoFavor("");
+                      else
+                        setMontoSaldoFavor(
+                          String(Math.min(saldoFavorDisponible, totalGeneral)),
+                        );
+                    }}
+                  />
+                  <div className="w-9 h-5 bg-slate-200 rounded-full peer-checked:bg-slate-800 transition-colors" />
+                  <div
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${usarSaldoFavor ? "translate-x-4" : ""}`}
+                  />
+                </label>
+              </div>
+
+              {usarSaldoFavor && (
+                <div className="mt-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                  {/* Selector */}
+                  <div className="p-4 border-b border-slate-100">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                      ¿Cuánto deseas usar?
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {[25, 50, 75, 100].map((pct) => {
+                        const montoPct = Math.min(
+                          Math.round((saldoFavorDisponible * pct) / 100),
+                          totalGeneral,
+                        );
+                        return (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => {
+                              setMontoSaldoFavor(String(montoPct));
+                              setSaldoAplicado(true);
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all cursor-pointer ${
+                              Number(montoSaldoFavor) === montoPct
+                                ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                                : "bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:shadow-sm"
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        );
+                      })}
+                      <div className="relative flex-[2]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={
+                            Number(montoSaldoFavor) > 0
+                              ? Number(montoSaldoFavor).toLocaleString("es-CO")
+                              : ""
+                          }
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, "");
+                            const num = Number(raw) || 0;
+                            setMontoSaldoFavor(
+                              String(
+                                Math.min(
+                                  num,
+                                  saldoFavorDisponible,
+                                  totalGeneral,
+                                ),
+                              ),
+                            );
+                            setSaldoAplicado(true);
+                          }}
+                          className="w-full pl-7 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 transition placeholder:text-slate-300"
+                          placeholder="Otro valor"
+                        />
+                      </div>
+                      {Number(montoSaldoFavor) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMontoSaldoFavor("");
+                            setSaldoAplicado(false);
+                          }}
+                          className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Limpiar"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Resumen */}
+                  <div className="px-4 py-3 grid grid-cols-4 gap-4 bg-slate-50">
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                        Total
+                      </p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(totalGeneral)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                        Saldo
+                      </p>
+                      <p className="text-sm font-bold text-emerald-600 mt-0.5">
+                        {formatCurrency(saldoFavorDisponible)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                        Descuento
+                      </p>
+                      <p
+                        className={`text-sm font-bold mt-0.5 ${Number(montoSaldoFavor) > 0 ? "text-amber-600" : "text-slate-300"}`}
+                      >
+                        {Number(montoSaldoFavor) > 0
+                          ? `-${formatCurrency(Number(montoSaldoFavor))}`
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                        Neto
+                      </p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {formatCurrency(
+                          Math.max(
+                            0,
+                            totalGeneral - (Number(montoSaldoFavor) || 0),
+                          ),
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botones */}
+                  <div className="px-4 py-3 border-t border-slate-100 flex justify-end gap-2">
+                    {!saldoAplicado ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!montoSaldoFavor || Number(montoSaldoFavor) <= 0)
+                            return toast.error(
+                              "Selecciona un monto a descontar",
+                            );
+                          setSaldoAplicado(true);
+                        }}
+                        disabled={
+                          !montoSaldoFavor || Number(montoSaldoFavor) <= 0
+                        }
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Aplicar descuento
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSaldoAplicado(false)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:border-red-300 text-slate-600 hover:text-red-600 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                        Quitar descuento
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Card: Artículos */}
@@ -572,6 +843,9 @@ const OrdenVentaForm = () => {
               placeholder="Buscar por referencia o descripción…"
               isClearable
               className="text-sm"
+              menuPortalTarget={document.body}
+              menuShouldScrollIntoView={false}
+              openMenuOnFocus={true}
               styles={{
                 control: (base, state) => ({
                   ...base,
@@ -592,6 +866,8 @@ const OrdenVentaForm = () => {
                   color: state.isSelected ? "white" : "#334155",
                   fontSize: "0.875rem",
                 }),
+                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                menu: (base) => ({ ...base, zIndex: 9999 }),
               }}
             />
           </div>
@@ -690,15 +966,38 @@ const OrdenVentaForm = () => {
               </tbody>
               {articulosSeleccionados.length > 0 && (
                 <tfoot>
+                  {saldoAplicado && Number(montoSaldoFavor) > 0 && (
+                    <tr className="border-t border-slate-100 bg-slate-50/70">
+                      <td
+                        colSpan="3"
+                        className="px-4 py-2 text-right text-xs text-slate-500"
+                      >
+                        Saldo a favor aplicado
+                      </td>
+                      <td className="px-4 py-2 text-right text-xs font-semibold text-emerald-600 tabular-nums">
+                        -{formatCurrency(Number(montoSaldoFavor))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  )}
                   <tr className="border-t-2 border-slate-200 bg-slate-50">
                     <td
                       colSpan="3"
                       className="px-4 py-3 text-right text-sm font-bold text-slate-700"
                     >
-                      Total General
+                      {saldoAplicado ? "Neto a pagar" : "Total General"}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-emerald-700">
-                      {formatCurrency(totalGeneral)}
+                    <td
+                      className={`px-4 py-3 text-right font-bold text-lg tabular-nums ${saldoAplicado ? "text-slate-800" : "text-emerald-700"}`}
+                    >
+                      {saldoAplicado
+                        ? formatCurrency(
+                            Math.max(
+                              0,
+                              totalGeneral - (Number(montoSaldoFavor) || 0),
+                            ),
+                          )
+                        : formatCurrency(totalGeneral)}
                     </td>
                     <td></td>
                   </tr>

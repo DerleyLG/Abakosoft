@@ -209,6 +209,7 @@ CREATE TABLE `clientes` (
   `direccion` text,
   `ciudad` varchar(100) DEFAULT NULL,
   `departamento` varchar(100) DEFAULT NULL,
+  `saldo_favor` decimal(12,2) DEFAULT '0.00',
   PRIMARY KEY (`id_cliente`),
   UNIQUE KEY `id_cliente` (`id_cliente`),
   KEY `idx_clientes_nombre` (`nombre`(100))
@@ -544,6 +545,7 @@ CREATE TABLE `inventario` (
   `stock` decimal(12,2) DEFAULT NULL,
   `stock_fabricado` decimal(12,2) NOT NULL DEFAULT '0.00',
   `stock_minimo` decimal(12,2) DEFAULT NULL,
+  `stock_reparacion` decimal(10,2) DEFAULT '0.00',
   `ultima_actualizacion` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_inventario`),
   KEY `fk1_inventario_articulo` (`id_articulo`),
@@ -606,7 +608,7 @@ CREATE TABLE `movimientos_inventario` (
   `tipo_movimiento` enum('entrada','salida','ajuste') NOT NULL,
   `fecha_movimiento` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `observaciones` text,
-  `tipo_origen_movimiento` enum('inicial','produccion','venta','compra','ajuste_manual','anulacion_venta','anulacion_compra','devolucion_cliente','devolucion_proveedor') NOT NULL,
+  `tipo_origen_movimiento` enum('inicial','produccion','venta','compra','ajuste_manual','anulacion_venta','anulacion_compra','devolucion_cliente','devolucion_proveedor','reparacion') NOT NULL,
   `referencia_documento_id` bigint unsigned DEFAULT NULL,
   `referencia_documento_tipo` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id_movimiento`),
@@ -631,7 +633,7 @@ CREATE TABLE `movimientos_tesoreria` (
   `tipo_documento` varchar(50) DEFAULT NULL,
   `fecha_movimiento` datetime NOT NULL,
   `monto` decimal(10,2) NOT NULL,
-  `id_metodo_pago` int NOT NULL,
+  `id_metodo_pago` int DEFAULT NULL,
   `referencia` varchar(255) DEFAULT NULL,
   `observaciones` text,
   PRIMARY KEY (`id_movimiento`),
@@ -708,8 +710,8 @@ CREATE TABLE `ordenes_venta` (
   `id_cliente` bigint unsigned DEFAULT NULL,
   `id_metodo_pago` int DEFAULT NULL,
   `estado` enum('pendiente','completada','anulada') DEFAULT 'pendiente',
-  `total` int NOT NULL,
-  `monto` int NOT NULL,
+  `total` decimal(12,2) DEFAULT NULL,
+  `monto` decimal(12,2) NOT NULL,
   `id_pedido` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id_orden_venta`),
   UNIQUE KEY `id_orden_venta` (`id_orden_venta`),
@@ -1049,6 +1051,114 @@ CREATE TABLE idempotency_keys (
   INDEX idx_key (key_value),
   INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `devoluciones_venta`
+--
+DROP TABLE IF EXISTS `devoluciones_venta`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `devoluciones_venta` (
+  `id_devolucion_venta` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `id_orden_venta` bigint unsigned DEFAULT NULL,
+  `id_cliente` bigint unsigned NOT NULL,
+  `fecha` date NOT NULL DEFAULT (curdate()),
+  `id_metodo_pago` int DEFAULT NULL,
+  `estado` enum('pendiente','aprobada','anulada') DEFAULT 'pendiente',
+  `motivo` text,
+  `total` decimal(12,2) NOT NULL,
+  `monto` decimal(12,2) NOT NULL,
+  PRIMARY KEY (`id_devolucion_venta`),
+  KEY `id_cliente` (`id_cliente`),
+  KEY `id_orden_venta` (`id_orden_venta`),
+  KEY `id_metodo_pago` (`id_metodo_pago`),
+  CONSTRAINT `devoluciones_venta_ibfk_1` FOREIGN KEY (`id_cliente`) REFERENCES `clientes` (`id_cliente`),
+  CONSTRAINT `devoluciones_venta_ibfk_2` FOREIGN KEY (`id_orden_venta`) REFERENCES `ordenes_venta` (`id_orden_venta`),
+  CONSTRAINT `devoluciones_venta_ibfk_3` FOREIGN KEY (`id_metodo_pago`) REFERENCES `metodos_pago` (`id_metodo_pago`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `detalle_devolucion_venta`
+--
+DROP TABLE IF EXISTS `detalle_devolucion_venta`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `detalle_devolucion_venta` (
+  `id_detalle_devolucion` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `id_devolucion_venta` bigint unsigned NOT NULL,
+  `id_articulo` bigint unsigned NOT NULL,
+  `cantidad` int NOT NULL,
+  `precio_unitario` decimal(10,2) NOT NULL,
+  `observaciones` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id_detalle_devolucion`),
+  KEY `id_articulo` (`id_articulo`),
+  KEY `fk_detalle_devolucion_venta` (`id_devolucion_venta`),
+  CONSTRAINT `detalle_devolucion_venta_ibfk_2` FOREIGN KEY (`id_articulo`) REFERENCES `articulos` (`id_articulo`),
+  CONSTRAINT `fk_detalle_devolucion_venta` FOREIGN KEY (`id_devolucion_venta`) REFERENCES `devoluciones_venta` (`id_devolucion_venta`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `reparaciones`
+--
+DROP TABLE IF EXISTS `reparaciones`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `reparaciones` (
+  `id_reparacion` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `id_cliente` bigint unsigned NOT NULL,
+  `id_articulo` bigint unsigned NOT NULL,
+  `id_devolucion_venta` bigint unsigned DEFAULT NULL,
+  `fecha_ingreso` date NOT NULL DEFAULT (curdate()),
+  `fecha_estimada` date DEFAULT NULL,
+  `fecha_entrega` date DEFAULT NULL,
+  `estado` enum('registrada','diagnosticada','en_reparacion','lista_entrega','entregada','cancelada') NOT NULL DEFAULT 'registrada',
+  `motivo` text NOT NULL,
+  `diagnostico` text,
+  `requiere_pago` tinyint(1) NOT NULL DEFAULT '0',
+  `subtotal_materiales` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `mano_obra` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `descuento` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `total` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `id_metodo_pago` int DEFAULT NULL,
+  `observaciones` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `id_trabajador` bigint unsigned DEFAULT NULL,
+  PRIMARY KEY (`id_reparacion`),
+  KEY `fk_rep_cliente` (`id_cliente`),
+  KEY `fk_rep_articulo` (`id_articulo`),
+  KEY `fk_rep_devolucion` (`id_devolucion_venta`),
+  KEY `fk_rep_metodo_pago` (`id_metodo_pago`),
+  KEY `fk_rep_trabajador` (`id_trabajador`),
+  CONSTRAINT `fk_rep_articulo` FOREIGN KEY (`id_articulo`) REFERENCES `articulos` (`id_articulo`),
+  CONSTRAINT `fk_rep_cliente` FOREIGN KEY (`id_cliente`) REFERENCES `clientes` (`id_cliente`),
+  CONSTRAINT `fk_rep_devolucion` FOREIGN KEY (`id_devolucion_venta`) REFERENCES `devoluciones_venta` (`id_devolucion_venta`),
+  CONSTRAINT `fk_rep_metodo_pago` FOREIGN KEY (`id_metodo_pago`) REFERENCES `metodos_pago` (`id_metodo_pago`),
+  CONSTRAINT `fk_rep_trabajador` FOREIGN KEY (`id_trabajador`) REFERENCES `trabajadores` (`id_trabajador`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `detalle_reparacion_material`
+--
+DROP TABLE IF EXISTS `detalle_reparacion_material`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `detalle_reparacion_material` (
+  `id_detalle` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `id_reparacion` bigint unsigned NOT NULL,
+  `id_articulo` bigint unsigned NOT NULL,
+  `cantidad` decimal(12,2) NOT NULL,
+  `costo_unitario` decimal(12,2) NOT NULL,
+  `subtotal` decimal(12,2) NOT NULL,
+  PRIMARY KEY (`id_detalle`),
+  KEY `fk_rep_mat_rep` (`id_reparacion`),
+  KEY `fk_rep_mat_art` (`id_articulo`),
+  CONSTRAINT `fk_rep_mat_art` FOREIGN KEY (`id_articulo`) REFERENCES `articulos` (`id_articulo`),
+  CONSTRAINT `fk_rep_mat_rep` FOREIGN KEY (`id_reparacion`) REFERENCES `reparaciones` (`id_reparacion`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 -- Datos iniciales: Unidades de medida

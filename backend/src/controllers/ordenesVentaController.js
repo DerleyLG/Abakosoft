@@ -104,9 +104,13 @@ module.exports = {
         detalles,
         id_metodo_pago,
         referencia,
-        observaciones_pago,
         id_pedido,
+        monto_saldo_favor: montoSaldoFavorRaw,
       } = req.body;
+
+      let { observaciones_pago } = req.body;
+
+      const montoSaldoFavor = Math.max(0, Number(montoSaldoFavorRaw) || 0);
 
       // Validar que la fecha actual no esté en un período cerrado
       // Usar la misma zona horaria que se usa para crear la orden
@@ -166,13 +170,16 @@ module.exports = {
         totalVenta += precio_unitario * cantidad;
       }
 
+      // ── Calcular monto real a cobrar (descontando saldo a favor) ──
+      const montoPagoReal = Math.max(0, totalVenta - montoSaldoFavor);
+
       const id_orden_venta = await ordenModel.create(
         {
           id_cliente,
           estado,
           fecha: fechaFormat,
           total: totalVenta,
-          monto: totalVenta,
+          monto: montoPagoReal,
           id_pedido: id_pedido || null,
         },
         connection,
@@ -204,6 +211,29 @@ module.exports = {
           connection,
         );
       }
+
+      // ── Aplicar saldo a favor si se indicó ──
+      if (montoSaldoFavor > 0) {
+        const saldoActual = await clienteModel.getSaldoFavor(
+          id_cliente,
+          connection,
+        );
+        if (saldoActual < montoSaldoFavor) {
+          throw new Error(
+            `El cliente no tiene suficiente saldo a favor. Disponible: ${saldoActual}, solicitado: ${montoSaldoFavor}`,
+          );
+        }
+        await clienteModel.decrementarSaldoFavor(
+          id_cliente,
+          montoSaldoFavor,
+          connection,
+        );
+        // Si no hay observaciones del usuario, poner texto por defecto
+        if (!observaciones_pago) {
+          observaciones_pago = "Descuento de saldo a favor aplicado";
+        }
+      }
+
       // Resolver id_metodo_pago por nombre si no se proporcionó
       let resolvedMetodoId = id_metodo_pago;
       if (
@@ -215,6 +245,32 @@ module.exports = {
         );
       }
 
+      // ── Movimiento de tesorería por saldo a favor usado ──
+      if (montoSaldoFavor > 0) {
+        // Usar el mismo método de pago del abono a saldo a favor
+        const [ultimoAbono] = await connection.query(
+          `SELECT id_metodo_pago FROM movimientos_tesoreria
+           WHERE tipo_documento = 'saldo_favor'
+             AND id_documento = ?
+           ORDER BY fecha_movimiento DESC
+           LIMIT 1`,
+          [id_cliente],
+        );
+        const metodoSaldo = ultimoAbono[0]?.id_metodo_pago || resolvedMetodoId;
+
+        await tesoreriaModel.insertarMovimiento(
+          {
+            id_documento: id_orden_venta,
+            tipo_documento: "saldo_favor_usado",
+            monto: -Math.abs(montoSaldoFavor),
+            id_metodo_pago: metodoSaldo,
+            referencia: `OV-${id_orden_venta}`,
+            observaciones: `Saldo usado en OV-${id_orden_venta}`,
+          },
+          connection,
+        );
+      }
+
       // Si el método resuelto corresponde a 'credito', crear crédito y actualizar id_metodo_pago a 4
       const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
       if (
@@ -222,29 +278,31 @@ module.exports = {
         creditoMetodoId &&
         Number(resolvedMetodoId) === Number(creditoMetodoId)
       ) {
-        await ventasCreditoModel.crearVentaCredito(
-          {
-            id_orden_venta,
-            id_cliente,
-            monto_total: totalVenta,
-            saldo_pendiente: totalVenta,
-            estado: "pendiente",
-            observaciones: observaciones_pago || null,
-          },
-          connection,
-        );
+        if (montoPagoReal > 0) {
+          await ventasCreditoModel.crearVentaCredito(
+            {
+              id_orden_venta,
+              id_cliente,
+              monto_total: montoPagoReal,
+              saldo_pendiente: montoPagoReal,
+              estado: "pendiente",
+              observaciones: observaciones_pago || null,
+            },
+            connection,
+          );
+        }
         // Forzar id_metodo_pago a 4 (CREDITO)
         await ordenModel.update(
           id_orden_venta,
           { id_metodo_pago: creditoMetodoId },
           connection,
         );
-      } else {
-        // Movimiento real en tesorería
+      } else if (montoPagoReal > 0) {
+        // Movimiento real en tesorería (monto restante después de saldo)
         const movimientoData = {
           id_documento: id_orden_venta,
           tipo_documento: "orden_venta",
-          monto: totalVenta,
+          monto: montoPagoReal,
           id_metodo_pago: resolvedMetodoId,
           referencia,
           observaciones: observaciones_pago,
@@ -293,7 +351,10 @@ module.exports = {
         id_metodo_pago,
         referencia,
         observaciones_pago,
+        monto_saldo_favor: montoSaldoFavorRaw,
       } = req.body;
+
+      const montoSaldoFavor = Math.max(0, Number(montoSaldoFavorRaw) || 0);
 
       connection = await db.getConnection();
       await connection.beginTransaction();
@@ -372,6 +433,70 @@ module.exports = {
         ? detalles.reduce((sum, d) => sum + d.cantidad * d.precio_unitario, 0)
         : ordenActual.total;
 
+      // ── Manejar cambio en saldo a favor ──
+      const saldoUsadoActual = Math.max(0, Number(ordenActual.total) - Number(ordenActual.monto));
+      const nuevoMonto = Math.max(0, nuevoTotal - montoSaldoFavor);
+      const clienteCambio = Number(id_cliente) !== Number(ordenActual.id_cliente);
+
+      if (montoSaldoFavor !== saldoUsadoActual || clienteCambio) {
+        if (saldoUsadoActual > 0) {
+          // Revertir saldo anterior al cliente original
+          await clienteModel.incrementarSaldoFavor(
+            ordenActual.id_cliente,
+            saldoUsadoActual,
+            connection,
+          );
+          await tesoreriaModel.deleteByDocumentoAndTipo(
+            id,
+            "saldo_favor_usado",
+            connection,
+          );
+        }
+        if (montoSaldoFavor > 0) {
+          // Validar saldo suficiente en el nuevo cliente
+          const saldoActualCliente = await clienteModel.getSaldoFavor(
+            id_cliente,
+            connection,
+          );
+          if (saldoActualCliente < montoSaldoFavor) {
+            throw new Error(
+              `El cliente no tiene suficiente saldo a favor. Disponible: ${saldoActualCliente}, solicitado: ${montoSaldoFavor}`,
+            );
+          }
+          // Aplicar nuevo saldo al nuevo cliente
+          await clienteModel.decrementarSaldoFavor(
+            id_cliente,
+            montoSaldoFavor,
+            connection,
+          );
+          // Buscar método de pago del último abono a saldo a favor del cliente
+          const [ultimoAbonoUpd] = await connection.query(
+            `SELECT id_metodo_pago FROM movimientos_tesoreria
+             WHERE tipo_documento = 'saldo_favor'
+               AND id_documento = ?
+             ORDER BY fecha_movimiento DESC
+             LIMIT 1`,
+            [id_cliente],
+          );
+          let metodoSaldoUpd = ultimoAbonoUpd[0]?.id_metodo_pago || id_metodo_pago || ordenActual.id_metodo_pago;
+          if (!metodoSaldoUpd) {
+            const [mp] = await connection.query("SELECT id_metodo_pago FROM metodos_pago ORDER BY id_metodo_pago ASC LIMIT 1");
+            metodoSaldoUpd = mp[0]?.id_metodo_pago;
+          }
+          await tesoreriaModel.insertarMovimiento(
+            {
+              id_documento: id,
+              tipo_documento: "saldo_favor_usado",
+              monto: -Math.abs(montoSaldoFavor),
+              id_metodo_pago: metodoSaldoUpd,
+              referencia: `OV-${id}`,
+              observaciones: `Saldo usado en OV-${id}`,
+            },
+            connection,
+          );
+        }
+      }
+
       console.log("Actualizando orden de venta:", {
         id,
         id_cliente,
@@ -386,21 +511,50 @@ module.exports = {
           id_cliente,
           estado,
           total: nuevoTotal,
+          monto: nuevoMonto,
         },
         connection,
       );
 
       console.log("Filas actualizadas:", updatedRows);
 
-      // Actualizar movimiento de tesorería si se proporcionan datos de pago
-      if (id_metodo_pago && ordenActual.id_movimiento_tesoreria) {
-        await tesoreriaModel.actualizarMovimiento(
-          ordenActual.id_movimiento_tesoreria,
+      // ── Actualizar movimiento de tesorería ──
+      const [movTes] = await connection.query(
+        `SELECT id_movimiento, monto FROM movimientos_tesoreria
+         WHERE id_documento = ? AND tipo_documento = 'orden_venta'
+         LIMIT 1`,
+        [id],
+      );
+      const movimientoOV = movTes[0] || null;
+
+      if (movimientoOV) {
+        const montoMovActual = Number(movimientoOV.monto || 0);
+        const nuevoMontoMov = Number(nuevoMonto);
+        if (
+          montoMovActual !== nuevoMontoMov ||
+          (id_metodo_pago && Number(id_metodo_pago) !== Number(ordenActual.id_metodo_pago))
+        ) {
+          await tesoreriaModel.actualizarMovimiento(
+            movimientoOV.id_movimiento,
+            {
+              monto: nuevoMontoMov,
+              id_metodo_pago: id_metodo_pago || undefined,
+              referencia: referencia || null,
+              observaciones: observaciones_pago || null,
+            },
+            connection,
+          );
+        }
+      } else if (id_metodo_pago && Number(nuevoMonto) > 0) {
+        await tesoreriaModel.insertarMovimiento(
           {
-            monto: nuevoTotal,
+            id_documento: id,
+            tipo_documento: "orden_venta",
+            monto: Number(nuevoMonto),
             id_metodo_pago,
             referencia: referencia || null,
             observaciones: observaciones_pago || null,
+            fecha_movimiento: null,
           },
           connection,
         );
@@ -410,13 +564,47 @@ module.exports = {
         throw new Error("No se pudo actualizar la orden de venta.");
       }
 
-      // Reparar y actualizar crédito asociado: recalcular estado y saldo según abonos, siempre
+      // ── Manejar crédito: transiciones entre crédito y contado ──
       const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
-      if (
-        (ordenActual.id_metodo_pago &&
-          Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId)) ||
-        (id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId))
-      ) {
+      const eraCredito = Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId);
+      const esCredito = id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId);
+
+      // Si era crédito y ya no → eliminar crédito y crear movimiento tesorería
+      if (eraCredito && !esCredito) {
+        await connection.query(
+          `DELETE FROM ventas_credito WHERE id_orden_venta = ?`,
+          [id],
+        );
+        if (Number(nuevoMonto) > 0 && id_metodo_pago) {
+          await tesoreriaModel.insertarMovimiento(
+            {
+              id_documento: id,
+              tipo_documento: "orden_venta",
+              monto: Number(nuevoMonto),
+              id_metodo_pago,
+              referencia: referencia || null,
+              observaciones: observaciones_pago || null,
+              fecha_movimiento: null,
+            },
+            connection,
+          );
+        }
+      } else if (!eraCredito && esCredito) {
+        // No era crédito y ahora sí → eliminar movimiento tesorería, crear crédito
+        await tesoreriaModel.deleteByDocumentoAndTipo(id, "orden_venta", connection);
+        await ventasCreditoModel.crearVentaCredito(
+          {
+            id_orden_venta: id,
+            id_cliente,
+            monto_total: nuevoTotal,
+            saldo_pendiente: nuevoTotal,
+            estado: "pendiente",
+            observaciones: observaciones_pago || null,
+          },
+          connection,
+        );
+      } else if (esCredito) {
+        // Ambos son crédito → actualizar crédito existente
         const credito = await ventasCreditoModel.getByOrdenVentaId(
           id,
           connection,
@@ -502,6 +690,22 @@ module.exports = {
         );
         console.log(
           `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`,
+        );
+      }
+
+      // Revertir saldo a favor si se usó
+      if (Number(orden.monto) < Number(orden.total)) {
+        const montoSaldoUsado = Number(orden.total) - Number(orden.monto);
+        await clienteModel.incrementarSaldoFavor(
+          orden.id_cliente,
+          montoSaldoUsado,
+          connection,
+        );
+        // Eliminar movimiento de tesorería del saldo usado
+        await tesoreriaModel.deleteByDocumentoAndTipo(
+          id,
+          "saldo_favor_usado",
+          connection,
         );
       }
 

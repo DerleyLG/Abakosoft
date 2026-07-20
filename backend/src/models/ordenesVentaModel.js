@@ -110,7 +110,9 @@ module.exports = {
         ov.estado,
         mp.nombre,
         vc.estado,
-        vc.saldo_pendiente
+        vc.saldo_pendiente,
+        ov.monto,
+        ov.total
     `;
 
     const [rows] = await db.query(
@@ -125,6 +127,7 @@ module.exports = {
         mp.nombre AS metodo_pago,
         vc.estado AS estado_credito,
         vc.saldo_pendiente,
+        ov.monto AS monto_neto,
         SUM(dov.cantidad * dov.precio_unitario) AS monto_total
        ${base}
        ORDER BY ${sortCol} ${dir}
@@ -184,7 +187,7 @@ module.exports = {
 
   update: async (
     id,
-    { id_cliente, estado, id_pedido, total, id_metodo_pago },
+    { id_cliente, estado, id_pedido, total, monto, id_metodo_pago },
     connection = db,
   ) => {
     const [result] = await (connection || db).query(
@@ -193,9 +196,10 @@ module.exports = {
            estado = COALESCE(?, estado), 
            id_pedido = COALESCE(?, id_pedido),
            total = COALESCE(?, total),
+           monto = COALESCE(?, monto),
            id_metodo_pago = COALESCE(?, id_metodo_pago)
        WHERE id_orden_venta = ?`,
-      [id_cliente, estado, id_pedido, total, id_metodo_pago, id],
+      [id_cliente, estado, id_pedido, total, monto, id_metodo_pago, id],
     );
     return result.affectedRows;
   },

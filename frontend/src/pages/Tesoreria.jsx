@@ -81,6 +81,13 @@ const TesoreriaDashboard = () => {
     transferenciasEgresoEfectivo: 0,
     transferenciasIngresoTransferencia: 0,
     transferenciasEgresoTransferencia: 0,
+    ventasReparacionesEfectivo: 0,
+    ventasReparacionesTransferencia: 0,
+    totalSaldoUsado: 0,
+    saldoFavorEfectivo: 0,
+    saldoFavorTransferencia: 0,
+    saldoUsadoEfectivo: 0,
+    saldoUsadoTransferencia: 0,
   });
 
   const [egresosSummary, setEgresosSummary] = useState({
@@ -112,109 +119,6 @@ const TesoreriaDashboard = () => {
       if (!isNaN(dt)) return dt;
     } catch (_) {}
     return null;
-  };
-
-  const calcularResumenFinanciero = (movs, metodos) => {
-    const resumen = {
-      fecha_inicio_periodo: null,
-      id_cierre: null,
-      saldoInicialEfectivo: 0,
-      saldoInicialTransferencia: 0,
-      totalCompras: 0,
-      totalVentas: 0,
-      ventasEfectivo: 0,
-      ventasTransferencia: 0,
-      comprasEfectivo: 0,
-      comprasTransferencia: 0,
-      costosEfectivo: 0,
-      costosTransferencia: 0,
-      pagosEfectivo: 0,
-      pagosTransferencia: 0,
-      anticiposEfectivo: 0,
-      anticiposTransferencia: 0,
-      abonosEfectivo: 0,
-      abonosTransferencia: 0,
-      transferenciasIngresoEfectivo: 0,
-      transferenciasEgresoEfectivo: 0,
-      transferenciasIngresoTransferencia: 0,
-      transferenciasEgresoTransferencia: 0,
-    };
-
-    const efectivoId = metodos.find((m) =>
-      m.nombre.toLowerCase().includes("efectivo"),
-    )?.id_metodo_pago;
-    const transferenciaId = metodos.find((m) =>
-      m.nombre.toLowerCase().includes("transferencia"),
-    )?.id_metodo_pago;
-
-    movs.forEach((mov) => {
-      const tipo = getTipoMovimiento(mov);
-      const monto = Number(mov.monto) || 0;
-      const montoAbsoluto = Math.abs(monto);
-
-      // Manejar transferencias entre métodos (NO son ventas ni compras)
-      if (tipo === "transferencia_fondos") {
-        if (mov.id_metodo_pago === efectivoId) {
-          if (monto > 0) {
-            resumen.transferenciasIngresoEfectivo += monto;
-          } else {
-            resumen.transferenciasEgresoEfectivo += montoAbsoluto;
-          }
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          if (monto > 0) {
-            resumen.transferenciasIngresoTransferencia += monto;
-          } else {
-            resumen.transferenciasEgresoTransferencia += montoAbsoluto;
-          }
-        }
-        return; // No continuar procesando este movimiento
-      }
-
-      if (tipo === "venta") {
-        resumen.totalVentas += montoAbsoluto;
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.ventasEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.ventasTransferencia += montoAbsoluto;
-        }
-      } else if (tipo === "compra") {
-        resumen.totalCompras += montoAbsoluto;
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.comprasEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.comprasTransferencia += montoAbsoluto;
-        }
-      } else if (tipo === "costo_indirecto") {
-        // Costos indirectos como egresos (NO se suman a compras, solo a costos)
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.costosEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.costosTransferencia += montoAbsoluto;
-        }
-      } else if (tipo === "pago_trabajador") {
-        // Pagos a trabajadores como egresos
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.pagosEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.pagosTransferencia += montoAbsoluto;
-        }
-      } else if (tipo === "anticipo") {
-        // Anticipos como egresos
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.anticiposEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.anticiposTransferencia += montoAbsoluto;
-        }
-      } else if (tipo === "abono_credito") {
-        // Abonos de crédito como ingresos (NO se suman a ventas, solo a abonos)
-        if (mov.id_metodo_pago === efectivoId) {
-          resumen.abonosEfectivo += montoAbsoluto;
-        } else if (mov.id_metodo_pago === transferenciaId) {
-          resumen.abonosTransferencia += montoAbsoluto;
-        }
-      }
-    });
-    return resumen;
   };
 
   useEffect(() => {
@@ -274,7 +178,13 @@ const TesoreriaDashboard = () => {
           anticiposCount: anticiposCountRes.data.count,
         });
 
-        setResumenFinanciero(resumenTarjetasRes.data);
+        setResumenFinanciero({
+          ...resumenTarjetasRes.data,
+          saldoInicialEfectivo:
+            resumenTarjetasRes.data?.saldoInicialEfectivo ?? 0,
+          saldoInicialTransferencia:
+            resumenTarjetasRes.data?.saldoInicialTransferencia ?? 0,
+        });
       } catch (err) {
         setError("Error al cargar los datos de tesorería.");
         console.error(err);
@@ -306,6 +216,7 @@ const TesoreriaDashboard = () => {
   };
 
   const getMetodoNombre = (id) => {
+    if (!id) return "No aplica";
     const metodo = metodosPago.find((m) => m.id_metodo_pago === id);
     return metodo ? metodo.nombre : "Desconocido";
   };
@@ -317,6 +228,10 @@ const TesoreriaDashboard = () => {
       if (tipoLower.includes("compra")) return "compra";
       if (tipoLower === "abono_credito" || tipoLower.includes("abono"))
         return "abono_credito";
+      if (tipoLower === "reparacion" || tipoLower.includes("reparacion"))
+        return "reparacion";
+      if (tipoLower === "saldo_favor_usado") return "saldo_favor_usado";
+      if (tipoLower === "saldo_favor") return "saldo_favor";
       if (tipoLower === "costo_indirecto" || tipoLower.includes("costo"))
         return "costo_indirecto";
       if (tipoLower === "pago_trabajador" || tipoLower.includes("pago"))
@@ -342,6 +257,9 @@ const TesoreriaDashboard = () => {
     if (tipo === "orden_venta") return `OV-${mov.id_documento}`;
     if (tipo === "abono_credito") return `OV-${mov.id_documento} (Abono)`;
     if (tipo === "orden_compra") return `OC-${mov.id_documento}`;
+    if (tipo === "reparacion") return `RP-${mov.id_documento}`;
+    if (tipo === "saldo_favor_usado" || tipo === "saldo_favor")
+      return `SF-${mov.id_documento}`;
     if (tipo === "reversion_orden_compra")
       return `OC-${mov.id_documento} (Rev.)`;
     if (tipo === "cancelacion_orden_compra")
@@ -452,7 +370,13 @@ const TesoreriaDashboard = () => {
         return b.id_movimiento - a.id_movimiento;
       });
       setMovimientos(movimientosOrdenados2);
-      setResumenFinanciero(resumenTarjetasRes.data);
+      setResumenFinanciero({
+        ...resumenTarjetasRes.data,
+        saldoInicialEfectivo:
+          resumenTarjetasRes.data?.saldoInicialEfectivo ?? 0,
+        saldoInicialTransferencia:
+          resumenTarjetasRes.data?.saldoInicialTransferencia ?? 0,
+      });
     } catch (error) {
       toast.dismiss(loadingToast);
       console.error("Error en transferencia:", error);
@@ -484,22 +408,26 @@ const TesoreriaDashboard = () => {
   const balanceEfectivo =
     (Number(resumenFinanciero.saldoInicialEfectivo) || 0) +
     resumenFinanciero.ventasEfectivo +
+    resumenFinanciero.saldoFavorEfectivo +
     resumenFinanciero.abonosEfectivo +
     resumenFinanciero.transferenciasIngresoEfectivo -
     resumenFinanciero.comprasEfectivo -
     resumenFinanciero.costosEfectivo -
     resumenFinanciero.pagosEfectivo -
     resumenFinanciero.anticiposEfectivo -
+    resumenFinanciero.saldoUsadoEfectivo -
     resumenFinanciero.transferenciasEgresoEfectivo;
   const balanceTransferencia =
     (Number(resumenFinanciero.saldoInicialTransferencia) || 0) +
     resumenFinanciero.ventasTransferencia +
+    resumenFinanciero.saldoFavorTransferencia +
     resumenFinanciero.abonosTransferencia +
     resumenFinanciero.transferenciasIngresoTransferencia -
     resumenFinanciero.comprasTransferencia -
     resumenFinanciero.costosTransferencia -
     resumenFinanciero.pagosTransferencia -
     resumenFinanciero.anticiposTransferencia -
+    resumenFinanciero.saldoUsadoTransferencia -
     resumenFinanciero.transferenciasEgresoTransferencia;
   const efectivoClass =
     balanceEfectivo >= 0 ? "text-green-600" : "text-red-600";
@@ -618,7 +546,21 @@ const TesoreriaDashboard = () => {
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500">Ventas</span>
                   <span className="text-xs font-semibold text-emerald-700">
-                    {formatCurrency(resumenFinanciero.ventasEfectivo)}
+                    {formatCurrency(
+                      Math.max(
+                        0,
+                        (resumenFinanciero.ventasEfectivo || 0) -
+                          (resumenFinanciero.ventasReparacionesEfectivo || 0),
+                      ),
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Reparaciones</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(
+                      resumenFinanciero.ventasReparacionesEfectivo || 0,
+                    )}
                   </span>
                 </div>
                 {features.includes("creditos") && (
@@ -631,18 +573,12 @@ const TesoreriaDashboard = () => {
                     </span>
                   </div>
                 )}
-                {resumenFinanciero.transferenciasIngresoEfectivo > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Transf. entrada
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-700">
-                      {formatCurrency(
-                        resumenFinanciero.transferenciasIngresoEfectivo,
-                      )}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo a favor</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(resumenFinanciero.saldoFavorEfectivo || 0)}
+                  </span>
+                </div>
               </div>
             </div>
             <div>
@@ -682,19 +618,12 @@ const TesoreriaDashboard = () => {
                     </span>
                   </div>
                 )}
-                {resumenFinanciero.transferenciasEgresoEfectivo > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Transf. salida
-                    </span>
-                    <span className="text-xs font-semibold text-rose-600">
-                      -
-                      {formatCurrency(
-                        resumenFinanciero.transferenciasEgresoEfectivo,
-                      )}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo usado</span>
+                  <span className="text-xs font-semibold text-rose-600">
+                    -{formatCurrency(resumenFinanciero.saldoUsadoEfectivo || 0)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -742,7 +671,22 @@ const TesoreriaDashboard = () => {
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500">Ventas</span>
                   <span className="text-xs font-semibold text-emerald-700">
-                    {formatCurrency(resumenFinanciero.ventasTransferencia)}
+                    {formatCurrency(
+                      Math.max(
+                        0,
+                        (resumenFinanciero.ventasTransferencia || 0) -
+                          (resumenFinanciero.ventasReparacionesTransferencia ||
+                            0),
+                      ),
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Reparaciones</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(
+                      resumenFinanciero.ventasReparacionesTransferencia || 0,
+                    )}
                   </span>
                 </div>
                 {features.includes("creditos") && (
@@ -755,18 +699,14 @@ const TesoreriaDashboard = () => {
                     </span>
                   </div>
                 )}
-                {resumenFinanciero.transferenciasIngresoTransferencia > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Transf. entrada
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-700">
-                      {formatCurrency(
-                        resumenFinanciero.transferenciasIngresoTransferencia,
-                      )}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo a favor</span>
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatCurrency(
+                      resumenFinanciero.saldoFavorTransferencia || 0,
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
             <div>
@@ -807,19 +747,15 @@ const TesoreriaDashboard = () => {
                     </span>
                   </div>
                 )}
-                {resumenFinanciero.transferenciasEgresoTransferencia > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Transf. salida
-                    </span>
-                    <span className="text-xs font-semibold text-rose-600">
-                      -
-                      {formatCurrency(
-                        resumenFinanciero.transferenciasEgresoTransferencia,
-                      )}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500">Saldo usado</span>
+                  <span className="text-xs font-semibold text-rose-600">
+                    -
+                    {formatCurrency(
+                      resumenFinanciero.saldoUsadoTransferencia || 0,
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -849,6 +785,8 @@ const TesoreriaDashboard = () => {
             >
               <option value="todos">Todos los tipos</option>
               <option value="venta">Venta</option>
+              <option value="reparacion">Reparación</option>
+              <option value="saldo_favor_usado">Saldo a favor</option>
               <option value="compra">Compra</option>
               {features.includes("costos") && (
                 <option value="costo_indirecto">Costo Indirecto</option>
@@ -944,22 +882,28 @@ const TesoreriaDashboard = () => {
                   const badgeClass =
                     tipo === "venta"
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : td === "reversion_orden_compra" ||
-                          td === "cancelacion_orden_compra"
+                      : td === "reparacion"
                         ? "bg-amber-50 text-amber-700 border border-amber-200"
-                        : tipo === "compra"
+                        : td === "saldo_favor_usado"
                           ? "bg-rose-50 text-rose-700 border border-rose-200"
-                          : tipo === "costo_indirecto"
-                            ? "bg-orange-50 text-orange-700 border border-orange-200"
-                            : tipo === "pago_trabajador"
-                              ? "bg-violet-50 text-violet-700 border border-violet-200"
-                              : tipo === "anticipo"
-                                ? "bg-sky-50 text-sky-700 border border-sky-200"
-                                : tipo === "abono_credito"
-                                  ? "bg-teal-50 text-teal-700 border border-teal-200"
-                                  : tipo === "transferencia_fondos"
-                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                                    : "bg-slate-50 text-slate-600 border border-slate-200";
+                          : td === "saldo_favor"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : td === "reversion_orden_compra" ||
+                                td === "cancelacion_orden_compra"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : tipo === "compra"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : tipo === "costo_indirecto"
+                                  ? "bg-orange-50 text-orange-700 border border-orange-200"
+                                  : tipo === "pago_trabajador"
+                                    ? "bg-violet-50 text-violet-700 border border-violet-200"
+                                    : tipo === "anticipo"
+                                      ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                      : tipo === "abono_credito"
+                                        ? "bg-teal-50 text-teal-700 border border-teal-200"
+                                        : tipo === "transferencia_fondos"
+                                          ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                          : "bg-slate-50 text-slate-600 border border-slate-200";
 
                   const tipoLabel =
                     td === "orden_venta"
@@ -968,20 +912,26 @@ const TesoreriaDashboard = () => {
                         ? "Abono"
                         : td === "orden_compra"
                           ? "Compra"
-                          : td === "reversion_orden_compra"
-                            ? "Reversión OC"
-                            : td === "cancelacion_orden_compra"
-                              ? "Cancelación OC"
-                              : td === "pago_trabajador"
-                                ? "Pago Trabajador"
-                                : td === "anticipo"
-                                  ? "Anticipo"
-                                  : td === "costo_indirecto"
-                                    ? "Costo Indirecto"
-                                    : td === "transferencia_fondos"
-                                      ? "Transferencia"
-                                      : tipo.charAt(0).toUpperCase() +
-                                        tipo.slice(1).replace(/_/g, " ");
+                          : td === "reparacion"
+                            ? "Reparación"
+                            : td === "reversion_orden_compra"
+                              ? "Reversión OC"
+                              : td === "cancelacion_orden_compra"
+                                ? "Cancelación OC"
+                                : td === "pago_trabajador"
+                                  ? "Pago Trabajador"
+                                  : td === "anticipo"
+                                    ? "Anticipo"
+                                    : td === "saldo_favor_usado"
+                                      ? "Saldo usado"
+                                      : td === "saldo_favor"
+                                        ? "Saldo a favor"
+                                        : td === "costo_indirecto"
+                                          ? "Costo Indirecto"
+                                          : td === "transferencia_fondos"
+                                            ? "Transferencia"
+                                            : tipo.charAt(0).toUpperCase() +
+                                              tipo.slice(1).replace(/_/g, " ");
 
                   return (
                     <tr
@@ -995,7 +945,28 @@ const TesoreriaDashboard = () => {
                           {tipoLabel}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-700">
+                      <td
+                        className="px-4 py-3 text-sm font-semibold text-slate-700 cursor-default"
+                        onMouseEnter={(e) => {
+                          const labelMap = {
+                            venta: "Orden de Venta",
+                            reparacion: "Reparación",
+                            compra: "Orden de Compra",
+                            pago_trabajador: "Pago Trabajador",
+                            anticipo: "Anticipo",
+                            costo_indirecto: "Costo Indirecto",
+                            transferencia_fondos: "Transferencia",
+                            saldo_favor: "Saldo a Favor",
+                            saldo_favor_usado: "Saldo usado",
+                            abono_credito: "Abono a Crédito",
+                            devolucion_cliente: "Devolución",
+                          };
+                          const docLabel = labelMap[tipo] || "Documento";
+                          showTooltip(e, `${docLabel} #${mov.id_documento || ""}`);
+                        }}
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                      >
                         {idRef}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-500">
@@ -1014,7 +985,7 @@ const TesoreriaDashboard = () => {
                       </td>
                       <td
                         className="px-4 py-3 text-sm text-slate-500 max-w-[150px] truncate cursor-default"
-                        onMouseEnter={(e) => showTooltip(e, mov.referencia)}
+                        onMouseEnter={(e) => showTooltip(e, `${getIdReferencia(mov)} — ${mov.observaciones || mov.referencia || ""}`)}
                         onMouseMove={moveTooltip}
                         onMouseLeave={hideTooltip}
                       >

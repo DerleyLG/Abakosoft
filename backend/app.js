@@ -51,6 +51,9 @@ const consumoMateriaPrimaRoutes = require("./src/routes/consumoMateriaPrimaRoute
 const unidadesRoutes = require("./src/routes/unidadesRoutes.js");
 const plansRoutes = require("./src/routes/plansRoutes");
 const saasRoutes = require("./src/routes/saasRoutes.js");
+const devolucionesVentas = require("./src/routes/devolucionesVentaRoutes.js");
+const reparacionesRoutes = require("./src/routes/reparacionesRoutes");
+const saldoFavorRoutes = require("./src/routes/saldoFavorRoutes");
 const {
   ensureSaasAuthSchema,
   purgeStaleRefreshSessions,
@@ -183,6 +186,12 @@ app.use("/api/seguimiento-articulo", seguimientoArticuloRoutes);
 app.use("/api/consumos-materia-prima", consumoMateriaPrimaRoutes);
 app.use("/api/unidades", unidadesRoutes);
 
+app.use("/api/devoluciones", devolucionesVentas);
+app.use("/api/devoluciones-ventas", devolucionesVentas);
+app.use("/api/reparaciones", reparacionesRoutes);
+app.use("/api/clientes/saldo-favor", saldoFavorRoutes);
+app.use("/api/saldo-favor", saldoFavorRoutes);
+
 // Panel de administración SaaS (gestión de empresas, planes, admins)
 app.use("/api/saas", saasRoutes);
 
@@ -220,10 +229,6 @@ const startServer = async () => {
       runSaasRefreshCleanup,
       saasRefreshCleanupMs,
     );
-    if (typeof saasRefreshCleanupTimer.unref === "function") {
-      saasRefreshCleanupTimer.unref();
-    }
-
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
     });

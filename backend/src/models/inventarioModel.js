@@ -16,6 +16,7 @@ const TIPOS_ORIGEN_MOVIMIENTO = {
   ANULACION_COMPRA: "anulacion_compra", // Reversión de stock por cancelación de orden de compra
   DEVOLUCION_CLIENTE: "devolucion_cliente", // Cuando un cliente devuelve físicamente un producto
   DEVOLUCION_PROVEEDOR: "devolucion_proveedor", // Cuando se devuelve físicamente stock a un proveedor
+  REPARACION: "reparacion", // Movimiento por orden de reparación
 };
 
 module.exports = {
@@ -47,6 +48,7 @@ module.exports = {
                 i.stock AS stock_disponible,
                 i.stock_fabricado,
                 i.stock_minimo,
+                COALESCE(i.stock_reparacion, 0) AS stock_reparacion,
                 i.ultima_actualizacion,
                 COALESCE(dof_agg.total_solicitado, 0) - COALESCE(lf_agg.total_fabricado, 0) AS stock_en_proceso
             FROM
@@ -137,6 +139,7 @@ module.exports = {
                 i.stock AS stock_disponible,
                 COALESCE(i.stock_fabricado, 0) AS stock_fabricado,
                 COALESCE(i.stock_minimo, 0) AS stock_minimo,
+                COALESCE(i.stock_reparacion, 0) AS stock_reparacion,
                 i.ultima_actualizacion,
                 COALESCE(dof_agg.total_solicitado, 0) - COALESCE(lf_agg.total_fabricado, 0) AS stock_en_proceso
             FROM inventario i
@@ -215,7 +218,7 @@ module.exports = {
     return result.affectedRows > 0;
   },
 
-  processInventoryMovement: async (data) => {
+  processInventoryMovement: async (data, connection = null) => {
     const id_articulo = data.id_articulo || data.id;
 
     let {
@@ -231,8 +234,14 @@ module.exports = {
     // Forzar cantidad_movida a número
     cantidad_movida = Number(cantidad_movida);
 
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
+    // Si no se proporciona connection, crear una nueva
+    const conn = connection || (await db.getConnection());
+    const isOwnConnection = !connection; // Bandera para saber si debemos hacer commit/release
+
+    // Solo hacer beginTransaction si creamos la conexión nosotros
+    if (isOwnConnection) {
+      await conn.beginTransaction();
+    }
 
     try {
       console.log(`[processInventoryMovement] Objeto 'data' recibido:`, data);
@@ -246,7 +255,7 @@ module.exports = {
         );
       }
 
-      let inventarioExistente = await connection.query(
+      let inventarioExistente = await conn.query(
         "SELECT * FROM inventario WHERE id_articulo = ? FOR UPDATE",
         [id_articulo],
       );
@@ -303,7 +312,7 @@ module.exports = {
             ? stock_minimo_inicial
             : currentStockMinimo;
 
-        await connection.query(
+        await conn.query(
           `UPDATE inventario SET stock = ?, stock_fabricado = ?, stock_minimo = ?, ultima_actualizacion = ? WHERE id_articulo = ?`,
           [
             nuevoStockDisponible,
@@ -315,29 +324,41 @@ module.exports = {
         );
       } else {
         console.log(
-          `[processInventoryMovement] Artículo ${id_articulo} NO encontrado en inventario. Origen: ${tipo_origen_movimiento}`,
+          `[processInventoryMovement] Artículo ${id_articulo} NO encontrado en inventario. Origen: ${tipo_origen_movimiento}. Creando registro con stock 0.`,
         );
-        if (tipo_origen_movimiento !== TIPOS_ORIGEN_MOVIMIENTO.INICIAL) {
-          throw new Error(
-            `Artículo ${id_articulo} no encontrado en inventario. Debe ser ingresado inicialmente con tipo_origen_movimiento 'inicial'.`,
+
+        // Si no existe, lo creamos con stock 0 para permitir el movimiento
+        const stockInicial = 0;
+        await conn.query(
+          `INSERT INTO inventario (id_articulo, stock, stock_fabricado, stock_reparacion, stock_minimo, ultima_actualizacion) VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            id_articulo,
+            tipo_movimiento === TIPOS_MOVIMIENTO.ENTRADA
+              ? cantidad_movida
+              : stockInicial,
+            0,
+            0,
+            stock_minimo_inicial || 0,
+            now,
+          ],
+        );
+        console.log(
+          `Artículo ${id_articulo} insertado en inventario con stock 0.`,
+        );
+
+        // Ajustar stock según el movimiento
+        if (tipo_movimiento === TIPOS_MOVIMIENTO.ENTRADA) {
+          // Ya se insertó con cantidad_movida, no hay que hacer nada extra
+        } else if (tipo_movimiento === TIPOS_MOVIMIENTO.SALIDA) {
+          // Permitir stock negativo
+          await conn.query(
+            `UPDATE inventario SET stock = ? WHERE id_articulo = ?`,
+            [0 - cantidad_movida, id_articulo],
           );
         }
-        if (stock_minimo_inicial === null) {
-          throw new Error(
-            `Se requiere stock_minimo_inicial para el ingreso inicial del artículo ${id_articulo}.`,
-          );
-        }
-        // Al crear un nuevo registro de inventario, stock_fabricado se inicializa con 0
-        // y solo se incrementará con movimientos de tipo 'produccion'.
-        // El 'stock' inicial (stock_disponible) será la cantidad_movida.
-        await connection.query(
-          `INSERT INTO inventario (id_articulo, stock, stock_fabricado, stock_minimo, ultima_actualizacion) VALUES (?, ?, ?, ?, ?)`,
-          [id_articulo, cantidad_movida, 0, stock_minimo_inicial, now], // stock_fabricado se inicializa en 0 aquí
-        );
-        console.log(`Artículo ${id_articulo} insertado en inventario.`);
       }
 
-      const [movimientoResult] = await connection.query(
+      const [movimientoResult] = await conn.query(
         `INSERT INTO movimientos_inventario (id_articulo, cantidad_movida, tipo_movimiento, tipo_origen_movimiento, observaciones, referencia_documento_id, referencia_documento_tipo, fecha_movimiento)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -355,8 +376,11 @@ module.exports = {
         `Movimiento ${movimientoResult.insertId} registrado para artículo ${id_articulo}.`,
       );
 
-      await connection.commit();
-      connection.release();
+      // Solo hacer commit y release si creamos la conexión internamente
+      if (isOwnConnection) {
+        await conn.commit();
+        conn.release();
+      }
 
       return {
         newStockDisponible: nuevoStockDisponible,
@@ -364,8 +388,11 @@ module.exports = {
         movimientoId: movimientoResult.insertId,
       };
     } catch (error) {
-      await connection.rollback();
-      connection.release();
+      // Solo hacer rollback y release si creamos la conexión internamente
+      if (isOwnConnection) {
+        await conn.rollback();
+        conn.release();
+      }
       console.error("Error en transacción de inventario:", error);
       throw error;
     }

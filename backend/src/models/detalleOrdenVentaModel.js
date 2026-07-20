@@ -4,7 +4,7 @@ module.exports = {
   // MODIFICADO: Acepta 'connection' opcional
   getAll: async (connection = db) => {
     const [rows] = await (connection || db).query(
-      "SELECT * FROM detalle_orden_venta"
+      "SELECT * FROM detalle_orden_venta",
     );
     return rows;
   },
@@ -12,11 +12,11 @@ module.exports = {
   // MODIFICADO: Acepta 'connection' opcional
   getByVenta: async (id_orden_venta, connection = db) => {
     const [rows] = await (connection || db).query(
-      `SELECT dov.*, a.descripcion
+      `SELECT dov.*, a.descripcion, a.referencia
        FROM detalle_orden_venta dov
        JOIN articulos a ON dov.id_articulo = a.id_articulo
        WHERE dov.id_orden_venta = ?`,
-      [id_orden_venta]
+      [id_orden_venta],
     );
     return rows;
   },
@@ -30,13 +30,13 @@ module.exports = {
       precio_unitario,
       observaciones = null,
     },
-    connection = db
+    connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `INSERT INTO detalle_orden_venta
        (id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones)
        VALUES (?, ?, ?, ?, ?)`,
-      [id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones]
+      [id_orden_venta, id_articulo, cantidad, precio_unitario, observaciones],
     );
     return result.insertId;
   },
@@ -51,7 +51,7 @@ module.exports = {
       precio_unitario,
       observaciones = null,
     },
-    connection = db
+    connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `UPDATE detalle_orden_venta
@@ -64,7 +64,7 @@ module.exports = {
         precio_unitario,
         observaciones,
         id,
-      ]
+      ],
     );
     return result.affectedRows;
   },
@@ -73,7 +73,7 @@ module.exports = {
   delete: async (id, connection = db) => {
     const [result] = await (connection || db).query(
       "DELETE FROM detalle_orden_venta WHERE id_detalle_venta = ?",
-      [id]
+      [id],
     );
     return result.affectedRows;
   },
@@ -82,8 +82,21 @@ module.exports = {
   deleteByVenta: async (id_orden_venta, connection = db) => {
     const [result] = await (connection || db).query(
       "DELETE FROM detalle_orden_venta WHERE id_orden_venta = ?",
-      [id_orden_venta]
+      [id_orden_venta],
     );
     return result.affectedRows;
+  },
+
+  // Obtener un artículo específico dentro de una orden de venta
+  getArticuloEnVenta: async (id_orden_venta, id_articulo, connection = db) => {
+    const [rows] = await (connection || db).query(
+      `SELECT dov.*, a.descripcion, a.referencia
+       FROM detalle_orden_venta dov
+       JOIN articulos a ON dov.id_articulo = a.id_articulo
+       WHERE dov.id_orden_venta = ? AND dov.id_articulo = ?
+       LIMIT 1`,
+      [id_orden_venta, id_articulo],
+    );
+    return rows[0];
   },
 };

@@ -9,6 +9,8 @@ import {
   FiSearch,
   FiShoppingCart,
   FiChevronDown,
+  FiPackage,
+  FiDollarSign,
 } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
@@ -18,6 +20,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
 import { usePlan } from "../hooks/usePlanApi";
+import SaldoFavorDrawer from "../components/SaldoFavorDrawer";
 
 const OrdenesVenta = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -32,12 +35,14 @@ const OrdenesVenta = () => {
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [drawerSaldoAbierto, setDrawerSaldoAbierto] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { features } = usePlan();
   const canCreate = can(user, ACTIONS.SALES_CREATE);
   const canEdit = can(user, ACTIONS.SALES_EDIT);
   const canDelete = can(user, ACTIONS.SALES_DELETE);
+  const canCreateReturn = can(user, ACTIONS.RETURNS_CREATE);
 
   useEffect(() => {
     const fetchOrdenes = async () => {
@@ -75,6 +80,15 @@ const OrdenesVenta = () => {
 
   const handleEdit = (id) => {
     navigate(`/ordenes_venta/editar/${id}`);
+  };
+
+  const handleCreateReturn = (orden) => {
+    navigate("/devoluciones/nueva", {
+      state: {
+        id_orden_venta: orden.id_orden_venta,
+        ventaPrevia: orden,
+      },
+    });
   };
 
   const handleDelete = (id) => {
@@ -206,12 +220,15 @@ const OrdenesVenta = () => {
               Nueva venta
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+          {can(user, ACTIONS.TREASURY_VIEW) && (
+            <button
+              onClick={() => setDrawerSaldoAbierto(true)}
+              className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              <FiDollarSign size={16} />
+              Saldo a favor
+            </button>
+          )}
           <div className="relative flex-1">
             <FiSearch
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -287,7 +304,11 @@ const OrdenesVenta = () => {
                     orden.estado_credito !== undefined;
                   const isCredito =
                     orden.metodo_pago === "credito" || tieneVentaCredito;
-                  const montoTotal = Number(orden.monto_total || 0);
+                  const montoTotal =
+                    orden.monto_neto &&
+                    Number(orden.monto_neto) !== Number(orden.monto_total || 0)
+                      ? Number(orden.monto_neto)
+                      : Number(orden.monto_total || 0);
                   const saldo = Number(orden.saldo_pendiente || 0);
                   let estadoDerivado = "pendiente";
                   if (saldo === 0) estadoDerivado = "pagado";
@@ -322,7 +343,12 @@ const OrdenesVenta = () => {
                             : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">
-                          ${montoTotal.toLocaleString()}
+                          $
+                          {(orden.monto_neto &&
+                          Number(orden.monto_neto) !== montoTotal
+                            ? Number(orden.monto_neto)
+                            : montoTotal
+                          ).toLocaleString()}
                         </td>
                         <td className="px-4 py-3">
                           {isCredito ? (
@@ -428,7 +454,7 @@ const OrdenesVenta = () => {
                                     orden.detalles.map((d, i) => (
                                       <tr
                                         key={i}
-                                        className="border-b border-slate-100 last:border-0"
+                                        className="border-b border-slate-100"
                                       >
                                         <td className="px-4 py-2 text-slate-700">
                                           {d.descripcion}
@@ -457,8 +483,67 @@ const OrdenesVenta = () => {
                                       </td>
                                     </tr>
                                   )}
+                                  {orden.monto_neto &&
+                                    Number(orden.monto_neto) !==
+                                      Number(orden.monto_total || 0) && (
+                                      <tr className="border-t border-slate-100 bg-emerald-50/40">
+                                        <td className="px-4 py-2 text-slate-600">
+                                          <span className="text-[11px] font-semibold text-red-700 uppercase tracking-wider">
+                                            Descuento de saldo a favor
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums text-slate-600 text-xs">
+                                          1
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums text-slate-600 text-xs font-semibold">
+                                          -$
+                                          {(
+                                            Number(orden.monto_total || 0) -
+                                            Number(orden.monto_neto)
+                                          ).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-red-700 text-xs">
+                                          -$
+                                          {(
+                                            Number(orden.monto_total || 0) -
+                                            Number(orden.monto_neto)
+                                          ).toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    )}
                                 </tbody>
+                                {orden.detalles?.length > 0 && (
+                                  <tfoot>
+                                    <tr className="border-t-2 border-slate-200 bg-slate-50">
+                                      <td
+                                        colSpan="3"
+                                        className="px-4 py-2 text-right text-xs font-bold text-slate-700"
+                                      >
+                                        Total
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-bold text-sm tabular-nums text-slate-800">
+                                        ${montoTotal.toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                )}
                               </table>
+                            </div>
+                            <div className="mt-2 flex justify-end">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/devoluciones/nueva`, {
+                                    state: {
+                                      id_orden_venta: orden.id_orden_venta,
+                                    },
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                              >
+                                <FiPackage size={13} />
+                                Crear devolución
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -532,6 +617,12 @@ const OrdenesVenta = () => {
           </div>
         </div>
       </div>
+
+      <SaldoFavorDrawer
+        isOpen={drawerSaldoAbierto}
+        onClose={() => setDrawerSaldoAbierto(false)}
+        onSuccess={() => setDrawerSaldoAbierto(false)}
+      />
     </div>
   );
 };

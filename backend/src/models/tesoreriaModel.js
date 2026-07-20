@@ -419,6 +419,13 @@ const TesoreriaModel = {
       transferenciasEgresoEfectivo: 0,
       transferenciasIngresoTransferencia: 0,
       transferenciasEgresoTransferencia: 0,
+      saldoFavorEfectivo: 0,
+      saldoFavorTransferencia: 0,
+      saldoUsadoEfectivo: 0,
+      saldoUsadoTransferencia: 0,
+      totalSaldoUsado: 0,
+      ventasReparacionesEfectivo: 0,
+      ventasReparacionesTransferencia: 0,
     };
 
     const tipoNormalizado = (tipoDocumento) => {
@@ -427,11 +434,13 @@ const TesoreriaModel = {
       if (tipo.includes("compra")) return "compra";
       if (tipo === "abono_credito" || tipo.includes("abono"))
         return "abono_credito";
+      if (tipo === "reparacion") return "reparacion";
       if (tipo === "costo_indirecto" || tipo.includes("costo"))
         return "costo_indirecto";
       if (tipo === "pago_trabajador" || tipo.includes("pago"))
         return "pago_trabajador";
       if (tipo === "anticipo" || tipo.includes("anticipo")) return "anticipo";
+      if (tipo === "saldo_favor_usado" || tipo === "saldo_favor") return tipo;
       if (tipo === "transferencia_fondos" || tipo.includes("transferencia"))
         return "transferencia_fondos";
       return "otro";
@@ -470,6 +479,17 @@ const TesoreriaModel = {
         return;
       }
 
+      if (tipo === "reparacion") {
+        if (esEfectivo(metodo)) {
+          resumen.ventasEfectivo += montoAbs;
+          resumen.ventasReparacionesEfectivo += montoAbs;
+        } else if (esTransferencia(metodo)) {
+          resumen.ventasTransferencia += montoAbs;
+          resumen.ventasReparacionesTransferencia += montoAbs;
+        }
+        return;
+      }
+
       if (tipo === "compra") {
         if (esEfectivo(metodo)) resumen.comprasEfectivo += montoAbs;
         else if (esTransferencia(metodo))
@@ -502,6 +522,22 @@ const TesoreriaModel = {
         if (esEfectivo(metodo)) resumen.abonosEfectivo += montoAbs;
         else if (esTransferencia(metodo))
           resumen.abonosTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "saldo_favor") {
+        if (esEfectivo(metodo)) resumen.saldoFavorEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.saldoFavorTransferencia += montoAbs;
+        return;
+      }
+
+      if (tipo === "saldo_favor_usado") {
+        resumen.totalSaldoUsado += montoAbs;
+        if (esEfectivo(metodo)) resumen.saldoUsadoEfectivo += montoAbs;
+        else if (esTransferencia(metodo))
+          resumen.saldoUsadoTransferencia += montoAbs;
+        return;
       }
     });
 

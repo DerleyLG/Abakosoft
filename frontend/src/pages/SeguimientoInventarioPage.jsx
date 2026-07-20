@@ -305,6 +305,12 @@ const SeguimientoInventarioPage = () => {
       case "reversion_orden_compra":
         prefijo = "Rev.OC";
         break;
+      case "anulacion_devolucion_cliente":
+        prefijo = "Dev. OV";
+        break;
+      case "cancelacion_orden_compra":
+        prefijo = "Anul. OC";
+        break;
       default:
         prefijo = mov.referencia_documento_tipo || "";
     }
@@ -579,7 +585,10 @@ const SeguimientoInventarioPage = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <FiCalendar size={14} className="text-slate-400" />
-                          <span className="text-slate-700 truncate max-w-[130px] block" title={formatDate(mov.fecha)}>
+                          <span
+                            className="text-slate-700 truncate max-w-[130px] block"
+                            title={formatDate(mov.fecha)}
+                          >
                             {formatDate(mov.fecha)}
                           </span>
                         </div>

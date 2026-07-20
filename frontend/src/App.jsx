@@ -84,6 +84,10 @@ import { SaasAuthProvider, useSaasAuth } from "./context/SaasAuthContext";
 import LandingPage from "./pages/LandingPage";
 import Planes from "./pages/Planes";
 import SuscripcionSuspendida from "./pages/SuscripcionSuspendida";
+import DevolucionesVenta from "./pages/DevolucionesVenta";
+import DevolucionForm from "./pages/DevolucionForm";
+import OrdenesReparacion from "./pages/OrdenesReparacion";
+import OrdenReparacionForm from "./pages/OrdenReparacionForm";
 
 const ProtectedSaasRoute = ({ children }) => {
   const { admin, loading } = useSaasAuth();
@@ -458,6 +462,43 @@ const AppLogic = () => {
             </RequirePermission>
           }
         />
+        <Route
+          path="devoluciones"
+          element={
+            <RequirePermission action={ACTIONS.RETURNS_VIEW}>
+              <DevolucionesVenta />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="devoluciones/nueva"
+          element={
+            <RequirePermission action={ACTIONS.RETURNS_CREATE}>
+              <PlanGuard feature="ventas">
+                <DevolucionForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+
+        {/* Órdenes de Reparación */}
+        <Route
+          path="reparaciones"
+          element={
+            <RequirePermission action={ACTIONS.REPAIRS_VIEW}>
+              <OrdenesReparacion />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="reparaciones/nueva"
+          element={
+            <RequirePermission action={ACTIONS.REPAIRS_CREATE}>
+              <OrdenReparacionForm />
+            </RequirePermission>
+          }
+        />
+
         <Route
           path="ordenes_pedido"
           element={

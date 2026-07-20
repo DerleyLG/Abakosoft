@@ -27,6 +27,7 @@ import {
 } from "react-icons/fi";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import formateaCantidad from "../utils/formateaCantidad";
 
 const MESES = [
   { value: "", label: "Todos los meses" },
@@ -147,7 +148,7 @@ const MovimientosArticuloPage = () => {
     // Filtrar por tipo
     if (tipoSeleccionado) {
       resultado = resultado.filter(
-        (mov) => mov.tipo_origen_movimiento === tipoSeleccionado
+        (mov) => mov.tipo_origen_movimiento === tipoSeleccionado,
       );
     }
 
@@ -160,7 +161,7 @@ const MovimientosArticuloPage = () => {
           (mov.observaciones &&
             mov.observaciones.toLowerCase().includes(searchLower)) ||
           (mov.referencia_documento_id &&
-            String(mov.referencia_documento_id).includes(searchLower))
+            String(mov.referencia_documento_id).includes(searchLower)),
       );
     }
 
@@ -263,7 +264,7 @@ const MovimientosArticuloPage = () => {
 
   // Paginación
   const totalPaginas = Math.ceil(
-    movimientosFiltrados.length / ITEMS_POR_PAGINA
+    movimientosFiltrados.length / ITEMS_POR_PAGINA,
   );
   const movimientosPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
@@ -830,7 +831,7 @@ const MovimientosArticuloPage = () => {
                     {movimientosPaginados.map((mov) => {
                       const tipoInfo = getTipoInfo(mov.tipo_origen_movimiento);
                       const IconComponent = tipoInfo.icon;
-               
+
                       const esAjuste = mov.tipo_movimiento === "ajuste";
                       const esEntrada = esAjuste
                         ? mov.cantidad_movida > 0
@@ -876,25 +877,41 @@ const MovimientosArticuloPage = () => {
                           <td className="px-4 py-3">
                             {mov.referencia_documento_id ? (
                               <span className="text-sm text-slate-600 font-mono">
-                                {mov.tipo_origen_movimiento === "venta"
-                                  ? `OV #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento ===
-                                    "anulacion_venta"
-                                  ? `Anul. OV #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento === "compra"
-                                  ? `OC #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento ===
-                                    "anulacion_compra"
-                                  ? `Anul. OC #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento === "produccion"
-                                  ? `OF #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento ===
-                                    "devolucion_cliente"
-                                  ? `Dev. OV #${mov.referencia_documento_id}`
-                                  : mov.tipo_origen_movimiento ===
-                                    "devolucion_proveedor"
-                                  ? `Dev. OC #${mov.referencia_documento_id}`
-                                  : `#${mov.referencia_documento_id}`}
+                                {(() => {
+                                  if (
+                                    mov.tipo_origen_movimiento ===
+                                      "ajuste_manual" &&
+                                    mov.referencia_documento_tipo
+                                  ) {
+                                    const labels = {
+                                      anulacion_devolucion_cliente: `Dev. OV #${mov.referencia_documento_id}`,
+                                      cancelacion_orden_compra: `Anul. OC #${mov.referencia_documento_id}`,
+                                      ajuste_inventario: `Ajuste #${mov.referencia_documento_id}`,
+                                    };
+                                    return (
+                                      labels[mov.referencia_documento_tipo] ||
+                                      `Ajuste #${mov.referencia_documento_id}`
+                                    );
+                                  }
+                                  switch (mov.tipo_origen_movimiento) {
+                                    case "venta":
+                                      return `OV #${mov.referencia_documento_id}`;
+                                    case "anulacion_venta":
+                                      return `Anul. OV #${mov.referencia_documento_id}`;
+                                    case "compra":
+                                      return `OC #${mov.referencia_documento_id}`;
+                                    case "anulacion_compra":
+                                      return `Anul. OC #${mov.referencia_documento_id}`;
+                                    case "produccion":
+                                      return `OF #${mov.referencia_documento_id}`;
+                                    case "devolucion_cliente":
+                                      return `Dev. OV #${mov.referencia_documento_id}`;
+                                    case "devolucion_proveedor":
+                                      return `Dev. OC #${mov.referencia_documento_id}`;
+                                    default:
+                                      return `#${mov.referencia_documento_id}`;
+                                  }
+                                })()}
                               </span>
                             ) : (
                               <span className="text-sm text-slate-400">-</span>
@@ -908,7 +925,7 @@ const MovimientosArticuloPage = () => {
                                   : "text-slate-700"
                               }`}
                             >
-                              {mov.stock_antes}
+                              {formateaCantidad(mov.stock_antes)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -920,7 +937,7 @@ const MovimientosArticuloPage = () => {
                               }`}
                             >
                               {esEntrada ? "+" : "-"}
-                              {cantidadAbsoluta}
+                              {formateaCantidad(cantidadAbsoluta)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -931,7 +948,7 @@ const MovimientosArticuloPage = () => {
                                   : "text-slate-700"
                               }`}
                             >
-                              {mov.stock_despues}
+                              {formateaCantidad(mov.stock_despues)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -952,8 +969,8 @@ const MovimientosArticuloPage = () => {
                                 const colorClass = esDineroEntra
                                   ? "text-emerald-600"
                                   : esDineroSale
-                                  ? "text-red-600"
-                                  : "text-slate-600";
+                                    ? "text-red-600"
+                                    : "text-slate-600";
 
                                 return (
                                   <span
@@ -982,7 +999,7 @@ const MovimientosArticuloPage = () => {
                     Mostrando {(paginaActual - 1) * ITEMS_POR_PAGINA + 1} -{" "}
                     {Math.min(
                       paginaActual * ITEMS_POR_PAGINA,
-                      movimientosFiltrados.length
+                      movimientosFiltrados.length,
                     )}{" "}
                     de {movimientosFiltrados.length}
                   </div>
@@ -1022,7 +1039,7 @@ const MovimientosArticuloPage = () => {
                             {pageNum}
                           </button>
                         );
-                      }
+                      },
                     )}
 
                     <button

@@ -424,7 +424,7 @@ const Inventario = () => {
                   En proceso
                 </th>
                 <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Mínimo
+                  En reparación
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Actualización
@@ -435,9 +435,6 @@ const Inventario = () => {
             <tbody>
               {filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
-                  const bajoMinimo =
-                    item.stock_minimo > 0 &&
-                    Number(item.stock_disponible) < Number(item.stock_minimo);
                   return (
                     <tr
                       key={item.id_inventario ?? `art-${item.id_articulo}`}
@@ -458,18 +455,14 @@ const Inventario = () => {
                           >
                             {item.descripcion}
                           </span>
-                          {bajoMinimo && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 whitespace-nowrap">
-                              Stock bajo
-                            </span>
-                          )}
+
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">
                         {item.abreviatura_unidad || item.nombre_unidad || "ud"}
                       </td>
                       <td
-                        className={`px-4 py-3 text-right font-semibold tabular-nums ${bajoMinimo ? "text-red-600" : "text-slate-800"}`}
+                        className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800"
                       >
                         {formateaCantidad(item.stock_disponible)}
                       </td>
@@ -480,7 +473,7 @@ const Inventario = () => {
                         {formateaCantidad(item.stock_en_proceso)}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-500 tabular-nums">
-                        {formateaCantidad(item.stock_minimo)}
+                        {formateaCantidad(item.stock_reparacion || 0)}
                       </td>
                       <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                         {item.ultima_actualizacion
