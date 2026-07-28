@@ -2,15 +2,12 @@ require("dotenv").config();
 const mysql = require("mysql2/promise");
 const { AsyncLocalStorage } = require("async_hooks");
 
-
 const tenantContext = new AsyncLocalStorage();
-
 
 const poolCache = new Map();
 
 // Límite de pools inactivos que se mantienen en cache
 const MAX_IDLE_POOLS = 20;
-
 
 function getTenantPool(dbName) {
   if (!dbName) throw new Error("db_name requerido para obtener pool de tenant");
@@ -19,7 +16,7 @@ function getTenantPool(dbName) {
     return poolCache.get(dbName);
   }
 
-  // Controlar tamaño de cache 
+  // Controlar tamaño de cache
   if (poolCache.size >= MAX_IDLE_POOLS) {
     const firstKey = poolCache.keys().next().value;
     const oldPool = poolCache.get(firstKey);
@@ -34,15 +31,14 @@ function getTenantPool(dbName) {
     database: dbName,
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
-    connectionLimit: 5, // Máximo 5 conexiones por empresa 
-    queueLimit: 20,
+    connectionLimit: 20, // Máximo 20 conexiones por empresa (dashboard requiere ~19 simultáneas)
+    queueLimit: 50,
     charset: "utf8mb4",
   });
 
   poolCache.set(dbName, pool);
   return pool;
 }
-
 
 async function releaseTenantPool(dbName) {
   if (poolCache.has(dbName)) {
@@ -51,7 +47,6 @@ async function releaseTenantPool(dbName) {
     poolCache.delete(dbName);
   }
 }
-
 
 function runWithTenant(dbName, fn) {
   const pool = getTenantPool(dbName);
