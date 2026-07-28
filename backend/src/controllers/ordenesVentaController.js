@@ -365,14 +365,35 @@ module.exports = {
       }
 
       // Validar que la fecha de la orden no esté en un período cerrado
+      // Excepto si es crédito con saldo pendiente (puede modificarse aunque el período esté cerrado)
+      const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
+      const esOCredito =
+        Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId) ||
+        (id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId));
+      const eraCredito =
+        Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId);
+
+      // Si el período está cerrado, solo permitir editar créditos (sin cambiar a contado)
       const fechaCerrada = await cierresCajaModel.validarFechaCerrada(
         ordenActual.fecha,
       );
       if (fechaCerrada) {
-        return res.status(400).json({
-          error:
-            "No se pueden modificar órdenes de venta de períodos cerrados. La fecha de esta orden está en un período cerrado de caja.",
-        });
+        if (!esOCredito) {
+          return res.status(400).json({
+            error:
+              "No se pueden modificar órdenes de venta de períodos cerrados. La fecha de esta orden está en un período cerrado de caja.",
+          });
+        }
+        if (
+          eraCredito &&
+          id_metodo_pago &&
+          Number(id_metodo_pago) !== Number(creditoMetodoId)
+        ) {
+          return res.status(400).json({
+            error:
+              "No se puede cambiar el método de pago de una orden a crédito en un período cerrado.",
+          });
+        }
       }
 
       if (!id_cliente || !estado) {
@@ -407,10 +428,45 @@ module.exports = {
             `Stock reintegrado para artículo ${detalle.id_articulo} por anulación de orden de venta ${id}: +${detalle.cantidad}`,
           );
         }
+
+        // Revertir saldo a favor si se usó
+        if (Number(ordenActual.monto) < Number(ordenActual.total)) {
+          const montoSaldoUsado =
+            Number(ordenActual.total) - Number(ordenActual.monto);
+          await clienteModel.incrementarSaldoFavor(
+            ordenActual.id_cliente,
+            montoSaldoUsado,
+            connection,
+          );
+          await tesoreriaModel.deleteByDocumentoAndTipo(
+            id,
+            "saldo_favor_usado",
+            connection,
+          );
+        }
+
+        // Eliminar movimiento de tesorería
+        await tesoreriaModel.deleteByDocumentoAndTipo(
+          id,
+          "orden_venta",
+          connection,
+        );
+
+        // Eliminar crédito si existe
+        const creditoId = await metodosDePagoModel.getIdByName("credito");
+        if (Number(ordenActual.id_metodo_pago) === Number(creditoId)) {
+          await connection.query(
+            "DELETE FROM ventas_credito WHERE id_orden_venta = ?",
+            [id],
+          );
+        }
       }
 
       // Actualizar detalles si se proporcionan
       if (detalles && Array.isArray(detalles) && detalles.length > 0) {
+        // Obtener detalles antiguos antes de eliminarlos (para ajustar inventario)
+        const oldDetalles = await detalleOrdenModel.getByVenta(id, connection);
+
         // Eliminar detalles antiguos
         await detalleOrdenModel.deleteByVenta(id, connection);
 
@@ -426,6 +482,44 @@ module.exports = {
             connection,
           );
         }
+
+        // Comparar y ajustar inventario por diferencia
+        const diffMap = {};
+        // Restar cantidades viejas
+        for (const old of oldDetalles) {
+          diffMap[old.id_articulo] =
+            (diffMap[old.id_articulo] || 0) - Number(old.cantidad);
+        }
+        // Sumar cantidades nuevas
+        for (const nuevo of detalles) {
+          diffMap[nuevo.id_articulo] =
+            (diffMap[nuevo.id_articulo] || 0) + Number(nuevo.cantidad);
+        }
+
+        for (const [idArticulo, diff] of Object.entries(diffMap)) {
+          if (diff === 0) continue;
+          const tipo =
+            diff < 0
+              ? inventarioModel.TIPOS_MOVIMIENTO.ENTRADA
+              : inventarioModel.TIPOS_MOVIMIENTO.SALIDA;
+          const obs =
+            diff < 0
+              ? `Reintegro por edición de orden de venta #${id}`
+              : `Salida adicional por edición de orden de venta #${id}`;
+          await inventarioModel.processInventoryMovement(
+            {
+              id_articulo: Number(idArticulo),
+              cantidad_movida: Math.abs(diff),
+              tipo_movimiento: tipo,
+              tipo_origen_movimiento:
+                inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.VENTA,
+              observaciones: obs,
+              referencia_documento_id: id,
+              referencia_documento_tipo: "orden_venta",
+            },
+            connection,
+          );
+        }
       }
 
       // Calcular nuevo total
@@ -434,9 +528,13 @@ module.exports = {
         : ordenActual.total;
 
       // ── Manejar cambio en saldo a favor ──
-      const saldoUsadoActual = Math.max(0, Number(ordenActual.total) - Number(ordenActual.monto));
+      const saldoUsadoActual = Math.max(
+        0,
+        Number(ordenActual.total) - Number(ordenActual.monto),
+      );
       const nuevoMonto = Math.max(0, nuevoTotal - montoSaldoFavor);
-      const clienteCambio = Number(id_cliente) !== Number(ordenActual.id_cliente);
+      const clienteCambio =
+        Number(id_cliente) !== Number(ordenActual.id_cliente);
 
       if (montoSaldoFavor !== saldoUsadoActual || clienteCambio) {
         if (saldoUsadoActual > 0) {
@@ -478,9 +576,14 @@ module.exports = {
              LIMIT 1`,
             [id_cliente],
           );
-          let metodoSaldoUpd = ultimoAbonoUpd[0]?.id_metodo_pago || id_metodo_pago || ordenActual.id_metodo_pago;
+          let metodoSaldoUpd =
+            ultimoAbonoUpd[0]?.id_metodo_pago ||
+            id_metodo_pago ||
+            ordenActual.id_metodo_pago;
           if (!metodoSaldoUpd) {
-            const [mp] = await connection.query("SELECT id_metodo_pago FROM metodos_pago ORDER BY id_metodo_pago ASC LIMIT 1");
+            const [mp] = await connection.query(
+              "SELECT id_metodo_pago FROM metodos_pago ORDER BY id_metodo_pago ASC LIMIT 1",
+            );
             metodoSaldoUpd = mp[0]?.id_metodo_pago;
           }
           await tesoreriaModel.insertarMovimiento(
@@ -532,7 +635,8 @@ module.exports = {
         const nuevoMontoMov = Number(nuevoMonto);
         if (
           montoMovActual !== nuevoMontoMov ||
-          (id_metodo_pago && Number(id_metodo_pago) !== Number(ordenActual.id_metodo_pago))
+          (id_metodo_pago &&
+            Number(id_metodo_pago) !== Number(ordenActual.id_metodo_pago))
         ) {
           await tesoreriaModel.actualizarMovimiento(
             movimientoOV.id_movimiento,
@@ -565,9 +669,8 @@ module.exports = {
       }
 
       // ── Manejar crédito: transiciones entre crédito y contado ──
-      const creditoMetodoId = await metodosDePagoModel.getIdByName("credito");
-      const eraCredito = Number(ordenActual.id_metodo_pago) === Number(creditoMetodoId);
-      const esCredito = id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId);
+      const esCredito =
+        id_metodo_pago && Number(id_metodo_pago) === Number(creditoMetodoId);
 
       // Si era crédito y ya no → eliminar crédito y crear movimiento tesorería
       if (eraCredito && !esCredito) {
@@ -591,7 +694,11 @@ module.exports = {
         }
       } else if (!eraCredito && esCredito) {
         // No era crédito y ahora sí → eliminar movimiento tesorería, crear crédito
-        await tesoreriaModel.deleteByDocumentoAndTipo(id, "orden_venta", connection);
+        await tesoreriaModel.deleteByDocumentoAndTipo(
+          id,
+          "orden_venta",
+          connection,
+        );
         await ventasCreditoModel.crearVentaCredito(
           {
             id_orden_venta: id,
