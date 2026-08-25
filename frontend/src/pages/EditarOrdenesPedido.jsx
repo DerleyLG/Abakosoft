@@ -1,9 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import { FiSave, FiArrowLeft, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiArrowLeft } from "react-icons/fi";
+import { X, PlusCircle } from "lucide-react";
+import AsyncSelect from "react-select/async";
 import { format } from "date-fns";
+
+const formatCOP = (number) => {
+  if (!number) return "0";
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(number);
+};
+
+const cleanCOPFormat = (formattedValue) => {
+  return parseInt(formattedValue.replace(/[^0-9]/g, ""), 10) || 0;
+};
 
 const EditarPedido = () => {
   const { id } = useParams();
@@ -15,13 +31,16 @@ const EditarPedido = () => {
     observaciones: "",
     fecha_pedido: format(new Date(), "yyyy-MM-dd"),
   });
-  const [detalles, setDetalles] = useState([]);
+  const [articulosSeleccionados, setArticulosSeleccionados] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [articulos, setArticulos] = useState([]);
+  const [articulosOptions, setArticulosOptions] = useState([]);
+  const [articuloSeleccionado, setArticuloSeleccionado] = useState(null);
+  const [editandoPrecio, setEditandoPrecio] = useState({});
   const [loading, setLoading] = useState(true);
 
-  const [allArticulos, setAllArticulos] = useState([]);
   const [allClientes, setAllClientes] = useState([]);
+  const cacheRef = useRef({});
+  const timerRef = useRef(null);
 
   const fetchDependencies = async () => {
     try {
@@ -30,13 +49,24 @@ const EditarPedido = () => {
       setClientes(resClientes.data);
 
       const [resArticulos, resCategorias] = await Promise.all([
-        api.get("/articulos"),
+        api.get("/articulos", { params: { page: 1, pageSize: 1 } }),
         api.get("/categorias"),
       ]);
 
-      const articulosAPI = Array.isArray(resArticulos.data)
-        ? resArticulos.data
-        : resArticulos.data?.data || [];
+      // Cargar TODOS los artículos (no solo la primera página de 25)
+      const totalArticulos = resArticulos.data?.total || 10000;
+      const resArticulosAll = await api.get("/articulos", {
+        params: {
+          page: 1,
+          pageSize: totalArticulos,
+          sortBy: "descripcion",
+          sortDir: "asc",
+        },
+      });
+
+      const articulosAPI = Array.isArray(resArticulosAll.data)
+        ? resArticulosAll.data
+        : resArticulosAll.data?.data || [];
 
       const categoriasAPI = Array.isArray(resCategorias.data)
         ? resCategorias.data
@@ -48,20 +78,30 @@ const EditarPedido = () => {
         categoriasMap[cat.id_categoria] = cat.tipo;
       });
 
-      // Filtrar solo artículos fabricables
-      const articulosFabricables = articulosAPI.filter(
-        (art) => categoriasMap[art.id_categoria] === "articulo_fabricable",
-      );
+      // Filtrar solo artículos fabricables y armar opciones para el buscador
+      const opciones = articulosAPI
+        .filter(
+          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable",
+        )
+        .map((art) => ({
+          value: art.id_articulo,
+          label: `${art.descripcion} (Ref: ${art.referencia})`,
+          referencia: art.referencia,
+          descripcion: art.descripcion,
+          ...art,
+        }));
 
-      setAllArticulos(articulosFabricables);
-      setArticulos(articulosFabricables);
+      setArticulosOptions(opciones);
+      cacheRef.current[""] = opciones;
+      return opciones;
     } catch (error) {
       toast.error("Error al cargar dependencias (Clientes/Artículos).");
       console.error("Error cargando dependencias:", error);
+      return [];
     }
   };
 
-  const fetchPedidoData = async () => {
+  const fetchPedidoData = async (opciones = []) => {
     try {
       const resPedido = await api.get(`/pedidos/${id}`);
       const pedido = resPedido.data;
@@ -79,9 +119,51 @@ const EditarPedido = () => {
         fecha_pedido: formattedDate,
       });
 
-      setDetalles(
+      // Asegurar que los artículos de los detalles existan en las opciones del
+      // buscador (pueden ser no fabricables o no estar en la primera página)
+      const listaActual = Array.isArray(opciones) ? opciones : [];
+      const idsFaltantes = resDetalles.data
+        .map((d) => d.id_articulo)
+        .filter((idArt) => !listaActual.some((a) => a.id_articulo == idArt));
+
+      if (idsFaltantes.length > 0) {
+        try {
+          const articulosFaltantes = (
+            await Promise.all(
+              idsFaltantes.map((idArt) =>
+                api
+                  .get(`/articulos/${idArt}`)
+                  .then((r) => r.data)
+                  .catch(() => null),
+              ),
+            )
+          ).filter(Boolean);
+
+          if (articulosFaltantes.length > 0) {
+            const opcionesCompletas = [
+              ...listaActual,
+              ...articulosFaltantes.map((art) => ({
+                value: art.id_articulo,
+                label: `${art.descripcion} (Ref: ${art.referencia})`,
+                referencia: art.referencia,
+                descripcion: art.descripcion,
+                ...art,
+              })),
+            ];
+            setArticulosOptions(opcionesCompletas);
+            cacheRef.current[""] = opcionesCompletas;
+          }
+        } catch (e) {
+          console.error("Error cargando artículos faltantes del pedido:", e);
+        }
+      }
+
+      // Cargar los artículos registrados en el pedido (descripcion viene del JOIN)
+      setArticulosSeleccionados(
         resDetalles.data.map((d) => ({
           id_articulo: d.id_articulo,
+          descripcion: d.descripcion || "Artículo",
+          referencia: d.referencia || "",
           cantidad: d.cantidad,
           precio_unitario: d.precio_unitario,
         })),
@@ -96,8 +178,11 @@ const EditarPedido = () => {
   };
 
   useEffect(() => {
-    fetchDependencies();
-    fetchPedidoData();
+    const init = async () => {
+      const articulosCargados = await fetchDependencies();
+      await fetchPedidoData(articulosCargados);
+    };
+    init();
   }, [id]);
 
   const handlePedidoChange = (e) => {
@@ -105,68 +190,159 @@ const EditarPedido = () => {
     setPedidoData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDetalleChange = (index, e) => {
-    const { name, value } = e.target;
-    const list = [...detalles];
-    list[index][name] =
-      name === "cantidad" || name === "precio_unitario" ? Number(value) : value;
+  // Búsqueda de artículos con debounce y caché (como en la creación de pedidos)
+  const loadArticulosOptions = useCallback(
+    (inputValue, callback) => {
+      const cacheKey = inputValue?.toLowerCase() || "";
 
-    let processedValue;
-
-    if (name === "precio_unitario") {
-      processedValue = parseCurrency(value);
-    } else if (name === "cantidad") {
-      processedValue = Number(value);
-    } else {
-      processedValue = value;
-    }
-
-    list[index][name] = processedValue;
-
-    if (name === "id_articulo" && allArticulos.length > 0) {
-      const selectedArticle = allArticulos.find((a) => a.id_articulo == value);
-      if (selectedArticle) {
-        list[index].precio_unitario = selectedArticle.precio_venta || 0;
+      if (!inputValue || inputValue.trim() === "") {
+        callback(articulosOptions);
+        return;
       }
+
+      if (cacheRef.current[cacheKey]) {
+        callback(cacheRef.current[cacheKey]);
+        return;
+      }
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
+      timerRef.current = setTimeout(() => {
+        const filtered = articulosOptions.filter(
+          (art) =>
+            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
+        );
+
+        cacheRef.current[cacheKey] = filtered;
+        callback(filtered);
+      }, 300);
+    },
+    [articulosOptions],
+  );
+
+  const agregarArticulo = (articulo) => {
+    const yaExiste = articulosSeleccionados.some(
+      (a) => a.id_articulo === articulo.id_articulo,
+    );
+    if (yaExiste) {
+      toast.error("Este artículo ya ha sido añadido al pedido.");
+      return;
     }
 
-    setDetalles(list);
-  };
-
-  const handleAddDetalle = () => {
-    setDetalles((prev) => [
+    setArticulosSeleccionados((prev) => [
       ...prev,
-      { id_articulo: "", cantidad: 1, precio_unitario: 0 },
+      {
+        ...articulo,
+        cantidad: 1,
+        precio_unitario: articulo.precio_venta || 0,
+      },
     ]);
+    setArticuloSeleccionado(null); // Limpiar la selección después de agregar
   };
 
-  const handleRemoveDetalle = (index) => {
-    if (detalles.length > 1) {
-      setDetalles((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      toast.error("El pedido debe tener al menos un detalle.");
+  const eliminarArticulo = (id_articulo) => {
+    setArticulosSeleccionados((prev) =>
+      prev.filter((a) => a.id_articulo !== id_articulo),
+    );
+  };
+
+  const cambiarCantidad = (id_articulo, cantidad) => {
+    const numCantidad = parseInt(cantidad, 10);
+    if (isNaN(numCantidad) || numCantidad < 1) {
+      toast.error("La cantidad debe ser un número positivo.");
+      return;
     }
+    setArticulosSeleccionados((prev) =>
+      prev.map((a) =>
+        a.id_articulo === id_articulo ? { ...a, cantidad: numCantidad } : a,
+      ),
+    );
+  };
+
+  const cambiarPrecioUnitario = (id_articulo, valor) => {
+    setEditandoPrecio((prev) => ({
+      ...prev,
+      [id_articulo]: valor,
+    }));
+  };
+
+  const handleFocusPrecio = (id_articulo, precioActual) => {
+    setEditandoPrecio((prev) => ({
+      ...prev,
+      [id_articulo]: precioActual.toString(),
+    }));
+  };
+
+  const handleBlurPrecio = (id_articulo, valor) => {
+    const numPrecio = valor.includes("$")
+      ? cleanCOPFormat(valor)
+      : parseInt(valor, 10) || 0;
+
+    if (isNaN(numPrecio) || numPrecio < 0) {
+      toast.error("El precio unitario debe ser un número positivo o cero.");
+      setEditandoPrecio((prev) => {
+        const newState = { ...prev };
+        delete newState[id_articulo];
+        return newState;
+      });
+      return;
+    }
+
+    setArticulosSeleccionados((prev) =>
+      prev.map((a) =>
+        a.id_articulo === id_articulo
+          ? { ...a, precio_unitario: numPrecio }
+          : a,
+      ),
+    );
+
+    setEditandoPrecio((prev) => {
+      const newState = { ...prev };
+      delete newState[id_articulo];
+      return newState;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      detalles.length === 0 ||
-      detalles.some(
-        (d) => !d.id_articulo || d.cantidad <= 0 || d.precio_unitario <= 0,
-      )
-    ) {
-      toast.error(
-        "Asegúrate de que todos los detalles estén completos y sean válidos (Artículos seleccionados, Cantidad y Precio > 0).",
-      );
+    if (articulosSeleccionados.length === 0) {
+      toast.error("Agrega al menos un artículo al pedido.");
       return;
     }
+    if (articulosSeleccionados.some((a) => a.cantidad <= 0)) {
+      toast.error("Las cantidades deben ser mayores a cero.");
+      return;
+    }
+    if (articulosSeleccionados.some((a) => a.precio_unitario < 0)) {
+      toast.error("El precio unitario no puede ser negativo.");
+      return;
+    }
+
+    // Tomar el precio en edición si existe (input sin blur)
+    const detalles = articulosSeleccionados.map((a) => {
+      const valorEditado = editandoPrecio?.[a.id_articulo];
+      const precio_unitario =
+        valorEditado !== undefined
+          ? typeof valorEditado === "string" && valorEditado.includes("$")
+            ? cleanCOPFormat(valorEditado)
+            : parseInt(valorEditado, 10) || 0
+          : a.precio_unitario;
+      return {
+        id_articulo: a.id_articulo,
+        cantidad: a.cantidad,
+        precio_unitario,
+      };
+    });
 
     try {
       const dataToSend = {
         ...pedidoData,
-        detalles: detalles,
+        detalles,
       };
       await api.put(`/pedidos/${id}`, dataToSend);
       toast.success("Pedido y detalles actualizados correctamente.");
@@ -177,26 +353,6 @@ const EditarPedido = () => {
       console.error("Error de actualización:", error);
       toast.error(errorMessage);
     }
-  };
-  const formatCurrency = (value) => {
-    if (value === null || value === undefined || isNaN(value)) {
-      return "";
-    }
-
-    return Number(value).toLocaleString("es-CO", {
-      style: "currency",
-      currency: "COP",
-
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-  const parseCurrency = (value) => {
-    if (typeof value !== "string" || !value) return 0;
-
-    const cleanValue = value.replace(/[^0-9]/g, "");
-
-    return Number(cleanValue);
   };
 
   if (loading) {
@@ -349,6 +505,40 @@ const EditarPedido = () => {
               Artículos del pedido
             </h2>
 
+            {/* Buscador de artículo para adicionar */}
+            <div className="flex items-center gap-2 mb-5">
+              <div className="flex-1">
+                <AsyncSelect
+                  cacheOptions
+                  loadOptions={loadArticulosOptions}
+                  defaultOptions={articulosOptions}
+                  value={articuloSeleccionado}
+                  onChange={(option) => {
+                    setArticuloSeleccionado(option);
+                    if (option) agregarArticulo(option);
+                  }}
+                  placeholder="Buscar artículo por nombre o referencia…"
+                  isClearable
+                  className="text-sm"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#e2e8f0",
+                      boxShadow: "none",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      "&:hover": { borderColor: "#94a3b8" },
+                    }),
+                    menuList: (base) => ({ ...base, maxHeight: "280px" }),
+                  }}
+                  isDisabled={loading}
+                  noOptionsMessage={() => "No se encontraron artículos"}
+                  loadingMessage={() => "Cargando artículos…"}
+                />
+              </div>
+            </div>
+
+            {/* Tabla de artículos (incluye los registrados en el pedido) */}
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-sm">
                 <thead className="bg-slate-100 border-b border-slate-200">
@@ -356,83 +546,120 @@ const EditarPedido = () => {
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                       Artículo
                     </th>
-                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-28">
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-32">
                       Cantidad
                     </th>
-                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-44">
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-40">
                       Precio Unitario
+                    </th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider w-36">
+                      Subtotal
                     </th>
                     <th className="px-4 py-3 w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {detalles.map((detalle, index) => (
-                    <tr
-                      key={index}
-                      className="hover:bg-slate-50/70 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <select
-                          name="id_articulo"
-                          value={detalle.id_articulo}
-                          onChange={(e) => handleDetalleChange(index, e)}
-                          required
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                        >
-                          <option value="">Seleccione artículo</option>
-                          {allArticulos.map((a) => (
-                            <option key={a.id_articulo} value={a.id_articulo}>
-                              {a.descripcion}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          name="cantidad"
-                          value={detalle.cantidad}
-                          onChange={(e) => handleDetalleChange(index, e)}
-                          min="1"
-                          required
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          name="precio_unitario"
-                          value={formatCurrency(detalle.precio_unitario)}
-                          onChange={(e) => handleDetalleChange(index, e)}
-                          required
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDetalle(index)}
-                          disabled={detalles.length === 1}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                          title="Eliminar artículo"
-                        >
-                          <FiTrash2 size={15} />
-                        </button>
+                  {articulosSeleccionados.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="text-center py-12">
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                          <PlusCircle size={28} className="opacity-30" />
+                          <p className="text-sm">
+                            Aún no hay artículos en el pedido
+                          </p>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    articulosSeleccionados.map((art) => (
+                      <tr
+                        key={art.id_articulo}
+                        className="hover:bg-slate-50/70 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {art.descripcion}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            type="number"
+                            min="1"
+                            value={art.cantidad === 0 ? "" : art.cantidad}
+                            onChange={(e) =>
+                              cambiarCantidad(art.id_articulo, e.target.value)
+                            }
+                            className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            type="text"
+                            value={
+                              editandoPrecio[art.id_articulo] !== undefined
+                                ? editandoPrecio[art.id_articulo]
+                                : formatCOP(art.precio_unitario)
+                            }
+                            onChange={(e) =>
+                              cambiarPrecioUnitario(
+                                art.id_articulo,
+                                e.target.value,
+                              )
+                            }
+                            onFocus={() =>
+                              handleFocusPrecio(
+                                art.id_articulo,
+                                art.precio_unitario,
+                              )
+                            }
+                            onBlur={(e) =>
+                              handleBlurPrecio(art.id_articulo, e.target.value)
+                            }
+                            className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            placeholder="$0"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-800">
+                          {formatCOP(art.precio_unitario * art.cantidad)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => eliminarArticulo(art.id_articulo)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Eliminar artículo"
+                          >
+                            <X size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
 
-            <button
-              type="button"
-              onClick={handleAddDetalle}
-              className="mt-4 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
-            >
-              <FiPlus size={15} />
-              Agregar artículo
-            </button>
+            {/* Total */}
+            {articulosSeleccionados.length > 0 && (
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 mt-5">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Total del pedido
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {articulosSeleccionados.length} artículo
+                    {articulosSeleccionados.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                  {formatCOP(
+                    articulosSeleccionados.reduce(
+                      (total, art) =>
+                        total + art.precio_unitario * art.cantidad,
+                      0,
+                    ),
+                  )}
+                </p>
+              </div>
+            )}
           </div>
         </form>
       </div>

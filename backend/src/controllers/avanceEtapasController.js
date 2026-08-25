@@ -199,15 +199,33 @@ module.exports = {
           .json({ error: "Alguna entidad relacionada no existe." });
       }
 
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Bloquear la fila del detalle de fabricación para serializar avances
+      // concurrentes de la misma orden+artículo. Sin este lock, dos requests
+      // simultáneos (doble clic, doble pestaña) leen la misma cantidad
+      // registrada y ambos insertan, duplicando el avance.
+      await connection.query(
+        `SELECT id_detalle_fabricacion
+         FROM detalle_orden_fabricacion
+         WHERE id_orden_fabricacion = ? AND id_articulo = ?
+         FOR UPDATE`,
+        [id_orden_fabricacion, id_articulo],
+      );
+
       // Validar si es posible registrar el avance para la cantidad especificada
       const validacion = await AvanceModel.puedeRegistrarAvance(
         id_orden_fabricacion,
         id_articulo,
         id_etapa_produccion,
         cantidad,
+        connection,
       );
 
       if (validacion?.permitido !== true) {
+        await connection.rollback();
+        connection.release();
         return res.status(400).json({
           error: `No puedes registrar esa cantidad. Están disponibles ${
             validacion?.disponible ?? 0
@@ -218,6 +236,7 @@ module.exports = {
       const cantidadTotalEsperada = await AvanceModel.getCantidadTotalArticulo(
         id_orden_fabricacion,
         id_articulo,
+        connection,
       );
 
       const cantidadRegistradaAntes =
@@ -225,6 +244,7 @@ module.exports = {
           id_orden_fabricacion,
           id_articulo,
           id_etapa_produccion,
+          connection,
         );
 
       const totalAcumulado = cantidadRegistradaAntes + cantidad;
@@ -236,10 +256,8 @@ module.exports = {
       const etapaFinalCliente = await AvanceModel.getEtapaFinalCliente(
         id_orden_fabricacion,
         id_articulo,
+        connection,
       );
-
-      connection = await db.getConnection();
-      await connection.beginTransaction();
 
       // Registrar el avance de etapa
       const avanceId = await AvanceModel.create(

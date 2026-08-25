@@ -48,6 +48,7 @@ const ListaOrdenesFabricacion = () => {
   const [expandedOrden, setExpandedOrden] = useState(null);
   const [mostrarFormularioAvance, setMostrarFormularioAvance] = useState(null);
   const [avanceKey, setAvanceKey] = useState(null);
+  const [guardandoAvance, setGuardandoAvance] = useState({});
   const navigate = useNavigate();
   const [formularios, setFormularios] = useState({});
   const [etapas, setEtapas] = useState([]);
@@ -1209,6 +1210,9 @@ const ListaOrdenesFabricacion = () => {
       toast.error("Formulario vacío");
       return;
     }
+    // Evitar doble envío mientras se procesa la solicitud
+    if (guardandoAvance[idOrden]) return;
+    setGuardandoAvance((prev) => ({ ...prev, [idOrden]: true }));
     try {
       const {
         articulo,
@@ -1343,6 +1347,8 @@ const ListaOrdenesFabricacion = () => {
         "Error al registrar avance.";
       toast.error(mensajeBackend);
       console.error("Error al manejar el avance:", error);
+    } finally {
+      setGuardandoAvance((prev) => ({ ...prev, [idOrden]: false }));
     }
   };
   return (
@@ -2155,9 +2161,12 @@ const ListaOrdenesFabricacion = () => {
                                         </button>
                                         <button
                                           type="submit"
-                                          className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
+                                          disabled={!!guardandoAvance[orden.id_orden_fabricacion]}
+                                          className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                          Registrar avance
+                                          {guardandoAvance[orden.id_orden_fabricacion]
+                                            ? "Registrando..."
+                                            : "Registrar avance"}
                                         </button>
                                       </div>
                                     </form>
