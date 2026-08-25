@@ -2161,10 +2161,16 @@ const ListaOrdenesFabricacion = () => {
                                         </button>
                                         <button
                                           type="submit"
-                                          disabled={!!guardandoAvance[orden.id_orden_fabricacion]}
+                                          disabled={
+                                            !!guardandoAvance[
+                                              orden.id_orden_fabricacion
+                                            ]
+                                          }
                                           className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                          {guardandoAvance[orden.id_orden_fabricacion]
+                                          {guardandoAvance[
+                                            orden.id_orden_fabricacion
+                                          ]
                                             ? "Registrando..."
                                             : "Registrar avance"}
                                         </button>
