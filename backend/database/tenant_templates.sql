@@ -444,11 +444,33 @@ CREATE TABLE `detalle_pago_trabajador` (
   UNIQUE KEY `id_detalle_pago` (`id_detalle_pago`),
   KEY `ix_detalle_pago_por_pago` (`id_pago`),
   KEY `ix_detalle_pago_por_avance_etapa` (`id_avance_etapa`),
-  CONSTRAINT `detalle_pago_trabajador_ibfk_2` FOREIGN KEY (`id_avance_etapa`) REFERENCES `avance_etapas_produccion` (`id_avance_etapa`) ON DELETE CASCADE,
   CONSTRAINT `fk_detalle_pago_avance` FOREIGN KEY (`id_avance_etapa`) REFERENCES `avance_etapas_produccion` (`id_avance_etapa`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_detalle_pago_pago` FOREIGN KEY (`id_pago`) REFERENCES `pagos_trabajadores` (`id_pago`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_pago_trabajador` FOREIGN KEY (`id_pago`) REFERENCES `pagos_trabajadores` (`id_pago`) ON DELETE CASCADE
+  CONSTRAINT `fk_detalle_pago_pago` FOREIGN KEY (`id_pago`) REFERENCES `pagos_trabajadores` (`id_pago`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=659 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `anticipo_aplicaciones`
+--
+-- Registra a qué anticipo(s) se aplicó cada línea de descuento de un pago,
+-- para poder revertir con precisión el saldo del anticipo si el pago se edita o elimina.
+--
+
+DROP TABLE IF EXISTS `anticipo_aplicaciones`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anticipo_aplicaciones` (
+  `id_aplicacion` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `id_detalle_pago` bigint unsigned NOT NULL,
+  `id_anticipo` bigint unsigned NOT NULL,
+  `monto_aplicado` decimal(12,2) NOT NULL,
+  PRIMARY KEY (`id_aplicacion`),
+  UNIQUE KEY `uk_aplicacion_detalle_anticipo` (`id_detalle_pago`,`id_anticipo`),
+  KEY `ix_aplicacion_detalle` (`id_detalle_pago`),
+  KEY `ix_aplicacion_anticipo` (`id_anticipo`),
+  CONSTRAINT `fk_aplicacion_detalle` FOREIGN KEY (`id_detalle_pago`) REFERENCES `detalle_pago_trabajador` (`id_detalle_pago`) ON DELETE CASCADE,
+  CONSTRAINT `fk_aplicacion_anticipo` FOREIGN KEY (`id_anticipo`) REFERENCES `anticipos_trabajadores` (`id_anticipo`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

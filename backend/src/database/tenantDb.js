@@ -9,6 +9,31 @@ const poolCache = new Map();
 // Límite de pools inactivos que se mantienen en cache
 const MAX_IDLE_POOLS = 20;
 
+// Migraciones suaves aplicadas de forma perezosa la primera vez que se abre
+// el pool de cada tenant en este proceso (no bloquea la creación del pool).
+async function ensureTenantSchema(pool, dbName) {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS anticipo_aplicaciones (
+        id_aplicacion bigint unsigned NOT NULL AUTO_INCREMENT,
+        id_detalle_pago bigint unsigned NOT NULL,
+        id_anticipo bigint unsigned NOT NULL,
+        monto_aplicado decimal(12,2) NOT NULL,
+        PRIMARY KEY (id_aplicacion),
+        KEY ix_aplicacion_detalle (id_detalle_pago),
+        KEY ix_aplicacion_anticipo (id_anticipo),
+        CONSTRAINT fk_aplicacion_detalle FOREIGN KEY (id_detalle_pago) REFERENCES detalle_pago_trabajador (id_detalle_pago) ON DELETE CASCADE,
+        CONSTRAINT fk_aplicacion_anticipo FOREIGN KEY (id_anticipo) REFERENCES anticipos_trabajadores (id_anticipo) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch (error) {
+    console.error(
+      `[tenant-schema] Error asegurando anticipo_aplicaciones en ${dbName}:`,
+      error.message,
+    );
+  }
+}
+
 function getTenantPool(dbName) {
   if (!dbName) throw new Error("db_name requerido para obtener pool de tenant");
 
@@ -37,6 +62,7 @@ function getTenantPool(dbName) {
   });
 
   poolCache.set(dbName, pool);
+  ensureTenantSchema(pool, dbName);
   return pool;
 }
 

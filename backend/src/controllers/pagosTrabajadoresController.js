@@ -216,25 +216,6 @@ module.exports = {
           const preferOrder = d.id_orden_fabricacion || null;
           const montoAAplicar = Math.abs(d.pago_unitario);
 
-          // Obtener anticipos disponibles del trabajador en el mismo orden de preferencia
-          const anticiposDisponibles =
-            await AnticiposModel.getDisponiblesByTrabajador(
-              id_trabajador,
-              preferOrder,
-              connection,
-            );
-
-          const totalDisponible = anticiposDisponibles.reduce((s, a) => {
-            return s + (Number(a.monto) - Number(a.monto_usado || 0));
-          }, 0);
-
-          if (totalDisponible < montoAAplicar) {
-            await connection.rollback();
-            return res.status(400).json({
-              error: `El trabajador no tiene suficiente saldo en anticipos para cubrir el descuento solicitado. Disponible: ${totalDisponible}`,
-            });
-          }
-
           // Insertar un único detalle de descuento (registro del descuento en el pago)
           const idDetalle = await detalleModel.create(
             {
@@ -248,20 +229,21 @@ module.exports = {
           );
           console.log("Insert detalle descuento, id generado:", idDetalle);
 
-          // Aplicar el descuento a uno o varios anticipos del trabajador hasta cubrir el monto
-          let restante = montoAAplicar;
-          for (const anticipo of anticiposDisponibles) {
-            const disponible =
-              Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
-            if (disponible <= 0) continue;
-            const aplicar = Math.min(disponible, restante);
-            await AnticiposModel.descontar(
-              anticipo.id_anticipo,
-              aplicar,
+          // Aplicar el descuento a uno o varios anticipos del trabajador hasta cubrir el
+          // monto, dejando registro de cada porción aplicada (para poder revertir después).
+          try {
+            await AnticiposModel.aplicarDescuento(
+              {
+                id_trabajador,
+                id_detalle_pago: idDetalle,
+                montoAAplicar,
+                preferOrder,
+              },
               connection,
             );
-            restante -= aplicar;
-            if (restante <= 0) break;
+          } catch (errAplicar) {
+            await connection.rollback();
+            return res.status(400).json({ error: errAplicar.message });
           }
         }
       }
@@ -275,6 +257,15 @@ module.exports = {
         [id_pago],
       );
       const montoTotal = pagoResult[0]?.monto_total || 0;
+
+      // El descuento por anticipo no puede superar la suma de los avances
+      if (montoTotal < 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error:
+            "El descuento por anticipo supera el total de avances del pago. El pago no puede quedar negativo.",
+        });
+      }
 
       // Crear movimiento de tesorería
 
@@ -306,161 +297,265 @@ module.exports = {
 
   // Actualizar pago y sus detalles
   updatePago: async (req, res) => {
+    const connection = await db.getConnection();
     try {
+      await connection.beginTransaction();
+
       const { id } = req.params;
       const {
         id_trabajador,
         fecha_pago,
         observaciones,
-        es_anticipo = 0,
+        id_metodo_pago,
+        referencia,
+        observaciones_pago,
         detalles,
       } = req.body;
 
       // Validaciones básicas
       if (!id_trabajador || !fecha_pago) {
+        await connection.rollback();
         return res.status(400).json({
           error: "Faltan campos obligatorios: id_trabajador o fecha_pago",
         });
       }
 
       if (!Array.isArray(detalles) || detalles.length === 0) {
+        await connection.rollback();
         return res
           .status(400)
           .json({ error: "Debe incluir al menos un detalle de pago" });
       }
 
+      const pagoExistente = await pagosModel.getById(id);
+      if (!pagoExistente) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Pago no encontrado" });
+      }
+
       // Validar trabajador existente
       const trabajadorExistente = await trabajadorModel.getById(id_trabajador);
       if (!trabajadorExistente) {
+        await connection.rollback();
         return res
           .status(400)
           .json({ error: "El trabajador especificado no existe." });
       }
 
-      // Validar que todos los id_avance_etapa en detalles existan
-      for (const detalle of detalles) {
-        // Si no es un descuento, validar que el avance exista
-        if (detalle.es_descuento !== true) {
-          // Asegurarse de no validar id_avance_etapa para descuentos
-          const avance = await avanceEtapasModel.getById(
-            detalle.id_avance_etapa,
-          );
-          if (!avance) {
-            return res.status(400).json({
-              error: `El id_avance_etapa ${detalle.id_avance_etapa} no existe`,
-            });
-          }
+      // 1. Revertir el efecto del pago anterior: liberar el saldo de anticipos
+      //    que hubieran consumido las líneas de descuento de este pago
+      //    (debe hacerse ANTES de borrar los detalles, de donde se leen las aplicaciones).
+      await AnticiposModel.revertirAplicacionesPorPago(id, connection);
+
+      // Desmarcar como pagados los avances que traía el pago anterior; se vuelven
+      // a marcar más abajo si siguen presentes en los detalles nuevos.
+      const detallesAnteriores = await detalleModel.getById(id);
+      for (const d of detallesAnteriores) {
+        if (d.id_avance_etapa && d.es_descuento !== 1) {
+          await avanceEtapasModel.updatePagado(d.id_avance_etapa, 0, connection);
         }
       }
 
-      // Calcular monto_total sumando subtotal de detalles
-      const monto_total = detalles.reduce(
-        (acc, item) => acc + item.cantidad * item.pago_unitario,
-        0,
-      );
+      // Eliminar detalles antiguos (arrastra en cascada las aplicaciones ya revertidas)
+      await detalleModel.deleteByPagoId(id, connection);
 
-      // Actualizar pago principal
-      await pagosModel.update(id, {
-        id_trabajador,
-        fecha_pago,
-        observaciones,
-        es_anticipo,
-        monto_total,
-      });
+      // Validar avances: existencia, no pagados (por otro pago), y mismo trabajador
+      const avancesIds = detalles
+        .filter((d) => d.es_descuento !== true)
+        .map((d) => d.id_avance_etapa);
+      if (avancesIds.length) {
+        const placeholders = avancesIds.map(() => "?").join(",");
+        const [avances] = await connection.query(
+          `SELECT id_avance_etapa, id_trabajador, pagado
+           FROM avance_etapas_produccion
+           WHERE id_avance_etapa IN (${placeholders})`,
+          avancesIds,
+        );
+        if (avances.length !== avancesIds.length) {
+          await connection.rollback();
+          return res
+            .status(400)
+            .json({ error: "Uno o más avances no existen." });
+        }
+        const algunoPagado = avances.some((a) => a.pagado === 1);
+        if (algunoPagado) {
+          await connection.rollback();
+          return res
+            .status(400)
+            .json({ error: "Uno o más avances ya fueron pagados por otro pago." });
+        }
+        const mismoTrabajador = avances.every(
+          (a) => a.id_trabajador === id_trabajador,
+        );
+        if (!mismoTrabajador) {
+          await connection.rollback();
+          return res.status(400).json({
+            error:
+              "Todos los avances deben pertenecer al mismo trabajador del pago.",
+          });
+        }
+      }
 
-      // Primero eliminar detalles antiguos para evitar conflicto FK
-      await detalleModel.deleteByPagoId(id);
-
-      // Insertar detalles nuevos y actualizar el estado 'pagado' si no es un descuento
+      // Insertar detalles nuevos, marcando avances como pagados y aplicando descuentos
       for (const detalle of detalles) {
         const esDescuento = detalle.es_descuento === true;
-        await detalleModel.create({
-          id_pago: id,
-          id_avance_etapa: esDescuento ? null : detalle.id_avance_etapa,
-          cantidad: detalle.cantidad,
-          pago_unitario: detalle.pago_unitario,
-          es_descuento: esDescuento ? 1 : 0,
-        });
 
-        // Si no es un descuento, y el avance no estaba ya pagado, marcarlo como pagado
         if (!esDescuento) {
-          const avanceActual = await avanceEtapasModel.getById(
-            detalle.id_avance_etapa,
+          await detalleModel.create(
+            {
+              id_pago: id,
+              id_avance_etapa: detalle.id_avance_etapa,
+              cantidad: detalle.cantidad,
+              pago_unitario: detalle.pago_unitario,
+              es_descuento: 0,
+            },
+            connection,
           );
-          if (avanceActual && avanceActual.pagado !== 1) {
-            // Solo actualiza si no está ya pagado
-            await avanceEtapasModel.updatePagado(detalle.id_avance_etapa, 1);
-            console.log(
-              `Avance de etapa ${detalle.id_avance_etapa} marcado como pagado durante la actualización del pago.`,
+          await avanceEtapasModel.updatePagado(
+            detalle.id_avance_etapa,
+            1,
+            connection,
+          );
+        } else {
+          const idDetalle = await detalleModel.create(
+            {
+              id_pago: id,
+              id_avance_etapa: null,
+              cantidad: detalle.cantidad,
+              pago_unitario: detalle.pago_unitario,
+              es_descuento: 1,
+            },
+            connection,
+          );
+
+          const preferOrder = detalle.id_orden_fabricacion || null;
+          const montoAAplicar = Math.abs(detalle.pago_unitario);
+          try {
+            await AnticiposModel.aplicarDescuento(
+              {
+                id_trabajador,
+                id_detalle_pago: idDetalle,
+                montoAAplicar,
+                preferOrder,
+              },
+              connection,
             );
+          } catch (errAplicar) {
+            await connection.rollback();
+            return res.status(400).json({ error: errAplicar.message });
           }
         }
       }
 
-      // Lógica para aplicar/revertir descuento de anticipo si es relevante en la actualización
-      // (Esta parte no estaba en tu código original de update, pero sería necesaria si los anticipos
-      // se gestionan en las actualizaciones de pagos)
+      // Recalcular total a partir de los detalles ya insertados
+      await pagosModel.calcularMonto(id, connection);
+      const [pagoResult] = await connection.query(
+        "SELECT monto_total FROM pagos_trabajadores WHERE id_pago = ?",
+        [id],
+      );
+      const montoTotal = pagoResult[0]?.monto_total || 0;
 
+      // El descuento por anticipo no puede superar la suma de los avances
+      if (montoTotal < 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          error:
+            "El descuento por anticipo supera el total de avances del pago. El pago no puede quedar negativo.",
+        });
+      }
+
+      await pagosModel.update(
+        id,
+        { id_trabajador, monto_total: montoTotal, observaciones, fecha_pago },
+        connection,
+      );
+
+      // Sincronizar el movimiento de tesorería con el nuevo total
+      // (si no se envían método/referencia, updateOrCreateMovimiento conserva los existentes)
+      await tesoreriaModel.updateOrCreateMovimiento(
+        {
+          id_documento: id,
+          tipo_documento: "pago_trabajador",
+          monto: -Math.abs(Number(montoTotal)),
+          id_metodo_pago: id_metodo_pago || null,
+          referencia: referencia || null,
+          observaciones: observaciones_pago || null,
+          fecha_movimiento: fecha_pago,
+        },
+        connection,
+      );
+
+      await connection.commit();
       return res
         .status(200)
         .json({ message: "Pago actualizado correctamente" });
     } catch (error) {
+      await connection.rollback();
       console.error("Error actualizando pago:", error);
       return res.status(500).json({ error: "Error actualizando pago" });
+    } finally {
+      connection.release();
     }
   },
 
   // Eliminar pago y detalles asociados
   deletePago: async (req, res) => {
+    const connection = await db.getConnection();
     try {
-      const id_pago = req.params.id;
+      await connection.beginTransaction();
 
-      // Obtener los detalles del pago antes de eliminarlos para saber qué avances desmarcar
-      const detallesDelPago = await detalleModel.getById(id_pago);
+      const id_pago = req.params.id;
 
       // Verificar existencia
       const pagoExistente = await pagosModel.getById(id_pago);
       if (!pagoExistente) {
+        await connection.rollback();
         return res.status(404).json({ error: "Pago no encontrado" });
       }
 
+      // Obtener los detalles del pago antes de eliminarlos para saber qué avances desmarcar
+      const detallesDelPago = await detalleModel.getById(id_pago);
+
+      // Revertir el saldo consumido en anticipos por los descuentos de este pago
+      // (debe hacerse ANTES de borrar los detalles, de donde se leen las aplicaciones)
+      await AnticiposModel.revertirAplicacionesPorPago(id_pago, connection);
+
       // Borrar detalles primero para evitar FK
-      await detalleModel.deleteByPagoId(id_pago);
+      await detalleModel.deleteByPagoId(id_pago, connection);
 
       // Borrar pago
-      await pagosModel.delete(id_pago);
+      await pagosModel.delete(id_pago, connection);
 
-      // --- ¡AÑADIDO CLAVE AQUÍ! Desmarcar avances como pagados al eliminar el pago ---
+      // Desmarcar avances como pagados al eliminar el pago
       for (const detalle of detallesDelPago) {
         if (detalle.id_avance_etapa && detalle.es_descuento !== 1) {
-          // Si es un avance de etapa y no un descuento
-          await avanceEtapasModel.updatePagado(detalle.id_avance_etapa, 0); // 0 para false/no pagado
+          await avanceEtapasModel.updatePagado(
+            detalle.id_avance_etapa,
+            0,
+            connection,
+          );
           console.log(
             `Avance de etapa ${detalle.id_avance_etapa} desmarcado como pagado.`,
           );
         }
       }
-      // --- FIN AÑADIDO ---
 
       // Eliminar movimiento de tesorería asociado al pago
-      let tesoreriaEliminada = false;
-      try {
-        const deleted = await tesoreriaModel.deleteByDocumentoAndTipo(
+      const tesoreriaEliminada =
+        (await tesoreriaModel.deleteByDocumentoAndTipo(
           id_pago,
           "pago_trabajador",
-        );
-        tesoreriaEliminada = deleted > 0;
-      } catch (errTes) {
-        console.error(
-          "Error eliminando movimiento de tesorería del pago:",
-          errTes,
-        );
-      }
+          connection,
+        )) > 0;
 
+      await connection.commit();
       res.json({ message: "Pago eliminado correctamente", tesoreriaEliminada });
     } catch (error) {
+      await connection.rollback();
       console.error("Error eliminando pago:", error);
       res.status(500).json({ error: "Error eliminando pago" });
+    } finally {
+      connection.release();
     }
   },
 

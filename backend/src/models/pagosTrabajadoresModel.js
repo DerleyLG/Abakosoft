@@ -154,7 +154,8 @@ module.exports = {
     );
   },
 
-  delete: async (id) => {
-    await db.query(`DELETE FROM pagos_trabajadores WHERE id_pago = ?`, [id]);
+  delete: async (id, connection = null) => {
+    const conn = connection || db;
+    await conn.query(`DELETE FROM pagos_trabajadores WHERE id_pago = ?`, [id]);
   },
 };

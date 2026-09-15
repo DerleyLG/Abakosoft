@@ -145,12 +145,26 @@ module.exports = {
 
   descontar: async (id_anticipo, montoAplicado, connection = null) => {
     const conn = connection || db;
-    // Obtener anticipo actual
+    // Obtener anticipo actual con lock de fila para evitar condiciones de
+    // carrera entre descuentos concurrentes (dos pagos simultáneos sobre el
+    // mismo anticipo podían leer el mismo monto_usado y sobre-descontar).
     const [rows] = await conn.query(
-      `SELECT monto, monto_usado FROM anticipos_trabajadores WHERE id_anticipo = ?`,
+      `SELECT monto, monto_usado FROM anticipos_trabajadores WHERE id_anticipo = ? FOR UPDATE`,
       [id_anticipo],
     );
     const anticipo = rows[0];
+    if (!anticipo) {
+      throw new Error(`El anticipo ${id_anticipo} no existe.`);
+    }
+
+    const disponible =
+      Number(anticipo.monto || 0) - Number(anticipo.monto_usado || 0);
+    if (Number(montoAplicado) > disponible) {
+      throw new Error(
+        `El anticipo ${id_anticipo} no tiene saldo suficiente. Disponible: ${disponible}`,
+      );
+    }
+
     const nuevoMontoUsado =
       Number(anticipo.monto_usado || 0) + Number(montoAplicado);
 
@@ -165,5 +179,100 @@ module.exports = {
        WHERE id_anticipo = ?`,
       [nuevoMontoUsado, nuevoEstado, id_anticipo],
     );
+  },
+
+  // Registra a qué anticipo se aplicó una porción de una línea de descuento,
+  // para poder revertirla con precisión si el pago se edita o elimina.
+  registrarAplicacion: async (
+    { id_detalle_pago, id_anticipo, monto_aplicado },
+    connection = null,
+  ) => {
+    const conn = connection || db;
+    await conn.query(
+      `INSERT INTO anticipo_aplicaciones (id_detalle_pago, id_anticipo, monto_aplicado)
+       VALUES (?, ?, ?)`,
+      [id_detalle_pago, id_anticipo, monto_aplicado],
+    );
+  },
+
+  // Aplica un descuento por anticipo (posiblemente repartido entre varios anticipos
+  // del trabajador) y deja registro de cada porción aplicada vía registrarAplicacion.
+  // Lanza un error si el saldo disponible no alcanza para cubrir el monto solicitado.
+  aplicarDescuento: async (
+    { id_trabajador, id_detalle_pago, montoAAplicar, preferOrder = null },
+    connection = null,
+  ) => {
+    const conn = connection || db;
+    const anticiposDisponibles = await module.exports.getDisponiblesByTrabajador(
+      id_trabajador,
+      preferOrder,
+      conn,
+    );
+
+    const totalDisponible = anticiposDisponibles.reduce(
+      (s, a) => s + (Number(a.monto) - Number(a.monto_usado || 0)),
+      0,
+    );
+
+    if (totalDisponible < montoAAplicar) {
+      throw new Error(
+        `El trabajador no tiene suficiente saldo en anticipos para cubrir el descuento solicitado. Disponible: ${totalDisponible}`,
+      );
+    }
+
+    let restante = montoAAplicar;
+    for (const anticipo of anticiposDisponibles) {
+      const disponible =
+        Number(anticipo.monto) - Number(anticipo.monto_usado || 0);
+      if (disponible <= 0) continue;
+      const aplicar = Math.min(disponible, restante);
+      await module.exports.descontar(anticipo.id_anticipo, aplicar, conn);
+      await module.exports.registrarAplicacion(
+        { id_detalle_pago, id_anticipo: anticipo.id_anticipo, monto_aplicado: aplicar },
+        conn,
+      );
+      restante -= aplicar;
+      if (restante <= 0) break;
+    }
+  },
+
+  // Revierte todas las aplicaciones de anticipo asociadas a un pago (todas sus líneas
+  // de descuento), restaurando monto_usado/estado de cada anticipo afectado.
+  // Debe llamarse ANTES de borrar los detalles del pago (de donde se leen las aplicaciones).
+  revertirAplicacionesPorPago: async (id_pago, connection = null) => {
+    const conn = connection || db;
+    const [rows] = await conn.query(
+      `SELECT aa.id_anticipo, SUM(aa.monto_aplicado) AS total_revertir
+       FROM anticipo_aplicaciones aa
+       JOIN detalle_pago_trabajador d ON d.id_detalle_pago = aa.id_detalle_pago
+       WHERE d.id_pago = ?
+       GROUP BY aa.id_anticipo`,
+      [id_pago],
+    );
+
+    for (const row of rows) {
+      const [anticipoRows] = await conn.query(
+        `SELECT monto, monto_usado FROM anticipos_trabajadores WHERE id_anticipo = ? FOR UPDATE`,
+        [row.id_anticipo],
+      );
+      const anticipo = anticipoRows[0];
+      if (!anticipo) continue;
+
+      const nuevoMontoUsado = Math.max(
+        0,
+        Number(anticipo.monto_usado || 0) - Number(row.total_revertir),
+      );
+      let nuevoEstado = "pendiente";
+      if (nuevoMontoUsado >= Number(anticipo.monto)) {
+        nuevoEstado = "saldado";
+      } else if (nuevoMontoUsado > 0) {
+        nuevoEstado = "parcial";
+      }
+
+      await conn.query(
+        `UPDATE anticipos_trabajadores SET monto_usado = ?, estado = ? WHERE id_anticipo = ?`,
+        [nuevoMontoUsado, nuevoEstado, row.id_anticipo],
+      );
+    }
   },
 };

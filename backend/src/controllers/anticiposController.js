@@ -116,10 +116,22 @@ module.exports = {
   descontarAnticipo: async (req, res) => {
     try {
       const { id_anticipo, montoAplicado } = req.body;
+      if (!id_anticipo || !montoAplicado || Number(montoAplicado) <= 0) {
+        return res.status(400).json({
+          error: "Debe indicar id_anticipo y un montoAplicado mayor a 0.",
+        });
+      }
       await AnticiposModel.descontar(id_anticipo, montoAplicado);
       res.status(200).json({ message: "Anticipo actualizado correctamente" });
     } catch (error) {
       console.error("Error al descontar anticipo:", error);
+      // El modelo lanza error cuando el anticipo no existe o el saldo no alcanza
+      if (
+        error.message?.includes("no existe") ||
+        error.message?.includes("saldo suficiente")
+      ) {
+        return res.status(400).json({ error: error.message });
+      }
       res.status(500).json({ error: "Error al actualizar anticipo" });
     }
   },

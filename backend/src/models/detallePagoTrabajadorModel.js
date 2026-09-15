@@ -100,8 +100,9 @@ module.exports = {
     );
   },
 
-  deleteByPagoId: async (id_pago) => {
-    await db.query("DELETE FROM detalle_pago_trabajador WHERE id_pago = ?", [
+  deleteByPagoId: async (id_pago, connection = null) => {
+    const conn = connection || db;
+    await conn.query("DELETE FROM detalle_pago_trabajador WHERE id_pago = ?", [
       id_pago,
     ]);
   },
