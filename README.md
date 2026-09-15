@@ -1,20 +1,20 @@
-# 🛠️ Plataforma de Gestión para Fábrica de Muebles
+#  Plataforma de Gestión para Fábrica de Muebles
 
 Este proyecto es una plataforma web desarrollada para facilitar la gestión de inventarios, pedidos y producción en una fábrica de muebles. Está construido con tecnologías modernas como **React**, **Node.js**, **Express** y **Tailwind CSS**.
 
 ---
 
-## 🚀 Tecnologías utilizadas
+##  Tecnologías utilizadas
 
 - 🔹 React.js (frontend)
 - 🔹 Tailwind CSS (estilos)
 - 🔹 Node.js + Express (backend)
-- 🔹 MySql (base de datos - en desarrollo)
+- 🔹 MySql (base de datos)
 - 🔹 Git y GitHub (control de versiones)
 
 ---
 
-## 📋 Funcionalidades principales
+##  Funcionalidades principales
 
 - Autenticación de usuarios y gestión de roles.
 - Registro y visualización de pedidos.
@@ -24,15 +24,15 @@ Este proyecto es una plataforma web desarrollada para facilitar la gestión de i
 
 ---
 
-## ⚙️ Instalación y ejecución local
+##  Instalación y ejecución local
 
-### 🔧 Requisitos previos
+###  Requisitos previos
 
 - Node.js y npm instalados
 - Mysql local o en la nube (cuando se conecte)
 - Git
 
-### 🖥️ Clonar el repositorio
+###  Clonar el repositorio
 
 ```bash
 git clone https://github.com/DerleyLG/plataforma-gestion-fabrica.git
