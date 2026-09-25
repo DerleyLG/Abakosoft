@@ -82,7 +82,7 @@ const CostosIndirectosNuevo = () => {
         pageSize: 20,
         sortBy: "id",
         sortDir: "desc",
-        estados: "pendiente,en proceso",
+        estados: "pendiente,en proceso,completada",
       };
       const res = await api.get("/ordenes-fabricacion", { params });
       const rows = Array.isArray(res.data?.data) ? res.data.data : [];
@@ -90,7 +90,7 @@ const CostosIndirectosNuevo = () => {
         value: o.id_orden_fabricacion,
         label: `OF #${o.id_orden_fabricacion} — ${
           o.nombre_cliente || "Sin cliente"
-        }`,
+        }${o.estado === "completada" ? " (Completada)" : ""}`,
       }));
     } catch (e) {
       console.error("Error cargando OFs:", e);
@@ -206,7 +206,9 @@ const CostosIndirectosNuevo = () => {
     }
 
     try {
-      await api.post("/costos-indirectos", payload, { headers: { "X-Idempotency-Key": idempotencyKey } });
+      await api.post("/costos-indirectos", payload, {
+        headers: { "X-Idempotency-Key": idempotencyKey },
+      });
       toast.success("Costo indirecto registrado correctamente");
       navigate("/costos_indirectos");
     } catch (error) {
@@ -442,7 +444,10 @@ const CostosIndirectosNuevo = () => {
         </div>
 
         {/* Card 4 — Asignación a OF */}
-        <div ref={ofCardRef} className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+        <div
+          ref={ofCardRef}
+          className="bg-white border border-slate-200 rounded-xl shadow-sm p-5"
+        >
           <div className="flex items-center gap-2 mb-4">
             <span className="w-2 h-2 rounded-full bg-slate-500" />
             <h2 className="text-sm font-semibold text-slate-700">
@@ -457,7 +462,14 @@ const CostosIndirectosNuevo = () => {
                 const checked = e.target.checked;
                 setAsignarAOF(checked);
                 if (checked) {
-                  setTimeout(() => ofCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                  setTimeout(
+                    () =>
+                      ofCardRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      }),
+                    50,
+                  );
                 } else {
                   setAsignacionMultiple(false);
                   setOfSeleccionada(null);
@@ -615,7 +627,7 @@ const CostosIndirectosNuevo = () => {
                                 mes: d.getMonth() + 1,
                                 driver,
                                 total,
-                                estados: "pendiente,en proceso",
+                                estados: "pendiente,en proceso,completada",
                               },
                             },
                           );

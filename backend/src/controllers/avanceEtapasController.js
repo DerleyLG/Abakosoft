@@ -292,13 +292,8 @@ module.exports = {
           );
 
         if (esCompuesto) {
-          console.log(
-            `Avance final para un componente de artículo compuesto. No se genera lote ni se actualiza inventario.`,
-          );
+          // Avance final para un componente de artículo compuesto: no se genera lote ni se actualiza inventario
         } else {
-          console.log(
-            `Avance final para un artículo simple. Generando lote y actualizando inventario.`,
-          );
           try {
             // Registrar el lote
             const loteId = await LoteModel.createLote(
@@ -312,17 +307,21 @@ module.exports = {
               connection,
             );
 
-            // Actualizar el inventario
-            await inventarioModel.processInventoryMovement({
-              id_articulo: Number(id_articulo),
-              cantidad_movida: Number(cantidad),
-              tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
-              tipo_origen_movimiento:
-                inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.PRODUCCION,
-              observaciones: `Lote #${loteId} de Orden de Fabricación #${id_orden_fabricacion} completado.`,
-              referencia_documento_id: loteId,
-              referencia_documento_tipo: "lote",
-            });
+            // Actualizar el inventario (dentro de la misma transacción para
+            // que el lote y el movimiento de inventario sean atómicos con el avance)
+            await inventarioModel.processInventoryMovement(
+              {
+                id_articulo: Number(id_articulo),
+                cantidad_movida: Number(cantidad),
+                tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
+                tipo_origen_movimiento:
+                  inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.PRODUCCION,
+                observaciones: `Lote #${loteId} de Orden de Fabricación #${id_orden_fabricacion} completado.`,
+                referencia_documento_id: loteId,
+                referencia_documento_tipo: "lote",
+              },
+              connection,
+            );
           } catch (inventoryError) {
             console.error(
               `Error crítico al actualizar inventario para artículo ${id_articulo} al crear lote:`,

@@ -81,6 +81,19 @@ router.get(
   requirePermission(ACTIONS.TREASURY_VIEW),
   TesoreriaController.getVentasCobrosReport,
 );
+// Conciliación bancaria: listar movimientos con filtros (ver) y marcar como validado (conciliar)
+router.get(
+  "/conciliacion",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_VIEW),
+  TesoreriaController.getConciliacion,
+);
+router.put(
+  "/conciliacion/:id",
+  requirePlanFeature("tesoreria"),
+  requirePermission(ACTIONS.TREASURY_RECONCILE),
+  TesoreriaController.marcarConciliado,
+);
 // Dato de referencia: consulta de pago asociado a un documento (compra/venta), sin restricción de plan
 router.get(
   "/:documento/:idDocumento",

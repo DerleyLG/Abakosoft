@@ -50,6 +50,119 @@ const tesoreriaController = {
       });
     }
   },
+
+  // Conciliación bancaria: lista movimientos con filtros y totales
+  getConciliacion: async (req, res) => {
+    try {
+      const {
+        desde,
+        hasta,
+        estado = "todos",
+        page = 1,
+        pageSize = 25,
+      } = req.query;
+
+      if (desde && hasta && String(desde) > String(hasta)) {
+        return res.status(400).json({
+          error: "La fecha 'desde' no puede ser mayor que 'hasta'.",
+        });
+      }
+
+      const { data, total } = await TesoreriaModel.getMovimientosConciliacion({
+        desde,
+        hasta,
+        estado,
+        page,
+        pageSize,
+      });
+
+      // Totales de la página actual: ingresos, egresos y conteo por estado
+      const totales = data.reduce(
+        (acc, m) => {
+          const monto = Number(m.monto || 0);
+          if (monto >= 0) acc.ingresos += monto;
+          else acc.egresos += Math.abs(monto);
+          if (Number(m.conciliado) === 1) acc.validados += 1;
+          else acc.pendientes += 1;
+          return acc;
+        },
+        { ingresos: 0, egresos: 0, pendientes: 0, validados: 0 },
+      );
+
+      const pg = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(200, Math.max(1, parseInt(pageSize) || 25));
+      const totalPages = Math.ceil(total / ps) || 1;
+
+      res.json({
+        data,
+        total,
+        page: pg,
+        pageSize: ps,
+        totalPages,
+        hasNext: pg < totalPages,
+        hasPrev: pg > 1,
+        totales,
+      });
+    } catch (error) {
+      console.error("Error al obtener movimientos para conciliación:", error);
+      res.status(500).json({
+        error:
+          "Error interno del servidor al obtener movimientos para conciliación.",
+      });
+    }
+  },
+
+  // Marca (o desmarca) un movimiento como conciliado/validado
+  marcarConciliado: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { conciliado } = req.body;
+
+      if (typeof conciliado !== "boolean") {
+        return res
+          .status(400)
+          .json({ error: "El campo 'conciliado' debe ser true o false." });
+      }
+      if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
+        return res
+          .status(400)
+          .json({ error: "El id del movimiento debe ser un número válido." });
+      }
+      const id_usuario = req.user?.id_usuario;
+      if (!id_usuario) {
+        return res
+          .status(401)
+          .json({ error: "Usuario no autenticado para conciliar." });
+      }
+
+      const affected = await TesoreriaModel.marcarConciliado(
+        id,
+        id_usuario,
+        conciliado,
+      );
+
+      if (affected === 0) {
+        return res
+          .status(404)
+          .json({ error: "Movimiento de tesorería no encontrado." });
+      }
+
+      res.json({
+        message: conciliado
+          ? "Movimiento validado correctamente"
+          : "Validación revertida correctamente",
+      });
+    } catch (error) {
+      console.error("Error al marcar conciliación:", error);
+      // Error de validación de negocio (movimiento no es venta por transferencia)
+      if (error.message?.includes("no es una venta por transferencia")) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({
+        error: "Error interno del servidor al marcar la conciliación.",
+      });
+    }
+  },
   getIngresosSummary: async (req, res) => {
     try {
       const summary = await TesoreriaModel.getIngresosSummary();

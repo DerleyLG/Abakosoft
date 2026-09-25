@@ -127,23 +127,32 @@ const OrdenesReparacion = () => {
       if (articulosCache.current[key])
         return callback(articulosCache.current[key]);
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        const filtrados = articulosList
-          .filter(
-            (a) =>
-              a.descripcion?.toLowerCase().includes(key) ||
-              a.referencia?.toLowerCase().includes(key),
-          )
-          .map((a) => ({
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((a) => ({
             value: a.id_articulo,
             label: `${a.descripcion}${a.referencia ? ` (Ref: ${a.referencia})` : ""}`,
             ...a,
           }));
-        articulosCache.current[key] = filtrados;
-        callback(filtrados);
+          articulosCache.current[key] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 200);
     },
-    [articulosList],
+    [],
   );
 
   const loadTrabajadoresOptions = useCallback(
@@ -192,18 +201,14 @@ const OrdenesReparacion = () => {
     input: (base) => ({ ...base, fontSize: "0.8125rem" }),
   };
 
-  // Cargar TODOS los artículos (sin paginación) para el buscador
+  // Cargar las primeras 20 sugerencias de artículos para el buscador
   useEffect(() => {
     const cargarArticulos = async () => {
       try {
-        const totalRes = await api.get("/articulos", {
-          params: { page: 1, pageSize: 1 },
-        });
-        const total = totalRes.data?.total || 10000;
         const res = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: total,
+            pageSize: 20,
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -519,10 +524,15 @@ const OrdenesReparacion = () => {
           >
             <FiArrowLeft size={18} />
           </button>
-          <FiTool className="text-slate-500" size={24} />
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Reparaciones
-          </h1>
+
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Postventa y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Reparaciones
+            </h1>
+          </div>
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
             {total}
           </span>
@@ -943,14 +953,22 @@ const OrdenesReparacion = () => {
                                               />
                                               <AsyncSelect
                                                 cacheOptions
-                                                loadOptions={loadTrabajadoresOptions}
-                                                defaultOptions={todosTrabajadores}
+                                                loadOptions={
+                                                  loadTrabajadoresOptions
+                                                }
+                                                defaultOptions={
+                                                  todosTrabajadores
+                                                }
                                                 value={diagTrabajador}
-                                                onChange={(opt) => setDiagTrabajador(opt)}
+                                                onChange={(opt) =>
+                                                  setDiagTrabajador(opt)
+                                                }
                                                 placeholder="Asignar responsable…"
                                                 isClearable
                                                 styles={selectStyles}
-                                                noOptionsMessage={() => "No encontrado"}
+                                                noOptionsMessage={() =>
+                                                  "No encontrado"
+                                                }
                                               />
                                               <div className="flex items-center justify-between gap-3">
                                                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1023,15 +1041,29 @@ const OrdenesReparacion = () => {
                                           <button
                                             onClick={() => {
                                               // Precargar responsable si ya está asignado
-                                              const trabPre = item.id_trabajador && todosTrabajadores.length > 0
-                                                ? todosTrabajadores.find((t) => t.value === item.id_trabajador) || null
-                                                : null;
+                                              const trabPre =
+                                                item.id_trabajador &&
+                                                todosTrabajadores.length > 0
+                                                  ? todosTrabajadores.find(
+                                                      (t) =>
+                                                        t.value ===
+                                                        item.id_trabajador,
+                                                    ) || null
+                                                  : null;
                                               setShowFormName(
                                                 `diag-${item.id_reparacion}`,
                                               );
-                                              setDiagTexto(item.diagnostico || "");
-                                              setDiagCosto(Number(item.mano_obra) || 0);
-                                              setDiagPago(item.requiere_pago ? true : false);
+                                              setDiagTexto(
+                                                item.diagnostico || "",
+                                              );
+                                              setDiagCosto(
+                                                Number(item.mano_obra) || 0,
+                                              );
+                                              setDiagPago(
+                                                item.requiere_pago
+                                                  ? true
+                                                  : false,
+                                              );
                                               setDiagTrabajador(trabPre);
                                             }}
                                             className="w-full inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 hover:text-amber-800 text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
@@ -1100,7 +1132,9 @@ const OrdenesReparacion = () => {
                                                       opt ? opt.value : "",
                                                     );
                                                     setMatCosto(
-                                                      opt?.precio_costo || opt?.precio_venta || 0,
+                                                      opt?.precio_costo ||
+                                                        opt?.precio_venta ||
+                                                        0,
                                                     );
                                                   }}
                                                   placeholder="Buscar artículo por nombre o referencia…"
@@ -1125,7 +1159,11 @@ const OrdenesReparacion = () => {
                                                     value={matCant}
                                                     onChange={(e) =>
                                                       setMatCant(
-                                                        e.target.value === "" ? "" : Number(e.target.value),
+                                                        e.target.value === ""
+                                                          ? ""
+                                                          : Number(
+                                                              e.target.value,
+                                                            ),
                                                       )
                                                     }
                                                     min={0}

@@ -6,7 +6,7 @@ async function getByIds(ids) {
   if (!ids || ids.length === 0) return [];
   const placeholders = ids.map(() => "?").join(",");
   const [rows] = await db.query(
-    `SELECT ofab.*, p.id_pedido, cli.nombre AS nombre_cliente
+    `SELECT ofab.*, p.id_pedido, cli.nombre AS nombre_cliente, cli.id_cliente AS id_cliente
      FROM ordenes_fabricacion ofab
      LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
      LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
@@ -26,7 +26,8 @@ module.exports = {
     SELECT 
       ofab.*, 
       p.id_pedido, 
-      cli.nombre AS nombre_cliente
+      cli.nombre AS nombre_cliente,
+      cli.id_cliente AS id_cliente
     FROM ordenes_fabricacion ofab
     LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
     LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
@@ -95,7 +96,8 @@ module.exports = {
       `SELECT 
          ofab.*, 
          p.id_pedido, 
-         cli.nombre AS nombre_cliente
+         cli.nombre AS nombre_cliente,
+         cli.id_cliente AS id_cliente
        ${base}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,
@@ -123,7 +125,8 @@ module.exports = {
       `SELECT 
        ofab.*, 
         p.id_pedido, 
-        cli.nombre AS nombre_cliente
+        cli.nombre AS nombre_cliente,
+        cli.id_cliente AS id_cliente
         FROM ordenes_fabricacion ofab
         LEFT JOIN pedidos p ON ofab.id_pedido = p.id_pedido
         LEFT JOIN clientes cli ON p.id_cliente = cli.id_cliente
@@ -186,9 +189,6 @@ module.exports = {
 
     try {
       await LoteModel.deleteByOrdenId(id);
-      console.log(
-        `Lotes fabricados asociados a la orden ${id} eliminados físicamente.`,
-      );
     } catch (error) {
       console.error(
         `Error al eliminar lotes fabricados para la orden ${id}:`,

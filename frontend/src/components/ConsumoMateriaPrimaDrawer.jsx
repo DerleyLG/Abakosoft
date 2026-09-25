@@ -138,13 +138,17 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      await api.post("/consumos-materia-prima", {
-        fecha,
-        id_articulo: articuloSeleccionado.id_articulo,
-        cantidad: cantidadNum,
-        notas: notas || null,
-        id_orden_fabricacion: null,
-      }, { headers: { "X-Idempotency-Key": idempotencyKey } });
+      await api.post(
+        "/consumos-materia-prima",
+        {
+          fecha,
+          id_articulo: articuloSeleccionado.id_articulo,
+          cantidad: cantidadNum,
+          notas: notas || null,
+          id_orden_fabricacion: null,
+        },
+        { headers: { "X-Idempotency-Key": idempotencyKey } },
+      );
 
       toast.success(
         `Consumo registrado: ${cantidadNum} ${articuloSeleccionado.abreviatura_unidad || "uds"} de ${articuloSeleccionado.descripcion}`,
@@ -247,11 +251,15 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
 
     setGuardandoInventario(true);
     try {
-      const res = await api.post("/inventario/inicializar", {
-        id_articulo: modalInicializar.articulo.id_articulo,
-        stock_inicial: stockNum,
-        stock_minimo: 2,
-      }, { headers: { "X-Idempotency-Key": idempotencyKeyInicializar } });
+      const res = await api.post(
+        "/inventario/inicializar",
+        {
+          id_articulo: modalInicializar.articulo.id_articulo,
+          stock_inicial: stockNum,
+          stock_minimo: 2,
+        },
+        { headers: { "X-Idempotency-Key": idempotencyKeyInicializar } },
+      );
 
       toast.success(
         `${modalInicializar.articulo.descripcion} agregado al inventario con ${stockNum} ${modalInicializar.articulo.abreviatura_unidad || "uds"}`,
@@ -331,7 +339,7 @@ const ConsumoMateriaPrimaDrawer = ({ isOpen, onClose }) => {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+        className={`fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 transform-gpu will-change-transform transition-transform duration-300 ease-out flex flex-col ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

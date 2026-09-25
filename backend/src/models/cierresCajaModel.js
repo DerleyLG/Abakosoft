@@ -171,6 +171,45 @@ const cierresCajaModel = {
       });
     }
 
+    // ── Conciliación bancaria: conteo de transferencias validadas ──
+    // Para el método de pago de transferencia, contar cuántos movimientos
+    // de venta por transferencia del período fueron validados (conciliado=1)
+    // en la conciliación bancaria.
+    const { fecha_inicio, fecha_fin } = cierre[0];
+    const [conciliacionRows] = await db.query(
+      `SELECT mt.id_metodo_pago,
+              COUNT(*) AS total_transferencias,
+              COALESCE(SUM(CASE WHEN mt.conciliado = 1 THEN 1 ELSE 0 END), 0) AS transferencias_conciliadas
+       FROM movimientos_tesoreria mt
+       JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
+       WHERE mt.tipo_documento = 'orden_venta'
+         AND LOWER(mp.nombre) LIKE '%transferencia%'
+         AND mt.fecha_movimiento >= ?
+         AND (? IS NULL OR mt.fecha_movimiento < DATE_ADD(?, INTERVAL 1 DAY))
+       GROUP BY mt.id_metodo_pago`,
+      [fecha_inicio, fecha_fin, fecha_fin],
+    );
+
+    const conciliacionMap = {};
+    conciliacionRows.forEach((r) => {
+      conciliacionMap[r.id_metodo_pago] = {
+        total_transferencias: Number(r.total_transferencias) || 0,
+        transferencias_conciliadas: Number(r.transferencias_conciliadas) || 0,
+      };
+    });
+
+    // Asignar el conteo a la fila del método de transferencia
+    detalle.forEach((d) => {
+      if (String(d.metodo_nombre).toLowerCase().includes("transferencia")) {
+        const c = conciliacionMap[d.id_metodo_pago] || {
+          total_transferencias: 0,
+          transferencias_conciliadas: 0,
+        };
+        d.total_transferencias = c.total_transferencias;
+        d.transferencias_conciliadas = c.transferencias_conciliadas;
+      }
+    });
+
     return {
       ...cierre[0],
       detalle_metodos: detalle,
@@ -497,11 +536,6 @@ const cierresCajaModel = {
         fecha_fin,
         id_cierre,
       ]);
-
-      console.log(
-        "[validarCierrePeriodo] Saldos calculados:",
-        JSON.stringify(rowsSaldos, null, 2),
-      );
 
       // Verificar cada método de pago
       for (const metodo of rowsSaldos) {

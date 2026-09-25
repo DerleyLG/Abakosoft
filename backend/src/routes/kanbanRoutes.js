@@ -25,5 +25,11 @@ router.post(
   requirePermission(ACTIONS.KANBAN_MANAGE),
   kanbanController.marcarComoEntregada,
 );
+router.post(
+  "/marcar-entregadas",
+  requirePlanFeature("kanban"),
+  requirePermission(ACTIONS.KANBAN_MANAGE),
+  kanbanController.marcarComoEntregadas,
+);
 
 module.exports = router;

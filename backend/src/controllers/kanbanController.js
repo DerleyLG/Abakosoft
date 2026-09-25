@@ -64,6 +64,42 @@ const kanbanController = {
   },
 
   /**
+   * POST /api/kanban/marcar-entregadas
+   * Marca múltiples órdenes como entregadas
+   */
+  marcarComoEntregadas: async (req, res) => {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          error: "Debe enviar al menos un id de orden de fabricación.",
+        });
+      }
+
+      const idsNumericos = ids
+        .map((id) => Number(id))
+        .filter((n) => Number.isFinite(n) && n > 0);
+
+      if (idsNumericos.length === 0) {
+        return res.status(400).json({ error: "IDs inválidos." });
+      }
+
+      const ordenes = await kanbanModel.marcarComoEntregadas(idsNumericos);
+
+      res.json({
+        message: `${ordenes.length} órdenes marcadas como entregadas exitosamente`,
+        ordenes,
+      });
+    } catch (error) {
+      console.error("Error marcando órdenes como entregadas:", error);
+      res
+        .status(500)
+        .json({ error: "Error al marcar órdenes como entregadas" });
+    }
+  },
+
+  /**
    * GET /api/kanban/ordenes-entregadas
    * Obtiene órdenes entregadas filtradas por mes/año
    */

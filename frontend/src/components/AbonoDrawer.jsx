@@ -168,7 +168,7 @@ const AbonoDrawer = ({ credito, onClose, onSaved }) => {
       <aside
         ref={drawerRef}
         tabIndex={-1}
-        className={`ml-auto bg-white w-full max-w-2xl h-full shadow-2xl p-6 overflow-auto transform transition-transform duration-250 ${visible ? "translate-x-0" : "translate-x-full"}`}
+        className={`ml-auto bg-white w-full max-w-2xl h-full shadow-2xl p-6 overflow-auto transform-gpu will-change-transform transition-transform duration-250 ${visible ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"
         aria-modal="true"
       >

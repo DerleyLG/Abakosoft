@@ -81,19 +81,14 @@ const CrearOrdenCompra = () => {
   const timerRef = useRef(null);
   const [todosLosArticulos, setTodosLosArticulos] = useState([]);
 
+  // Cargar las primeras opciones (sugerencias iniciales) sin descargar todo el catálogo
   useEffect(() => {
-    const cargarTodosArticulos = async () => {
+    const cargarSugerenciasIniciales = async () => {
       try {
-        // Obtener total de artículos primero
-        const resTotal = await api.get("/articulos", {
-          params: { page: 1, pageSize: 1 },
-        });
-        const total = resTotal.data.total || 10000;
-
         const response = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: total,
+            pageSize: 20,
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -114,19 +109,15 @@ const CrearOrdenCompra = () => {
         toast.error("Error al cargar lista de artículos");
       }
     };
-    cargarTodosArticulos();
+    cargarSugerenciasIniciales();
   }, []);
 
   // Función para cargar artículos dinámicamente con debounce y caché
+  // Búsqueda REMOTA: consulta al backend por cada término, SIN filtro de
+  // categoría para que las órdenes de compra abarquen TODOS los artículos.
   const loadArticulosOptions = useCallback(
     (inputValue, callback) => {
       const cacheKey = inputValue?.toLowerCase() || "";
-
-      // Si no hay búsqueda, retornar todos los artículos
-      if (!inputValue || inputValue.trim() === "") {
-        callback(todosLosArticulos);
-        return;
-      }
 
       // Si ya está en caché, retornar inmediatamente
       if (cacheRef.current[cacheKey]) {
@@ -140,20 +131,34 @@ const CrearOrdenCompra = () => {
       }
 
       // Debounce: esperar 300ms después de que el usuario deje de escribir
-      timerRef.current = setTimeout(() => {
-        const filtered = todosLosArticulos.filter(
-          (art) =>
-            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
-        );
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((art) => ({
+            value: art.id_articulo,
+            label: `${art.descripcion} (Ref: ${art.referencia})`,
+            ...art,
+          }));
 
-        // Guardar en caché
-        cacheRef.current[cacheKey] = filtered;
-        callback(filtered);
+          // Guardar en caché
+          cacheRef.current[cacheKey] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 300);
     },
-    [todosLosArticulos],
+    [],
   );
 
   const verificarYAgregarAlInventario = async (
@@ -176,9 +181,17 @@ const CrearOrdenCompra = () => {
                 label: "Sí",
                 onClick: async () => {
                   try {
-                    await api.post("/inventario/inicializar", {
-                      id_articulo: Number(idArticulo),
-                    }, { headers: { "X-Idempotency-Key": idempotencyKeyInicializar } });
+                    await api.post(
+                      "/inventario/inicializar",
+                      {
+                        id_articulo: Number(idArticulo),
+                      },
+                      {
+                        headers: {
+                          "X-Idempotency-Key": idempotencyKeyInicializar,
+                        },
+                      },
+                    );
                     toast.success(
                       "Artículo agregado al inventario con stock 0",
                     );
@@ -249,9 +262,18 @@ const CrearOrdenCompra = () => {
           articulo.abreviatura_unidad || articulo.nombre_unidad || "ud",
         precio_unitario: articulo.precio_costo || 0,
         precio_costo_original: articulo.precio_costo || 0,
+        es_bruto: false,
       },
     ]);
     setArticuloSeleccionado(null);
+  };
+
+  const cambiarEsBruto = (id_articulo, esBruto) => {
+    setArticulosSeleccionados((prev) =>
+      prev.map((a) =>
+        a.id_articulo === id_articulo ? { ...a, es_bruto: esBruto } : a,
+      ),
+    );
   };
 
   const eliminarArticulo = (id_articulo) => {
@@ -370,6 +392,7 @@ const CrearOrdenCompra = () => {
         id_articulo: Number(a.id_articulo),
         cantidad: Number(a.cantidad),
         precio_unitario: Number(a.precio_unitario),
+        es_bruto: Boolean(a.es_bruto),
       })),
       id_metodo_pago: parseInt(idMetodoPago),
       referencia: referenciaPago.trim() || null,
@@ -403,7 +426,9 @@ const CrearOrdenCompra = () => {
         });
       } else {
         // Sin archivo, enviar JSON normal
-        await api.post("/ordenes-compra", datos, { headers: { "X-Idempotency-Key": idempotencyKey } });
+        await api.post("/ordenes-compra", datos, {
+          headers: { "X-Idempotency-Key": idempotencyKey },
+        });
       }
 
       toast.success("Orden de compra creada correctamente", {
@@ -703,6 +728,9 @@ const CrearOrdenCompra = () => {
                   <th className="px-3 py-2 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-16">
                     Unidad
                   </th>
+                  <th className="px-3 py-2 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-28">
+                    ¿Va a fábrica?
+                  </th>
                   <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                     Precio unit.
                   </th>
@@ -716,7 +744,7 @@ const CrearOrdenCompra = () => {
                 {articulosSeleccionados.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="6"
+                      colSpan="7"
                       className="text-center py-10 text-slate-400 text-xs"
                     >
                       Agrega artículos usando el buscador de arriba
@@ -757,6 +785,22 @@ const CrearOrdenCompra = () => {
                       <td className="px-3 py-2 text-xs text-slate-500">
                         {art.abreviatura_unidad || "ud"}
                       </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(art.es_bruto)}
+                            onChange={(e) =>
+                              cambiarEsBruto(art.id_articulo, e.target.checked)
+                            }
+                            className="w-4 h-4 rounded border-slate-300 text-slate-700 cursor-pointer"
+                            disabled={loading}
+                          />
+                          <span className="text-[9px] text-slate-400 leading-none">
+                            no suma stock
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-right">
                         <input
                           type="text"
@@ -792,7 +836,7 @@ const CrearOrdenCompra = () => {
                 <tfoot>
                   <tr className="border-t border-slate-100 bg-slate-50">
                     <td
-                      colSpan="4"
+                      colSpan="5"
                       className="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"
                     >
                       Total

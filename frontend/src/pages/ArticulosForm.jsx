@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import AsyncSelect from "react-select/async";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { FiArrowLeft, FiPlus, FiTrash2 } from "react-icons/fi";
@@ -39,10 +40,50 @@ const CrearArticulo = () => {
 
   //  Estado para artículos compuestos
   const [esCompuesto, setEsCompuesto] = useState(false);
+  const [descatalogado, setDescatalogado] = useState(false);
   const [componentes, setComponentes] = useState([{ id: "", cantidad: "" }]);
   const [articulos, setArticulos] = useState([]);
+  const componentesCacheRef = useRef({});
+  const componentesTimerRef = useRef(null);
 
   const navigate = useNavigate();
+
+  // Búsqueda remota de artículos simples para componentes
+  const loadComponentesOptions = useCallback((inputValue, callback) => {
+    const key = (inputValue || "").toLowerCase();
+    if (componentesCacheRef.current[key]) {
+      callback(componentesCacheRef.current[key]);
+      return;
+    }
+    if (componentesTimerRef.current) clearTimeout(componentesTimerRef.current);
+    componentesTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get("/articulos", {
+          params: {
+            buscar: inputValue || "",
+            page: 1,
+            pageSize: 20,
+            sortBy: "descripcion",
+            sortDir: "asc",
+          },
+        });
+        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+        // Solo artículos simples pueden ser componentes
+        const opciones = rows
+          .filter((art) => !art.es_compuesto)
+          .map((art) => ({
+            value: art.id_articulo,
+            label: `${art.referencia ? `${art.referencia} — ` : ""}${art.descripcion}`,
+            ...art,
+          }));
+        componentesCacheRef.current[key] = opciones;
+        callback(opciones);
+      } catch (error) {
+        console.error("Error buscando componentes:", error);
+        callback([]);
+      }
+    }, 300);
+  }, []);
 
   //  Efecto para cargar categorías y todos los artículos disponibles
   useEffect(() => {
@@ -159,6 +200,7 @@ const CrearArticulo = () => {
         id_categoria: idCategoria ? parseInt(idCategoria) : null,
         id_unidad: idUnidad ? parseInt(idUnidad) : null,
         es_compuesto: esCompuesto, // Enviamos el estado del checkbox
+        descatalogado: descatalogado ? 1 : 0,
         componentes: esCompuesto
           ? componentes.map((c) => ({
               id: parseInt(c.id),
@@ -409,6 +451,34 @@ const CrearArticulo = () => {
                       </div>
                     </label>
                   </div>
+
+                  <div className="pt-1 border-t border-slate-100">
+                    <label
+                      htmlFor="descatalogado"
+                      className="flex items-center gap-3 cursor-pointer"
+                    >
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          id="descatalogado"
+                          checked={!!descatalogado}
+                          onChange={(e) => setDescatalogado(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 rounded-full bg-red-200 peer-checked:bg-red-600 transition-colors" />
+                        <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          Descatalogado
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Oculta el artículo de los selectores sin perder su
+                          histórico
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -442,22 +512,42 @@ const CrearArticulo = () => {
                     key={index}
                     className="grid grid-cols-[1fr_120px_36px] gap-2 items-center p-2.5 border border-slate-100 rounded-lg bg-slate-50"
                   >
-                    <select
-                      value={comp.id}
-                      onChange={(e) =>
-                        handleComponenteChange(index, "id", e.target.value)
+                    <AsyncSelect
+                      cacheOptions
+                      loadOptions={loadComponentesOptions}
+                      value={
+                        comp.id
+                          ? {
+                              value: comp.id,
+                              label: comp.descripcion
+                                ? `${comp.referencia ? `${comp.referencia} — ` : ""}${comp.descripcion}`
+                                : `Artículo #${comp.id}`,
+                            }
+                          : null
                       }
-                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer transition"
-                      required
-                    >
-                      <option value="">Seleccionar artículo…</option>
-                      {articulos.map((art) => (
-                        <option key={art.id_articulo} value={art.id_articulo}>
-                          {art.referencia ? `${art.referencia} — ` : ""}
-                          {art.descripcion}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(option) =>
+                        handleComponenteChange(
+                          index,
+                          "id",
+                          option ? option.value : "",
+                        )
+                      }
+                      placeholder="Buscar artículo…"
+                      isClearable
+                      className="text-sm"
+                      noOptionsMessage={() => "No se encontraron artículos"}
+                      loadingMessage={() => "Buscando…"}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#e2e8f0",
+                          boxShadow: "none",
+                          "&:hover": { borderColor: "#94a3b8" },
+                          borderRadius: "0.375rem",
+                          minHeight: "34px",
+                        }),
+                      }}
+                    />
                     <input
                       id={`cantidad-${index}`}
                       type="number"

@@ -94,7 +94,9 @@ const ListaAvances = () => {
   useEffect(() => {
     const fetchTrabajadores = async () => {
       try {
-        const res = await api.get("/trabajadores");
+        const res = await api.get("/trabajadores", {
+          params: { incluir_inactivos: true },
+        });
         setTrabajadores(res.data);
       } catch (error) {
         console.error("Error al cargar trabajadores:", error);
@@ -250,9 +252,14 @@ const ListaAvances = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Avances de producción
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Manufactura y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Avances de producción
+            </h1>
+          </div>
           {total > 0 && (
             <p className="text-xs text-slate-400 mt-0.5">{total} registros</p>
           )}
@@ -313,6 +320,7 @@ const ListaAvances = () => {
               {trabajadores.map((t) => (
                 <option key={t.id_trabajador} value={t.id_trabajador}>
                   {t.nombre}
+                  {Number(t.activo) === 0 ? " (inactivo)" : ""}
                 </option>
               ))}
             </select>
@@ -334,37 +342,68 @@ const ListaAvances = () => {
           </div>
         </div>
         {anticipoPendienteInfo?.hasPendiente && (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-              Anticipo detectado
-            </span>
-            <div className="text-xs text-slate-600">
-              <span className="font-semibold">
-                {trabajadores.find(
-                  (t) =>
-                    String(t.id_trabajador) ===
-                    String(idTrabajadorSeleccionado),
-                )?.nombre || ""}
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                Anticipo detectado
               </span>
-              {" — "}anticipo pendiente:{" "}
-              <span className="font-semibold text-sky-700">
-                {fmtCOP(anticipoPendienteInfo.totalDisponible)}
-              </span>
-              {Array.isArray(
-                anticiposDetallePorTrabajador[idTrabajadorSeleccionado],
-              ) &&
-                anticiposDetallePorTrabajador[idTrabajadorSeleccionado].length >
-                  0 && (
-                  <span className="ml-1 text-slate-400">
-                    — Orden(es):{" "}
-                    {anticiposDetallePorTrabajador[idTrabajadorSeleccionado]
-                      .map((a) => a.id_orden_fabricacion)
-                      .filter(Boolean)
-                      .map((o) => `#${o}`)
-                      .join(", ") || "—"}
-                  </span>
-                )}
+              <div className="text-xs text-slate-600">
+                <span className="font-semibold">
+                  {trabajadores.find(
+                    (t) =>
+                      String(t.id_trabajador) ===
+                      String(idTrabajadorSeleccionado),
+                  )?.nombre || ""}
+                </span>
+                {" — "}pendiente:{" "}
+                <span className="font-semibold text-sky-700">
+                  {fmtCOP(anticipoPendienteInfo.totalDisponible)}
+                </span>
+              </div>
             </div>
+
+            {/* Desglose compacto por orden de fabricación */}
+            {Array.isArray(
+              anticiposDetallePorTrabajador[idTrabajadorSeleccionado],
+            ) &&
+              anticiposDetallePorTrabajador[idTrabajadorSeleccionado].length >
+                0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {anticiposDetallePorTrabajador[idTrabajadorSeleccionado].map(
+                    (a) => {
+                      const saldo =
+                        Number(a.monto) - Number(a.monto_usado || 0);
+                      return (
+                        <span
+                          key={a.id_anticipo}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200 text-[11px] text-slate-700 whitespace-nowrap"
+                          title={`Anticipo #${a.id_anticipo} · ${a.estado}`}
+                        >
+                          <span className="font-semibold text-slate-800">
+                            {a.id_orden_fabricacion
+                              ? `OF #${a.id_orden_fabricacion}`
+                              : "Sin orden"}
+                          </span>
+                          <span className="text-slate-400">·</span>
+                          <span>{fmtCOP(a.monto)}</span>
+                          {Number(a.monto_usado || 0) > 0 && (
+                            <>
+                              <span className="text-slate-400">·</span>
+                              <span className="text-slate-500">
+                                usado {fmtCOP(a.monto_usado)}
+                              </span>
+                            </>
+                          )}
+                          <span className="text-slate-400">·</span>
+                          <span className="font-semibold text-sky-700">
+                            saldo {fmtCOP(saldo)}
+                          </span>
+                        </span>
+                      );
+                    },
+                  )}
+                </div>
+              )}
           </div>
         )}
       </div>

@@ -962,7 +962,10 @@ const TesoreriaDashboard = () => {
                             devolucion_cliente: "Devolución",
                           };
                           const docLabel = labelMap[tipo] || "Documento";
-                          showTooltip(e, `${docLabel} #${mov.id_documento || ""}`);
+                          showTooltip(
+                            e,
+                            `${docLabel} #${mov.id_documento || ""}`,
+                          );
                         }}
                         onMouseMove={moveTooltip}
                         onMouseLeave={hideTooltip}
@@ -985,7 +988,12 @@ const TesoreriaDashboard = () => {
                       </td>
                       <td
                         className="px-4 py-3 text-sm text-slate-500 max-w-[150px] truncate cursor-default"
-                        onMouseEnter={(e) => showTooltip(e, `${getIdReferencia(mov)} — ${mov.observaciones || mov.referencia || ""}`)}
+                        onMouseEnter={(e) =>
+                          showTooltip(
+                            e,
+                            `${getIdReferencia(mov)} — ${mov.observaciones || mov.referencia || ""}`,
+                          )
+                        }
                         onMouseMove={moveTooltip}
                         onMouseLeave={hideTooltip}
                       >

@@ -3,7 +3,7 @@ const db = require("../database/db");
 const etapasProduccionModel = {
   getAll: async () => {
     const [rows] = await db.query(
-      "SELECT * FROM etapas_produccion ORDER BY orden ASC",
+      "SELECT * FROM etapas_produccion ORDER BY orden ASC, id_etapa DESC",
     );
     return rows;
   },

@@ -374,6 +374,11 @@ const OrdenVentaForm = () => {
       }
 
       toast.success("Orden de venta creada correctamente");
+      if (ordenRes?.data?.id_orden_fabricacion_entregada) {
+        toast.success(
+          `La OF #${ordenRes.data.id_orden_fabricacion_entregada} se marcó como entregada en el Kanban.`,
+        );
+      }
       navigate("/ordenes_venta");
     } catch (error) {
       setIsSubmitting(false);

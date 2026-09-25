@@ -16,7 +16,7 @@ const reportesController = {
     } catch (error) {
       console.error(
         "Error al obtener reporte de servicios tercerizados:",
-        error
+        error,
       );
       res.status(500).json({ error: "Error al generar el reporte" });
     }
@@ -43,7 +43,7 @@ const reportesController = {
     } catch (error) {
       console.error(
         "Error al obtener reporte de avance de fabricación:",
-        error
+        error,
       );
       res.status(500).json({ error: "Error al generar el reporte" });
     }
@@ -75,7 +75,17 @@ const reportesController = {
 
   async getInventarioActual(req, res) {
     try {
-      let { categoria, articulo, desde, hasta } = req.query;
+      let {
+        categoria,
+        articulo,
+        desde,
+        hasta,
+        id_etapa,
+        buscar,
+        id_categoria,
+        tipo_categoria,
+        id_unidad,
+      } = req.query;
 
       // Si llegan parámetros duplicados (?desde=...&desde=...), Express puede parsearlos como array
       if (Array.isArray(desde)) {
@@ -110,6 +120,11 @@ const reportesController = {
         articulo,
         desde,
         hasta,
+        id_etapa,
+        buscar,
+        id_categoria,
+        tipo_categoria,
+        id_unidad,
       });
       res.json({ success: true, data });
     } catch (error) {
@@ -156,7 +171,7 @@ const reportesController = {
         solo_mano_obra == null
           ? true
           : ["1", "true", "si", "sí", "yes"].includes(
-              String(solo_mano_obra).toLowerCase()
+              String(solo_mano_obra).toLowerCase(),
             );
 
       const data = await reportesModel.getUtilidadPorOrden({
@@ -274,7 +289,7 @@ const reportesController = {
     } catch (error) {
       console.error(
         "Error al obtener reporte de movimientos de inventario:",
-        error
+        error,
       );
       res.status(500).json({
         success: false,

@@ -17,7 +17,9 @@ const ListaTrabajadores = () => {
     const fetchTrabajadores = async () => {
       setLoading(true);
       try {
-        const res = await api.get("/trabajadores");
+        const res = await api.get("/trabajadores", {
+          params: { incluir_inactivos: true },
+        });
         setTrabajadores(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Error cargando trabajadores", error);
@@ -31,24 +33,27 @@ const ListaTrabajadores = () => {
 
   const handleDelete = (id) => {
     confirmAlert({
-      title: "Confirmar eliminación",
-      message: "¿Seguro que quieres eliminar este trabajador?",
+      title: "Confirmar inhabilitación",
+      message:
+        "¿Seguro que quieres inhabilitar este trabajador? Su histórico (avances, anticipos, pagos) se conservará para auditoría.",
       buttons: [
         {
-          label: "Sí",
+          label: "Sí, inhabilitar",
           onClick: async () => {
             try {
               await api.delete(`/trabajadores/${id}`);
-              toast.success("Trabajador eliminado");
+              toast.success("Trabajador inhabilitado");
               setTrabajadores((prev) =>
-                prev.filter((t) => t.id_trabajador !== id),
+                prev.map((t) =>
+                  t.id_trabajador === id ? { ...t, activo: 0 } : t,
+                ),
               );
             } catch (error) {
               const msg =
                 error.response?.data?.mensaje ||
                 error.response?.data?.message ||
                 error.message;
-              toast.error(msg || "Error interno al eliminar el trabajador");
+              toast.error(msg || "Error interno al inhabilitar el trabajador");
             }
           },
         },
@@ -73,9 +78,14 @@ const ListaTrabajadores = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Trabajadores
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Catálogo de
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Trabajadores
+            </h1>
+          </div>
           {trabajadores.length > 0 && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
               {trabajadores.length}

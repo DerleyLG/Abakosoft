@@ -1063,14 +1063,11 @@ const SeguimientoArticuloDrawer = ({ isOpen, onClose, idArticulo }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {/* Overlay: sin backdrop-blur (muy costoso en animación) */}
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-slate-100 shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-slate-100 shadow-2xl flex flex-col transform-gpu will-change-transform animate-slide-in-right">
         {/* Header */}
         <div className="bg-slate-800 px-6 py-5 flex-shrink-0">
           <div className="flex items-center justify-between">

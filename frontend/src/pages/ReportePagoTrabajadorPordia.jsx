@@ -24,7 +24,9 @@ const ReportePagoTrabajadorPorDia = () => {
   useEffect(() => {
     const cargarTrabajadores = async () => {
       try {
-        const res = await api.get("/trabajadores");
+        const res = await api.get("/trabajadores", {
+          params: { incluir_inactivos: true },
+        });
         const data = Array.isArray(res.data) ? res.data : [];
         setTrabajadores(
           data.map((t) => ({ value: t.id_trabajador, label: t.nombre })),

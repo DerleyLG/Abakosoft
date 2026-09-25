@@ -18,10 +18,22 @@ router.get(
   inventarioController.obtenerInventario,
 );
 router.get(
+  "/por-etapas",
+  requirePlanFeature("inventario"),
+  requirePermission(ACTIONS.INVENTORY_VIEW),
+  inventarioController.obtenerInventarioPorEtapas,
+);
+router.get(
   "/bajo-stock",
   requirePlanFeature("inventario"),
   requirePermission(ACTIONS.INVENTORY_VIEW),
   inventarioController.getArticulosBajoStock,
+);
+router.get(
+  "/:id/movimientos",
+  requirePlanFeature("inventario"),
+  requirePermission(ACTIONS.INVENTORY_VIEW),
+  inventarioController.getMovimientosArticulo,
 );
 router.get(
   "/:id",

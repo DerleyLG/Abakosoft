@@ -138,7 +138,17 @@ module.exports = {
     const [rows] = await db.query(sql, valores);
     return rows;
   },
-  async getInventarioActual({ categoria, articulo, desde, hasta }) {
+  async getInventarioActual({
+    categoria,
+    articulo,
+    desde,
+    hasta,
+    id_etapa,
+    buscar,
+    id_categoria,
+    tipo_categoria,
+    id_unidad,
+  }) {
     try {
       if (Array.isArray(desde)) {
         desde = desde[desde.length - 1];
@@ -164,6 +174,13 @@ module.exports = {
       const filtros = [];
       const paramsWhere = [];
 
+      // Búsqueda global (misma lógica que el módulo de inventario)
+      if (buscar && String(buscar).trim() !== "") {
+        filtros.push("(a.descripcion LIKE ? OR a.referencia LIKE ?)");
+        const like = `%${buscar}%`;
+        paramsWhere.push(like, like);
+      }
+
       if (categoria) {
         filtros.push("c.nombre LIKE ?");
         paramsWhere.push(`%${categoria}%`);
@@ -172,6 +189,32 @@ module.exports = {
       if (articulo) {
         filtros.push("a.descripcion LIKE ?");
         paramsWhere.push(`%${articulo}%`);
+      }
+
+      if (id_categoria) {
+        filtros.push("a.id_categoria = ?");
+        paramsWhere.push(Number(id_categoria));
+      }
+
+      if (tipo_categoria) {
+        filtros.push("c.tipo = ?");
+        paramsWhere.push(tipo_categoria);
+      }
+
+      if (id_unidad) {
+        filtros.push("a.id_unidad = ?");
+        paramsWhere.push(Number(id_unidad));
+      }
+
+      if (id_etapa) {
+        // Mismo criterio que el módulo de inventario: "sin_produccion"
+        // filtra artículos sin etapa actual (sin OF activa ni avances).
+        if (String(id_etapa) === "sin_produccion") {
+          filtros.push("etapa_actual_agg.id_etapa_actual IS NULL");
+        } else {
+          filtros.push("etapa_actual_agg.id_etapa_actual = ?");
+          paramsWhere.push(Number(id_etapa));
+        }
       }
 
       const where = filtros.length > 0 ? `WHERE ${filtros.join(" AND ")}` : "";
@@ -213,6 +256,8 @@ module.exports = {
         i.stock,
         i.stock_minimo,
         i.ultima_actualizacion,
+        etapa_actual_agg.id_etapa_actual AS id_etapa_actual,
+        ep_actual.nombre AS nombre_etapa_actual,
         COALESCE((
           SELECT SUM(mv.cantidad_movida)
           FROM movimientos_inventario mv
@@ -221,18 +266,51 @@ module.exports = {
         COALESCE((
           SELECT SUM(mf.cantidad_movida)
           FROM movimientos_inventario mf
+      LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
           WHERE ${fabricadasConds.join(" AND ")}
         ), 0) AS unidades_fabricadas
       FROM inventario i
       INNER JOIN articulos a ON i.id_articulo = a.id_articulo
       LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+      -- Etapa actual por artículo (misma lógica del Kanban)
+      LEFT JOIN (
+          SELECT
+              art.id_articulo,
+              MIN(COALESCE(
+                  ep_en_proceso.id_etapa,
+                  ep_siguiente.id_etapa,
+                  ep_primera.id_etapa
+              )) AS id_etapa_actual
+          FROM articulos art
+          LEFT JOIN (
+              SELECT aep.id_articulo, MIN(ep.orden) AS min_orden
+              FROM avance_etapas_produccion aep
+              JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+              JOIN ordenes_fabricacion ofa ON aep.id_orden_fabricacion = ofa.id_orden_fabricacion
+              WHERE aep.estado = 'en proceso'
+                AND ofa.estado IN ('pendiente', 'en proceso')
+              GROUP BY aep.id_articulo
+          ) en_proceso ON en_proceso.id_articulo = art.id_articulo
+          LEFT JOIN etapas_produccion ep_en_proceso ON ep_en_proceso.orden = en_proceso.min_orden
+          LEFT JOIN (
+              SELECT aep.id_articulo, MAX(ep.orden) AS max_orden_completada
+              FROM avance_etapas_produccion aep
+              JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+              JOIN ordenes_fabricacion ofa ON aep.id_orden_fabricacion = ofa.id_orden_fabricacion
+              WHERE aep.estado = 'completado'
+                AND ofa.estado IN ('pendiente', 'en proceso')
+              GROUP BY aep.id_articulo
+          ) completadas ON completadas.id_articulo = art.id_articulo
+          LEFT JOIN etapas_produccion ep_siguiente ON ep_siguiente.orden = completadas.max_orden_completada + 1
+          LEFT JOIN etapas_produccion ep_primera ON ep_primera.orden = (SELECT MIN(orden) FROM etapas_produccion)
+          GROUP BY art.id_articulo
+      ) etapa_actual_agg ON etapa_actual_agg.id_articulo = i.id_articulo
+      LEFT JOIN etapas_produccion ep_actual ON ep_actual.id_etapa = etapa_actual_agg.id_etapa_actual
       ${where}
       ORDER BY a.descripcion
     `;
 
       const allParams = [...paramsVentas, ...paramsFabricadas, ...paramsWhere];
-      console.log("Consulta Inventario:", sql);
-      console.log("Parámetros:", allParams);
 
       const [rows] = await db.query(sql, allParams);
       return rows;

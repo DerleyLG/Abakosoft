@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import Select from "react-select";
+import AsyncSelect from "react-select/async";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { FiArrowLeft } from "react-icons/fi";
@@ -13,18 +13,17 @@ const NuevoInventario = () => {
   const [cantidad, setCantidad] = useState(0);
   const [stockMinimo, setStockMinimo] = useState(0);
   const navigate = useNavigate();
+  const cacheRef = useRef({});
+  const timerRef = useRef(null);
 
+  // Cargar las primeras 20 sugerencias al inicio
   useEffect(() => {
     const fetchArticulos = async () => {
       try {
-        const resTotal = await api.get("/articulos", {
-          params: { page: 1, pageSize: 1 },
-        });
-        const total = resTotal.data.total || 10000;
         const res = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: total,
+            pageSize: 20,
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -34,18 +33,53 @@ const NuevoInventario = () => {
           : Array.isArray(res.data)
             ? res.data
             : [];
-        setArticulos(
-          lista.map((art) => ({
-            value: art.id_articulo,
-            label: art.descripcion,
-          })),
-        );
+        const opciones = lista.map((art) => ({
+          value: art.id_articulo,
+          label: art.descripcion,
+          ...art,
+        }));
+        setArticulos(opciones);
+        cacheRef.current[""] = opciones;
       } catch (error) {
         console.error("Error al cargar artículos", error);
         toast.error("Error al cargar artículos");
       }
     };
     fetchArticulos();
+  }, []);
+
+  // Búsqueda remota: consulta al backend por cada término (todos los artículos)
+  const loadArticulosOptions = useCallback((inputValue, callback) => {
+    const cacheKey = inputValue?.toLowerCase() || "";
+    if (cacheRef.current[cacheKey]) {
+      callback(cacheRef.current[cacheKey]);
+      return;
+    }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get("/articulos", {
+          params: {
+            buscar: inputValue || "",
+            page: 1,
+            pageSize: 20,
+            sortBy: "descripcion",
+            sortDir: "asc",
+          },
+        });
+        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+        const opciones = rows.map((art) => ({
+          value: art.id_articulo,
+          label: art.descripcion,
+          ...art,
+        }));
+        cacheRef.current[cacheKey] = opciones;
+        callback(opciones);
+      } catch (error) {
+        console.error("Error buscando artículos", error);
+        callback([]);
+      }
+    }, 300);
   }, []);
 
   const handleSubmit = async (e) => {
@@ -131,13 +165,17 @@ const NuevoInventario = () => {
               <label className={labelCls}>
                 Artículo <span className="text-red-400">*</span>
               </label>
-              <Select
-                options={articulos}
+              <AsyncSelect
+                cacheOptions
+                loadOptions={loadArticulosOptions}
+                defaultOptions={articulos}
                 value={articuloSeleccionado}
                 onChange={setArticuloSeleccionado}
-                placeholder="Selecciona un artículo…"
+                placeholder="Busca un artículo…"
                 isClearable
                 className="text-sm"
+                noOptionsMessage={() => "No se encontraron artículos"}
+                loadingMessage={() => "Buscando…"}
                 styles={{
                   control: (base, state) => ({
                     ...base,

@@ -227,10 +227,7 @@ const ProrrateoOrdenDrawer = ({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
       <div className="relative ml-auto w-full max-w-6xl bg-gradient-to-br from-slate-50 to-white h-full shadow-2xl flex flex-col">
         {/* Header */}
         <div className=" bg-indigo-400  px-8 py-5 flex-shrink-0">
@@ -553,7 +550,7 @@ const ProrrateoOrdenDrawer = ({
                           </div>
                         </div>
                       ))}
-                  </div>    
+                  </div>
                 </div>
               )}
 

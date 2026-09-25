@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { FiEdit2, FiTrash2, FiPlus, FiCheck, FiX } from "react-icons/fi";
+import {
+  FiEdit2,
+  FiTrash2,
+  FiPlus,
+  FiCheck,
+  FiX,
+  FiSettings,
+} from "react-icons/fi";
 import api from "../services/api";
 import toast from "react-hot-toast";
 
@@ -467,14 +474,27 @@ const Configuracion = () => {
   const [tab, setTab] = useState("metodos");
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Configuración</h1>
-      <p className="text-slate-500 text-sm mb-6">
-        Administra los catálogos base del sistema.
-      </p>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-5">
+      {/* ─── Encabezado ─── */}
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-2xl bg-slate-900 flex items-center justify-center shadow-sm">
+          <FiSettings size={22} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Administración de
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+            Configuración
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Administra los catálogos base del sistema.
+          </p>
+        </div>
+      </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-6 gap-1">
+      <div className="flex border-b border-slate-200 gap-1">
         {TABS.map((t) => (
           <button
             key={t.id}

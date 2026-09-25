@@ -112,9 +112,9 @@ export const PERMISSION_TO_FEATURE = {
   "sales:delete": "ventas",
 
   // Devoluciones
-"returns:view": "devoluciones",
-"returns:create": "devoluciones",
-"returns:cancel": "devoluciones",
+  "returns:view": "devoluciones",
+  "returns:create": "devoluciones",
+  "returns:cancel": "devoluciones",
 
   // Órdenes de Pedido
   "orders:view": "ordenes",
@@ -145,6 +145,7 @@ export const PERMISSION_TO_FEATURE = {
   "payments:create": "pagos",
   "payments:delete": "pagos",
   "anticipos:view": "anticipos",
+  "anticipos:create": "anticipos",
   // Ventas a Crédito
   "credits:view": "creditos",
   "credits:create": "creditos",
@@ -158,6 +159,7 @@ export const PERMISSION_TO_FEATURE = {
   // Tesorería
   "treasury:view": "tesoreria",
   "treasury:manage": "tesoreria",
+  "treasury:reconcile": "tesoreria",
   // Cierres de Caja
   "cash_closings:view": "cierres_caja",
   "cash_closings:create": "cierres_caja",

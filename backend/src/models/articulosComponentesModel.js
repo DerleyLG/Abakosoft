@@ -43,8 +43,8 @@ const ArticuloComponente = {
     },
 
     
-    async deleteByArticuloPadreId(articuloPadreId) {
-        const [result] = await db.query(
+    async deleteByArticuloPadreId(articuloPadreId, connection = db) {
+        const [result] = await (connection || db).query(
             "DELETE FROM articulos_componentes WHERE articulo_padre_id = ?",
             [articuloPadreId]
         );

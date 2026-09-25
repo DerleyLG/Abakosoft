@@ -25,7 +25,9 @@ const PagosTrabajadores = () => {
   useEffect(() => {
     const fetchInit = async () => {
       try {
-        const resTrabajadores = await api.get("/trabajadores");
+        const resTrabajadores = await api.get("/trabajadores", {
+          params: { incluir_inactivos: true },
+        });
         setTrabajadores(resTrabajadores.data || []);
       } catch (error) {
         console.error("Error cargando trabajadores:", error);
@@ -139,9 +141,14 @@ const PagosTrabajadores = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Pagos
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Remuneración y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Pagos
+            </h1>
+          </div>
           {total > 0 && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
               {total}
@@ -185,6 +192,7 @@ const PagosTrabajadores = () => {
           {trabajadores.map((t) => (
             <option key={t.id_trabajador} value={t.id_trabajador}>
               {t.nombre}
+              {Number(t.activo) === 0 ? " (inactivo)" : ""}
             </option>
           ))}
         </select>

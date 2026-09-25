@@ -12,6 +12,7 @@ import {
   FiBox,
   FiTruck,
   FiPercent,
+  FiChevronRight,
 } from "react-icons/fi";
 import { useIdempotencyKey } from "../hooks/useIdempotencyKey";
 
@@ -133,6 +134,20 @@ const CierresCajaCerrar = () => {
     // Evitar problemas de zona horaria
     const [year, month, day] = fecha.split("T")[0].split("-");
     return new Date(year, month - 1, day).toLocaleDateString("es-CO");
+  };
+
+  // Drill-down: abrir la conciliación bancaria con el rango del cierre
+  // precargado, para que el usuario pueda verificar las transferencias
+  // que el cierre está contando.
+  const irAConciliacion = () => {
+    if (!cierre) return;
+    const desde = cierre.fecha_inicio
+      ? String(cierre.fecha_inicio).split("T")[0].split(" ")[0]
+      : "";
+    const hasta = cierre.fecha_fin
+      ? String(cierre.fecha_fin).split("T")[0].split(" ")[0]
+      : new Date().toISOString().slice(0, 10);
+    navigate(`/conciliacion-bancaria?desde=${desde}&hasta=${hasta}`);
   };
 
   const handleSubmit = async (e) => {
@@ -395,6 +410,9 @@ const CierresCajaCerrar = () => {
                 <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   Saldo Final
                 </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
+                  Conciliación
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -423,6 +441,28 @@ const CierresCajaCerrar = () => {
                     <span className="text-sm font-bold text-slate-900">
                       {formatMonto(detalle.saldo_final)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {detalle.total_transferencias > 0 ? (
+                      <button
+                        onClick={irAConciliacion}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${
+                          detalle.transferencias_conciliadas ===
+                          detalle.total_transferencias
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                        title={`Transferencias de venta del período del cierre (${formatFecha(
+                          cierre.fecha_inicio,
+                        )} → ${formatFecha(cierre.fecha_fin)}) validadas en conciliación bancaria. Clic para ver el detalle con el rango precargado.`}
+                      >
+                        {detalle.transferencias_conciliadas} de{" "}
+                        {detalle.total_transferencias} validadas
+                        <FiChevronRight size={11} />
+                      </button>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -469,6 +509,9 @@ const CierresCajaCerrar = () => {
                       ),
                     )}
                   </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-slate-300 text-xs">—</span>
                 </td>
               </tr>
             </tbody>

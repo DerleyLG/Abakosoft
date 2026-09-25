@@ -20,7 +20,12 @@ import {
   ChevronRight,
   LogOut,
 } from "lucide-react";
-import { FiDollarSign, FiCreditCard, FiCalendar } from "react-icons/fi";
+import {
+  FiDollarSign,
+  FiCreditCard,
+  FiCalendar,
+  FiCheckCircle,
+} from "react-icons/fi";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
@@ -93,12 +98,13 @@ const Sidebar = ({ isOpen }) => {
     ACTIONS.CATEGORIES_VIEW,
     ACTIONS.SUPPLIERS_VIEW,
     ACTIONS.CLIENTS_VIEW,
+    ACTIONS.WORKERS_VIEW,
   );
 
   const showOperaciones = hasAnyPermission(
-    ACTIONS.WORKERS_VIEW,
     ACTIONS.PAYMENTS_VIEW,
     ACTIONS.PAYMENTS_CREATE,
+    ACTIONS.ANTICIPOS_VIEW,
     ACTIONS.INVENTORY_VIEW,
   );
 
@@ -167,26 +173,33 @@ const Sidebar = ({ isOpen }) => {
                 <Users size={17} /> Clientes
               </NavLink>
             )}
+            {can(user, ACTIONS.WORKERS_VIEW) &&
+              features.includes("trabajadores") && (
+                <NavLink to="/trabajadores" end className={navLinkClass}>
+                  <Settings size={17} /> Trabajadores
+                </NavLink>
+              )}
           </>
         )}
 
         {/* ── Operaciones ─────────────────────────── */}
         {showOperaciones &&
           (features.includes("trabajadores") ||
-            features.includes("inventario")) && (
+            features.includes("inventario") ||
+            features.includes("anticipos")) && (
             <>
               <SectionLabel>Operaciones</SectionLabel>
-              {can(user, ACTIONS.WORKERS_VIEW) &&
-                features.includes("trabajadores") && (
-                  <NavLink to="/trabajadores" end className={navLinkClass}>
-                    <Settings size={17} /> Trabajadores
-                  </NavLink>
-                )}
               {(can(user, ACTIONS.PAYMENTS_VIEW) ||
                 can(user, ACTIONS.PAYMENTS_CREATE)) &&
                 features.includes("pagos") && (
                   <NavLink to="/trabajadores/pagos" className={navLinkClass}>
                     <FiCreditCard size={17} /> Pagos
+                  </NavLink>
+                )}
+              {can(user, ACTIONS.ANTICIPOS_VIEW) &&
+                features.includes("anticipos") && (
+                  <NavLink to="/pagos_anticipados" className={navLinkClass}>
+                    <FiDollarSign size={17} /> Anticipos
                   </NavLink>
                 )}
               {can(user, ACTIONS.INVENTORY_VIEW) &&
@@ -226,92 +239,103 @@ const Sidebar = ({ isOpen }) => {
                 )}
               </button>
 
+              {/* Animación suave con grid-template-rows: se ajusta a la altura
+                  real del contenido (el max-h fijo se ve brusco) */}
               <div
-                className={`ml-2 overflow-hidden transition-all duration-300 ease-in-out ${
-                  ordenesOpen
-                    ? "max-h-[1000px] opacity-100"
-                    : "max-h-0 opacity-0"
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                  ordenesOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                 }`}
               >
-                <div className="ml-3 border-l border-slate-700 pl-3 pb-1 space-y-0.5">
-                  {/* ── Ventas ── */}
-                  {(can(user, ACTIONS.SALES_VIEW) ||
-                    can(user, ACTIONS.RETURNS_VIEW) ||
-                    can(user, ACTIONS.REPAIRS_VIEW) ||
-                    can(user, ACTIONS.ORDERS_VIEW)) && (
-                    <>
-                      <MiniLabel>Comercial</MiniLabel>
-                      {can(user, ACTIONS.SALES_VIEW) &&
-                        features.includes("ventas") && (
-                          <NavLink to="/ordenes_venta" className={subLinkClass}>
-                            <ShoppingCart size={14} /> Ventas
-                          </NavLink>
-                        )}
-                      {can(user, ACTIONS.RETURNS_VIEW) &&
-                        features.includes("devoluciones") && (
-                          <NavLink to="/devoluciones" className={subLinkClass}>
-                            <RotateCcw size={14} /> Devoluciones
-                          </NavLink>
-                        )}
-                      {can(user, ACTIONS.REPAIRS_VIEW) && (
-                        <NavLink to="/reparaciones" className={subLinkClass}>
-                          <Wrench size={14} /> Reparaciones
-                        </NavLink>
-                      )}
-                      {can(user, ACTIONS.ORDERS_VIEW) &&
-                        (features.includes("ordenes_pedido") ||
-                          features.includes("pedidos")) && (
-                          <NavLink
-                            to="/ordenes_pedido"
-                            className={subLinkClass}
-                          >
-                            <FilePlus2 size={14} /> Pedidos
-                          </NavLink>
-                        )}
-                    </>
-                  )}
-
-                  {/* ── Compras ── */}
-                  {can(user, ACTIONS.PURCHASES_VIEW) &&
-                    features.includes("compras") && (
+                <div className="overflow-hidden">
+                  <div className="ml-3 border-l border-slate-700 pl-3 pb-1 space-y-0.5">
+                    {/* ── Ventas ── */}
+                    {(can(user, ACTIONS.SALES_VIEW) ||
+                      can(user, ACTIONS.RETURNS_VIEW) ||
+                      can(user, ACTIONS.REPAIRS_VIEW) ||
+                      can(user, ACTIONS.ORDERS_VIEW)) && (
                       <>
-                        <MiniLabel>Abastecimiento</MiniLabel>
-                        <NavLink to="/ordenes_compra" className={subLinkClass}>
-                          <Truck size={14} /> Compras
-                        </NavLink>
-                      </>
-                    )}
-
-                  {/* ── Producción ── */}
-                  {can(user, ACTIONS.FABRICATION_VIEW) &&
-                    features.includes("fabricacion") && (
-                      <>
-                        <MiniLabel>Producción</MiniLabel>
-                        {can(user, ACTIONS.FABRICATION_VIEW) && (
-                          <NavLink
-                            to="/ordenes_fabricacion"
-                            className={subLinkClass}
-                          >
-                            <Factory size={14} /> Fabricación
-                          </NavLink>
-                        )}
-                        {can(user, ACTIONS.KANBAN_VIEW) &&
-                          features.includes("kanban") && (
-                            <NavLink to="/kanban" className={subLinkClass}>
-                              <Kanban size={14} /> Tablero
-                            </NavLink>
-                          )}
-                        {can(user, ACTIONS.PROGRESS_VIEW) &&
-                          features.includes("progreso") && (
+                        <MiniLabel>Comercial</MiniLabel>
+                        {can(user, ACTIONS.SALES_VIEW) &&
+                          features.includes("ventas") && (
                             <NavLink
-                              to="/progreso-fabricacion"
+                              to="/ordenes_venta"
                               className={subLinkClass}
                             >
-                              <TrendingUp size={14} /> Progreso
+                              <ShoppingCart size={14} /> Ventas
+                            </NavLink>
+                          )}
+                        {can(user, ACTIONS.RETURNS_VIEW) &&
+                          features.includes("devoluciones") && (
+                            <NavLink
+                              to="/devoluciones"
+                              className={subLinkClass}
+                            >
+                              <RotateCcw size={14} /> Devoluciones
+                            </NavLink>
+                          )}
+                        {can(user, ACTIONS.REPAIRS_VIEW) && (
+                          <NavLink to="/reparaciones" className={subLinkClass}>
+                            <Wrench size={14} /> Reparaciones
+                          </NavLink>
+                        )}
+                        {can(user, ACTIONS.ORDERS_VIEW) &&
+                          (features.includes("ordenes_pedido") ||
+                            features.includes("pedidos")) && (
+                            <NavLink
+                              to="/ordenes_pedido"
+                              className={subLinkClass}
+                            >
+                              <FilePlus2 size={14} /> Pedidos
                             </NavLink>
                           )}
                       </>
                     )}
+
+                    {/* ── Compras ── */}
+                    {can(user, ACTIONS.PURCHASES_VIEW) &&
+                      features.includes("compras") && (
+                        <>
+                          <MiniLabel>Abastecimiento</MiniLabel>
+                          <NavLink
+                            to="/ordenes_compra"
+                            className={subLinkClass}
+                          >
+                            <Truck size={14} /> Compras
+                          </NavLink>
+                        </>
+                      )}
+
+                    {/* ── Producción ── */}
+                    {can(user, ACTIONS.FABRICATION_VIEW) &&
+                      features.includes("fabricacion") && (
+                        <>
+                          <MiniLabel>Producción</MiniLabel>
+                          {can(user, ACTIONS.FABRICATION_VIEW) && (
+                            <NavLink
+                              to="/ordenes_fabricacion"
+                              className={subLinkClass}
+                            >
+                              <Factory size={14} /> Fabricación
+                            </NavLink>
+                          )}
+                          {can(user, ACTIONS.KANBAN_VIEW) &&
+                            features.includes("kanban") && (
+                              <NavLink to="/kanban" className={subLinkClass}>
+                                <Kanban size={14} /> Tablero
+                              </NavLink>
+                            )}
+                          {can(user, ACTIONS.PROGRESS_VIEW) &&
+                            features.includes("progreso") && (
+                              <NavLink
+                                to="/progreso-fabricacion"
+                                className={subLinkClass}
+                              >
+                                <TrendingUp size={14} /> Progreso
+                              </NavLink>
+                            )}
+                        </>
+                      )}
+                  </div>
                 </div>
               </div>
             </>
@@ -331,6 +355,11 @@ const Sidebar = ({ isOpen }) => {
               {can(user, ACTIONS.TREASURY_VIEW) && (
                 <NavLink to="/tesoreria" className={navLinkClass}>
                   <FiDollarSign size={17} /> Tesorería
+                </NavLink>
+              )}
+              {can(user, ACTIONS.TREASURY_VIEW) && (
+                <NavLink to="/conciliacion-bancaria" className={navLinkClass}>
+                  <FiCheckCircle size={17} /> Conciliación Bancaria
                 </NavLink>
               )}
               {can(user, ACTIONS.CASH_CLOSINGS_VIEW) &&
@@ -353,7 +382,16 @@ const Sidebar = ({ isOpen }) => {
                 </NavLink>
               )}
             {can(user, ACTIONS.USERS_MANAGE) && (
-              <NavLink to="/gestionUsuarios" className={navLinkClass}>
+              <NavLink
+                to="/gestionUsuarios"
+                className={({ isActive }) =>
+                  navLinkClass({
+                    isActive:
+                      isActive ||
+                      window.location.pathname.startsWith("/gestionRoles"),
+                  })
+                }
+              >
                 <Users size={17} /> Gestión de Usuarios
               </NavLink>
             )}

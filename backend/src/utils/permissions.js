@@ -86,6 +86,7 @@ const ACTIONS = {
 
   // Anticipos
   ANTICIPOS_VIEW: "anticipos:view",
+  ANTICIPOS_CREATE: "anticipos:create",
 
   // Ventas a Crédito / Abonos
   CREDITS_VIEW: "credits:view",
@@ -102,6 +103,7 @@ const ACTIONS = {
   // Tesorería
   TREASURY_VIEW: "treasury:view",
   TREASURY_MANAGE: "treasury:manage",
+  TREASURY_RECONCILE: "treasury:reconcile",
 
   // Cierres de Caja
   CASH_CLOSINGS_VIEW: "cash_closings:view",

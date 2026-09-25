@@ -313,8 +313,30 @@ module.exports = {
       }
 
       // Solo completar el pedido si existe un id_pedido
+      let idOrdenFabricacionEntregada = null;
       if (id_pedido) {
         await pedidoModel.completar(id_pedido, connection);
+
+        // Marcar automáticamente la(s) OF(s) asociada(s) al pedido como entregada(s)
+        // para que aparezcan en la columna "Entregada" del Kanban.
+        // La OF se identifica por su id_pedido (no por la orden de venta).
+        const [ofsDelPedido] = await connection.query(
+          `SELECT id_orden_fabricacion, estado
+           FROM ordenes_fabricacion
+           WHERE id_pedido = ?`,
+          [id_pedido],
+        );
+        for (const ofRow of ofsDelPedido) {
+          // No tocar estados terminales ya cerrados: entregada/cancelada
+          if (!["entregada", "cancelada"].includes(String(ofRow.estado))) {
+            await connection.query(
+              `UPDATE ordenes_fabricacion SET estado = 'entregada', fecha_entrega = NOW()
+               WHERE id_orden_fabricacion = ?`,
+              [ofRow.id_orden_fabricacion],
+            );
+            idOrdenFabricacionEntregada = ofRow.id_orden_fabricacion;
+          }
+        }
       }
 
       await connection.commit();
@@ -323,6 +345,9 @@ module.exports = {
       return res.status(201).json({
         message: "Orden de venta y movimiento de tesorería creados.",
         id_orden_venta,
+        ...(idOrdenFabricacionEntregada
+          ? { id_orden_fabricacion_entregada: idOrdenFabricacionEntregada }
+          : {}),
       });
     } catch (error) {
       if (connection) {
@@ -600,14 +625,6 @@ module.exports = {
         }
       }
 
-      console.log("Actualizando orden de venta:", {
-        id,
-        id_cliente,
-        estado,
-        total: nuevoTotal,
-        ordenActual: { estado: ordenActual.estado, total: ordenActual.total },
-      });
-
       const updatedRows = await ordenModel.update(
         id,
         {
@@ -618,8 +635,6 @@ module.exports = {
         },
         connection,
       );
-
-      console.log("Filas actualizadas:", updatedRows);
 
       // ── Actualizar movimiento de tesorería ──
       const [movTes] = await connection.query(

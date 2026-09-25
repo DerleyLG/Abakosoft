@@ -335,7 +335,6 @@ const consumoMateriaPrimaController = {
   inicializarTabla: async () => {
     try {
       await consumoMateriaPrimaModel.createTableIfNotExists();
-      console.log("Tabla consumos_materia_prima verificada/creada");
     } catch (error) {
       console.error("Error inicializando tabla de consumos:", error);
     }

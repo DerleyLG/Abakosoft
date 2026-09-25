@@ -257,9 +257,14 @@ const OrdenesCompra = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Órdenes de compra
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Abastecimiento y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Órdenes de compra
+            </h1>
+          </div>
           {total > 0 && (
             <p className="text-xs text-slate-400 mt-0.5">{total} órdenes</p>
           )}
@@ -631,7 +636,14 @@ const OrdenesCompra = () => {
                                     orden.detalles.map((d, i) => (
                                       <tr key={i} className="hover:bg-slate-50">
                                         <td className="px-3 py-2 text-slate-700">
-                                          {d.descripcion_articulo}
+                                          <div className="flex items-center gap-2">
+                                            {d.descripcion_articulo}
+                                            {Number(d.es_bruto) === 1 && (
+                                              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-1.5 py-0.5 flex-shrink-0 whitespace-nowrap">
+                                                va a fábrica
+                                              </span>
+                                            )}
+                                          </div>
                                         </td>
                                         <td className="px-3 py-2 text-right text-slate-600">
                                           {formateaCantidad(d.cantidad)}

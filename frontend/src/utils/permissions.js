@@ -102,6 +102,7 @@ export const ACTIONS = {
 
   // Anticipos
   ANTICIPOS_VIEW: "anticipos:view",
+  ANTICIPOS_CREATE: "anticipos:create",
 
   // Ventas a Crédito / Abonos
   CREDITS_VIEW: "credits:view",
@@ -118,6 +119,7 @@ export const ACTIONS = {
   // Tesorería
   TREASURY_VIEW: "treasury:view",
   TREASURY_MANAGE: "treasury:manage",
+  TREASURY_RECONCILE: "treasury:reconcile",
 
   // Cierres de Caja
   CASH_CLOSINGS_VIEW: "cash_closings:view",
@@ -231,8 +233,8 @@ export const PERMISSION_GROUPS = {
     ACTIONS.PAYMENTS_VIEW,
     ACTIONS.PAYMENTS_CREATE,
     ACTIONS.PAYMENTS_DELETE,
-    ACTIONS.ANTICIPOS_VIEW,
   ],
+  Anticipos: [ACTIONS.ANTICIPOS_VIEW, ACTIONS.ANTICIPOS_CREATE],
   "Ventas a Crédito": [
     ACTIONS.CREDITS_VIEW,
     ACTIONS.CREDITS_CREATE,
@@ -246,6 +248,7 @@ export const PERMISSION_GROUPS = {
     ACTIONS.INDIRECT_COSTS_ASSIGN,
   ],
   Tesorería: [ACTIONS.TREASURY_VIEW, ACTIONS.TREASURY_MANAGE],
+  "Conciliación Bancaria": [ACTIONS.TREASURY_RECONCILE],
   "Cierres de Caja": [
     ACTIONS.CASH_CLOSINGS_VIEW,
     ACTIONS.CASH_CLOSINGS_CREATE,
@@ -349,6 +352,7 @@ export const ACTION_LABELS = {
   [ACTIONS.PAYMENTS_CREATE]: "Registrar pagos",
   [ACTIONS.PAYMENTS_DELETE]: "Eliminar pagos",
   [ACTIONS.ANTICIPOS_VIEW]: "Ver anticipos",
+  [ACTIONS.ANTICIPOS_CREATE]: "Registrar anticipos",
   [ACTIONS.CREDITS_VIEW]: "Ver ventas a crédito",
   [ACTIONS.CREDITS_CREATE]: "Crear crédito manual",
   [ACTIONS.CREDITS_MANAGE]: "Registrar abonos a créditos",
@@ -359,6 +363,7 @@ export const ACTION_LABELS = {
   [ACTIONS.INDIRECT_COSTS_ASSIGN]: "Asignar costos a órdenes",
   [ACTIONS.TREASURY_VIEW]: "Ver tesorería",
   [ACTIONS.TREASURY_MANAGE]: "Gestionar tesorería (transferencias)",
+  [ACTIONS.TREASURY_RECONCILE]: "Conciliar tesorería (validar transferencias)",
   [ACTIONS.CASH_CLOSINGS_VIEW]: "Ver cierres de caja",
   [ACTIONS.CASH_CLOSINGS_CREATE]: "Crear períodos de caja",
   [ACTIONS.CASH_CLOSINGS_CLOSE]: "Cerrar períodos de caja",
@@ -532,6 +537,9 @@ export const PERMISSION_DEPENDENCIES = {
   ],
   [ACTIONS.PAYMENTS_DELETE]: [ACTIONS.PAYMENTS_VIEW],
 
+  // Anticipos
+  [ACTIONS.ANTICIPOS_CREATE]: [ACTIONS.ANTICIPOS_VIEW],
+
   // Créditos
   [ACTIONS.CREDITS_CREATE]: [ACTIONS.CREDITS_VIEW],
   [ACTIONS.CREDITS_MANAGE]: [ACTIONS.CREDITS_VIEW],
@@ -551,6 +559,7 @@ export const PERMISSION_DEPENDENCIES = {
 
   // Tesorería
   [ACTIONS.TREASURY_MANAGE]: [ACTIONS.TREASURY_VIEW],
+  [ACTIONS.TREASURY_RECONCILE]: [ACTIONS.TREASURY_VIEW],
 
   // Cierres de Caja
   [ACTIONS.CASH_CLOSINGS_CREATE]: [ACTIONS.CASH_CLOSINGS_VIEW],

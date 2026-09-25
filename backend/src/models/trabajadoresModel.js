@@ -1,14 +1,13 @@
 // src/models/trabajadoresModel.js
-const db = require('../database/db');
+const db = require("../database/db");
 
 module.exports = {
-  getAll: async () => {
+  getAll: async ({ incluirInactivos = false } = {}) => {
     const [rows] = await db.query(`
       SELECT id_trabajador, nombre, telefono, cargo, activo
       FROM trabajadores
-      WHERE activo = 1
-      ORDER BY nombre
-
+      ${incluirInactivos ? "" : "WHERE activo = 1"}
+      ORDER BY activo DESC, nombre
     `);
     return rows;
   },
@@ -18,7 +17,7 @@ module.exports = {
       `SELECT id_trabajador, nombre, telefono, cargo, activo
        FROM trabajadores
        WHERE id_trabajador = ?`,
-      [id]
+      [id],
     );
     return rows[0];
   },
@@ -27,7 +26,7 @@ module.exports = {
     const [result] = await db.query(
       `INSERT INTO trabajadores (nombre, telefono, cargo, activo)
        VALUES (?, ?, ?, 1)`,
-      [nombre, telefono || null, cargo || null]
+      [nombre, telefono || null, cargo || null],
     );
     return result.insertId;
   },
@@ -37,7 +36,7 @@ module.exports = {
       `UPDATE trabajadores
        SET nombre = ?, telefono = ?, cargo = ?, activo = ?
        WHERE id_trabajador = ?`,
-      [nombre, telefono || null, cargo || null, activo ? 1 : 0, id]
+      [nombre, telefono || null, cargo || null, activo ? 1 : 0, id],
     );
   },
 
@@ -47,7 +46,7 @@ module.exports = {
       `UPDATE trabajadores
        SET activo = 0
        WHERE id_trabajador = ?`,
-      [id]
+      [id],
     );
-  }
+  },
 };

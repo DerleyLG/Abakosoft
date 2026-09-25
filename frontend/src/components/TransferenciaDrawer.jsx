@@ -1,43 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { FiRepeat, FiX, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { FiRepeat, FiX, FiTrendingUp, FiTrendingDown } from "react-icons/fi";
+import toast from "react-hot-toast";
 
-const TransferenciaDrawer = ({ 
-  isOpen, 
-  onClose, 
-  metodosPago, 
-  balanceEfectivo, 
+const TransferenciaDrawer = ({
+  isOpen,
+  onClose,
+  metodosPago,
+  balanceEfectivo,
   balanceTransferencia,
-  onTransferenciaExitosa 
+  onTransferenciaExitosa,
 }) => {
   const [transferencia, setTransferencia] = useState({
-    metodoOrigen: '',
-    metodoDestino: '',
-    monto: '',
-    observaciones: ''
+    metodoOrigen: "",
+    metodoDestino: "",
+    monto: "",
+    observaciones: "",
   });
   const [procesando, setProcesando] = useState(false);
 
   // Formatear número con separadores de miles
   const formatNumber = (value) => {
-    if (!value) return '';
-    const number = value.replace(/\D/g, '');
-    return number.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (!value) return "";
+    const number = value.replace(/\D/g, "");
+    return number.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   const handleMontoChange = (e) => {
-    const value = e.target.value.replace(/,/g, '');
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    const value = e.target.value.replace(/,/g, "");
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
       setTransferencia({ ...transferencia, monto: value });
     }
   };
 
-  const efectivo = metodosPago.find(m => m.nombre.toLowerCase().includes('efectivo'));
-  const transferenciaMetodo = metodosPago.find(m => m.nombre.toLowerCase().includes('transferencia'));
+  const efectivo = metodosPago.find((m) =>
+    m.nombre.toLowerCase().includes("efectivo"),
+  );
+  const transferenciaMetodo = metodosPago.find((m) =>
+    m.nombre.toLowerCase().includes("transferencia"),
+  );
 
   const getMetodoNombre = (id) => {
-    const metodo = metodosPago.find(m => m.id_metodo_pago === parseInt(id));
-    return metodo?.nombre || '';
+    const metodo = metodosPago.find((m) => m.id_metodo_pago === parseInt(id));
+    return metodo?.nombre || "";
   };
 
   // Calcular balances proyectados
@@ -70,27 +74,27 @@ const TransferenciaDrawer = ({
     e.preventDefault();
 
     if (!transferencia.metodoOrigen || !transferencia.metodoDestino) {
-      toast.error('Debes seleccionar método origen y destino');
+      toast.error("Debes seleccionar método origen y destino");
       return;
     }
 
     if (transferencia.metodoOrigen === transferencia.metodoDestino) {
-      toast.error('No puedes transferir al mismo método');
+      toast.error("No puedes transferir al mismo método");
       return;
     }
 
     const monto = parseFloat(transferencia.monto);
     if (isNaN(monto) || monto <= 0) {
-      toast.error('El monto debe ser mayor a 0');
+      toast.error("El monto debe ser mayor a 0");
       return;
     }
 
     const origenNombre = getMetodoNombre(transferencia.metodoOrigen);
     const destinoNombre = getMetodoNombre(transferencia.metodoDestino);
-    let tipoMovimiento = 'Transferencia de fondos';
+    let tipoMovimiento = "Transferencia de fondos";
 
     // La referencia se envía vacía
-    let referencia = '';
+    let referencia = "";
 
     // Observación automática si el usuario la deja en blanco
     let observaciones = transferencia.observaciones;
@@ -106,11 +110,16 @@ const TransferenciaDrawer = ({
         monto: monto,
         observaciones,
         referencia,
-        tipo_movimiento: tipoMovimiento
+        tipo_movimiento: tipoMovimiento,
       });
 
       // Limpiar formulario
-      setTransferencia({ metodoOrigen: '', metodoDestino: '', monto: '', observaciones: '' });
+      setTransferencia({
+        metodoOrigen: "",
+        metodoDestino: "",
+        monto: "",
+        observaciones: "",
+      });
       onClose();
     } catch (error) {
       // El error ya se maneja en el componente padre
@@ -120,23 +129,41 @@ const TransferenciaDrawer = ({
   };
 
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
   };
 
-  const { nuevoBalanceEfectivo, nuevoBalanceTransferencia } = calcularBalanceProyectado();
-  const mostrarProyeccion = transferencia.metodoOrigen && transferencia.metodoDestino && transferencia.monto;
+  const { nuevoBalanceEfectivo, nuevoBalanceTransferencia } =
+    calcularBalanceProyectado();
+  const mostrarProyeccion =
+    transferencia.metodoOrigen &&
+    transferencia.metodoDestino &&
+    transferencia.monto;
 
   // Determinar si es retiro o ingreso
-  const esRetiro = parseInt(transferencia.metodoOrigen) === transferenciaMetodo?.id_metodo_pago;
-  const esIngresoEfectivo = parseInt(transferencia.metodoDestino) === efectivo?.id_metodo_pago;
-  const tipoOperacion = esRetiro ? 'Retiro' : 'Ingreso';
-  const iconoOperacion = esRetiro ? <FiTrendingDown className="text-red-600" size={20} /> : <FiTrendingUp className={esIngresoEfectivo ? "text-green-600" : "text-blue-600"} size={20} />;
-  const colorOperacion = esRetiro ? 'text-red-600' : esIngresoEfectivo ? 'text-green-600' : 'text-blue-600';
+  const esRetiro =
+    parseInt(transferencia.metodoOrigen) ===
+    transferenciaMetodo?.id_metodo_pago;
+  const esIngresoEfectivo =
+    parseInt(transferencia.metodoDestino) === efectivo?.id_metodo_pago;
+  const tipoOperacion = esRetiro ? "Retiro" : "Ingreso";
+  const iconoOperacion = esRetiro ? (
+    <FiTrendingDown className="text-red-600" size={20} />
+  ) : (
+    <FiTrendingUp
+      className={esIngresoEfectivo ? "text-green-600" : "text-blue-600"}
+      size={20}
+    />
+  );
+  const colorOperacion = esRetiro
+    ? "text-red-600"
+    : esIngresoEfectivo
+      ? "text-green-600"
+      : "text-blue-600";
 
   // Animación del drawer y overlay
   // Si no está abierto, no renderizar nada
@@ -148,14 +175,14 @@ const TransferenciaDrawer = ({
       <div
         className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 animate-fadeIn"
         onClick={onClose}
-        style={{ animation: 'fadeIn 0.3s' }}
+        style={{ animation: "fadeIn 0.3s" }}
       />
 
       {/* Drawer con animación slide-in */}
       <div
-        className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300"
+        className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform-gpu will-change-transform transition-transform duration-300"
         style={{
-          animation: 'slideInRight 0.3s',
+          animation: "slideInRight 0.3s",
         }}
       >
         <div className="flex flex-col h-full">
@@ -179,17 +206,26 @@ const TransferenciaDrawer = ({
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Saldos Actuales */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <p className="text-sm font-semibold text-slate-700 mb-3"> Saldos Actuales (mes en curso)</p>
+                <p className="text-sm font-semibold text-slate-700 mb-3">
+                  {" "}
+                  Saldos Actuales (mes en curso)
+                </p>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-slate-600">Efectivo:</span>
-                    <span className={`font-bold ${balanceEfectivo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span
+                      className={`font-bold ${balanceEfectivo >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(balanceEfectivo)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Transferencia Bancaria:</span>
-                    <span className={`font-bold ${balanceTransferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className="text-sm text-slate-600">
+                      Transferencia Bancaria:
+                    </span>
+                    <span
+                      className={`font-bold ${balanceTransferencia >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(balanceTransferencia)}
                     </span>
                   </div>
@@ -203,19 +239,32 @@ const TransferenciaDrawer = ({
                 </label>
                 <select
                   value={transferencia.metodoOrigen}
-                  onChange={(e) => setTransferencia({ ...transferencia, metodoOrigen: e.target.value })}
+                  onChange={(e) =>
+                    setTransferencia({
+                      ...transferencia,
+                      metodoOrigen: e.target.value,
+                    })
+                  }
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600 bg-white"
                   required
                 >
                   <option value="">Seleccionar método</option>
                   {metodosPago
-                    .filter(m => {
-                      const nombre = (m.nombre || '').toLowerCase();
-                      const esVisible = nombre.includes('efectivo') || nombre.includes('transferencia');
-                      return esVisible && String(m.id_metodo_pago) !== String(transferencia.metodoDestino);
+                    .filter((m) => {
+                      const nombre = (m.nombre || "").toLowerCase();
+                      const esVisible =
+                        nombre.includes("efectivo") ||
+                        nombre.includes("transferencia");
+                      return (
+                        esVisible &&
+                        String(m.id_metodo_pago) !==
+                          String(transferencia.metodoDestino)
+                      );
                     })
-                    .map(m => (
-                      <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nombre}</option>
+                    .map((m) => (
+                      <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                        {m.nombre}
+                      </option>
                     ))}
                 </select>
               </div>
@@ -227,29 +276,49 @@ const TransferenciaDrawer = ({
                 </label>
                 <select
                   value={transferencia.metodoDestino}
-                  onChange={(e) => setTransferencia({ ...transferencia, metodoDestino: e.target.value })}
+                  onChange={(e) =>
+                    setTransferencia({
+                      ...transferencia,
+                      metodoDestino: e.target.value,
+                    })
+                  }
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600 bg-white"
                   required
                 >
                   <option value="">Seleccionar método</option>
                   {metodosPago
-                    .filter(m => {
-                      const nombre = (m.nombre || '').toLowerCase();
-                      const esVisible = nombre.includes('efectivo') || nombre.includes('transferencia');
-                      return esVisible && String(m.id_metodo_pago) !== String(transferencia.metodoOrigen);
+                    .filter((m) => {
+                      const nombre = (m.nombre || "").toLowerCase();
+                      const esVisible =
+                        nombre.includes("efectivo") ||
+                        nombre.includes("transferencia");
+                      return (
+                        esVisible &&
+                        String(m.id_metodo_pago) !==
+                          String(transferencia.metodoOrigen)
+                      );
                     })
-                    .map(m => (
-                      <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nombre}</option>
+                    .map((m) => (
+                      <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                        {m.nombre}
+                      </option>
                     ))}
                 </select>
               </div>
 
               {/* Tipo de Operación */}
               {transferencia.metodoOrigen && transferencia.metodoDestino && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg border ${esRetiro ? 'bg-red-50 border-red-200' : esIngresoEfectivo ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div
+                  className={`flex items-center gap-2 p-3 rounded-lg border ${esRetiro ? "bg-red-50 border-red-200" : esIngresoEfectivo ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
+                >
                   {iconoOperacion}
                   <span className={`font-semibold ${colorOperacion}`}>
-                    {tipoOperacion} {esRetiro ? 'desde cuenta bancaria' : esIngresoEfectivo ? 'a efectivo' : 'a cuenta bancaria'}
+                    {tipoOperacion}{" "}
+                    {esRetiro
+                      ? "desde cuenta bancaria"
+                      : esIngresoEfectivo
+                        ? "a efectivo"
+                        : "a cuenta bancaria"}
                   </span>
                 </div>
               )}
@@ -260,7 +329,9 @@ const TransferenciaDrawer = ({
                   Monto a transferir
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                  <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                    $
+                  </span>
                   <input
                     type="text"
                     value={formatNumber(transferencia.monto)}
@@ -279,7 +350,12 @@ const TransferenciaDrawer = ({
                 </label>
                 <textarea
                   value={transferencia.observaciones}
-                  onChange={(e) => setTransferencia({ ...transferencia, observaciones: e.target.value })}
+                  onChange={(e) =>
+                    setTransferencia({
+                      ...transferencia,
+                      observaciones: e.target.value,
+                    })
+                  }
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600"
                   rows={3}
                   placeholder="Descripción adicional de la transferencia..."
@@ -290,25 +366,37 @@ const TransferenciaDrawer = ({
               {mostrarProyeccion && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <p className="text-sm font-semibold text-blue-900">Balance Proyectado Después de la Transferencia</p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      Balance Proyectado Después de la Transferencia
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-blue-700">Efectivo:</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">{formatCurrency(balanceEfectivo)}</span>
+                        <span className="text-xs text-gray-500">
+                          {formatCurrency(balanceEfectivo)}
+                        </span>
                         <span className="text-lg">→</span>
-                        <span className={`font-bold ${nuevoBalanceEfectivo > balanceEfectivo ? 'text-green-600' : nuevoBalanceEfectivo < balanceEfectivo ? 'text-red-600' : 'text-gray-700'}`}>
+                        <span
+                          className={`font-bold ${nuevoBalanceEfectivo > balanceEfectivo ? "text-green-600" : nuevoBalanceEfectivo < balanceEfectivo ? "text-red-600" : "text-gray-700"}`}
+                        >
                           {formatCurrency(nuevoBalanceEfectivo)}
                         </span>
                       </div>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700">Transferencia:</span>
+                      <span className="text-sm text-blue-700">
+                        Transferencia:
+                      </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">{formatCurrency(balanceTransferencia)}</span>
+                        <span className="text-xs text-gray-500">
+                          {formatCurrency(balanceTransferencia)}
+                        </span>
                         <span className="text-lg">→</span>
-                        <span className={`font-bold ${nuevoBalanceTransferencia > balanceTransferencia ? 'text-green-600' : nuevoBalanceTransferencia < balanceTransferencia ? 'text-red-600' : 'text-gray-700'}`}>
+                        <span
+                          className={`font-bold ${nuevoBalanceTransferencia > balanceTransferencia ? "text-green-600" : nuevoBalanceTransferencia < balanceTransferencia ? "text-red-600" : "text-gray-700"}`}
+                        >
                           {formatCurrency(nuevoBalanceTransferencia)}
                         </span>
                       </div>
@@ -332,7 +420,7 @@ const TransferenciaDrawer = ({
                   className="flex-1 px-4 py-3 bg-slate-700 text-white font-semibold rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   disabled={procesando}
                 >
-                  {procesando ? 'Procesando...' : 'Transferir'}
+                  {procesando ? "Procesando..." : "Transferir"}
                 </button>
               </div>
             </form>
@@ -344,7 +432,7 @@ const TransferenciaDrawer = ({
 };
 
 // Animaciones CSS
-const style = document.createElement('style');
+const style = document.createElement("style");
 style.innerHTML = `
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -355,8 +443,8 @@ style.innerHTML = `
   to { transform: translateX(0); }
 }
 `;
-if (!document.head.querySelector('style[data-transferencia-drawer]')) {
-  style.setAttribute('data-transferencia-drawer', 'true');
+if (!document.head.querySelector("style[data-transferencia-drawer]")) {
+  style.setAttribute("data-transferencia-drawer", "true");
   document.head.appendChild(style);
 }
 

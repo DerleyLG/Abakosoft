@@ -29,6 +29,32 @@ const TesoreriaModel = {
     return result.affectedRows;
   },
 
+  // Actualiza el monto de un movimiento de tesorería por documento y tipo
+  actualizarMovimientoPorDocumento: async (
+    { id_documento, tipo_documento, monto, id_metodo_pago, referencia },
+    connection = db,
+  ) => {
+    const conn = connection || db;
+    const sets = ["monto = ?"];
+    const params = [monto];
+    if (id_metodo_pago !== undefined) {
+      sets.push("id_metodo_pago = ?");
+      params.push(id_metodo_pago || null);
+    }
+    if (referencia !== undefined) {
+      sets.push("referencia = ?");
+      params.push(referencia || null);
+    }
+    params.push(id_documento, tipo_documento);
+    const [result] = await conn.query(
+      `UPDATE movimientos_tesoreria
+       SET ${sets.join(", ")}
+       WHERE id_documento = ? AND tipo_documento = ?`,
+      params,
+    );
+    return result.affectedRows;
+  },
+
   getMetodosPago: async () => {
     const [rows] = await db.query("SELECT * FROM metodos_pago");
     return rows;
@@ -677,6 +703,132 @@ const TesoreriaModel = {
       );
     }
     return rows;
+  },
+
+  // ── Conciliación bancaria ──────────────────────────────────────────
+  // Lista movimientos de tesorería con filtros (rango de fechas, estado de
+  // conciliación, método de pago, tipo de documento) e info del usuario que
+  // validó cada movimiento.
+  getMovimientosConciliacion: async ({
+    desde = null,
+    hasta = null,
+    estado = "todos",
+    page = 1,
+    pageSize = 25,
+  } = {}) => {
+    // La conciliación bancaria valida únicamente ventas pagadas por
+    // transferencia bancaria (verificar que el pago realmente llegó).
+    const where = [
+      "m.tipo_documento = 'orden_venta'",
+      "LOWER(mp.nombre) LIKE '%transferencia%'",
+    ];
+    const params = [];
+
+    if (desde) {
+      where.push("DATE(m.fecha_movimiento) >= ?");
+      params.push(desde);
+    }
+    if (hasta) {
+      where.push("DATE(m.fecha_movimiento) <= ?");
+      params.push(hasta);
+    }
+    if (estado === "pendiente") {
+      where.push("m.conciliado = 0");
+    } else if (estado === "validado") {
+      where.push("m.conciliado = 1");
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const baseSelect = `
+      SELECT
+        m.id_movimiento,
+        m.id_documento,
+        m.tipo_documento,
+        m.fecha_movimiento,
+        m.monto,
+        m.id_metodo_pago,
+        mp.nombre AS nombre_metodo,
+        m.referencia,
+        m.observaciones,
+        m.conciliado,
+        m.fecha_conciliacion,
+        m.id_usuario_conciliacion,
+        u.nombre_usuario AS usuario_conciliacion,
+        cl.nombre AS nombre_cliente
+      FROM movimientos_tesoreria m
+      LEFT JOIN metodos_pago mp ON m.id_metodo_pago = mp.id_metodo_pago
+      LEFT JOIN usuarios u ON m.id_usuario_conciliacion = u.id_usuario
+      LEFT JOIN ordenes_venta ov ON m.tipo_documento = 'orden_venta'
+        AND ov.id_orden_venta = m.id_documento
+      LEFT JOIN clientes cl ON cl.id_cliente = ov.id_cliente
+      ${whereSql}
+    `;
+
+    // Total de registros que cumplen el filtro (para paginar)
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) AS total FROM (${baseSelect}) AS sub`,
+      params,
+    );
+
+    const pg = Math.max(1, parseInt(page) || 1);
+    const ps = Math.min(200, Math.max(1, parseInt(pageSize) || 25));
+    const offset = (pg - 1) * ps;
+
+    const [rows] = await db.query(
+      `${baseSelect}
+       ORDER BY m.fecha_movimiento DESC, m.id_movimiento DESC
+       LIMIT ? OFFSET ?`,
+      [...params, ps, offset],
+    );
+
+    return { data: rows, total: Number(total || 0) };
+  },
+
+  // Marca (o desmarca) un movimiento como conciliado/validado, registrando
+  // quién lo validó y cuándo.
+  // - Solo permite marcar movimientos que sean ventas pagadas por transferencia
+  //   bancaria (mismo criterio que la lista), para no validar compras/pagos.
+  // - fecha_conciliacion usa NOW() de MySQL (el contenedor corre en
+  //   America/Bogota), evitando el desfase UTC de new Date() de Node.
+  marcarConciliado: async (id_movimiento, id_usuario, conciliado) => {
+    if (!id_usuario) {
+      throw new Error("Se requiere un usuario autenticado para conciliar.");
+    }
+
+    if (conciliado) {
+      // Validar que el movimiento sea una venta pagada por transferencia
+      const [[mov]] = await db.query(
+        `SELECT m.id_movimiento
+         FROM movimientos_tesoreria m
+         JOIN metodos_pago mp ON m.id_metodo_pago = mp.id_metodo_pago
+         WHERE m.id_movimiento = ?
+           AND m.tipo_documento = 'orden_venta'
+           AND LOWER(mp.nombre) LIKE '%transferencia%'
+         LIMIT 1`,
+        [id_movimiento],
+      );
+      if (!mov) {
+        throw new Error(
+          "El movimiento no es una venta por transferencia bancaria y no puede validarse.",
+        );
+      }
+    }
+
+    const [result] = await db.query(
+      `UPDATE movimientos_tesoreria
+       SET conciliado = ?,
+           fecha_conciliacion = CASE WHEN ? THEN NOW() ELSE NULL END,
+           id_usuario_conciliacion = ?
+       WHERE id_movimiento = ?`,
+      [
+        conciliado ? 1 : 0,
+        conciliado ? 1 : 0,
+        conciliado ? id_usuario : null,
+        id_movimiento,
+      ],
+    );
+    return result.affectedRows;
   },
 };
 

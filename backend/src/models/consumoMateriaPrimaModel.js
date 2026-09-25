@@ -322,14 +322,11 @@ const consumoMateriaPrimaModel = {
       (c) => !c.id_orden_fabricacion,
     );
 
-   
-
     // 4. Obtener avances por orden, artículo y etapa en el periodo
     const idsOrdenes = ordenes.map((o) => o.id_orden_fabricacion);
     const avanceEtapasModel = require("./avanceEtapasModel");
     const avances = await avanceEtapasModel.getByOrdenes(idsOrdenes);
 
-   
     // Agrupar avances por artículo y etapa
     const avancesPorArticuloEtapa = {};
     let totalGlobalPorArticuloEtapa = {};
@@ -474,10 +471,6 @@ const consumoMateriaPrimaModel = {
         distribucion,
       });
     }
-    console.log(
-      "[DEBUG] prorrateoPorArticulo:",
-      JSON.stringify(prorrateoPorArticulo, null, 2),
-    );
 
     // 6. Calcular totales por orden (sumando exclusivos y prorrateados)
     const prorrateo = ordenes.map((orden) => {

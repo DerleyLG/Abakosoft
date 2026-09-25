@@ -205,7 +205,6 @@ module.exports = {
             },
             connection,
           );
-          console.log("Insert detalle avance, id generado:", idDetalle);
           await avanceEtapasModel.updatePagado(
             d.id_avance_etapa,
             1,
@@ -227,7 +226,6 @@ module.exports = {
             },
             connection,
           );
-          console.log("Insert detalle descuento, id generado:", idDetalle);
 
           // Aplicar el descuento a uno o varios anticipos del trabajador hasta cubrir el
           // monto, dejando registro de cada porción aplicada (para poder revertir después).
@@ -352,7 +350,11 @@ module.exports = {
       const detallesAnteriores = await detalleModel.getById(id);
       for (const d of detallesAnteriores) {
         if (d.id_avance_etapa && d.es_descuento !== 1) {
-          await avanceEtapasModel.updatePagado(d.id_avance_etapa, 0, connection);
+          await avanceEtapasModel.updatePagado(
+            d.id_avance_etapa,
+            0,
+            connection,
+          );
         }
       }
 
@@ -380,9 +382,9 @@ module.exports = {
         const algunoPagado = avances.some((a) => a.pagado === 1);
         if (algunoPagado) {
           await connection.rollback();
-          return res
-            .status(400)
-            .json({ error: "Uno o más avances ya fueron pagados por otro pago." });
+          return res.status(400).json({
+            error: "Uno o más avances ya fueron pagados por otro pago.",
+          });
         }
         const mismoTrabajador = avances.every(
           (a) => a.id_trabajador === id_trabajador,

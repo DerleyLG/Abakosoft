@@ -23,14 +23,25 @@ module.exports = {
   TIPOS_MOVIMIENTO,
   TIPOS_ORIGEN_MOVIMIENTO,
 
-  obtenerInventarioPorArticulo: async (id_articulo) => {
-    const [rows] = await db.query(
-      "SELECT * FROM inventario WHERE id_articulo = ?",
+  obtenerInventarioPorArticulo: async (id_articulo, connection = null) => {
+    const conn = connection || db;
+    const [rows] = await conn.query(
+      `SELECT
+                i.*,
+                a.descripcion,
+                a.referencia,
+                a.precio_costo,
+                a.precio_venta,
+                c.nombre AS nombre_categoria,
+                c.tipo AS tipo_categoria,
+                u.nombre AS nombre_unidad,
+                u.abreviatura AS abreviatura_unidad
+            FROM inventario i
+            JOIN articulos a ON i.id_articulo = a.id_articulo
+            LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+            LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
+            WHERE i.id_articulo = ?`,
       [id_articulo],
-    );
-    console.log(
-      `Resultado de obtenerInventarioPorArticulo para id_articulo ${id_articulo}:`,
-      rows[0],
     );
     return rows.length > 0 ? rows[0] : null;
   },
@@ -84,6 +95,7 @@ module.exports = {
     buscar = "",
     id_categoria = null,
     tipo_categoria = null,
+    id_etapa = null,
     page = 1,
     pageSize = 25,
     sortBy = "descripcion",
@@ -121,6 +133,14 @@ module.exports = {
       filters.push("c.tipo = ?");
       params.push(tipo_categoria);
     }
+    if (id_etapa) {
+      if (id_etapa === "sin_produccion") {
+        filters.push("etapa_actual_agg.id_etapa_actual IS NULL");
+      } else {
+        filters.push("etapa_actual_agg.id_etapa_actual = ?");
+        params.push(Number(id_etapa));
+      }
+    }
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
     const baseSelect = `
@@ -136,6 +156,8 @@ module.exports = {
                 u.nombre AS nombre_unidad,
                 u.abreviatura AS abreviatura_unidad,
                 e.nombre AS nombre_etapa,
+                etapa_actual_agg.id_etapa_actual AS id_etapa_actual,
+                ep_actual.nombre AS nombre_etapa_actual,
                 i.stock AS stock_disponible,
                 COALESCE(i.stock_fabricado, 0) AS stock_fabricado,
                 COALESCE(i.stock_minimo, 0) AS stock_minimo,
@@ -147,6 +169,47 @@ module.exports = {
             LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
             LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
             LEFT JOIN etapas_produccion e ON a.id_etapa = e.id_etapa
+            -- Etapa actual por artículo (misma lógica del Kanban/reporte)
+            -- Solo se asigna etapa si el artículo tiene una OF activa (pendiente/en proceso)
+            LEFT JOIN (
+                SELECT
+                    art.id_articulo,
+                    MIN(COALESCE(
+                        ep_en_proceso.id_etapa,
+                        ep_siguiente.id_etapa,
+                        CASE WHEN ofa_activa.id_articulo IS NOT NULL THEN ep_primera.id_etapa END
+                    )) AS id_etapa_actual
+                FROM articulos art
+                LEFT JOIN (
+                    SELECT DISTINCT dof.id_articulo
+                    FROM detalle_orden_fabricacion dof
+                    JOIN ordenes_fabricacion ofa ON dof.id_orden_fabricacion = ofa.id_orden_fabricacion
+                    WHERE ofa.estado IN ('pendiente', 'en proceso')
+                ) ofa_activa ON ofa_activa.id_articulo = art.id_articulo
+                LEFT JOIN (
+                    SELECT aep.id_articulo, MIN(ep.orden) AS min_orden
+                    FROM avance_etapas_produccion aep
+                    JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+                    JOIN ordenes_fabricacion ofa ON aep.id_orden_fabricacion = ofa.id_orden_fabricacion
+                    WHERE aep.estado = 'en proceso'
+                      AND ofa.estado IN ('pendiente', 'en proceso')
+                    GROUP BY aep.id_articulo
+                ) en_proceso ON en_proceso.id_articulo = art.id_articulo
+                LEFT JOIN etapas_produccion ep_en_proceso ON ep_en_proceso.orden = en_proceso.min_orden
+                LEFT JOIN (
+                    SELECT aep.id_articulo, MAX(ep.orden) AS max_orden_completada
+                    FROM avance_etapas_produccion aep
+                    JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+                    JOIN ordenes_fabricacion ofa ON aep.id_orden_fabricacion = ofa.id_orden_fabricacion
+                    WHERE aep.estado = 'completado'
+                      AND ofa.estado IN ('pendiente', 'en proceso')
+                    GROUP BY aep.id_articulo
+                ) completadas ON completadas.id_articulo = art.id_articulo
+                LEFT JOIN etapas_produccion ep_siguiente ON ep_siguiente.orden = completadas.max_orden_completada + 1
+                LEFT JOIN etapas_produccion ep_primera ON ep_primera.orden = (SELECT MIN(orden) FROM etapas_produccion)
+                GROUP BY art.id_articulo
+            ) etapa_actual_agg ON etapa_actual_agg.id_articulo = i.id_articulo
+            LEFT JOIN etapas_produccion ep_actual ON ep_actual.id_etapa = etapa_actual_agg.id_etapa_actual
             LEFT JOIN (
                 SELECT dof.id_articulo, SUM(dof.cantidad) AS total_solicitado
                 FROM detalle_orden_fabricacion dof
@@ -193,10 +256,135 @@ module.exports = {
     return { data: rows, total };
   },
 
+  /**
+   * Vista "Por etapas": artículos en inventario con las unidades en proceso
+   * en cada etapa de producción, basado en los avances registrados
+   * (avance_etapas_produccion con estado 'en proceso' en OFs activas).
+   */
+  obtenerPorEtapas: async ({
+    buscar = "",
+    id_categoria = null,
+    tipo_categoria = null,
+    id_etapa = null,
+    id_unidad = null,
+    solo_con_produccion = false,
+    page = 1,
+    pageSize = 25,
+  }) => {
+    const p = Math.max(1, parseInt(page) || 1);
+    const ps = Math.min(1000, Math.max(1, parseInt(pageSize) || 25));
+    const offset = (p - 1) * ps;
+
+    const filters = [];
+    const params = [];
+    if (buscar && String(buscar).trim() !== "") {
+      filters.push("(a.descripcion LIKE ? OR a.referencia LIKE ?)");
+      const like = `%${buscar}%`;
+      params.push(like, like);
+    }
+    if (id_categoria) {
+      filters.push("a.id_categoria = ?");
+      params.push(Number(id_categoria));
+    }
+    if (tipo_categoria) {
+      filters.push("c.tipo = ?");
+      params.push(tipo_categoria);
+    }
+    if (id_unidad) {
+      filters.push("a.id_unidad = ?");
+      params.push(Number(id_unidad));
+    }
+    if (id_etapa) {
+      // Solo artículos con unidades en proceso en la etapa seleccionada
+      filters.push(`EXISTS (
+        SELECT 1 FROM avance_etapas_produccion aep_f
+        JOIN ordenes_fabricacion ofa_f ON aep_f.id_orden_fabricacion = ofa_f.id_orden_fabricacion
+        WHERE aep_f.id_articulo = i.id_articulo
+          AND aep_f.id_etapa_produccion = ?
+          AND aep_f.estado = 'en proceso'
+          AND ofa_f.estado IN ('pendiente', 'en proceso')
+      )`);
+      params.push(Number(id_etapa));
+    }
+    if (solo_con_produccion) {
+      // Solo artículos con al menos una unidad en proceso en alguna etapa
+      filters.push(`EXISTS (
+        SELECT 1 FROM avance_etapas_produccion aep_p
+        JOIN ordenes_fabricacion ofa_p ON aep_p.id_orden_fabricacion = ofa_p.id_orden_fabricacion
+        WHERE aep_p.id_articulo = i.id_articulo
+          AND aep_p.estado = 'en proceso'
+          AND ofa_p.estado IN ('pendiente', 'en proceso')
+      )`);
+    }
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    // 1. Artículos en inventario (paginados)
+    const [rows] = await db.query(
+      `SELECT i.id_articulo, a.referencia, a.descripcion,
+              u.nombre AS nombre_unidad, u.abreviatura AS abreviatura_unidad,
+              c.nombre AS nombre_categoria
+       FROM inventario i
+       JOIN articulos a ON i.id_articulo = a.id_articulo
+       LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+       LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
+       ${whereClause}
+       ORDER BY a.descripcion ASC
+       LIMIT ? OFFSET ?`,
+      [...params, ps, offset],
+    );
+
+    const [countRows] = await db.query(
+      `SELECT COUNT(*) AS total
+       FROM inventario i
+       JOIN articulos a ON i.id_articulo = a.id_articulo
+       LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+       ${whereClause}`,
+      params,
+    );
+
+    // 2. Cantidades en proceso por etapa para esos artículos (evita N+1)
+    const ids = rows.map((r) => r.id_articulo);
+    let etapasRows = [];
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => "?").join(",");
+      const [etapas] = await db.query(
+        `SELECT aep.id_articulo, aep.id_etapa_produccion AS id_etapa,
+                ep.nombre AS nombre_etapa, ep.orden,
+                SUM(aep.cantidad) AS cantidad
+         FROM avance_etapas_produccion aep
+         JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
+         JOIN ordenes_fabricacion ofa ON aep.id_orden_fabricacion = ofa.id_orden_fabricacion
+         WHERE aep.estado = 'en proceso'
+           AND ofa.estado IN ('pendiente', 'en proceso')
+           AND aep.id_articulo IN (${placeholders})
+         GROUP BY aep.id_articulo, aep.id_etapa_produccion, ep.nombre, ep.orden
+         ORDER BY ep.orden ASC, ep.id_etapa ASC`,
+        ids,
+      );
+      etapasRows = etapas;
+    }
+
+    // 3. Pivotar: cada artículo con su lista de etapas y cantidades
+    const data = rows.map((r) => ({
+      ...r,
+      etapas: etapasRows
+        .filter((e) => e.id_articulo === r.id_articulo)
+        .map((e) => ({
+          id_etapa: e.id_etapa,
+          nombre: e.nombre_etapa,
+          cantidad: Number(e.cantidad) || 0,
+        })),
+    }));
+
+    return { data, total: countRows[0]?.total || 0 };
+  },
+
   getArticulosBajoStock: async () => {
     const [rows] = await db.query(`
             SELECT
+                i.id_articulo,
                 a.descripcion,
+                a.referencia,
                 i.stock,
                 i.stock_minimo
             FROM
@@ -204,7 +392,8 @@ module.exports = {
             JOIN
                 articulos a ON i.id_articulo = a.id_articulo
             WHERE
-                i.stock <= i.stock_minimo
+                (i.stock < 0
+                 OR (i.stock <= i.stock_minimo AND i.stock_minimo > 0))
             ORDER BY a.descripcion ASC
         `);
     return rows;
@@ -244,11 +433,6 @@ module.exports = {
     }
 
     try {
-      console.log(`[processInventoryMovement] Objeto 'data' recibido:`, data);
-      console.log(
-        `[processInventoryMovement] id_articulo (extraído): ${id_articulo}`,
-      );
-
       if (typeof id_articulo === "undefined" || id_articulo === null) {
         throw new Error(
           "ID de artículo no proporcionado o inválido en processInventoryMovement.",
@@ -323,10 +507,6 @@ module.exports = {
           ],
         );
       } else {
-        console.log(
-          `[processInventoryMovement] Artículo ${id_articulo} NO encontrado en inventario. Origen: ${tipo_origen_movimiento}. Creando registro con stock 0.`,
-        );
-
         // Si no existe, lo creamos con stock 0 para permitir el movimiento
         const stockInicial = 0;
         await conn.query(
@@ -341,9 +521,6 @@ module.exports = {
             stock_minimo_inicial || 0,
             now,
           ],
-        );
-        console.log(
-          `Artículo ${id_articulo} insertado en inventario con stock 0.`,
         );
 
         // Ajustar stock según el movimiento
@@ -371,9 +548,6 @@ module.exports = {
           referencia_documento_tipo,
           now,
         ],
-      );
-      console.log(
-        `Movimiento ${movimientoResult.insertId} registrado para artículo ${id_articulo}.`,
       );
 
       // Solo hacer commit y release si creamos la conexión internamente

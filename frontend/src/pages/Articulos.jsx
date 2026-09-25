@@ -15,6 +15,8 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiFilter,
+  FiEyeOff,
+  FiEye,
 } from "react-icons/fi";
 import "../styles/confirmAlert.css";
 
@@ -33,6 +35,7 @@ const ListaArticulos = () => {
   const [sortBy] = useState("descripcion");
   const [sortDir] = useState("asc");
   const [loading, setLoading] = useState(false);
+  const [verDescatalogados, setVerDescatalogados] = useState(false);
   const navigate = useNavigate();
 
   // Cargar categorías al inicio
@@ -65,6 +68,7 @@ const ListaArticulos = () => {
             buscar: searchTerm,
             tipo_categoria: categoriaSeleccionada ? "" : activeTab, // Solo tipo si no hay categoría específica
             id_categoria: categoriaSeleccionada, // Categoría específica si está seleccionada
+            solo_descatalogados: verDescatalogados ? "1" : "",
             page,
             pageSize,
             sortBy,
@@ -98,6 +102,7 @@ const ListaArticulos = () => {
     searchTerm,
     categoriaSeleccionada,
     activeTab,
+    verDescatalogados,
     page,
     pageSize,
     sortBy,
@@ -140,6 +145,54 @@ const ListaArticulos = () => {
 
   const handleRowDoubleClick = (id) => {
     navigate(`/articulos/editar/${id}`);
+  };
+
+  const handleToggleDescatalogado = async (art) => {
+    const nuevoValor = art.descatalogado ? 0 : 1;
+    const accion = art.descatalogado ? "reactivar" : "descatalogar";
+    confirmAlert({
+      title: art.descatalogado ? "Reactivar artículo" : "Descatalogar artículo",
+      message: art.descatalogado
+        ? `¿Seguro que quieres reactivar "${art.descripcion}"? Volverá a aparecer en los selectores.`
+        : `¿Seguro que quieres descatalogar "${art.descripcion}"? Dejará de aparecer en los selectores de ventas, compras y producción, pero conservará su histórico.`,
+      buttons: [
+        {
+          label: "Sí",
+          onClick: async () => {
+            try {
+              const idempotencyKey = generateUUID();
+              await api.put(
+                `/articulos/${art.id_articulo}`,
+                { descatalogado: nuevoValor },
+                { headers: { "X-Idempotency-Key": idempotencyKey } },
+              );
+              toast.success(
+                art.descatalogado
+                  ? "Artículo reactivado"
+                  : "Artículo descatalogado",
+              );
+              setArticulos((prev) =>
+                prev.map((a) =>
+                  a.id_articulo === art.id_articulo
+                    ? { ...a, descatalogado: nuevoValor }
+                    : a,
+                ),
+              );
+            } catch (error) {
+              const mensajeBackend =
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message;
+              toast.error(mensajeBackend);
+            }
+          },
+        },
+        {
+          label: "No",
+          onClick: () => {},
+        },
+      ],
+    });
   };
 
   const handleCrearClick = () => {
@@ -209,9 +262,14 @@ const ListaArticulos = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Artículos
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Catálogo de
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Artículos
+            </h1>
+          </div>
           {total > 0 && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
               {total.toLocaleString()}
@@ -284,6 +342,46 @@ const ListaArticulos = () => {
             </select>
           </div>
         )}
+        {/* Segmented control: estado del catálogo */}
+        <div
+          className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit"
+          role="group"
+          aria-label="Filtrar por estado del catálogo"
+          title="Filtrar por estado del catálogo"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setVerDescatalogados(false);
+              setPage(1);
+            }}
+            aria-pressed={!verDescatalogados}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              !verDescatalogados
+                ? "bg-slate-900 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <FiEye size={13} />
+            Activos
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setVerDescatalogados(true);
+              setPage(1);
+            }}
+            aria-pressed={verDescatalogados}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              verDescatalogados
+                ? "bg-slate-900 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <FiEyeOff size={13} />
+            Descatalogados
+          </button>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -307,8 +405,14 @@ const ListaArticulos = () => {
                 <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   P. Costo
                 </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Stock
+                </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Categoría
+                </th>
+                <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-16">
+                  Estado
                 </th>
                 <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-16">
                   &nbsp;
@@ -319,7 +423,7 @@ const ListaArticulos = () => {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 9 }).map((__, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-3.5 bg-slate-100 rounded w-full" />
                       </td>
@@ -350,37 +454,98 @@ const ListaArticulos = () => {
                     <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
                       ${Number(art.precio_costo).toLocaleString()}
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {Number(art.stock_disponible) > 0 ? (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            Number(art.stock_minimo) > 0 &&
+                            Number(art.stock_disponible) <= Number(art.stock_minimo)
+                              ? "bg-red-50 border-red-200 text-red-600"
+                              : "bg-slate-100 border-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {Number(art.stock_disponible).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
                         {art.nombre_categoria}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(art.id_articulo);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
-                        title="Eliminar artículo"
-                      >
-                        <FiTrash2 size={15} />
-                      </button>
+                      {art.descatalogado ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200">
+                          <FiEyeOff size={11} />
+                          Descatalogado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <FiEye size={11} />
+                          Activo
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleDescatalogado(art);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all cursor-pointer"
+                          title={
+                            art.descatalogado
+                              ? "Reactivar artículo"
+                              : "Descatalogar artículo"
+                          }
+                        >
+                          {art.descatalogado ? (
+                            <FiEye size={15} />
+                          ) : (
+                            <FiEyeOff size={15} />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(art.id_articulo);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                          title="Eliminar artículo"
+                        >
+                          <FiTrash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="text-center py-16">
+                  <td colSpan="9" className="text-center py-16">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <FiBox size={32} className="opacity-40" />
+                      {verDescatalogados ? (
+                        <FiEyeOff size={32} className="opacity-40" />
+                      ) : (
+                        <FiBox size={32} className="opacity-40" />
+                      )}
                       <p className="text-sm font-medium">
-                        No se encontraron artículos
+                        {verDescatalogados
+                          ? "No hay artículos descatalogados"
+                          : "No se encontraron artículos"}
                       </p>
-                      {searchTerm && (
+                      {verDescatalogados ? (
                         <p className="text-xs">
-                          Intenta con otro término de búsqueda
+                          Todos los artículos están activos en el catálogo
                         </p>
+                      ) : (
+                        searchTerm && (
+                          <p className="text-xs">
+                            Intenta con otro término de búsqueda
+                          </p>
+                        )
                       )}
                     </div>
                   </td>

@@ -439,9 +439,14 @@ const ProgresoFabricacion = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Progreso de fabricación
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Manufactura y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Progreso de fabricación
+            </h1>
+          </div>
           {paginacion.total > 0 && (
             <p className="text-xs text-slate-400 mt-0.5">
               {paginacion.total} órdenes

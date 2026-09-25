@@ -151,9 +151,14 @@ const CostosIndirectos = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-            Costos indirectos
-          </h1>
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Costeo y
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+              Costos indirectos
+            </h1>
+          </div>
           {total > 0 && (
             <p className="text-xs text-slate-400 mt-0.5">{total} registros</p>
           )}
@@ -225,7 +230,7 @@ const CostosIndirectos = () => {
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="w-8 px-3 py-3" />
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                 ID
+                  ID
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   Tipo de costo

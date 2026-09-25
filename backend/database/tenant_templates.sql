@@ -78,6 +78,7 @@ CREATE TABLE `articulos` (
   `precio_costo` int DEFAULT NULL,
   `id_categoria` bigint unsigned DEFAULT NULL,
   `es_compuesto` tinyint(1) NOT NULL DEFAULT '0',
+  `descatalogado` tinyint(1) NOT NULL DEFAULT '0',
   `id_unidad` int NOT NULL DEFAULT '1',
   `id_etapa` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id_articulo`),
@@ -87,6 +88,7 @@ CREATE TABLE `articulos` (
   KEY `idx_referencia` (`referencia`),
   KEY `fk_articulos_unidad` (`id_unidad`),
   KEY `fk_articulos_etapa` (`id_etapa`),
+  KEY `idx_articulos_descatalogado` (`descatalogado`),
   CONSTRAINT `fk_articulos_categoria` FOREIGN KEY (`id_categoria`) REFERENCES `categorias` (`id_categoria`),
   CONSTRAINT `fk_articulos_etapa` FOREIGN KEY (`id_etapa`) REFERENCES `etapas_produccion` (`id_etapa`),
   CONSTRAINT `fk_articulos_unidad` FOREIGN KEY (`id_unidad`) REFERENCES `unidades` (`id_unidad`)
@@ -142,7 +144,7 @@ CREATE TABLE `avance_etapas_produccion` (
   CONSTRAINT `avance_etapas_produccion_ibfk_1` FOREIGN KEY (`id_orden_fabricacion`) REFERENCES `ordenes_fabricacion` (`id_orden_fabricacion`) ON DELETE CASCADE,
   CONSTRAINT `avance_etapas_produccion_ibfk_2` FOREIGN KEY (`id_etapa_produccion`) REFERENCES `etapas_produccion` (`id_etapa`) ON DELETE CASCADE,
   CONSTRAINT `fk_avance_articulo` FOREIGN KEY (`id_articulo`) REFERENCES `articulos` (`id_articulo`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_avance_trabajador` FOREIGN KEY (`id_trabajador`) REFERENCES `trabajadores` (`id_trabajador`) ON DELETE CASCADE
+  CONSTRAINT `fk_avance_trabajador` FOREIGN KEY (`id_trabajador`) REFERENCES `trabajadores` (`id_trabajador`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=712 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -368,6 +370,7 @@ CREATE TABLE `detalle_orden_compra` (
   `cantidad` decimal(12,2) NOT NULL,
   `precio_unitario` decimal(10,2) NOT NULL,
   `id_orden_fabricacion` bigint unsigned DEFAULT NULL,
+  `es_bruto` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id_detalle_compra`),
   UNIQUE KEY `id_detalle_compra` (`id_detalle_compra`),
   KEY `id_orden_fabricacion` (`id_orden_fabricacion`),
@@ -658,10 +661,16 @@ CREATE TABLE `movimientos_tesoreria` (
   `id_metodo_pago` int DEFAULT NULL,
   `referencia` varchar(255) DEFAULT NULL,
   `observaciones` text,
+  `conciliado` tinyint(1) NOT NULL DEFAULT '0',
+  `fecha_conciliacion` datetime DEFAULT NULL,
+  `id_usuario_conciliacion` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id_movimiento`),
   KEY `id_metodo_pago` (`id_metodo_pago`),
   KEY `idx_fecha_movimiento` (`fecha_movimiento`),
-  CONSTRAINT `movimientos_tesoreria_ibfk_1` FOREIGN KEY (`id_metodo_pago`) REFERENCES `metodos_pago` (`id_metodo_pago`)
+  KEY `idx_conciliado` (`conciliado`),
+  KEY `fk_conciliacion_usuario` (`id_usuario_conciliacion`),
+  CONSTRAINT `movimientos_tesoreria_ibfk_1` FOREIGN KEY (`id_metodo_pago`) REFERENCES `metodos_pago` (`id_metodo_pago`),
+  CONSTRAINT `fk_conciliacion_usuario` FOREIGN KEY (`id_usuario_conciliacion`) REFERENCES `usuarios` (`id_usuario`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=477 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -819,10 +828,10 @@ INSERT INTO permisos_rol (id_rol, accion) VALUES
   (1, 'kanban:view'), (1, 'kanban:manage'),
   (1, 'progress:view'),
   (1, 'payments:view'), (1, 'payments:create'), (1, 'payments:delete'),
-  (1, 'anticipos:view'),
+  (1, 'anticipos:view'), (1, 'anticipos:create'),
   (1, 'credits:view'), (1, 'credits:create'), (1, 'credits:manage'),
   (1, 'indirect_costs:view'), (1, 'indirect_costs:create'), (1, 'indirect_costs:edit'), (1, 'indirect_costs:delete'), (1, 'indirect_costs:assign'),
-  (1, 'treasury:view'), (1, 'treasury:manage'),
+  (1, 'treasury:view'), (1, 'treasury:manage'), (1, 'treasury:reconcile'),
   (1, 'cash_closings:view'), (1, 'cash_closings:create'), (1, 'cash_closings:close'), (1, 'cash_closings:delete'),
   (1, 'production_stages:view'), (1, 'production_stages:manage'),
   (1, 'cost_history:view'),
@@ -830,6 +839,8 @@ INSERT INTO permisos_rol (id_rol, accion) VALUES
   (1, 'outsourced_services:view'), (1, 'outsourced_services:manage'),
   (1, 'units:view'), (1, 'units:manage'),
   (1, 'reports:view'),
+  (1, 'returns:view'), (1, 'returns:create'), (1, 'returns:cancel'),
+  (1, 'repairs:view'), (1, 'repairs:create'), (1, 'repairs:diagnose'), (1, 'repairs:manage'), (1, 'repairs:deliver'), (1, 'repairs:cancel'),
   (1, 'users:manage');
 
 -- Operario: permisos operativos
@@ -855,7 +866,9 @@ INSERT INTO permisos_rol (id_rol, accion) VALUES
   (2, 'cost_history:view'),
   (2, 'payment_methods:view'),
   (2, 'outsourced_services:view'),
-  (2, 'units:view');
+  (2, 'units:view'),
+  (2, 'returns:view'), (2, 'returns:create'),
+  (2, 'repairs:view'), (2, 'repairs:create');
 
 -- Supervisor: permisos intermedios y de supervisión
 INSERT INTO permisos_rol (id_rol, accion) VALUES
@@ -873,17 +886,19 @@ INSERT INTO permisos_rol (id_rol, accion) VALUES
   (3, 'kanban:view'), (3, 'kanban:manage'),
   (3, 'progress:view'),
   (3, 'payments:view'), (3, 'payments:create'),
-  (3, 'anticipos:view'),
+  (3, 'anticipos:view'), (3, 'anticipos:create'),
   (3, 'credits:view'), (3, 'credits:manage'),
   (3, 'indirect_costs:view'),
-  (3, 'treasury:view'),
+  (3, 'treasury:view'), (3, 'treasury:reconcile'),
   (3, 'cash_closings:view'),
   (3, 'reports:view'),
   (3, 'production_stages:view'), (3, 'production_stages:manage'),
   (3, 'cost_history:view'),
   (3, 'payment_methods:view'), (3, 'payment_methods:manage'),
   (3, 'outsourced_services:view'), (3, 'outsourced_services:manage'),
-  (3, 'units:view'), (3, 'units:manage');
+  (3, 'units:view'), (3, 'units:manage'),
+  (3, 'returns:view'), (3, 'returns:create'), (3, 'returns:cancel'),
+  (3, 'repairs:view'), (3, 'repairs:create'), (3, 'repairs:diagnose'), (3, 'repairs:manage'), (3, 'repairs:deliver'), (3, 'repairs:cancel');
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

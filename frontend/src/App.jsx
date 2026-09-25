@@ -41,6 +41,7 @@ import CostosIndirectosNuevo from "./pages/CostosIndirectosForm";
 import VistaReportes from "./pages/Reportes";
 import ReporteInventario from "./pages/ReporteInventario";
 import ListaAnticipos from "./pages/Anticipos";
+import AnticiposForm from "./pages/AnticiposForm";
 import CostosMateriaPrima from "./pages/costosMateriaPrima";
 import ReporteAvanceFabricacion from "./pages/ReporteAvanceFabricacion";
 import ReporteVentasPorPeriodo from "./pages/ReporteVentasPorPeriodo";
@@ -55,6 +56,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SidebarProvider } from "./context/SidebarContext";
 import ReporteMovimientosInventario from "./pages/ReporteMovimientosInventario";
 import Tesoreria from "./pages/Tesoreria";
+import ConciliacionBancaria from "./pages/ConciliacionBancaria";
 import GestionUsuarios from "./pages/GestionUsuarios";
 import UsuarioForm from "./pages/UsuarioForm";
 import EditarUsuario from "./pages/EditarUsuario";
@@ -602,6 +604,26 @@ const AppLogic = () => {
           }
         />
         <Route
+          path="anticipos/nuevo"
+          element={
+            <RequirePermission action={ACTIONS.ANTICIPOS_VIEW}>
+              <PlanGuard feature="anticipos">
+                <AnticiposForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="anticipos/editar/:id"
+          element={
+            <RequirePermission action={ACTIONS.ANTICIPOS_VIEW}>
+              <PlanGuard feature="anticipos">
+                <AnticiposForm />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="costos_materia_prima"
           element={
             <RequirePermission action={ACTIONS.INDIRECT_COSTS_VIEW}>
@@ -619,6 +641,18 @@ const AppLogic = () => {
             <RequirePermission action={ACTIONS.TREASURY_VIEW}>
               <PlanGuard feature="tesoreria">
                 <Tesoreria />
+              </PlanGuard>
+            </RequirePermission>
+          }
+        />
+
+        {/* Conciliación Bancaria */}
+        <Route
+          path="conciliacion-bancaria"
+          element={
+            <RequirePermission action={ACTIONS.TREASURY_VIEW}>
+              <PlanGuard feature="tesoreria">
+                <ConciliacionBancaria />
               </PlanGuard>
             </RequirePermission>
           }

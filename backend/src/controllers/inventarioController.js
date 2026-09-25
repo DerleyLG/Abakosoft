@@ -100,6 +100,7 @@ module.exports = {
         buscar = "",
         id_categoria = null,
         tipo_categoria = null,
+        id_etapa = null,
         sortBy = "descripcion",
         sortDir = "asc",
         stock_fabricado = "",
@@ -111,6 +112,7 @@ module.exports = {
         buscar,
         id_categoria,
         tipo_categoria,
+        id_etapa,
         page,
         pageSize,
         sortBy,
@@ -137,6 +139,41 @@ module.exports = {
     } catch (error) {
       console.error("Error al obtener artículos con bajo stock:", error);
       res.status(500).json({ error: "Error interno del servidor" });
+    }
+  },
+
+  obtenerInventarioPorEtapas: async (req, res) => {
+    try {
+      const {
+        page = 1,
+        pageSize = 25,
+        buscar = "",
+        id_categoria = null,
+        tipo_categoria = null,
+        id_etapa = null,
+        id_unidad = null,
+        solo_con_produccion = "",
+      } = req.query;
+
+      const { data, total } = await InventarioModel.obtenerPorEtapas({
+        buscar,
+        id_categoria,
+        tipo_categoria,
+        id_etapa,
+        id_unidad,
+        solo_con_produccion:
+          solo_con_produccion === "1" || solo_con_produccion === "true",
+        page,
+        pageSize,
+      });
+
+      const p = Math.max(1, parseInt(page) || 1);
+      const ps = Math.min(100, Math.max(1, parseInt(pageSize) || 25));
+      const totalPages = Math.ceil(total / ps) || 1;
+      res.json({ data, page: p, pageSize: ps, total, totalPages });
+    } catch (error) {
+      console.error("Error al obtener inventario por etapas:", error);
+      res.status(500).json({ error: "Error al obtener inventario por etapas" });
     }
   },
 
@@ -181,6 +218,16 @@ module.exports = {
         return res
           .status(400)
           .json({ error: "Stock y stock mínimo deben ser números válidos." });
+      }
+      if (Number(nuevoStockTotal) < 0) {
+        return res
+          .status(400)
+          .json({ error: "El stock no puede ser negativo." });
+      }
+      if (Number(nuevoStockMinimo) < 0) {
+        return res
+          .status(400)
+          .json({ error: "El stock mínimo no puede ser negativo." });
       }
 
       const inventarioActual =
@@ -253,6 +300,18 @@ module.exports = {
         });
       }
 
+      // Validar que no tenga movimientos históricos para no perder trazabilidad
+      const [movimientos] = await db.query(
+        "SELECT COUNT(*) AS total FROM movimientos_inventario WHERE id_articulo = ?",
+        [id_articulo],
+      );
+      if (movimientos[0]?.total > 0) {
+        return res.status(400).json({
+          message:
+            "No se puede eliminar este artículo del inventario porque tiene movimientos históricos registrados. Si ya no se usa, descatágalo desde Artículos.",
+        });
+      }
+
       const eliminado =
         await InventarioModel.eliminarDelInventario(id_articulo);
 
@@ -280,7 +339,7 @@ module.exports = {
   inicializarArticuloEnInventario: async (req, res) => {
     let connection;
     try {
-      const { id_articulo, stock_inicial = 0, stock_minimo = 2 } = req.body;
+      const { id_articulo, stock_inicial = 0, stock_minimo = 0 } = req.body;
 
       if (!id_articulo) {
         return res.status(400).json({
@@ -361,6 +420,37 @@ module.exports = {
         message:
           error.message || "Error al inicializar el artículo en el inventario.",
       });
+    }
+  },
+
+  /**
+   * Historial reciente de movimientos de un artículo (para el modal de editar stock).
+   * Ruta: GET /inventario/:id/movimientos?limit=5
+   */
+  getMovimientosArticulo: async (req, res) => {
+    const { id } = req.params;
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 5));
+
+    try {
+      const [rows] = await db.query(
+        `SELECT mi.id_movimiento,
+                mi.cantidad_movida,
+                mi.tipo_movimiento,
+                mi.tipo_origen_movimiento,
+                mi.observaciones,
+                mi.fecha_movimiento
+         FROM movimientos_inventario mi
+         WHERE mi.id_articulo = ?
+         ORDER BY mi.fecha_movimiento DESC, mi.id_movimiento DESC
+         LIMIT ?`,
+        [id, limit],
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("Error al obtener movimientos del artículo:", error);
+      res
+        .status(500)
+        .json({ error: "Error al obtener movimientos del artículo." });
     }
   },
 };

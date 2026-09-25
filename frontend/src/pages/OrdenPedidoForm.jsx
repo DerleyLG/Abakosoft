@@ -55,21 +55,15 @@ const OrdenPedidoForm = () => {
   const cacheRef = useRef({});
   const timerRef = useRef(null);
 
-  // Cargar todos los artículos fabricables al inicio
+  // Cargar las primeras 20 sugerencias de artículos fabricables al inicio
   useEffect(() => {
     const cargarArticulos = async () => {
-      if (Object.keys(categoriasMap).length === 0) return;
-
       try {
-        const resTotal = await api.get("/articulos", {
-          params: { page: 1, pageSize: 1 },
-        });
-        const total = resTotal.data.total || 10000;
-
         const response = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: total,
+            pageSize: 20,
+            tipo_categoria: "articulo_fabricable",
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -78,12 +72,7 @@ const OrdenPedidoForm = () => {
           ? response.data
           : response.data?.data || [];
 
-        // Filtrar solo artículos fabricables
-        const articulosFabricables = articulosData.filter(
-          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable",
-        );
-
-        const opciones = articulosFabricables.map((art) => ({
+        const opciones = articulosData.map((art) => ({
           value: art.id_articulo,
           label: `${art.descripcion} (Ref: ${art.referencia})`,
           referencia: art.referencia,
@@ -99,7 +88,7 @@ const OrdenPedidoForm = () => {
       }
     };
     cargarArticulos();
-  }, [categoriasMap]);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -130,15 +119,10 @@ const OrdenPedidoForm = () => {
   }, []);
 
   // Función para cargar artículos dinámicamente con debounce y caché
+  // Búsqueda REMOTA: consulta al backend por cada término (solo fabricables)
   const loadArticulosOptions = useCallback(
     (inputValue, callback) => {
       const cacheKey = inputValue?.toLowerCase() || "";
-
-      // Si no hay búsqueda, retornar todos los artículos
-      if (!inputValue || inputValue.trim() === "") {
-        callback(articulosOptions);
-        return;
-      }
 
       // Si ya está en caché, retornar inmediatamente
       if (cacheRef.current[cacheKey]) {
@@ -152,20 +136,37 @@ const OrdenPedidoForm = () => {
       }
 
       // Debounce: esperar 300ms después de que el usuario deje de escribir
-      timerRef.current = setTimeout(() => {
-        const filtered = articulosOptions.filter(
-          (art) =>
-            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
-        );
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              tipo_categoria: "articulo_fabricable",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((art) => ({
+            value: art.id_articulo,
+            label: `${art.descripcion} (Ref: ${art.referencia})`,
+            referencia: art.referencia,
+            descripcion: art.descripcion,
+            ...art,
+          }));
 
-        // Guardar en caché
-        cacheRef.current[cacheKey] = filtered;
-        callback(filtered);
+          // Guardar en caché
+          cacheRef.current[cacheKey] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 300);
     },
-    [articulosOptions],
+    [],
   );
 
   const agregarArticulo = async (articulo) => {

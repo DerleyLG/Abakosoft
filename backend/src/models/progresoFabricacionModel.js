@@ -164,7 +164,7 @@ const progresoFabricacionModel = {
       await progresoFabricacionModel.getProgresoOrdenesFabricacion(filtros);
 
     const [etapas] = await db.query(
-      "SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC",
+      "SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC, id_etapa DESC",
     );
 
     // Crear mapa de etapas por orden
@@ -350,7 +350,7 @@ const progresoFabricacionModel = {
 
     // Obtener todas las etapas disponibles
     const [todasEtapas] = await db.query(
-      "SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC",
+      "SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC, id_etapa DESC",
     );
 
     // Agrupar por orden de fabricación

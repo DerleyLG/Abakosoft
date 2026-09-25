@@ -85,7 +85,7 @@ const OrdenReparacionForm = () => {
         const artsRes = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: totalArts,
+            pageSize: 20,
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -163,21 +163,35 @@ const OrdenReparacionForm = () => {
   const loadArticulosOptions = useCallback(
     (inputValue, callback) => {
       const key = (inputValue || "").toLowerCase();
-      if (!key) return callback(todosArticulos);
       if (articulosCache.current[key])
         return callback(articulosCache.current[key]);
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        const filtrados = todosArticulos.filter(
-          (a) =>
-            a.label.toLowerCase().includes(key) ||
-            (a.referencia || "").toLowerCase().includes(key),
-        );
-        articulosCache.current[key] = filtrados;
-        callback(filtrados);
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((a) => ({
+            value: a.id_articulo,
+            label: `${a.descripcion}${a.referencia ? ` (Ref: ${a.referencia})` : ""}`,
+            ...a,
+          }));
+          articulosCache.current[key] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 200);
     },
-    [todosArticulos],
+    [],
   );
 
   const loadTrabajadoresOptions = useCallback(

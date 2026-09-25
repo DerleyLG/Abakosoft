@@ -194,7 +194,7 @@ exports.createCostoIndirecto = async (req, res) => {
             .status(400)
             .json({ error: `La OF #${a.id_orden_fabricacion} no existe.` });
         }
-        if (["cancelada", "completada"].includes(String(estado))) {
+        if (String(estado) === "cancelada") {
           return res.status(400).json({
             error: `No se puede asignar a la OF #${a.id_orden_fabricacion} con estado '${estado}'.`,
           });
@@ -226,7 +226,7 @@ exports.createCostoIndirecto = async (req, res) => {
             .status(400)
             .json({ error: `La OF #${id_orden_fabricacion} no existe.` });
         }
-        if (["cancelada", "completada"].includes(String(rows[0].estado))) {
+        if (String(rows[0].estado) === "cancelada") {
           return res.status(400).json({
             error: `No se puede asignar a la OF #${id_orden_fabricacion} con estado '${rows[0].estado}'.`,
           });
@@ -343,12 +343,10 @@ exports.delete = async (req, res) => {
       );
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Costo indirecto eliminado correctamente",
-        tesoreriaEliminada,
-      });
+    res.status(200).json({
+      message: "Costo indirecto eliminado correctamente",
+      tesoreriaEliminada,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -10,12 +10,18 @@ const categoriaExiste = async (id_categoria) => {
   return rows.length > 0;
 };
 
+// Normaliza la referencia: recorta espacios y convierte a mayúsculas
+// para evitar duplicados por diferencias de caja o espacios.
+const normalizarReferencia = (ref) =>
+  String(ref || "").trim().toUpperCase();
+
 const getArticulos = async (req, res) => {
   try {
     const {
       buscar = "",
       tipo_categoria = "",
       id_categoria = "",
+      solo_descatalogados = "",
       page,
       pageSize,
       sortBy,
@@ -29,6 +35,8 @@ const getArticulos = async (req, res) => {
       buscar,
       tipo_categoria,
       id_categoria,
+      solo_descatalogados:
+        solo_descatalogados === "1" || solo_descatalogados === "true",
       page: p,
       pageSize: ps,
       sortBy,
@@ -89,7 +97,7 @@ const createArticulo = async (req, res) => {
 
     const [referenciaRows] = await db.query(
       "SELECT id_articulo FROM articulos WHERE referencia = ?",
-      [referencia],
+      [normalizarReferencia(referencia)],
     );
     if (referenciaRows.length > 0) {
       return res
@@ -141,7 +149,7 @@ const createArticulo = async (req, res) => {
     // Creamos el artículo principal
     const articuloId = await Articulo.create(
       {
-        referencia,
+        referencia: normalizarReferencia(referencia),
         descripcion,
         precio_venta,
         precio_costo,
@@ -231,35 +239,150 @@ const getComponentesParaOrdenFabricacion = async (req, res) => {
 const updateArticulo = async (req, res) => {
   const { id } = req.params;
   const idArticulo = parseInt(id);
-  // Validar referencia solo si viene en el body
-  if (req.body.referencia !== undefined) {
-    const [rows] = await db.query(
-      "SELECT * FROM articulos WHERE referencia = ?  AND id_articulo != ?",
-      [req.body.referencia, idArticulo],
-    );
-    if (rows.length > 0) {
-      return res
-        .status(400)
-        .json({ error: "Ya existe un artículo con esa referencia" });
-    }
-  }
-  // Validar existencia de la categoría solo si viene en el body
-  if (req.body.id_categoria !== undefined) {
-    const categoriaValida = await categoriaExiste(req.body.id_categoria);
-    if (!categoriaValida) {
-      return res
-        .status(400)
-        .json({ error: "La categoría especificada no existe" });
-    }
-  }
-  try {
-    const result = await Articulo.update(id, req.body);
+  let connection;
 
-    if (result.affectedRows == 0) {
+  try {
+    const {
+      referencia,
+      descripcion,
+      precio_venta,
+      precio_costo,
+      id_categoria,
+      id_unidad,
+      id_etapa,
+      es_compuesto,
+      descatalogado,
+      componentes,
+    } = req.body;
+
+    // Normalizar referencia si viene en el body
+    const referenciaFinal =
+      referencia !== undefined && referencia !== null
+        ? normalizarReferencia(referencia)
+        : undefined;
+
+    // Validar referencia única (normalizada) solo si viene
+    if (referenciaFinal !== undefined) {
+      const [rows] = await db.query(
+        "SELECT * FROM articulos WHERE referencia = ? AND id_articulo != ?",
+        [referenciaFinal, idArticulo],
+      );
+      if (rows.length > 0) {
+        return res
+          .status(400)
+          .json({ error: "Ya existe un artículo con esa referencia" });
+      }
+    }
+
+    // Validar existencia de la categoría solo si viene en el body
+    if (id_categoria !== undefined && id_categoria !== null) {
+      const categoriaValida = await categoriaExiste(id_categoria);
+      if (!categoriaValida) {
+        return res
+          .status(400)
+          .json({ error: "La categoría especificada no existe" });
+      }
+    }
+
+    // Obtener el artículo actual para conocer su estado de compuesto
+    const articuloActual = await Articulo.getById(idArticulo);
+    if (!articuloActual) {
       return res.status(404).json({ error: "Artículo no encontrado" });
     }
+
+    // Determinar el valor final de es_compuesto (si viene o se conserva)
+    const esCompuestoFinal =
+      es_compuesto !== undefined && es_compuesto !== null
+        ? es_compuesto
+          ? 1
+          : 0
+        : articuloActual.es_compuesto
+          ? 1
+          : 0;
+
+    // Validar componentes según el estado final
+    if (esCompuestoFinal === 1) {
+      if (!Array.isArray(componentes) || componentes.length === 0) {
+        return res.status(400).json({
+          error:
+            "Un artículo compuesto debe tener al menos un componente válido.",
+        });
+      }
+      for (const comp of componentes) {
+        if (
+          !comp.id ||
+          typeof comp.cantidad !== "number" ||
+          comp.cantidad <= 0
+        ) {
+          return res.status(400).json({
+            error: `Formato de componente inválido: ${JSON.stringify(
+              comp,
+            )}. Se requieren 'id' y 'cantidad' (número positivo).`,
+          });
+        }
+        if (Number(comp.id) === idArticulo) {
+          return res.status(400).json({
+            error: "Un artículo compuesto no puede contenerse a sí mismo como componente.",
+          });
+        }
+        const [componenteArticuloRows] = await db.query(
+          "SELECT id_articulo FROM articulos WHERE id_articulo = ?",
+          [comp.id],
+        );
+        if (componenteArticuloRows.length === 0) {
+          return res.status(400).json({
+            error: `El componente con ID ${comp.id} no es un artículo válido.`,
+          });
+        }
+      }
+    }
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // Actualizar el artículo (incluye es_compuesto y descatalogado)
+    const result = await Articulo.update(
+      idArticulo,
+      {
+        referencia: referenciaFinal,
+        descripcion,
+        precio_venta,
+        precio_costo,
+        id_categoria,
+        id_unidad,
+        id_etapa,
+        es_compuesto: esCompuestoFinal,
+        descatalogado,
+      },
+      connection,
+    );
+
+    if (result.affectedRows == 0) {
+      await connection.rollback();
+      connection.release();
+      return res.status(404).json({ error: "Artículo no encontrado" });
+    }
+
+    // Actualizar componentes: borrar y recrear si es compuesto,
+    // o eliminar los existentes si dejó de serlo
+    await ArticuloComponente.deleteByArticuloPadreId(idArticulo, connection);
+    if (esCompuestoFinal === 1) {
+      await ArticuloComponente.CreateComponentesEnLote(
+        idArticulo,
+        componentes,
+        connection,
+      );
+    }
+
+    await connection.commit();
+    connection.release();
+
     res.json({ message: "Artículo actualizado" });
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
     console.error("Error al actualizar artículo:", error);
     res.status(500).json({ error: "Error al actualizar artículo" });
   }
@@ -276,7 +399,42 @@ const deleteArticulo = async (req, res) => {
     if (movimientos.length > 0) {
       return res.status(400).json({
         error:
-          "No puedes eliminar este artículo porque tiene movimientos registrados.",
+          "No puedes eliminar este artículo porque tiene movimientos registrados. Puedes descatalogarlo para ocultarlo de los selectores sin perder su histórico.",
+      });
+    }
+
+    // Detectar referencias en otras tablas para dar un mensaje claro
+    const [refs] = await db.query(
+      `SELECT
+        (SELECT COUNT(*) FROM detalle_orden_venta WHERE id_articulo = ?) AS en_ventas,
+        (SELECT COUNT(*) FROM detalle_orden_compra WHERE id_articulo = ?) AS en_compras,
+        (SELECT COUNT(*) FROM detalle_orden_fabricacion WHERE id_articulo = ?) AS en_fabricacion,
+        (SELECT COUNT(*) FROM detalle_pedido WHERE id_articulo = ?) AS en_pedidos,
+        (SELECT COUNT(*) FROM articulos_componentes WHERE articulo_componente_id = ?) AS es_componente,
+        (SELECT COUNT(*) FROM articulos_componentes WHERE articulo_padre_id = ?) AS tiene_componentes,
+        (SELECT COUNT(*) FROM historial_costos WHERE id_articulo = ?) AS en_historial,
+        (SELECT COUNT(*) FROM lotes_fabricados WHERE id_articulo = ?) AS en_lotes,
+        (SELECT COUNT(*) FROM inventario WHERE id_articulo = ?) AS en_inventario`,
+      [id, id, id, id, id, id, id, id, id],
+    );
+    const r = refs[0] || {};
+    const usos = [
+      r.en_ventas > 0 && `${r.en_ventas} venta(s)`,
+      r.en_compras > 0 && `${r.en_compras} compra(s)`,
+      r.en_fabricacion > 0 && `${r.en_fabricacion} orden(es) de fabricación`,
+      r.en_pedidos > 0 && `${r.en_pedidos} pedido(s)`,
+      r.es_componente > 0 && "es componente de otro artículo",
+      r.tiene_componentes > 0 && "tiene componentes definidos",
+      r.en_historial > 0 && "tiene historial de costos",
+      r.en_lotes > 0 && "tiene lotes fabricados",
+      r.en_inventario > 0 && "está en el inventario",
+    ].filter(Boolean);
+
+    if (usos.length > 0) {
+      return res.status(400).json({
+        error: `No puedes eliminar este artículo porque ${usos.join(
+          ", ",
+        )}. Puedes descatalogarlo para ocultarlo de los selectores sin perder su histórico.`,
       });
     }
 

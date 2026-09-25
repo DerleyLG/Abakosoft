@@ -240,7 +240,10 @@ const Dashboard = () => {
         <section className="bg-white border border-slate-200 rounded-xl shadow-sm px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Vista general de
+              </p>
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
                 Dashboard Operativo
               </h1>
               <p className="text-xs md:text-sm text-slate-500 inline-flex items-center gap-2">

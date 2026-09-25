@@ -1,8 +1,9 @@
 const db = require("../database/db");
 
 const Articulo = {
-  async getAll() {
-    const [rows] = await db.query(`
+  async getAll(incluirDescatalogados = false) {
+    const [rows] = await db.query(
+      `
     SELECT 
       a.*, 
       c.nombre AS nombre_categoria,
@@ -14,7 +15,9 @@ const Articulo = {
       categorias c ON a.id_categoria = c.id_categoria
     LEFT JOIN
       unidades u ON a.id_unidad = u.id_unidad
-  `);
+    ${incluirDescatalogados ? "" : "WHERE a.descatalogado = 0"}
+  `,
+    );
     return rows;
   },
 
@@ -63,10 +66,13 @@ const Articulo = {
       id_categoria,
       id_unidad,
       id_etapa,
+      es_compuesto,
+      descatalogado,
     },
+    connection = db,
   ) {
     // Obtener los valores actuales del artículo
-    const [rows] = await db.query(
+    const [rows] = await (connection || db).query(
       "SELECT * FROM articulos WHERE id_articulo = ?",
       [id],
     );
@@ -101,8 +107,22 @@ const Articulo = {
     if (typeof etapaFinal === "undefined" || etapaFinal === null) {
       etapaFinal = actual.id_etapa;
     }
-    const [result] = await db.query(
-      "UPDATE articulos SET referencia=?, descripcion=?, precio_venta=?, precio_costo=?, id_categoria=?, id_unidad=?, id_etapa=? WHERE id_articulo=?",
+    const esCompuestoFinal =
+      es_compuesto !== undefined && es_compuesto !== null
+        ? es_compuesto
+          ? 1
+          : 0
+        : actual.es_compuesto
+          ? 1
+          : 0;
+    const descatalogadoFinal =
+      descatalogado !== undefined && descatalogado !== null
+        ? descatalogado
+          ? 1
+          : 0
+        : actual.descatalogado;
+    const [result] = await (connection || db).query(
+      "UPDATE articulos SET referencia=?, descripcion=?, precio_venta=?, precio_costo=?, id_categoria=?, id_unidad=?, id_etapa=?, es_compuesto=?, descatalogado=? WHERE id_articulo=?",
       [
         referenciaFinal,
         descripcionFinal,
@@ -111,6 +131,8 @@ const Articulo = {
         idCategoriaFinal,
         idUnidadFinal,
         etapaFinal,
+        esCompuestoFinal,
+        descatalogadoFinal,
         id,
       ],
     );
@@ -131,7 +153,8 @@ const Articulo = {
     SELECT a.*, c.nombre AS nombre_categoria
     FROM articulos a
     LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
-    WHERE a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?
+    WHERE (a.referencia LIKE ? OR a.descripcion LIKE ? OR c.nombre LIKE ?)
+      AND a.descatalogado = 0
   `,
       [`%${filtro}%`, `%${filtro}%`, `%${filtro}%`],
     );
@@ -143,6 +166,7 @@ const Articulo = {
     buscar = "",
     tipo_categoria = "",
     id_categoria = "",
+    solo_descatalogados = false,
     page = 1,
     pageSize = 25,
     sortBy = "descripcion",
@@ -171,6 +195,15 @@ const Articulo = {
       "(a.referencia LIKE ? OR a.descripcion LIKE ? OR COALESCE(c.nombre, '') LIKE ?)";
     let params = [like, like, like];
 
+    // Filtro por estado del catálogo:
+    // - Por defecto: solo artículos activos (descatalogado = 0)
+    // - solo_descatalogados: solo artículos descatalogados (descatalogado = 1)
+    if (solo_descatalogados) {
+      whereCondition += " AND a.descatalogado = 1";
+    } else {
+      whereCondition += " AND a.descatalogado = 0";
+    }
+
     // Agregar filtro por categoría específica (tiene prioridad)
     if (id_categoria) {
       whereCondition += " AND a.id_categoria = ?";
@@ -184,10 +217,13 @@ const Articulo = {
 
     // Consulta de datos paginados
     const [rows] = await db.query(
-      `SELECT a.*, c.nombre AS nombre_categoria, u.nombre AS nombre_unidad, u.abreviatura AS abreviatura_unidad
+      `SELECT a.*, c.nombre AS nombre_categoria, u.nombre AS nombre_unidad, u.abreviatura AS abreviatura_unidad,
+              COALESCE(i.stock, 0) AS stock_disponible,
+              COALESCE(i.stock_minimo, 0) AS stock_minimo
        FROM articulos a
        LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
        LEFT JOIN unidades u ON a.id_unidad = u.id_unidad
+       LEFT JOIN inventario i ON i.id_articulo = a.id_articulo
        WHERE ${whereCondition}
        ORDER BY ${sortCol} ${dir}
        LIMIT ? OFFSET ?`,

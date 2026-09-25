@@ -62,6 +62,8 @@ import {
   TrendingDown,
   Banknote,
   CheckCircle2,
+  HandCoins,
+  Landmark,
 } from "lucide-react";
 import {
   PERMISSION_GROUPS,
@@ -89,9 +91,11 @@ const GROUP_ICONS = {
   "Kanban / Producción": <Grid size={20} className="text-slate-500" />,
   Compras: <FiShoppingCart size={20} className="text-slate-500" />,
   Pagos: <DollarSign size={20} className="text-slate-500" />,
+  Anticipos: <HandCoins size={20} className="text-slate-500" />,
   "Ventas a Crédito": <CreditCard size={20} className="text-slate-500" />,
   "Costos Indirectos": <TrendingDown size={20} className="text-slate-500" />,
   Tesorería: <Banknote size={20} className="text-slate-500" />,
+  "Conciliación Bancaria": <Landmark size={20} className="text-slate-500" />,
   "Cierres de Caja": <LucideLock size={20} className="text-slate-500" />,
   "Etapas de Producción": (
     <LucideSettings size={20} className="text-slate-500" />
@@ -234,8 +238,9 @@ const PermisosCheckboxes = ({ permisos, onChange, isReadOnly = false }) => {
         </div>
       </div>
 
-      {/* Acordeones de grupos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {/* Acordeones de grupos — grid de 2 columnas compacto. Cada grupo tiene
+          altura propia (items-start) para que expandir uno NO estire al vecino. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         {gruposFiltrados.map(([grupo, acciones]) => {
           const allActions = PERMISSION_GROUPS[grupo];
           const todasActivas = allActions.every((a) => permisos.includes(a));
@@ -255,21 +260,23 @@ const PermisosCheckboxes = ({ permisos, onChange, isReadOnly = false }) => {
           return (
             <div
               key={grupo}
-              className={`rounded-xl border transition-all duration-200 ${
+              className={`rounded-xl border transition-colors duration-200 overflow-hidden ${
                 grupoAllLocked
                   ? "border-violet-100 bg-violet-50/30"
-                  : algunaActiva
+                  : isExpanded
                     ? "border-slate-300 bg-white shadow-sm"
-                    : "border-slate-200 bg-slate-50/50"
+                    : algunaActiva
+                      ? "border-slate-200 bg-white"
+                      : "border-slate-200 bg-slate-50/50"
               }`}
             >
               {/* Cabecera del grupo */}
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-slate-50/60 transition-colors"
                 onClick={() => toggleGroup(grupo)}
               >
                 <span
-                  className={`flex items-center justify-center w-8 h-8 rounded-lg border-2 mr-1 ${grupoAllLocked ? "bg-violet-50 border-violet-200" : "bg-slate-100 border-slate-200"}`}
+                  className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 ${grupoAllLocked ? "bg-violet-50 border border-violet-200" : "bg-slate-100 border border-slate-200"}`}
                 >
                   {icon}
                 </span>
@@ -294,9 +301,7 @@ const PermisosCheckboxes = ({ permisos, onChange, isReadOnly = false }) => {
                   <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
-                        grupoAllLocked
-                          ? "bg-violet-200"
-                          : "bg-gradient-to-r from-slate-400 to-slate-600"
+                        grupoAllLocked ? "bg-violet-200" : "bg-slate-400"
                       }`}
                       style={{
                         width: grupoAllLocked
@@ -345,114 +350,120 @@ const PermisosCheckboxes = ({ permisos, onChange, isReadOnly = false }) => {
                   />
                   <div className="w-9 h-5 bg-slate-300 peer-checked:bg-slate-700 rounded-full transition-colors duration-200 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:after:translate-x-4 after:shadow-sm" />
                 </label>
-                <span className="text-slate-400 transition-transform duration-200">
-                  {isExpanded ? (
-                    <FiChevronDown size={18} />
-                  ) : (
-                    <FiChevronRight size={18} />
-                  )}
+                <span
+                  className={`text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                >
+                  <FiChevronDown size={18} />
                 </span>
               </div>
 
-              {/* Contenido expandido */}
-              {isExpanded && (
-                <div className="px-4 pb-3 border-t border-slate-100">
-                  <div className="pt-2 space-y-0.5">
-                    {acciones.map((accion) => {
-                      const isLocked = lockedActions.has(accion);
-                      const esDependenciaRequerida =
-                        !isLocked &&
-                        permisos.some(
-                          (p) =>
-                            PERMISSION_DEPENDENCIES[p]?.includes(accion) &&
-                            p !== accion,
-                        );
-                      const isChecked = permisos.includes(accion);
-                      const isDisabled =
-                        isLocked || esDependenciaRequerida || isReadOnly;
+              {/* Contenido expandido — animación suave con grid-rows */}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                  isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="px-4 pb-3 border-t border-slate-100">
+                    <div className="pt-2 space-y-0.5">
+                      {acciones.map((accion) => {
+                        const isLocked = lockedActions.has(accion);
+                        const esDependenciaRequerida =
+                          !isLocked &&
+                          permisos.some(
+                            (p) =>
+                              PERMISSION_DEPENDENCIES[p]?.includes(accion) &&
+                              p !== accion,
+                          );
+                        const isChecked = permisos.includes(accion);
+                        const isDisabled =
+                          isLocked || esDependenciaRequerida || isReadOnly;
 
-                      return (
-                        <label
-                          key={accion}
-                          className={`group flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-150 select-none ${
-                            isLocked
-                              ? "opacity-50 cursor-not-allowed"
-                              : esDependenciaRequerida
-                                ? "opacity-60 cursor-default"
-                                : isChecked
-                                  ? "bg-slate-100/70 cursor-pointer"
-                                  : "hover:bg-slate-100/50 cursor-pointer"
-                          }`}
-                          title={
-                            isLocked
-                              ? "Requiere plan Pro"
-                              : esDependenciaRequerida
-                                ? "Requerido por otro permiso activo"
-                                : ""
-                          }
-                        >
-                          {/* Custom checkbox / lock icon */}
-                          <div
-                            className={`flex items-center justify-center w-4 h-4 rounded border transition-all duration-150 ${
+                        return (
+                          <label
+                            key={accion}
+                            className={`group flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-150 select-none ${
                               isLocked
-                                ? "border-violet-200 bg-violet-50"
-                                : isChecked
-                                  ? esDependenciaRequerida
-                                    ? "bg-slate-400 border-slate-400"
-                                    : "bg-slate-700 border-slate-700"
-                                  : "border-slate-300 group-hover:border-slate-400"
+                                ? "opacity-50 cursor-not-allowed"
+                                : esDependenciaRequerida
+                                  ? "opacity-60 cursor-default"
+                                  : isChecked
+                                    ? "bg-slate-100/70 cursor-pointer"
+                                    : "hover:bg-slate-100/50 cursor-pointer"
                             }`}
+                            title={
+                              isLocked
+                                ? "Requiere plan Pro"
+                                : esDependenciaRequerida
+                                  ? "Requerido por otro permiso activo"
+                                  : ""
+                            }
                           >
-                            {isLocked ? (
-                              <FiLock size={8} className="text-violet-400" />
-                            ) : isChecked ? (
-                              <FiCheck
-                                size={10}
-                                className="text-white"
-                                strokeWidth={3}
-                              />
-                            ) : null}
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => {
-                              if (isDisabled) return;
-                              if (isChecked) {
-                                onChange(permisos.filter((p) => p !== accion));
-                              } else {
-                                onChange(
-                                  resolvePermissionDependencies([
-                                    ...permisos,
-                                    accion,
-                                  ]),
-                                );
-                              }
-                            }}
-                            className="sr-only"
-                          />
-                          <span
-                            className={`text-sm flex-1 ${isLocked ? "text-slate-400" : "text-slate-700"}`}
-                          >
-                            {ACTION_LABELS[accion] || accion}
-                          </span>
-                          {isLocked && (
-                            <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-1.5 py-0.5 leading-none">
-                              <FiLock size={8} /> Pro
+                            {/* Custom checkbox / lock icon */}
+                            <div
+                              className={`flex items-center justify-center w-4 h-4 rounded border transition-all duration-150 ${
+                                isLocked
+                                  ? "border-violet-200 bg-violet-50"
+                                  : isChecked
+                                    ? esDependenciaRequerida
+                                      ? "bg-slate-400 border-slate-400"
+                                      : "bg-slate-700 border-slate-700"
+                                    : "border-slate-300 group-hover:border-slate-400"
+                              }`}
+                            >
+                              {isLocked ? (
+                                <FiLock size={8} className="text-violet-400" />
+                              ) : isChecked ? (
+                                <FiCheck
+                                  size={10}
+                                  className="text-white"
+                                  strokeWidth={3}
+                                />
+                              ) : null}
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onChange={() => {
+                                if (isDisabled) return;
+                                if (isChecked) {
+                                  onChange(
+                                    permisos.filter((p) => p !== accion),
+                                  );
+                                } else {
+                                  onChange(
+                                    resolvePermissionDependencies([
+                                      ...permisos,
+                                      accion,
+                                    ]),
+                                  );
+                                }
+                              }}
+                              className="sr-only"
+                            />
+                            <span
+                              className={`text-sm flex-1 ${isLocked ? "text-slate-400" : "text-slate-700"}`}
+                            >
+                              {ACTION_LABELS[accion] || accion}
                             </span>
-                          )}
-                          {!isLocked && esDependenciaRequerida && (
-                            <span className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 leading-none">
-                              <FiLock size={8} /> Requerido
-                            </span>
-                          )}
-                        </label>
-                      );
-                    })}
+                            {isLocked && (
+                              <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-1.5 py-0.5 leading-none">
+                                <FiLock size={8} /> Pro
+                              </span>
+                            )}
+                            {!isLocked && esDependenciaRequerida && (
+                              <span className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 leading-none">
+                                <FiLock size={8} /> Requerido
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
@@ -468,19 +479,24 @@ const PermisosCheckboxes = ({ permisos, onChange, isReadOnly = false }) => {
 };
 
 const FormLayout = ({ title, onBack, onSave, saveLabel, children }) => (
-  <div className="w-full px-4 md:px-8 lg:px-12 py-8 animate-fade-in">
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+  <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6">
+    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-5">
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
           className="flex items-center justify-center w-9 h-9 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 focus:ring-2 focus:ring-slate-400 transition cursor-pointer"
           aria-label="Volver"
         >
-          <FiArrowLeft size={20} />
+          <FiArrowLeft size={18} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Administración de
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+            {title}
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
             Configura nombre y permisos de acceso
           </p>
         </div>
@@ -488,9 +504,9 @@ const FormLayout = ({ title, onBack, onSave, saveLabel, children }) => (
       {onSave && (
         <button
           onClick={onSave}
-          className="cursor-pointer inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm focus:ring-2 focus:ring-slate-400 transition active:scale-[0.97]"
+          className="cursor-pointer inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm focus:ring-2 focus:ring-slate-400 transition"
         >
-          <FiSave size={16} /> {saveLabel}
+          <FiSave size={15} /> {saveLabel}
         </button>
       )}
     </div>
@@ -697,26 +713,22 @@ const GestionRoles = () => {
     );
   }
 
-  // Vista principal: lista de roles como cards
+  // Vista principal: lista de roles como tabla
   return (
-    <div className="w-full px-4 md:px-8 lg:px-12 py-8 animate-fade-in">
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-10">
-        <div className="flex items-center gap-3 mb-2">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 focus:ring-2 focus:ring-slate-400 transition"
-            aria-label="Volver"
-          >
-            <FiArrowLeft size={20} />
-          </button>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-5">
+      {/* ─── Encabezado ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-slate-900 flex items-center justify-center shadow-sm">
+            <FiShield size={22} className="text-white" />
+          </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-0.5">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Administración de
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
               Gestión de roles
             </h1>
-            <p className="text-slate-600">
-              Administra y personaliza roles con permisos granulares del sistema
-            </p>
           </div>
         </div>
         <button
@@ -724,137 +736,179 @@ const GestionRoles = () => {
             setCreando(true);
             setCrearRolKey(generateUUID());
           }}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 text-white shadow-sm transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
         >
-          <FiPlus size={14} /> Nuevo rol
+          <FiPlus size={15} /> Nuevo rol
         </button>
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24">
-          <div className="w-12 h-12 border-3 border-slate-200 border-t-slate-700 rounded-full animate-spin mb-4" />
-          <p className="text-slate-600 font-medium">Cargando roles…</p>
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="w-10 h-10 border-3 border-slate-200 border-t-slate-700 rounded-full animate-spin mb-3" />
+          <p className="text-sm text-slate-500">Cargando roles…</p>
         </div>
       ) : roles.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {roles.map((rol) => {
-            const isSystem = [1, 2, 3].includes(rol.id_rol);
-            const roleColors = {
-              1: {
-                icon: "bg-red-500",
-                badge: "bg-red-50 border-red-200 text-red-700",
-              }, // admin
-              2: {
-                icon: "bg-blue-500",
-                badge: "bg-blue-50 border-blue-200 text-blue-700",
-              }, // supervisor
-              3: {
-                icon: "bg-amber-500",
-                badge: "bg-amber-50 border-amber-200 text-amber-700",
-              }, // operario
-              default: {
-                icon: "bg-slate-400",
-                badge: "bg-slate-50 border-slate-200 text-slate-700",
-              },
-            };
-            const colors = roleColors[rol.id_rol] || roleColors.default;
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Rol
+                  </th>
+                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Tipo
+                  </th>
+                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Permisos
+                  </th>
+                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {roles.map((rol) => {
+                  const isSystem = [1, 2, 3].includes(rol.id_rol);
+                  const roleStyles = {
+                    1: {
+                      badge:
+                        "bg-emerald-50 text-emerald-700 border-emerald-200",
+                      dot: "bg-emerald-500",
+                      label: "Administrador",
+                    },
+                    2: {
+                      badge: "bg-teal-50 text-teal-700 border-teal-200",
+                      dot: "bg-teal-500",
+                      label: "Supervisor",
+                    },
+                    3: {
+                      badge: "bg-sky-50 text-sky-700 border-sky-200",
+                      dot: "bg-sky-500",
+                      label: "Operario",
+                    },
+                    default: {
+                      badge: "bg-slate-50 text-slate-700 border-slate-200",
+                      dot: "bg-slate-400",
+                      label: "Personalizado",
+                    },
+                  };
+                  const styles = roleStyles[rol.id_rol] || roleStyles.default;
+                  const totalPermisos = rol.permisos?.length || 0;
+                  const pct = Math.min((totalPermisos / 30) * 100, 100);
 
-            return (
-              <div
-                key={rol.id_rol}
-                className="group relative bg-white border-2 border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-300 cursor-default overflow-hidden"
-              >
-                {/* Fondo decorativo */}
-                <div
-                  className={`absolute top-0 right-0 w-32 h-32 ${colors.icon} opacity-5 rounded-full -mr-16 -mt-16 blur-xl`}
-                />
-
-                <div className="relative space-y-4">
-                  {/* Encabezado */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div
-                        className={`flex items-center justify-center w-12 h-12 rounded-xl ${colors.icon} shadow-sm`}
-                      >
-                        <FiShield size={20} className="text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-bold text-slate-900 capitalize text-base">
-                          {rol.nombre_rol}
-                        </h3>
-                        {isSystem && (
-                          <span
-                            className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border mt-1.5 ${colors.badge}`}
+                  return (
+                    <tr
+                      key={rol.id_rol}
+                      className="hover:bg-slate-50/70 transition-colors"
+                    >
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${
+                              styles.dot === "bg-emerald-500"
+                                ? "bg-emerald-500"
+                                : styles.dot === "bg-teal-500"
+                                  ? "bg-teal-500"
+                                  : styles.dot === "bg-sky-500"
+                                    ? "bg-sky-500"
+                                    : "bg-slate-400"
+                            }`}
                           >
-                            Sistema
+                            <FiShield size={15} />
+                          </div>
+                          <p className="text-sm font-semibold text-slate-800 capitalize">
+                            {rol.nombre_rol}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {isSystem ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${styles.badge}`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${styles.dot}`}
+                            />
+                            {styles.label}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-slate-50 text-slate-600 border-slate-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Personalizado
                           </span>
                         )}
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-300 font-mono bg-slate-50 px-2 py-1 rounded-lg">
-                      ID: {rol.id_rol}
-                    </span>
-                  </div>
-
-                  {/* Info rápida */}
-                  {rol.permisos && rol.permisos.length > 0 && (
-                    <div className="pt-2 pb-2">
-                      <div className="text-xs text-slate-600 mb-2">
-                        <span className="font-semibold text-slate-900">
-                          {rol.permisos.length}
-                        </span>{" "}
-                        permisos activos
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full bg-gradient-to-r ${colors.icon} rounded-full transition-all duration-300`}
-                          style={{
-                            width: `${Math.min((rol.permisos.length / 30) * 100, 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Acciones */}
-                  <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => handleEditar(rol)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 py-2.5 rounded-lg transition cursor-pointer"
-                      title={
-                        rol.nombre_rol === "admin"
-                          ? "Los permisos del administrador no pueden modificarse"
-                          : undefined
-                      }
-                    >
-                      {rol.nombre_rol === "admin" ? (
-                        <FiLock size={14} />
-                      ) : (
-                        <FiEdit size={14} />
-                      )}
-                      {rol.nombre_rol === "admin" ? "Ver" : "Editar"}
-                    </button>
-                    {!isSystem && (
-                      <>
-                        <div className="w-px h-6 bg-slate-200" />
-                        <button
-                          onClick={() => handleEliminar(rol)}
-                          className="flex items-center justify-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 py-2.5 px-3 rounded-lg transition cursor-pointer"
-                        >
-                          <FiTrash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3 min-w-[140px]">
+                          <div className="h-1.5 w-24 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                styles.dot === "bg-emerald-500"
+                                  ? "bg-emerald-500"
+                                  : styles.dot === "bg-teal-500"
+                                    ? "bg-teal-500"
+                                    : styles.dot === "bg-sky-500"
+                                      ? "bg-sky-500"
+                                      : "bg-slate-400"
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-semibold text-slate-600">
+                            {totalPermisos}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-500 bg-slate-50 border border-slate-100 rounded-md px-2 py-1">
+                          <FiLock size={10} className="text-slate-400" />
+                          {rol.id_rol}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleEditar(rol)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                            title={
+                              rol.nombre_rol === "admin"
+                                ? "Los permisos del administrador no pueden modificarse"
+                                : undefined
+                            }
+                          >
+                            {rol.nombre_rol === "admin" ? (
+                              <FiLock size={13} />
+                            ) : (
+                              <FiEdit size={13} />
+                            )}
+                            {rol.nombre_rol === "admin" ? "Ver" : "Editar"}
+                          </button>
+                          {!isSystem && (
+                            <button
+                              onClick={() => handleEliminar(rol)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <FiTrash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-            <FiUsers size={32} className="text-slate-400" />
+            <FiUsers size={30} className="text-slate-400" />
           </div>
           <h3 className="text-slate-700 font-semibold text-lg mb-2">
             No hay roles creados
@@ -868,9 +922,9 @@ const GestionRoles = () => {
               setCreando(true);
               setCrearRolKey(generateUUID());
             }}
-            className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
           >
-            <FiPlus size={18} /> Crear primer rol
+            <FiPlus size={16} /> Crear primer rol
           </button>
         </div>
       )}

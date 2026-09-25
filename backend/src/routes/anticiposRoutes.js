@@ -26,14 +26,38 @@ router.get(
   requirePermission(ACTIONS.ANTICIPOS_VIEW),
   controller.getPorTrabajador,
 );
+router.get(
+  "/:id/aplicaciones",
+  requirePlanFeature("anticipos"),
+  requirePermission(ACTIONS.ANTICIPOS_VIEW),
+  controller.getAplicaciones,
+);
+router.get(
+  "/:id",
+  requirePlanFeature("anticipos"),
+  requirePermission(ACTIONS.ANTICIPOS_VIEW),
+  controller.getAnticipoById,
+);
 router.post(
   "/",
   requirePlanFeature("anticipos"),
-  requirePermission(ACTIONS.ANTICIPOS_VIEW),
+  requirePermission(ACTIONS.ANTICIPOS_CREATE),
   pagosController.createAnticipo,
 );
+router.put(
+  "/:id",
+  requirePlanFeature("anticipos"),
+  requirePermission(ACTIONS.ANTICIPOS_CREATE),
+  controller.updateAnticipo,
+);
+router.delete(
+  "/:id",
+  requirePlanFeature("anticipos"),
+  requirePermission(ACTIONS.ANTICIPOS_CREATE),
+  controller.deleteAnticipo,
+);
 router.get(
-  "/:trab/:ord",
+  "/activo/:trab/:ord",
   requirePlanFeature("anticipos"),
   requirePermission(ACTIONS.ANTICIPOS_VIEW),
   controller.getAnticipoActivo,
@@ -41,7 +65,7 @@ router.get(
 router.patch(
   "/descontar",
   requirePlanFeature("anticipos"),
-  requirePermission(ACTIONS.ANTICIPOS_VIEW),
+  requirePermission(ACTIONS.ANTICIPOS_CREATE),
   controller.descontarAnticipo,
 );
 

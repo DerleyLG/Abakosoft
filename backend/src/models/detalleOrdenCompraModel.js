@@ -22,14 +22,20 @@ module.exports = {
 
   // Crear nuevo detalle de orden de compra
   create: async (
-    { id_orden_compra, id_articulo, cantidad, precio_unitario },
+    { id_orden_compra, id_articulo, cantidad, precio_unitario, es_bruto = 0 },
     connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `INSERT INTO detalle_orden_compra
-       (id_orden_compra, id_articulo, cantidad, precio_unitario)
-       VALUES (?, ?, ?, ?)`,
-      [id_orden_compra, id_articulo, cantidad, precio_unitario],
+       (id_orden_compra, id_articulo, cantidad, precio_unitario, es_bruto)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        id_orden_compra,
+        id_articulo,
+        cantidad,
+        precio_unitario,
+        es_bruto ? 1 : 0,
+      ],
     );
     return result.insertId;
   },
@@ -37,18 +43,19 @@ module.exports = {
   // Actualizar detalle de orden
   update: async (
     id_detalle_compra,
-    { id_orden_compra, id_articulo, cantidad, precio_unitario },
+    { id_orden_compra, id_articulo, cantidad, precio_unitario, es_bruto = 0 },
     connection = db,
   ) => {
     const [result] = await (connection || db).query(
       `UPDATE detalle_orden_compra
-       SET id_orden_compra = ?, id_articulo = ?, cantidad = ?, precio_unitario = ?
+       SET id_orden_compra = ?, id_articulo = ?, cantidad = ?, precio_unitario = ?, es_bruto = ?
        WHERE id_detalle_compra = ?`,
       [
         id_orden_compra,
         id_articulo,
         cantidad,
         precio_unitario,
+        es_bruto ? 1 : 0,
         id_detalle_compra,
       ],
     );

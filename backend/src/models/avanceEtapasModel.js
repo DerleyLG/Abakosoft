@@ -818,7 +818,6 @@ module.exports = {
     );
 
     if (!ordenData.length) {
-      console.log(`Orden ${id_orden_fabricacion} no encontrada.`);
       return false;
     }
 
@@ -826,9 +825,6 @@ module.exports = {
     const estadoActualOrden = ordenData[0].estado;
 
     if (estadoActualOrden === "completada") {
-      console.log(
-        `Orden ${id_orden_fabricacion} ya está completada. No se requiere acción.`,
-      );
       return true;
     }
 

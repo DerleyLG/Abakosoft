@@ -280,7 +280,7 @@ const AnticipoAlert = ({
                   <thead>
                     <tr className="text-left text-xs text-slate-500">
                       <th>Id Anticipo</th>
-                      <th>Orden</th>
+                      <th>Orden de fabricación</th>
                       <th>Saldo</th>
                       <th>Aplicar</th>
                     </tr>
@@ -293,9 +293,21 @@ const AnticipoAlert = ({
                       >
                         <td className="py-1">{s.id_anticipo}</td>
                         <td className="py-1">
-                          {s.id_orden_fabricacion
-                            ? `#${s.id_orden_fabricacion}`
-                            : "—"}
+                          {s.id_orden_fabricacion ? (
+                            <div>
+                              <span className="font-semibold text-slate-800">
+                                #{s.id_orden_fabricacion}
+                              </span>
+                              {s.orden_descripcion && (
+                                <span className="text-slate-500">
+                                  {" "}
+                                  · {s.orden_descripcion}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="py-1">${s.saldo.toLocaleString()}</td>
                         <td className="py-1 text-amber-700">

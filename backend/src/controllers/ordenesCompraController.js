@@ -209,7 +209,7 @@ async function createOrdenCompra(req, res) {
     const itemsMap = new Map();
     let totalCompra = 0;
     for (const item of items) {
-      const { id_articulo, cantidad, precio_unitario } = item;
+      const { id_articulo, cantidad, precio_unitario, es_bruto } = item;
 
       if (
         !id_articulo ||
@@ -255,9 +255,16 @@ async function createOrdenCompra(req, res) {
         const existente = itemsMap.get(id_articulo);
         existente.cantidad += cantidad;
         existente.precio_unitario = precio_unitario;
+        // Si alguno de los items duplicados está marcado como bruto, se conserva la marca
+        existente.es_bruto = existente.es_bruto || es_bruto ? 1 : 0;
         itemsMap.set(id_articulo, existente);
       } else {
-        itemsMap.set(id_articulo, { id_articulo, cantidad, precio_unitario });
+        itemsMap.set(id_articulo, {
+          id_articulo,
+          cantidad,
+          precio_unitario,
+          es_bruto: es_bruto ? 1 : 0,
+        });
       }
       totalCompra += cantidad * precio_unitario;
     }
@@ -278,7 +285,7 @@ async function createOrdenCompra(req, res) {
     }
 
     for (const [id_articulo, item] of itemsMap) {
-      const { cantidad, precio_unitario } = item;
+      const { cantidad, precio_unitario, es_bruto } = item;
 
       await detalleOrdenCompra.create(
         {
@@ -286,6 +293,7 @@ async function createOrdenCompra(req, res) {
           id_articulo: id_articulo,
           cantidad: cantidad,
           precio_unitario: precio_unitario,
+          es_bruto: es_bruto,
         },
         connection,
       );
@@ -365,22 +373,32 @@ async function confirmarRecepcion(req, res) {
     }
 
     for (const detalle of detalles) {
-      await inventarioModel.processInventoryMovement(
-        {
-          id_articulo: Number(detalle.id_articulo),
-          cantidad_movida: Number(detalle.cantidad),
-          tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
-          tipo_origen_movimiento:
-            inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.COMPRA,
-          observaciones: `Entrada por recepción de orden de compra #${id}`,
-          referencia_documento_id: id,
-          referencia_documento_tipo: "orden_compra",
-        },
-        connection,
-      );
-      console.log(
-        `[OrdenCompraController] Stock sumado para artículo ${detalle.id_articulo}.`,
-      );
+      const esBruto = Number(detalle.es_bruto) === 1;
+
+      if (esBruto) {
+        // Artículo marcado como "en bruto": va directo a fabricación.
+        // No suma a inventario aquí; el stock se alimenta al completar la OF.
+        console.log(
+          `[OrdenCompraController] Artículo ${detalle.id_articulo} marcado como bruto (va a fabricación). No se suma stock en recepción de OC #${id}.`,
+        );
+      } else {
+        await inventarioModel.processInventoryMovement(
+          {
+            id_articulo: Number(detalle.id_articulo),
+            cantidad_movida: Number(detalle.cantidad),
+            tipo_movimiento: inventarioModel.TIPOS_MOVIMIENTO.ENTRADA,
+            tipo_origen_movimiento:
+              inventarioModel.TIPOS_ORIGEN_MOVIMIENTO.COMPRA,
+            observaciones: `Entrada por recepción de orden de compra #${id}`,
+            referencia_documento_id: id,
+            referencia_documento_tipo: "orden_compra",
+          },
+          connection,
+        );
+        console.log(
+          `[OrdenCompraController] Stock sumado para artículo ${detalle.id_articulo}.`,
+        );
+      }
 
       // Actualizar precio de costo del artículo si difiere del precio de compra
       const precioCompra = Number(detalle.precio_unitario) || 0;
@@ -566,7 +584,7 @@ async function updateOrdenCompra(req, res) {
     let totalCompra = 0;
 
     for (const item of detalles) {
-      const { id_articulo, cantidad, precio_unitario } = item;
+      const { id_articulo, cantidad, precio_unitario, es_bruto } = item;
 
       if (
         !id_articulo ||
@@ -607,6 +625,7 @@ async function updateOrdenCompra(req, res) {
       if (detallesAgrupados.has(id_articulo)) {
         const existente = detallesAgrupados.get(id_articulo);
         existente.cantidad += cantidad;
+        existente.es_bruto = existente.es_bruto || es_bruto ? 1 : 0;
 
         detallesAgrupados.set(id_articulo, existente);
       } else {
@@ -614,6 +633,7 @@ async function updateOrdenCompra(req, res) {
           id_articulo,
           cantidad,
           precio_unitario,
+          es_bruto: es_bruto ? 1 : 0,
         });
       }
 
@@ -653,6 +673,7 @@ async function updateOrdenCompra(req, res) {
           id_articulo: item.id_articulo,
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
+          es_bruto: item.es_bruto,
         },
         connection,
       );
@@ -725,6 +746,14 @@ const deleteOrdenCompra = async (req, res) => {
         connection,
       );
       for (const detalle of detalles) {
+        // Los artículos marcados como bruto nunca sumaron stock en la recepción,
+        // por lo que no hay nada que revertir.
+        if (Number(detalle.es_bruto) === 1) {
+          console.log(
+            `[OrdenCompraController] Artículo ${detalle.id_articulo} es bruto: no se revierte stock en cancelación de OC #${id}.`,
+          );
+          continue;
+        }
         await inventarioModel.processInventoryMovement(
           {
             id_articulo: Number(detalle.id_articulo),
@@ -862,6 +891,14 @@ async function updateEstadoOrdenCompra(req, res) {
           [id],
         );
         for (const detalle of detalles[0]) {
+          // Los artículos marcados como bruto nunca sumaron stock en la recepción,
+          // por lo que no hay nada que revertir.
+          if (Number(detalle.es_bruto) === 1) {
+            console.log(
+              `[OrdenCompraController] Artículo ${detalle.id_articulo} es bruto: no se revierte stock al pasar OC #${id} a pendiente.`,
+            );
+            continue;
+          }
           try {
             await require("../models/inventarioModel").processInventoryMovement(
               {

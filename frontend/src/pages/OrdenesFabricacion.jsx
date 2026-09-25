@@ -19,6 +19,7 @@ import {
   FiEye,
   FiEyeOff,
   FiChevronDown,
+  FiShoppingCart,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import ProrrateoButton from "../components/ProrrateoButton";
@@ -1397,9 +1398,14 @@ const ListaOrdenesFabricacion = () => {
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
           {/* Título */}
           <div className="flex items-center gap-2 shrink-0">
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-              Órdenes de fabricación
-            </h1>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Manufactura y
+              </p>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight -mt-0.5">
+                Órdenes de fabricación
+              </h1>
+            </div>
             {total > 0 && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
                 {total}
@@ -1613,6 +1619,38 @@ const ListaOrdenesFabricacion = () => {
                   const isExpanded =
                     expandedOrden === orden.id_orden_fabricacion;
                   const estado = (orden.estado || "").toLowerCase().trim();
+                  const handleCrearOrdenVenta = (e, orden) => {
+                    e.stopPropagation();
+
+                    confirmAlert({
+                      title: "Confirmar orden de venta",
+                      message:
+                        "¿Está seguro que desea crear una orden de venta a partir de esta orden de fabricación?",
+                      buttons: [
+                        {
+                          label: "Sí",
+                          onClick: () => {
+                            navigate("/ordenes_venta/nuevo", {
+                              state: {
+                                pedidoData: {
+                                  id_cliente: orden.id_cliente || null,
+                                  detalles: (orden.detalles || []).map((d) => ({
+                                    id_articulo: d.id_articulo,
+                                    descripcion: d.descripcion,
+                                    cantidad: d.cantidad,
+                                    precio_unitario:
+                                      Number(d.precio_unitario) || 0,
+                                  })),
+                                },
+                              },
+                            });
+                          },
+                        },
+                        { label: "No" },
+                      ],
+                    });
+                  };
+
                   const ESTADO_BADGE = {
                     pendiente:
                       "bg-amber-50 text-amber-700 border border-amber-200",
@@ -1747,6 +1785,18 @@ const ListaOrdenesFabricacion = () => {
                             >
                               <FiPlus size={14} />
                             </button>
+                            {esOrdenCompletada(orden.estado) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCrearOrdenVenta(e, orden);
+                                }}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                                title="Crear orden de venta a partir de esta orden de fabricación"
+                              >
+                                <FiShoppingCart size={14} />
+                              </button>
+                            )}
                             {canDelete && (
                               <button
                                 onClick={(e) => {
@@ -1833,6 +1883,16 @@ const ListaOrdenesFabricacion = () => {
                                         className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer"
                                       >
                                         <FiTrendingUp size={12} /> Ver progreso
+                                      </button>
+                                      <button
+                                        onClick={(e) =>
+                                          handleCrearOrdenVenta(e, orden)
+                                        }
+                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                        title="Crear orden de venta a partir de esta orden de fabricación"
+                                      >
+                                        <FiShoppingCart size={12} /> Crear orden
+                                        de venta
                                       </button>
                                     </div>
                                   );

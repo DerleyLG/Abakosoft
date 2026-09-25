@@ -1,7 +1,13 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import formateaCantidad from "../utils/formateaCantidad";
 import api from "../services/api";
-import { FiLoader, FiArrowLeft, FiX } from "react-icons/fi";
+import {
+  FiLoader,
+  FiArrowLeft,
+  FiX,
+  FiCalendar,
+  FiSearch,
+} from "react-icons/fi";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
@@ -31,13 +37,57 @@ const ReporteBase = ({
   showSummary = true,
   containerClassName = "p-6",
   summaryVariant = "default",
+  // Soporte de vistas (ej: Stock | Por etapas), igual que el módulo de inventario
+  vistas = null, // [{ id, label }]
+  endpointsPorVista = null, // { [vistaId]: endpoint }
+  columnasPorVista = null, // { [vistaId]: columnas }
+  filtrosPorVista = null, // { [vistaId]: filtros } — si se define, cada vista tiene sus filtros
+  filtrosIniciales = null, // { name: value } precargados (ej: mes actual)
+  filtrosClientSide = [], // nombres de filtros que se aplican en el frontend (sin petición)
+  filtrarClientSide = null, // (datos, filtrosActivos) => datos filtrados
 }) => {
   const [datos, setDatos] = useState([]);
   const [cargando, setCargando] = useState(false);
-  const [filtrosActivos, setFiltrosActivos] = useState({});
-  const [filtrosParaAPI, setFiltrosParaAPI] = useState({});
+  const [vistaActiva, setVistaActiva] = useState(vistas?.[0]?.id || null);
+  const [filtrosActivos, setFiltrosActivos] = useState(filtrosIniciales || {});
+  const [filtrosParaAPI, setFiltrosParaAPI] = useState(filtrosIniciales || {});
   const [internalSummary, setInternalSummary] = useState([]);
+  const [paginaLocal, setPaginaLocal] = useState(1);
   const navigate = useNavigate();
+
+  // Filtros client-side: se aplican sobre los datos ya cargados (instantáneo,
+  // sin petición al backend). Ej: "Solo con producción" en la vista por etapas.
+  const datosFiltrados = useMemo(() => {
+    if (filtrarClientSide) {
+      return filtrarClientSide(datos, filtrosActivos);
+    }
+    return datos;
+  }, [datos, filtrosActivos, filtrarClientSide]);
+
+  // Paginación client-side: el reporte trae todo (hasta 1000) pero solo se
+  // renderizan 50 filas a la vez → la tabla es instantánea aunque haya 400+.
+  const FILAS_POR_PAGINA = 50;
+  const totalPaginasLocal = Math.max(
+    1,
+    Math.ceil(datosFiltrados.length / FILAS_POR_PAGINA),
+  );
+  const filasVisibles = datosFiltrados.slice(
+    (paginaLocal - 1) * FILAS_POR_PAGINA,
+    paginaLocal * FILAS_POR_PAGINA,
+  );
+
+  // Al cambiar datos o vista, volver a la primera página
+  useEffect(() => {
+    setPaginaLocal(1);
+  }, [datosFiltrados, vistaActiva]);
+
+  // Endpoint, columnas y filtros según la vista activa
+  const endpointActivo =
+    vistas && endpointsPorVista ? endpointsPorVista[vistaActiva] : endpoint;
+  const columnasActivas =
+    vistas && columnasPorVista ? columnasPorVista[vistaActiva] : columnas;
+  const filtrosActivosVista =
+    filtrosPorVista && vistas ? filtrosPorVista[vistaActiva] : filtros;
 
   const timezone = "America/Bogota";
 
@@ -62,7 +112,17 @@ const ReporteBase = ({
   const obtenerDatos = useCallback(async () => {
     try {
       setCargando(true);
-      const res = await api.get(endpoint, { params: filtrosParaAPI });
+      const params = { ...filtrosParaAPI };
+      // Los reportes no pagan: traer todos los registros (el backend limita a 1000)
+      params.pageSize = 1000;
+      // Los filtros client-side no van al backend (se aplican en el frontend)
+      filtrosClientSide.forEach((f) => delete params[f]);
+      // En la vista "Por etapas" el filtro "sin_produccion" no aplica
+      // (el endpoint por-etapas solo lista artículos con producción activa).
+      if (vistaActiva === "etapas" && params.id_etapa === "sin_produccion") {
+        delete params.id_etapa;
+      }
+      const res = await api.get(endpointActivo, { params });
 
       // Soportar forma { data, summary }
       let datosProcesados = Array.isArray(res.data)
@@ -76,7 +136,6 @@ const ReporteBase = ({
       try {
         onDataChange && onDataChange(datosProcesados);
       } catch {}
-      toast.success("Datos cargados exitosamente.");
     } catch (error) {
       console.error("Error al cargar los datos:", error);
       toast.error(
@@ -90,7 +149,7 @@ const ReporteBase = ({
     } finally {
       setCargando(false);
     }
-  }, [endpoint, filtrosParaAPI]);
+  }, [endpointActivo, filtrosParaAPI, vistaActiva]);
 
   useEffect(() => {
     obtenerDatos();
@@ -99,24 +158,46 @@ const ReporteBase = ({
   const debouncedSetFiltrosParaAPI = useCallback(
     debounce((newFiltros) => {
       setFiltrosParaAPI(newFiltros);
-    }, 1000),
+    }, 300),
     [],
   );
 
   const handleChangeFiltro = (name, value) => {
     const newFiltros = { ...filtrosActivos, [name]: value };
     setFiltrosActivos(newFiltros);
+    // Los filtros client-side no disparan petición: se aplican al instante
+    if (filtrosClientSide.includes(name)) return;
     debouncedSetFiltrosParaAPI(newFiltros);
+  };
+
+  // Cambia la vista (ej: Stock | Por etapas) y recarga con el endpoint correspondiente
+  const cambiarVista = (vistaId) => {
+    if (vistaId === vistaActiva) return;
+    setVistaActiva(vistaId);
+    setDatos([]);
+    setInternalSummary([]);
+    // Limpiar filtros que no aplican a la nueva vista (ej: etapa solo en "Por etapas")
+    if (filtrosPorVista) {
+      const filtrosNuevaVista = filtrosPorVista[vistaId] || [];
+      const nuevosFiltros = {};
+      Object.keys(filtrosActivos).forEach((name) => {
+        if (filtrosNuevaVista.some((f) => f.name === name)) {
+          nuevosFiltros[name] = filtrosActivos[name];
+        }
+      });
+      setFiltrosActivos(nuevosFiltros);
+      setFiltrosParaAPI(nuevosFiltros);
+    }
   };
 
   const generarPDF = () => {
     try {
-      if (!datos || datos.length === 0)
+      if (!datosFiltrados || datosFiltrados.length === 0)
         return toast.error("No hay datos para exportar");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const headers = columnas.map((c) => c.header);
-      const body = datos.map((row) => {
-        return columnas.map((col) => {
+      const headers = columnasActivas.map((c) => c.header);
+      const body = datosFiltrados.map((row) => {
+        return columnasActivas.map((col) => {
           let value;
           if (typeof col.accessor === "function") {
             value = col.accessor(row);
@@ -189,15 +270,15 @@ const ReporteBase = ({
 
   const handleDownloadExcel = () => {
     try {
-      if (!datos || datos.length === 0)
+      if (!datosFiltrados || datosFiltrados.length === 0)
         return toast.error("No hay datos para exportar");
 
-      const headers = columnas.map(
+      const headers = columnasActivas.map(
         (c) =>
           c.header || (typeof c.accessor === "string" ? c.accessor : "col"),
       );
-      const rows = datos.map((row) => {
-        return columnas.map((col) => {
+      const rows = datosFiltrados.map((row) => {
+        return columnasActivas.map((col) => {
           let value;
           if (typeof col.accessor === "function") value = col.accessor(row);
           else value = row[col.accessor];
@@ -260,7 +341,7 @@ const ReporteBase = ({
       });
       ws["!cols"] = colWidths;
 
-      columnas.forEach((col, colIndex) => {
+      columnasActivas.forEach((col, colIndex) => {
         if (col.isCurrency) {
           const headerRowIndex = aoa.findIndex((r) => r === headers);
           for (let r = headerRowIndex + 1; r <= aoa.length; r++) {
@@ -326,20 +407,46 @@ const ReporteBase = ({
 
   return (
     <div className={containerClassName}>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-slate-700">{titulo}</h1> 
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-slate-700">{titulo}</h1>
+          {/* Segmented control de vistas (igual que el módulo de inventario) */}
+          {vistas && vistas.length > 0 && (
+            <div
+              className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 w-fit shadow-sm"
+              role="group"
+              aria-label="Vista del reporte"
+            >
+              {vistas.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => cambiarVista(v.id)}
+                  aria-pressed={vistaActiva === v.id}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    vistaActiva === v.id
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={handleDownloadExcel}
             className="bg-green-800 hover:bg-green-900 text-white px-4 py-2 rounded-md cursor-pointer"
-            disabled={cargando || datos.length === 0}
+            disabled={cargando || datosFiltrados.length === 0}
           >
             Exportar Excel
           </button>
           <button
             onClick={generarPDF}
             className="bg-slate-600 hover:bg-slate-800 text-white px-4 py-2 rounded-md cursor-pointer"
-            disabled={cargando || datos.length === 0}
+            disabled={cargando || datosFiltrados.length === 0}
           >
             Exportar PDF
           </button>
@@ -353,63 +460,129 @@ const ReporteBase = ({
           </button>
         </div>
       </div>
-      {filtros.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-10 mb-4">
-          {filtros.map((filtro) => (
-            <div key={filtro.name} className="flex flex-col">
-              <label className="text-sm mb-1 text-slate-600">
-                {filtro.label}
-              </label>
-              {filtro.type === "datepicker" ? (
-                <div className="relative">
-                  <DatePicker
-                    selected={
-                      filtrosActivos[filtro.name]
-                        ? new Date(filtrosActivos[filtro.name] + "T00:00:00")
-                        : null
-                    }
-                    onChange={(date) => {
-                      if (date) {
-                        const formattedDate = formatInTimeZone(
-                          date,
-                          timezone,
-                          "yyyy-MM-dd",
-                        );
-                        handleChangeFiltro(filtro.name, formattedDate);
-                      } else {
-                        handleChangeFiltro(filtro.name, null);
+      {filtrosActivosVista.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2.5">
+            {filtrosActivosVista.map((filtro) => (
+              <div key={filtro.name} className="flex flex-col">
+                {filtro.type !== "checkbox" && (
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    {filtro.label}
+                  </label>
+                )}
+                {filtro.type === "datepicker" ? (
+                  <div className="relative">
+                    <FiCalendar
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <DatePicker
+                      selected={
+                        filtrosActivos[filtro.name]
+                          ? new Date(filtrosActivos[filtro.name] + "T00:00:00")
+                          : null
                       }
-                    }}
-                    dateFormat="yyyy-MM-dd"
-                    className="border border-slate-300 rounded-md px-3 py-2 text-sm w-full"
+                      onChange={(date) => {
+                        if (date) {
+                          const formattedDate = formatInTimeZone(
+                            date,
+                            timezone,
+                            "yyyy-MM-dd",
+                          );
+                          handleChangeFiltro(filtro.name, formattedDate);
+                        } else {
+                          handleChangeFiltro(filtro.name, null);
+                        }
+                      }}
+                      dateFormat="yyyy-MM-dd"
+                      className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                      disabled={cargando}
+                      placeholderText={filtro.label}
+                    />
+                    {filtrosActivos[filtro.name] && (
+                      <button
+                        type="button"
+                        onClick={() => handleChangeFiltro(filtro.name, null)}
+                        className="absolute top-1/2 right-2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Limpiar"
+                      >
+                        <FiX size={14} />
+                      </button>
+                    )}
+                  </div>
+                ) : filtro.type === "select" ? (
+                  <select
+                    name={filtro.name}
+                    value={filtrosActivos[filtro.name] || ""}
+                    onChange={(e) =>
+                      handleChangeFiltro(e.target.name, e.target.value)
+                    }
+                    className="w-full text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent cursor-pointer"
                     disabled={cargando}
-                    placeholderText={filtro.label}
-                  />
-                  {filtrosActivos[filtro.name] && (
-                    <button
-                      type="button"
-                      onClick={() => handleChangeFiltro(filtro.name, null)}
-                      className="absolute top-1/2 right-1 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <option value="">{filtro.placeholder || "Todos"}</option>
+                    {(filtro.opciones || []).map((opcion) => (
+                      <option key={opcion.value} value={opcion.value}>
+                        {opcion.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : filtro.type === "checkbox" ? (
+                  <>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                      {filtro.label}
+                    </label>
+                    <label
+                      className={`inline-flex items-center justify-between gap-2 w-full text-sm cursor-pointer select-none bg-white border rounded-lg px-3 shadow-sm transition h-9 ${
+                        filtrosActivos[filtro.name]
+                          ? "border-slate-700 bg-slate-50"
+                          : "border-slate-200 hover:bg-slate-50"
+                      }`}
                     >
-                      <FiX className="h-5 w-5" /> 
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <input
-                  type={filtro.type || "text"}
-                  name={filtro.name}
-                  placeholder={filtro.label}
-                  value={filtrosActivos[filtro.name] || ""}
-                  onChange={(e) =>
-                    handleChangeFiltro(e.target.name, e.target.value)
-                  }
-                  className="border border-slate-300 rounded-md px-3 py-2 text-sm w-full"
-                  disabled={cargando}
-                />
-              )}
-            </div>
-          ))}
+                      <span className="text-xs font-medium text-slate-600">
+                        Activo
+                      </span>
+                      <input
+                        type="checkbox"
+                        name={filtro.name}
+                        checked={!!filtrosActivos[filtro.name]}
+                        onChange={(e) =>
+                          handleChangeFiltro(
+                            e.target.name,
+                            e.target.checked ? "1" : "",
+                          )
+                        }
+                        className="w-4 h-4 accent-slate-700 cursor-pointer"
+                        disabled={cargando}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <div className="relative">
+                    {filtro.type === "text" && (
+                      <FiSearch
+                        size={15}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                      />
+                    )}
+                    <input
+                      type={filtro.type || "text"}
+                      name={filtro.name}
+                      placeholder={filtro.placeholder || filtro.label}
+                      value={filtrosActivos[filtro.name] || ""}
+                      onChange={(e) =>
+                        handleChangeFiltro(e.target.name, e.target.value)
+                      }
+                      className={`w-full text-sm bg-white border border-slate-200 rounded-lg py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition ${
+                        filtro.type === "text" ? "pl-9 pr-3" : "px-3"
+                      }`}
+                      disabled={cargando}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {showSummary &&
@@ -481,7 +654,7 @@ const ReporteBase = ({
           <table className="min-w-full text-sm border-spacing-0 border border-gray-300 rounded-lg overflow-hidden text-left">
             <thead className="bg-slate-100">
               <tr>
-                {columnas.map((col) => (
+                {columnasActivas.map((col) => (
                   <th
                     key={col.accessor}
                     className="text-left px-4 py-2 font-medium border-b border-gray-300"
@@ -492,19 +665,19 @@ const ReporteBase = ({
               </tr>
             </thead>
             <tbody>
-              {datos.length === 0 ? (
+              {datosFiltrados.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={columnas.length}
+                    colSpan={columnasActivas.length}
                     className="text-center text-slate-400 py-6"
                   >
                     No hay datos para mostrar.
                   </td>
                 </tr>
               ) : (
-                datos.map((fila, i) => (
+                filasVisibles.map((fila, i) => (
                   <tr key={i} className="hover:bg-slate-50">
-                    {columnas.map((col) => (
+                    {columnasActivas.map((col) => (
                       <td
                         key={col.accessor}
                         className="px-2 py-2 border-b border-gray-300"
@@ -551,6 +724,37 @@ const ReporteBase = ({
               )}
             </tbody>
           </table>
+        )}
+        {/* Paginación client-side */}
+        {!cargando && datosFiltrados.length > FILAS_POR_PAGINA && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-white">
+            <p className="text-xs text-slate-500">
+              Mostrando {(paginaLocal - 1) * FILAS_POR_PAGINA + 1}–
+              {Math.min(paginaLocal * FILAS_POR_PAGINA, datosFiltrados.length)}{" "}
+              de {datosFiltrados.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaLocal((p) => Math.max(1, p - 1))}
+                disabled={paginaLocal <= 1}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Anterior
+              </button>
+              <span className="text-xs font-semibold text-slate-600">
+                {paginaLocal} / {totalPaginasLocal}
+              </span>
+              <button
+                onClick={() =>
+                  setPaginaLocal((p) => Math.min(totalPaginasLocal, p + 1))
+                }
+                disabled={paginaLocal >= totalPaginasLocal}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

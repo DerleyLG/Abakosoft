@@ -29,6 +29,24 @@ const CierresCajaDetalle = () => {
   const [mostrarModalEditarSaldos, setMostrarModalEditarSaldos] =
     useState(false);
 
+  // Tooltip flotante (mismo estilo que Tesorería)
+  const [tooltip, setTooltip] = useState({
+    visible: false,
+    text: "",
+    x: 0,
+    y: 0,
+  });
+  const showTooltip = (e, text) => {
+    if (!text) return;
+    setTooltip({ visible: true, text, x: e.clientX, y: e.clientY });
+  };
+  const moveTooltip = (e) => {
+    setTooltip((prev) => ({ ...prev, x: e.clientX, y: e.clientY }));
+  };
+  const hideTooltip = () => {
+    setTooltip((prev) => ({ ...prev, visible: false }));
+  };
+
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -104,6 +122,20 @@ const CierresCajaDetalle = () => {
     fetchData(); // Refrescar datos del cierre
   };
 
+  // Drill-down: abrir la conciliación bancaria con el rango del cierre
+  // precargado, para que el usuario pueda verificar las transferencias
+  // que el cierre está contando.
+  const irAConciliacion = () => {
+    if (!cierre) return;
+    const desde = cierre.fecha_inicio
+      ? String(cierre.fecha_inicio).split("T")[0].split(" ")[0]
+      : "";
+    const hasta = cierre.fecha_fin
+      ? String(cierre.fecha_fin).split("T")[0].split(" ")[0]
+      : new Date().toISOString().slice(0, 10);
+    navigate(`/conciliacion-bancaria?desde=${desde}&hasta=${hasta}`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-68px)] bg-slate-50 flex items-center justify-center">
@@ -132,6 +164,19 @@ const CierresCajaDetalle = () => {
 
   return (
     <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6 select-none">
+      {/* Tooltip flotante global (mismo estilo que Tesorería) */}
+      {tooltip.visible && (
+        <div
+          className="fixed z-[9999] pointer-events-none max-w-sm bg-slate-900 text-white text-xs rounded-xl px-3 py-2 shadow-2xl whitespace-pre-wrap break-words leading-relaxed"
+          style={{
+            left: tooltip.x + 14,
+            top: tooltip.y + 14,
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -373,6 +418,9 @@ const CierresCajaDetalle = () => {
                 <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
                   {cierre.estado === "abierto" ? "Saldo Actual" : "Saldo Final"}
                 </th>
+                <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right">
+                  Conciliación
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -401,6 +449,33 @@ const CierresCajaDetalle = () => {
                     <span className="text-sm font-bold text-slate-900">
                       {formatMonto(detalle.saldo_final)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {detalle.total_transferencias > 0 ? (
+                      <button
+                        onClick={irAConciliacion}
+                        onMouseEnter={(e) =>
+                          showTooltip(
+                            e,
+                            "Transferencias validadas en conciliación. Clic para ver el detalle.",
+                          )
+                        }
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={hideTooltip}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${
+                          detalle.transferencias_conciliadas ===
+                          detalle.total_transferencias
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {detalle.transferencias_conciliadas} de{" "}
+                        {detalle.total_transferencias} validadas
+                        <FiChevronRight size={11} />
+                      </button>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -447,6 +522,9 @@ const CierresCajaDetalle = () => {
                       ),
                     )}
                   </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-slate-300 text-xs">—</span>
                 </td>
               </tr>
             </tbody>

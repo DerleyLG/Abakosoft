@@ -70,6 +70,7 @@ const kanbanModel = {
     const [[todosAvances], allDetallesRaw, [etapasDB]] = await Promise.all([
       db.query(`
         SELECT aep.id_orden_fabricacion, aep.id_etapa_produccion, aep.estado, aep.fecha_registro,
+               aep.cantidad,
                ep.orden as orden_etapa
         FROM avance_etapas_produccion aep
         JOIN etapas_produccion ep ON aep.id_etapa_produccion = ep.id_etapa
@@ -79,7 +80,7 @@ const kanbanModel = {
         ? detalleOrdenFabricacionModel.getByOrdenes(ids)
         : Promise.resolve([]),
       db.query(
-        `SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC`,
+        `SELECT id_etapa, nombre, orden FROM etapas_produccion ORDER BY orden ASC, id_etapa DESC`,
       ),
     ]);
 
@@ -107,6 +108,12 @@ const kanbanModel = {
       etapaOrdenMap[e.id_etapa] = e.orden;
     });
 
+    // Crear mapa de id_etapa -> nombre (para el indicador de etapas activas)
+    const etapaNombreMap = {};
+    etapasDB.forEach((e) => {
+      etapaNombreMap[e.id_etapa] = e.nombre;
+    });
+
     // Crear mapa de siguiente etapa: salta al primer id con un orden SUPERIOR
     // Etapas paralelas (mismo orden) apuntan todas al mismo siguiente
     const siguienteMap = {};
@@ -114,9 +121,6 @@ const kanbanModel = {
       const siguiente = etapasDB.find((e) => e.orden > etapa.orden);
       siguienteMap[etapa.id_etapa] = siguiente ? siguiente.id_etapa : null;
     }
-
-    // Primera etapa del flujo
-    const primeraEtapaId = etapasDB.length > 0 ? etapasDB[0].id_etapa : null;
 
     const ordenes = rows.map((orden) => {
       let columna = "sin_iniciar";
@@ -147,16 +151,49 @@ const kanbanModel = {
       // Obtener avances de esta orden
       const avancesOrden = avancesPorOrden[orden.id_orden_fabricacion] || [];
 
-      // Etapa en proceso más TEMPRANA (cuello de botella: dónde hay trabajo pendiente)
+      // Cantidad total de la orden (suma de cantidades de los detalles)
+      const cantidadTotalOrden = detalles.reduce(
+        (acc, d) => acc + (Number(d.cantidad) || 0),
+        0,
+      );
+
+      // Etapa en proceso más AVANZADA (progreso real: dónde está el trabajo más adelantado)
       // Si hay empate de orden, elegir la más reciente por fecha
       const enProceso = avancesOrden
         .filter((av) => av.estado === "en proceso")
         .sort(
           (a, b) =>
-            a.orden_etapa - b.orden_etapa ||
+            b.orden_etapa - a.orden_etapa ||
             new Date(b.fecha_registro) - new Date(a.fecha_registro),
         );
       const etapaEnProcesoActual = enProceso.length > 0 ? enProceso[0] : null;
+
+      // Etapas activas (con trabajo en proceso) para el indicador de la tarjeta
+      // Agrupar por etapa y sumar la cantidad en proceso
+      const etapasEnProcesoMap = new Map();
+      enProceso.forEach((av) => {
+        const id = av.id_etapa_produccion;
+        if (!etapasEnProcesoMap.has(id)) {
+          etapasEnProcesoMap.set(id, {
+            id_etapa: id,
+            nombre: etapaNombreMap[id] || `Etapa ${id}`,
+            cantidad_en_proceso: 0,
+            cantidad_total: cantidadTotalOrden,
+          });
+        }
+        etapasEnProcesoMap.get(id).cantidad_en_proceso +=
+          Number(av.cantidad) || 0;
+      });
+      const etapasEnProceso = Array.from(etapasEnProcesoMap.values());
+      // Etapas anteriores a la más avanzada que aún tienen trabajo en proceso
+      // (con su cantidad) para informar específicamente qué falta por terminar
+      const etapasPendientesAnteriores = !!etapaEnProcesoActual
+        ? etapasEnProceso.filter(
+            (et) =>
+              (etapaOrdenMap[et.id_etapa] ?? -1) <
+              etapaEnProcesoActual.orden_etapa,
+          )
+        : [];
 
       // Última etapa completada más avanzada (por campo orden, luego fecha)
       const completadas = avancesOrden
@@ -222,8 +259,11 @@ const kanbanModel = {
             columna = "finalizada";
           }
         } else {
-          // No ha completado ninguna etapa, empieza en la primera etapa
-          columna = primeraEtapaId ? `etapa_${primeraEtapaId}` : "sin_iniciar";
+          // Sin ninguna etapa completada ni en proceso: va a la columna
+          // "sin_iniciar". Con etapas paralelas (mismo orden) no hay una
+          // "primera etapa global" única; cada columna de etapa muestra
+          // solo órdenes con avances reales en esa etapa.
+          columna = "sin_iniciar";
           estado_etapa = "pendiente_iniciar";
         }
       }
@@ -248,6 +288,8 @@ const kanbanModel = {
         total_etapas_requeridas,
         columna,
         estado_etapa,
+        etapas_en_proceso: etapasEnProceso,
+        etapas_pendientes_anteriores: etapasPendientesAnteriores,
         dias_restantes: diasRestantes,
         prioridad,
       };
@@ -315,13 +357,36 @@ const kanbanModel = {
 
     return rows[0];
   },
+
+  marcarComoEntregadas: async (ids) => {
+    if (!ids || ids.length === 0) return [];
+    const placeholders = ids.map(() => "?").join(",");
+
+    // Actualizar el estado y establecer la fecha de entrega para todas
+    await db.query(
+      `UPDATE ordenes_fabricacion 
+       SET estado = 'entregada', fecha_entrega = NOW() 
+       WHERE id_orden_fabricacion IN (${placeholders})`,
+      ids,
+    );
+
+    // Retornar las órdenes actualizadas con su fecha
+    const [rows] = await db.query(
+      `SELECT id_orden_fabricacion, fecha_fin_estimada, fecha_entrega
+       FROM ordenes_fabricacion 
+       WHERE id_orden_fabricacion IN (${placeholders})`,
+      ids,
+    );
+
+    return rows;
+  },
   /**
    * Obtiene las etapas de producción ordenadas
    */ getEtapasProduccion: async () => {
     const [rows] = await db.query(
       `SELECT id_etapa, nombre, orden, cargo 
        FROM etapas_produccion 
-       ORDER BY orden ASC`,
+       ORDER BY orden ASC, id_etapa DESC`,
     );
     return rows;
   },

@@ -54,16 +54,11 @@ const EditarOrdenCompra = () => {
   const [detalles, setDetalles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Función para cargar artículos con búsqueda (usada en AsyncSelect)
+  // Función para cargar artículos con búsqueda REMOTA (usada en AsyncSelect)
+  // Sin filtro de categoría: las órdenes de compra abarcan TODOS los artículos.
   const loadArticulosOptions = useCallback(
     (inputValue, callback) => {
       const cacheKey = inputValue?.toLowerCase() || "";
-
-      // Si no hay búsqueda, retornar todos los artículos
-      if (!inputValue || inputValue.trim() === "") {
-        callback(articulosOptions);
-        return;
-      }
 
       // Si ya está en caché, retornar inmediatamente
       if (cacheRef.current[cacheKey]) {
@@ -77,19 +72,35 @@ const EditarOrdenCompra = () => {
       }
 
       // Debounce: esperar 300ms
-      timerRef.current = setTimeout(() => {
-        // Filtrar localmente
-        const filtered = articulosOptions.filter(
-          (art) =>
-            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()),
-        );
-        // Guardar en caché
-        cacheRef.current[cacheKey] = filtered;
-        callback(filtered);
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((art) => ({
+            value: art.id_articulo,
+            label: `${art.descripcion} (Ref: ${art.referencia || "N/A"})`,
+            referencia: art.referencia,
+            descripcion: art.descripcion,
+            ...art,
+          }));
+          // Guardar en caché
+          cacheRef.current[cacheKey] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 300);
     },
-    [articulosOptions],
+    [],
   );
   const { id } = useParams();
   const navigate = useNavigate();
@@ -156,7 +167,7 @@ const EditarOrdenCompra = () => {
         api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: 10000,
+            pageSize: 20,
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -174,7 +185,7 @@ const EditarOrdenCompra = () => {
       );
       setAllArticulos(articulosArray);
 
-      // Crear opciones para AsyncSelect
+      // Crear opciones para AsyncSelect (solo las primeras 20 como sugerencias)
       const opciones = articulosArray.map((art) => ({
         value: art.id_articulo,
         label: `${art.descripcion} (Ref: ${art.referencia || "N/A"})`,
@@ -228,6 +239,7 @@ const EditarOrdenCompra = () => {
             precio_unitario: Number(d.precio_unitario) || 0,
             precio_costo_original:
               Number(d.precio_costo_articulo) || Number(d.precio_unitario) || 0, // Precio costo actual del artículo
+            es_bruto: Number(d.es_bruto) === 1,
           }))
         : [];
       setDetalles(detallesFormateados);
@@ -346,7 +358,7 @@ const EditarOrdenCompra = () => {
   };
 
   const handleDetalleChange = (index, e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     const list = [...detalles];
     let processedValue = value;
 
@@ -354,6 +366,8 @@ const EditarOrdenCompra = () => {
       processedValue = parseCurrency(value);
     } else if (name === "cantidad") {
       processedValue = Number(value);
+    } else if (name === "es_bruto") {
+      processedValue = type === "checkbox" ? checked : Boolean(value);
     }
 
     list[index][name] = processedValue;
@@ -381,6 +395,7 @@ const EditarOrdenCompra = () => {
         cantidad: 1,
         precio_unitario: 0,
         precio_costo_original: 0,
+        es_bruto: false,
       },
     ]);
   };
@@ -846,6 +861,9 @@ const EditarOrdenCompra = () => {
                   <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">
                     Cantidad
                   </th>
+                  <th className="px-3 py-2 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-28">
+                    ¿Va a fábrica?
+                  </th>
                   <th className="px-3 py-2 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                     Precio unit. (COP)
                   </th>
@@ -859,7 +877,7 @@ const EditarOrdenCompra = () => {
                 {detalles.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={isEditable ? 5 : 4}
+                      colSpan={isEditable ? 6 : 5}
                       className="text-center py-10 text-slate-400 text-xs"
                     >
                       Agrega artículos con el botón de arriba
@@ -934,6 +952,21 @@ const EditarOrdenCompra = () => {
                           className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
                         />
                       </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <input
+                            type="checkbox"
+                            name="es_bruto"
+                            checked={Boolean(detalle.es_bruto)}
+                            onChange={(e) => handleDetalleChange(index, e)}
+                            disabled={!isEditable}
+                            className="w-4 h-4 rounded border-slate-300 text-slate-700 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <span className="text-[9px] text-slate-400 leading-none">
+                            no suma stock
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-right">
                         <div className="relative inline-flex items-center">
                           <span className="absolute left-2 text-slate-400 text-xs">
@@ -976,7 +1009,7 @@ const EditarOrdenCompra = () => {
                 <tfoot>
                   <tr className="border-t border-slate-100 bg-slate-50">
                     <td
-                      colSpan={isEditable ? 3 : 3}
+                      colSpan={isEditable ? 4 : 4}
                       className="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"
                     >
                       Total

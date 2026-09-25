@@ -231,7 +231,9 @@ const getArticulosBajoStock = async (limit = 6) => {
   const [rows] = await db.query(
     `
       SELECT 
+        i.id_articulo,
         a.descripcion,
+        a.referencia,
         i.stock,
         i.stock_minimo
       FROM 
@@ -239,7 +241,8 @@ const getArticulosBajoStock = async (limit = 6) => {
       JOIN 
         articulos a ON i.id_articulo = a.id_articulo
       WHERE 
-        i.stock <= i.stock_minimo
+        (i.stock < 0
+         OR (i.stock <= i.stock_minimo AND i.stock_minimo > 0))
         LIMIT ?
     `,
     [limit],

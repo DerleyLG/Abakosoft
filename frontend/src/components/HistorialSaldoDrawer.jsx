@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import toast from "react-hot-toast";
-import { FiX, FiClock, FiDollarSign, FiArrowUpRight, FiArrowDownLeft, FiCalendar } from "react-icons/fi";
+import {
+  FiX,
+  FiClock,
+  FiDollarSign,
+  FiArrowUpRight,
+  FiArrowDownLeft,
+  FiCalendar,
+} from "react-icons/fi";
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat("es-CO", {
@@ -13,7 +20,11 @@ const formatCurrency = (v) =>
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 const quickDates = [
@@ -29,34 +40,52 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
   const [loading, setLoading] = useState(false);
   const [desde, setDesde] = useState(new Date().toISOString().split("T")[0]);
   const [hasta, setHasta] = useState(new Date().toISOString().split("T")[0]);
-  const [fechaInput, setFechaInput] = useState(new Date().toISOString().split("T")[0]);
+  const [fechaInput, setFechaInput] = useState(
+    new Date().toISOString().split("T")[0],
+  );
 
   const getDateRange = useCallback((days) => {
     const hoy = new Date();
     if (days === "month") {
-      return { desde: new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split("T")[0], hasta: hoy.toISOString().split("T")[0] };
+      return {
+        desde: new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+          .toISOString()
+          .split("T")[0],
+        hasta: hoy.toISOString().split("T")[0],
+      };
     }
     const desdeDate = new Date(hoy);
     desdeDate.setDate(hoy.getDate() - days);
-    return { desde: desdeDate.toISOString().split("T")[0], hasta: hoy.toISOString().split("T")[0] };
+    return {
+      desde: desdeDate.toISOString().split("T")[0],
+      hasta: hoy.toISOString().split("T")[0],
+    };
   }, []);
 
-  const fetchHistorial = useCallback(async (desdeFecha, hastaFecha) => {
-    if (!cliente) return;
-    setLoading(true);
-    try {
-      const res = await api.get(`/clientes/saldo-favor/${cliente.value}/historial`, {
-        params: { desde: desdeFecha, hasta: hastaFecha },
-      });
-      setMovimientos(Array.isArray(res.data.movimientos) ? res.data.movimientos : []);
-      setSaldoActual(Number(res.data.saldo_actual) || 0);
-    } catch (error) {
-      toast.error("Error al cargar historial");
-      setMovimientos([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [cliente]);
+  const fetchHistorial = useCallback(
+    async (desdeFecha, hastaFecha) => {
+      if (!cliente) return;
+      setLoading(true);
+      try {
+        const res = await api.get(
+          `/clientes/saldo-favor/${cliente.value}/historial`,
+          {
+            params: { desde: desdeFecha, hasta: hastaFecha },
+          },
+        );
+        setMovimientos(
+          Array.isArray(res.data.movimientos) ? res.data.movimientos : [],
+        );
+        setSaldoActual(Number(res.data.saldo_actual) || 0);
+      } catch (error) {
+        toast.error("Error al cargar historial");
+        setMovimientos([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cliente],
+  );
 
   useEffect(() => {
     if (isOpen && cliente) {
@@ -110,7 +139,9 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
               <FiClock className="text-slate-600" size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Historial de saldo</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                Historial de saldo
+              </h2>
               <p className="text-xs text-slate-500">{cliente?.label || ""}</p>
             </div>
           </div>
@@ -122,18 +153,27 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: "calc(100vh - 140px)" }}>
+        <div
+          className="p-6 space-y-4 overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 140px)" }}
+        >
           {/* Saldo actual */}
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Saldo actual</p>
-            <p className={`text-2xl font-bold mt-1 ${saldoActual > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+            <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">
+              Saldo actual
+            </p>
+            <p
+              className={`text-2xl font-bold mt-1 ${saldoActual > 0 ? "text-emerald-600" : "text-slate-400"}`}
+            >
               {formatCurrency(saldoActual)}
             </p>
           </div>
 
           {/* Filtro rápido */}
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Filtrar por fecha</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Filtrar por fecha
+            </p>
             <div className="flex items-center gap-2 mb-3">
               {quickDates.map((qd) => (
                 <button
@@ -146,7 +186,10 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
               ))}
             </div>
             <div className="relative">
-              <FiCalendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <FiCalendar
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
               <input
                 type="date"
                 value={fechaInput}
@@ -160,12 +203,20 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
           {movimientos.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
-                <p className="text-[10px] text-emerald-600 uppercase font-semibold tracking-wider">Abonos</p>
-                <p className="text-sm font-bold text-emerald-700 mt-0.5">{formatCurrency(totalAbonos)}</p>
+                <p className="text-[10px] text-emerald-600 uppercase font-semibold tracking-wider">
+                  Abonos
+                </p>
+                <p className="text-sm font-bold text-emerald-700 mt-0.5">
+                  {formatCurrency(totalAbonos)}
+                </p>
               </div>
               <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center">
-                <p className="text-[10px] text-rose-600 uppercase font-semibold tracking-wider">Usado</p>
-                <p className="text-sm font-bold text-rose-700 mt-0.5">{formatCurrency(totalUsos)}</p>
+                <p className="text-[10px] text-rose-600 uppercase font-semibold tracking-wider">
+                  Usado
+                </p>
+                <p className="text-sm font-bold text-rose-700 mt-0.5">
+                  {formatCurrency(totalUsos)}
+                </p>
               </div>
             </div>
           )}
@@ -173,13 +224,19 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
           {/* Lista de movimientos */}
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Movimientos {desde === hasta ? formatDate(desde) : `${formatDate(desde)} - ${formatDate(hasta)}`}
+              Movimientos{" "}
+              {desde === hasta
+                ? formatDate(desde)
+                : `${formatDate(desde)} - ${formatDate(hasta)}`}
             </p>
 
             {loading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
+                  <div
+                    key={i}
+                    className="h-16 bg-slate-100 rounded-xl animate-pulse"
+                  />
                 ))}
               </div>
             ) : movimientos.length === 0 ? (
@@ -199,8 +256,14 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${esAbono ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>
-                            {esAbono ? <FiArrowDownLeft size={14} /> : <FiArrowUpRight size={14} />}
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${esAbono ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}
+                          >
+                            {esAbono ? (
+                              <FiArrowDownLeft size={14} />
+                            ) : (
+                              <FiArrowUpRight size={14} />
+                            )}
                           </div>
                           <div>
                             <p className="text-xs font-semibold text-slate-700">
@@ -213,14 +276,21 @@ const HistorialSaldoDrawer = ({ isOpen, onClose, cliente }) => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-xs font-bold ${esAbono ? "text-emerald-600" : "text-rose-600"}`}>
-                            {esAbono ? "+" : "-"}{formatCurrency(monto)}
+                          <p
+                            className={`text-xs font-bold ${esAbono ? "text-emerald-600" : "text-rose-600"}`}
+                          >
+                            {esAbono ? "+" : "-"}
+                            {formatCurrency(monto)}
                           </p>
-                          <p className="text-[10px] text-slate-400">{formatDate(mov.fecha)}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {formatDate(mov.fecha)}
+                          </p>
                         </div>
                       </div>
                       {mov.observaciones && (
-                        <p className="text-[10px] text-slate-500 mt-1.5 ml-9 leading-relaxed">{mov.observaciones}</p>
+                        <p className="text-[10px] text-slate-500 mt-1.5 ml-9 leading-relaxed">
+                          {mov.observaciones}
+                        </p>
                       )}
                     </div>
                   );

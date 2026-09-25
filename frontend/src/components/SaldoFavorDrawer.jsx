@@ -55,6 +55,19 @@ const SaldoFavorDrawer = ({
   const [metodosPago, setMetodosPago] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // Monta el contenido pesado (AsyncSelect) solo cuando el drawer está o estuvo
+  // abierto. Al cerrar, se mantiene montado durante la transición de salida
+  // (300ms) y luego se desmonta, evitando render innecesario del AsyncSelect.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setVisible(true);
+      return;
+    }
+    const t = setTimeout(() => setVisible(false), 300);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) {
       setCliente(clienteInicial);
@@ -132,20 +145,23 @@ const SaldoFavorDrawer = ({
 
   return (
     <>
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Drawer */}
+      {/* Overlay: sin backdrop-blur (muy costoso en animación), con fade real */}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+      />
+
+      {/* Drawer: transform-gpu + will-change para animar en capa propia (GPU) */}
+      <div
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-2xl transform-gpu will-change-transform transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
+        aria-hidden={!isOpen}
       >
+        {visible && (
+          <>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
           <div className="flex items-center gap-3">
@@ -285,6 +301,8 @@ const SaldoFavorDrawer = ({
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
     </>
   );

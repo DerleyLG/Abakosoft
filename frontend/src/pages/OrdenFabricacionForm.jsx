@@ -46,16 +46,10 @@ const CrearOrdenFabricacion = () => {
   const cacheRef = useRef({});
   const timerRef = useRef(null);
 
-  // Función para cargar artículos con búsqueda
+  // Función para cargar artículos con búsqueda REMOTA (solo fabricables)
   const loadArticulosOptions = useCallback(
     (inputValue, callback) => {
       const cacheKey = inputValue?.toLowerCase() || "";
-
-      // Si no hay búsqueda, retornar todos los artículos
-      if (!inputValue || inputValue.trim() === "") {
-        callback(articulosOptions);
-        return;
-      }
 
       // Si ya está en caché, retornar inmediatamente
       if (cacheRef.current[cacheKey]) {
@@ -69,21 +63,36 @@ const CrearOrdenFabricacion = () => {
       }
 
       // Debounce: esperar 300ms
-      timerRef.current = setTimeout(() => {
-        // Filtrar localmente
-        const filtered = articulosOptions.filter(
-          (art) =>
-            art.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.referencia?.toLowerCase().includes(inputValue.toLowerCase()) ||
-            art.descripcion?.toLowerCase().includes(inputValue.toLowerCase()),
-        );
-
-        // Guardar en caché
-        cacheRef.current[cacheKey] = filtered;
-        callback(filtered);
+      timerRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get("/articulos", {
+            params: {
+              buscar: inputValue || "",
+              tipo_categoria: "articulo_fabricable",
+              page: 1,
+              pageSize: 20,
+              sortBy: "descripcion",
+              sortDir: "asc",
+            },
+          });
+          const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+          const opciones = rows.map((art) => ({
+            value: art.id_articulo,
+            label: `${art.descripcion} (Ref: ${art.referencia || "N/A"})`,
+            referencia: art.referencia,
+            descripcion: art.descripcion,
+            ...art,
+          }));
+          // Guardar en caché
+          cacheRef.current[cacheKey] = opciones;
+          callback(opciones);
+        } catch (error) {
+          console.error("Error buscando artículos:", error);
+          callback([]);
+        }
       }, 300);
     },
-    [articulosOptions],
+    [],
   );
 
   useEffect(() => {
@@ -134,17 +143,12 @@ const CrearOrdenFabricacion = () => {
 
     const fetchArticulos = async () => {
       try {
-        // Primera llamada para saber cuántos artículos hay en total
-        const resInicial = await api.get("/articulos", {
-          params: { page: 1, pageSize: 1 },
-        });
-        const total = resInicial.data.total || 0;
-
-        // Ahora obtener TODOS los artículos en una sola llamada
+        // Cargar solo las primeras 20 sugerencias (búsqueda remota al escribir)
         const res = await api.get("/articulos", {
           params: {
             page: 1,
-            pageSize: total || 10000,
+            pageSize: 20,
+            tipo_categoria: "articulo_fabricable",
             sortBy: "descripcion",
             sortDir: "asc",
           },
@@ -156,25 +160,10 @@ const CrearOrdenFabricacion = () => {
             ? payload
             : [];
 
-        // Obtener categorías para filtrar solo artículos fabricables
-        const resCategorias = await api.get("/categorias");
-        const categorias = Array.isArray(resCategorias.data)
-          ? resCategorias.data
-          : [];
-        const categoriasMap = {};
-        categorias.forEach((cat) => {
-          categoriasMap[cat.id_categoria] = cat.tipo;
-        });
-
-        // Filtrar solo artículos fabricables
-        const articulosFabricables = rows.filter(
-          (art) => categoriasMap[art.id_categoria] === "articulo_fabricable",
-        );
-
-        setArticulos(articulosFabricables);
+        setArticulos(rows);
 
         // Crear opciones para AsyncSelect
-        const opciones = articulosFabricables.map((art) => ({
+        const opciones = rows.map((art) => ({
           value: art.id_articulo,
           label: `${art.descripcion} (Ref: ${art.referencia || "N/A"})`,
           referencia: art.referencia,
@@ -219,9 +208,19 @@ const CrearOrdenFabricacion = () => {
 
         // manejar artículos compuestos y no compuestos
         const nuevosDetallesPromises = detallesPedido.map(async (item) => {
-          const articuloOriginal = articulos.find(
+          let articuloOriginal = articulos.find(
             (a) => a.id_articulo === item.id_articulo,
           );
+
+          // Si no está en la lista cargada (búsqueda remota), buscarlo por id
+          if (!articuloOriginal) {
+            try {
+              const resArt = await api.get(`/articulos/${item.id_articulo}`);
+              articuloOriginal = resArt.data;
+            } catch (e) {
+              articuloOriginal = null;
+            }
+          }
 
           // Si el artículo es compuesto, hace una llamada para obtener sus componentes
           if (articuloOriginal?.es_compuesto) {

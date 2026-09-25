@@ -64,9 +64,14 @@ const OrdenesDashboard = () => {
   }
   return (
     <div className="w-full px-4 md:px-12 lg:px-20 py-10 select-none">
-      <h1 className="text-4xl font-bold text-gray-800 mb-10 ">
-        Gestión de ordenes
-      </h1>
+      <div>
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          Centro de
+        </p>
+        <h1 className="text-4xl font-bold text-gray-800 mb-10 -mt-0.5">
+          Gestión de ordenes
+        </h1>
+      </div>
 
       <div className="grid gap-8 md:grid-cols-3">
         {/* Órdenes de Compra */}

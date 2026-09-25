@@ -169,14 +169,7 @@ module.exports = {
     anio = null,
   ) => {
     try {
-      console.log(
-        "[Model] getMovimientosInventario - idArticulo:",
-        idArticulo,
-        "limit:",
-        limit,
-      );
       const dateFilter = buildDateFilter("mi.fecha_movimiento", mes, anio);
-      console.log("[Model] dateFilter:", dateFilter);
       const query = `
         SELECT 
           mi.id_movimiento,
@@ -191,9 +184,7 @@ module.exports = {
         LIMIT ?
       `;
       const params = [idArticulo, ...dateFilter.params, limit];
-      console.log("[Model] Ejecutando query con params:", params);
       const [rows] = await db.query(query, params);
-      console.log("[Model] Query ejecutada, filas:", rows?.length || 0);
       return rows;
     } catch (error) {
       console.error("[Model] Error en getMovimientosInventario:", error);
