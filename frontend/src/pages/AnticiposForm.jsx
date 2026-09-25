@@ -58,6 +58,9 @@ const AnticiposForm = () => {
         setMonto(Number(a.monto) || 0);
         setFecha(String(a.fecha).split("T")[0].split(" ")[0]);
         setObservaciones(a.observaciones || "");
+        // Método de pago y referencia vienen del movimiento de tesorería
+        setIdMetodoPago(a.id_metodo_pago ? String(a.id_metodo_pago) : "");
+        setReferencia(a.referencia || "");
       } catch (error) {
         console.error("Error cargando anticipo:", error);
         toast.error("Error al cargar el anticipo");
