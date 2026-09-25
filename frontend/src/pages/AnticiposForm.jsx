@@ -54,7 +54,9 @@ const AnticiposForm = () => {
         const res = await api.get(`/anticipos/${id}`);
         const a = res.data;
         setTrabajadorSeleccionado(String(a.id_trabajador));
-        setOrdenSeleccionada(a.id_orden_fabricacion ? String(a.id_orden_fabricacion) : "");
+        setOrdenSeleccionada(
+          a.id_orden_fabricacion ? String(a.id_orden_fabricacion) : "",
+        );
         setMonto(Number(a.monto) || 0);
         setFecha(String(a.fecha).split("T")[0].split(" ")[0]);
         setObservaciones(a.observaciones || "");
@@ -293,8 +295,8 @@ const AnticiposForm = () => {
                   Detalles adicionales
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Opcionales. Vincula el anticipo a una orden si corresponde a un
-                  trabajo específico.
+                  Opcionales. Vincula el anticipo a una orden si corresponde a
+                  un trabajo específico.
                 </p>
               </div>
 
