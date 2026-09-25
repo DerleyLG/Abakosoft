@@ -58,8 +58,9 @@ const Inventario = () => {
   const [modalBajoStock, setModalBajoStock] = useState(false);
   const [cargandoBajoStock, setCargandoBajoStock] = useState(false);
   const [articulosBajoStock, setArticulosBajoStock] = useState([]);
-  const bajoStockModal = useModalTransition(modalBajoStock, () =>
-    setModalBajoStock(false),
+  const bajoStockModal = useModalTransition(
+    modalBajoStock,
+    () => setModalBajoStock(false),
   );
   const [etapas, setEtapas] = useState([]);
   const [etapaSeleccionada, setEtapaSeleccionada] = useState("");
@@ -425,9 +426,9 @@ const Inventario = () => {
               >
                 <Icon size={15} />
                 {config.label}
-              </button>
-            );
-          })}
+            </button>
+          );
+        })}
         </div>
 
         {/* Aviso sutil de bajo stock, a la derecha de los tabs */}
@@ -1089,6 +1090,7 @@ const Inventario = () => {
             </div>
           </div>
         </div>
+       
       )}
 
       {/* Modal para editar stock (al final para quedar encima del modal de bajo stock) */}
@@ -1099,6 +1101,7 @@ const Inventario = () => {
         onSave={guardarStockYMinimo}
       />
     </div>
+    
   );
 };
 

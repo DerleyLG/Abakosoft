@@ -47,9 +47,7 @@ const ConciliacionBancaria = () => {
   const desdeUrl = searchParams.get("desde");
   const hastaUrl = searchParams.get("hasta");
   const [desde, setDesde] = useState(desdeUrl || primerDiaMes);
-  const [hasta, setHasta] = useState(
-    hastaUrl || hoy.toISOString().slice(0, 10),
-  );
+  const [hasta, setHasta] = useState(hastaUrl || hoy.toISOString().slice(0, 10));
   const [estado, setEstado] = useState("todos");
 
   const [movimientos, setMovimientos] = useState([]);

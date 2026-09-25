@@ -84,22 +84,7 @@ module.exports = {
       if (!anticipo) {
         return res.status(404).json({ error: "Anticipo no encontrado" });
       }
-      // El método de pago y la referencia se guardan en el movimiento de
-      // tesorería asociado (tipo_documento = 'anticipo'). Se devuelven junto
-      // al anticipo para que el formulario de edición los precargue.
-      const [mov] = await db.query(
-        `SELECT id_metodo_pago, referencia
-         FROM movimientos_tesoreria
-         WHERE id_documento = ? AND tipo_documento = 'anticipo'
-         ORDER BY id_movimiento DESC
-         LIMIT 1`,
-        [id],
-      );
-      res.json({
-        ...anticipo,
-        id_metodo_pago: mov[0]?.id_metodo_pago ?? null,
-        referencia: mov[0]?.referencia ?? null,
-      });
+      res.json(anticipo);
     } catch (error) {
       console.error("Error al obtener anticipo:", error);
       res.status(500).json({ error: "Error al obtener anticipo" });
@@ -207,14 +192,7 @@ module.exports = {
     const connection = await db.getConnection();
     try {
       const { id } = req.params;
-      const {
-        id_orden_fabricacion,
-        monto,
-        observaciones,
-        fecha,
-        id_metodo_pago,
-        referencia,
-      } = req.body;
+      const { id_orden_fabricacion, monto, observaciones, fecha } = req.body;
 
       const anticipo = await AnticiposModel.getById(id);
       if (!anticipo) {
@@ -222,9 +200,7 @@ module.exports = {
       }
 
       if (monto !== undefined && (isNaN(monto) || Number(monto) <= 0)) {
-        return res
-          .status(400)
-          .json({ error: "El monto debe ser mayor a cero." });
+        return res.status(400).json({ error: "El monto debe ser mayor a cero." });
       }
 
       await connection.beginTransaction();
@@ -237,21 +213,6 @@ module.exports = {
             id_documento: Number(id),
             tipo_documento: "anticipo",
             monto: -Math.abs(Number(monto)),
-            id_metodo_pago,
-            referencia,
-          },
-          connection,
-        );
-      } else if (id_metodo_pago !== undefined || referencia !== undefined) {
-        // Aunque el monto no cambie, actualizar método de pago / referencia
-        const tesoreriaModel = require("../models/tesoreriaModel");
-        await tesoreriaModel.actualizarMovimientoPorDocumento(
-          {
-            id_documento: Number(id),
-            tipo_documento: "anticipo",
-            monto: -Math.abs(Number(anticipo.monto)),
-            id_metodo_pago,
-            referencia,
           },
           connection,
         );

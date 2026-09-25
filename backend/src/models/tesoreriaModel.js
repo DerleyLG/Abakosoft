@@ -31,26 +31,15 @@ const TesoreriaModel = {
 
   // Actualiza el monto de un movimiento de tesorería por documento y tipo
   actualizarMovimientoPorDocumento: async (
-    { id_documento, tipo_documento, monto, id_metodo_pago, referencia },
+    { id_documento, tipo_documento, monto },
     connection = db,
   ) => {
     const conn = connection || db;
-    const sets = ["monto = ?"];
-    const params = [monto];
-    if (id_metodo_pago !== undefined) {
-      sets.push("id_metodo_pago = ?");
-      params.push(id_metodo_pago || null);
-    }
-    if (referencia !== undefined) {
-      sets.push("referencia = ?");
-      params.push(referencia || null);
-    }
-    params.push(id_documento, tipo_documento);
     const [result] = await conn.query(
       `UPDATE movimientos_tesoreria
-       SET ${sets.join(", ")}
+       SET monto = ?
        WHERE id_documento = ? AND tipo_documento = ?`,
-      params,
+      [monto, id_documento, tipo_documento],
     );
     return result.affectedRows;
   },

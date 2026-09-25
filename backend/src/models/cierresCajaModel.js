@@ -194,7 +194,8 @@ const cierresCajaModel = {
     conciliacionRows.forEach((r) => {
       conciliacionMap[r.id_metodo_pago] = {
         total_transferencias: Number(r.total_transferencias) || 0,
-        transferencias_conciliadas: Number(r.transferencias_conciliadas) || 0,
+        transferencias_conciliadas:
+          Number(r.transferencias_conciliadas) || 0,
       };
     });
 

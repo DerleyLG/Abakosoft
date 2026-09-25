@@ -112,7 +112,7 @@ module.exports = {
     return { data: rows, total, resumen };
   },
 
-  create: async ({
+    create: async ({
     id_trabajador,
     fecha,
     id_orden_fabricacion,
