@@ -173,8 +173,8 @@ const cierresCajaModel = {
 
     // ── Conciliación bancaria: conteo de transferencias validadas ──
     // Para el método de pago de transferencia, contar cuántos movimientos
-    // de venta por transferencia del período fueron validados (conciliado=1)
-    // en la conciliación bancaria.
+    // de venta y abonos a crédito por transferencia del período fueron
+    // validados (conciliado=1) en la conciliación bancaria.
     const { fecha_inicio, fecha_fin } = cierre[0];
     const [conciliacionRows] = await db.query(
       `SELECT mt.id_metodo_pago,
@@ -182,7 +182,7 @@ const cierresCajaModel = {
               COALESCE(SUM(CASE WHEN mt.conciliado = 1 THEN 1 ELSE 0 END), 0) AS transferencias_conciliadas
        FROM movimientos_tesoreria mt
        JOIN metodos_pago mp ON mt.id_metodo_pago = mp.id_metodo_pago
-       WHERE mt.tipo_documento = 'orden_venta'
+       WHERE mt.tipo_documento IN ('orden_venta', 'abono_credito')
          AND LOWER(mp.nombre) LIKE '%transferencia%'
          AND mt.fecha_movimiento >= ?
          AND (? IS NULL OR mt.fecha_movimiento < DATE_ADD(?, INTERVAL 1 DAY))
@@ -194,8 +194,7 @@ const cierresCajaModel = {
     conciliacionRows.forEach((r) => {
       conciliacionMap[r.id_metodo_pago] = {
         total_transferencias: Number(r.total_transferencias) || 0,
-        transferencias_conciliadas:
-          Number(r.transferencias_conciliadas) || 0,
+        transferencias_conciliadas: Number(r.transferencias_conciliadas) || 0,
       };
     });
 

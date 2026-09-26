@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiEye } from "react-icons/fi";
+import {
+  FiPlus,
+  FiSearch,
+  FiEdit2,
+  FiTrash2,
+  FiEye,
+  FiArrowRight,
+} from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { confirmAlert } from "react-confirm-alert";
 import "react-confirm-alert/src/react-confirm-alert.css";
@@ -120,7 +127,9 @@ const ListaAnticipos = () => {
 
   const verAplicaciones = async (anticipo) => {
     try {
-      const res = await api.get(`/anticipos/${anticipo.id_anticipo}/aplicaciones`);
+      const res = await api.get(
+        `/anticipos/${anticipo.id_anticipo}/aplicaciones`,
+      );
       setAplicaciones(Array.isArray(res.data) ? res.data : []);
       setAnticipoAplicaciones(anticipo);
     } catch (error) {
@@ -177,6 +186,13 @@ const ListaAnticipos = () => {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => navigate("/avances_fabricacion")}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+          >
+            Avances de fabricación
+            <FiArrowRight size={15} />
+          </button>
           <button
             onClick={() => navigate("/trabajadores/pagos")}
             className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"

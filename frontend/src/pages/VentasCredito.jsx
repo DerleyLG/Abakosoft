@@ -80,7 +80,13 @@ const VentasCredito = () => {
 
         const openId = location.state?.openCreditId;
         const openOrderId = location.state?.openOrderId;
-        if (openId || openOrderId) {
+        const openHistorialId = location.state?.openHistorialId;
+        if (openHistorialId) {
+          setHistorialCreditoId(openHistorialId);
+          try {
+            navigate(location.pathname, { replace: true, state: {} });
+          } catch (_) {}
+        } else if (openId || openOrderId) {
           const credito =
             data.find((c) => c.id_venta_credito === openId) ||
             data.find((c) => c.id_orden_venta === openOrderId);

@@ -18,7 +18,7 @@ import {
 import React from "react";
 import { useSidebar } from "../context/SidebarContext";
 import DrawerOrdenesEntregadas from "../components/DrawerOrdenesEntregadas";
-import Swal from "sweetalert2";
+import ConfirmarEntregasModal from "../components/ConfirmarEntregasModal";
 
 // Helper para formatear fechas evitando problemas de zona horaria
 const formatFecha = (fecha) => {
@@ -38,6 +38,8 @@ const KanbanBoard = () => {
   const [drawerAnio, setDrawerAnio] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrdenes, setSelectedOrdenes] = useState(new Set());
+  const [confirmarEntregas, setConfirmarEntregas] = useState(null); // { ids: [] }
+  const [marcandoEntregas, setMarcandoEntregas] = useState(false);
   const [puedeScrollIzq, setPuedeScrollIzq] = useState(false);
   const [puedeScrollDer, setPuedeScrollDer] = useState(false);
   const scrollRef = useRef(null);
@@ -151,47 +153,57 @@ const KanbanBoard = () => {
   };
 
   const marcarComoEntregada = async (id_orden) => {
-    const result = await Swal.fire({
-      title: "¿Marcar como entregada?",
-      html: `
-        <p class="mb-2">La orden <strong>OF #${id_orden}</strong> será marcada como entregada.</p>
-        <p class="text-sm text-gray-600">Esto la moverá al historial de órdenes entregadas.</p>
-      `,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Sí, marcar como entregada",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#10b981",
-      cancelButtonColor: "#6b7280",
-    });
+    setConfirmarEntregas({ ids: [id_orden] });
+  };
 
-    if (result.isConfirmed) {
-      try {
-        const response = await api.post(
-          `/kanban/marcar-entregada/${id_orden}`,
+  const ejecutarMarcarEntregadas = async () => {
+    if (!confirmarEntregas) return;
+    const ids = confirmarEntregas.ids;
+    const esIndividual = ids.length === 1;
+    setMarcandoEntregas(true);
+    try {
+      let response;
+      if (esIndividual) {
+        response = await api.post(
+          `/kanban/marcar-entregada/${ids[0]}`,
           {},
           { headers: { "X-Idempotency-Key": generateUUID() } },
         );
         toast.success("Orden marcada como entregada exitosamente");
-
-        // Usar la fecha retornada por el backend para el filtro del drawer
-        if (response.data && response.data.fecha_entrega) {
-          const fechaEntrega = new Date(response.data.fecha_entrega);
-          setDrawerMes(fechaEntrega.getMonth() + 1);
-          setDrawerAnio(fechaEntrega.getFullYear());
-        } else {
-          // Fallback a fecha actual si no viene en la respuesta
-          const ahora = new Date();
-          setDrawerMes(ahora.getMonth() + 1);
-          setDrawerAnio(ahora.getFullYear());
-        }
-
-        fetchKanbanData(); // Recargar datos
-        setDrawerOpen(true); // Abrir drawer para ver la orden entregada
-      } catch (error) {
-        console.error("Error marcando orden como entregada:", error);
-        toast.error("Error al marcar la orden como entregada");
+      } else {
+        response = await api.post(
+          "/kanban/marcar-entregadas",
+          { ids },
+          { headers: { "X-Idempotency-Key": generateUUID() } },
+        );
+        toast.success(
+          `${ids.length} órdenes marcadas como entregadas exitosamente`,
+        );
       }
+
+      // Usar la fecha retornada por el backend para el filtro del drawer
+      const fechaEntrega =
+        response.data?.fecha_entrega ||
+        response.data?.ordenes?.[0]?.fecha_entrega;
+      if (fechaEntrega) {
+        const f = new Date(fechaEntrega);
+        setDrawerMes(f.getMonth() + 1);
+        setDrawerAnio(f.getFullYear());
+      } else {
+        const ahora = new Date();
+        setDrawerMes(ahora.getMonth() + 1);
+        setDrawerAnio(ahora.getFullYear());
+      }
+
+      setConfirmarEntregas(null);
+      setSelectedOrdenes(new Set());
+      fetchKanbanData(); // Recargar datos
+      setDrawerOpen(true); // Abrir drawer para ver las órdenes entregadas
+    } catch (error) {
+      console.error("Error marcando órdenes como entregadas:", error);
+      toast.error("Error al marcar las órdenes como entregadas");
+    } finally {
+      setMarcandoEntregas(false);
     }
   };
 
@@ -227,53 +239,7 @@ const KanbanBoard = () => {
   const marcarSeleccionadasComoEntregadas = async () => {
     const ids = Array.from(selectedOrdenes);
     if (ids.length === 0) return;
-
-    const result = await Swal.fire({
-      title: `¿Marcar ${ids.length} órdenes como entregadas?`,
-      html: `
-        <p class="mb-2">Las órdenes <strong>${ids
-          .map((id) => `#${id}`)
-          .join(", ")}</strong> serán marcadas como entregadas.</p>
-        <p class="text-sm text-gray-600">Esto las moverá al historial de órdenes entregadas.</p>
-      `,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Sí, marcar como entregadas",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#10b981",
-      cancelButtonColor: "#6b7280",
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-      const response = await api.post(
-        "/kanban/marcar-entregadas",
-        { ids },
-        { headers: { "X-Idempotency-Key": generateUUID() } },
-      );
-      toast.success(
-        `${ids.length} órdenes marcadas como entregadas exitosamente`,
-      );
-
-      // Usar la fecha retornada por el backend para el filtro del drawer
-      if (response.data?.ordenes?.[0]?.fecha_entrega) {
-        const fechaEntrega = new Date(response.data.ordenes[0].fecha_entrega);
-        setDrawerMes(fechaEntrega.getMonth() + 1);
-        setDrawerAnio(fechaEntrega.getFullYear());
-      } else {
-        const ahora = new Date();
-        setDrawerMes(ahora.getMonth() + 1);
-        setDrawerAnio(ahora.getFullYear());
-      }
-
-      setSelectedOrdenes(new Set());
-      fetchKanbanData(); // Recargar datos
-      setDrawerOpen(true); // Abrir drawer para ver las órdenes entregadas
-    } catch (error) {
-      console.error("Error marcando órdenes como entregadas:", error);
-      toast.error("Error al marcar las órdenes como entregadas");
-    }
+    setConfirmarEntregas({ ids });
   };
 
   // Colores rotativos para las columnas de etapas (misma paleta visual)
@@ -770,6 +736,15 @@ const KanbanBoard = () => {
         onClose={() => setDrawerOpen(false)}
         mesInicial={drawerMes}
         anioInicial={drawerAnio}
+      />
+
+      {/* Modal de confirmación para marcar como entregadas */}
+      <ConfirmarEntregasModal
+        isOpen={confirmarEntregas !== null}
+        onClose={() => setConfirmarEntregas(null)}
+        ids={confirmarEntregas?.ids || []}
+        onConfirm={ejecutarMarcarEntregadas}
+        cargando={marcandoEntregas}
       />
     </div>
   );

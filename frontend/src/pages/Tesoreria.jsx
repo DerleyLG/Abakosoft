@@ -13,6 +13,7 @@ import {
 } from "react-icons/fi";
 import TransferenciaDrawer from "../components/TransferenciaDrawer";
 import { usePlan } from "../hooks/usePlanApi";
+import Tooltip from "../components/Tooltip";
 
 const TesoreriaDashboard = () => {
   const { features } = usePlan();
@@ -1013,17 +1014,18 @@ const TesoreriaDashboard = () => {
                       </td>
                       <td className="px-4 py-3">
                         {tipo === "abono_credito" && mov.id_documento && (
-                          <button
-                            onClick={() =>
-                              navigate("/ventas_credito", {
-                                state: { openCreditId: mov.id_documento },
-                              })
-                            }
-                            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
-                            title="Ver crédito"
-                          >
-                            <FiCreditCard size={14} />
-                          </button>
+                          <Tooltip text="Ver crédito">
+                            <button
+                              onClick={() =>
+                                navigate("/ventas_credito", {
+                                  state: { openCreditId: mov.id_documento },
+                                })
+                              }
+                              className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
+                            >
+                              <FiCreditCard size={14} />
+                            </button>
+                          </Tooltip>
                         )}
                       </td>
                     </tr>

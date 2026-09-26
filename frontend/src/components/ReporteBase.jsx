@@ -46,13 +46,47 @@ const ReporteBase = ({
   filtrosClientSide = [], // nombres de filtros que se aplican en el frontend (sin petición)
   filtrarClientSide = null, // (datos, filtrosActivos) => datos filtrados
 }) => {
+  const timezone = "America/Bogota";
+
+  // Filtros iniciales por defecto: si no se pasan filtrosIniciales y el
+  // reporte tiene filtros de fecha (desde/hasta), precargar el mes actual
+  // (desde = primer día del mes, hasta = hoy) para temas prácticos.
+  const filtrosInicialesPorDefecto = useMemo(() => {
+    if (filtrosIniciales) return filtrosIniciales;
+    const filtrosFecha = (
+      filtrosPorVista && vistas
+        ? Object.values(filtrosPorVista).flat()
+        : filtros
+    ).filter((f) => f && f.type === "datepicker");
+    if (filtrosFecha.length === 0) return {};
+
+    const hoy = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
+    const primerDiaMes = formatInTimeZone(new Date(), timezone, "yyyy-MM-01");
+    const iniciales = {};
+    filtrosFecha.forEach((f) => {
+      const name = String(f.name || "").toLowerCase();
+      if (name.includes("desde") || name.includes("inicio")) {
+        iniciales[f.name] = primerDiaMes;
+      } else if (name.includes("hasta") || name.includes("fin")) {
+        iniciales[f.name] = hoy;
+      }
+    });
+    return iniciales;
+  }, [filtros, filtrosIniciales, filtrosPorVista, vistas]);
+
   const [datos, setDatos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [vistaActiva, setVistaActiva] = useState(vistas?.[0]?.id || null);
-  const [filtrosActivos, setFiltrosActivos] = useState(filtrosIniciales || {});
-  const [filtrosParaAPI, setFiltrosParaAPI] = useState(filtrosIniciales || {});
+  const [filtrosActivos, setFiltrosActivos] = useState(
+    filtrosInicialesPorDefecto,
+  );
+  const [filtrosParaAPI, setFiltrosParaAPI] = useState(
+    filtrosInicialesPorDefecto,
+  );
   const [internalSummary, setInternalSummary] = useState([]);
   const [paginaLocal, setPaginaLocal] = useState(1);
+  const [autocompleteText, setAutocompleteText] = useState({});
+  const [autocompleteOpen, setAutocompleteOpen] = useState({});
   const navigate = useNavigate();
 
   // Filtros client-side: se aplican sobre los datos ya cargados (instantáneo,
@@ -88,8 +122,6 @@ const ReporteBase = ({
     vistas && columnasPorVista ? columnasPorVista[vistaActiva] : columnas;
   const filtrosActivosVista =
     filtrosPorVista && vistas ? filtrosPorVista[vistaActiva] : filtros;
-
-  const timezone = "America/Bogota";
 
   const formatDateCell = (value) => {
     if (!value) return "";
@@ -211,6 +243,7 @@ const ReporteBase = ({
             "fecha",
             "fecha_pago",
             "fecha_inicio",
+            "fecha_movimiento",
           ].includes(col.accessor);
           if (isDateColumn && value) return formatDateCell(value);
           if (col.isCurrency) return formatCurrencyCOP(value);
@@ -289,6 +322,7 @@ const ReporteBase = ({
             "fecha",
             "fecha_pago",
             "fecha_inicio",
+            "fecha_movimiento",
           ].includes(col.accessor);
           if (isDateColumn && value) return formatDateCell(value);
 
@@ -495,7 +529,7 @@ const ReporteBase = ({
                         }
                       }}
                       dateFormat="yyyy-MM-dd"
-                      className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                      className="w-full pl-9 pr-10 py-2 text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
                       disabled={cargando}
                       placeholderText={filtro.label}
                     />
@@ -503,11 +537,136 @@ const ReporteBase = ({
                       <button
                         type="button"
                         onClick={() => handleChangeFiltro(filtro.name, null)}
-                        className="absolute top-1/2 right-2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                         title="Limpiar"
                       >
-                        <FiX size={14} />
+                        <FiX size={13} />
                       </button>
+                    )}
+                  </div>
+                ) : filtro.type === "autocomplete" ? (
+                  <div className="relative">
+                    <FiSearch
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <input
+                      type="text"
+                      name={filtro.name}
+                      placeholder={filtro.placeholder || filtro.label}
+                      value={autocompleteText[filtro.name] ?? ""}
+                      onChange={(e) => {
+                        const texto = e.target.value;
+                        setAutocompleteText((prev) => ({
+                          ...prev,
+                          [filtro.name]: texto,
+                        }));
+                        setAutocompleteOpen((prev) => ({
+                          ...prev,
+                          [filtro.name]: true,
+                        }));
+                        // Si el texto cambia, limpiar el valor seleccionado
+                        if (filtrosActivos[filtro.name]) {
+                          handleChangeFiltro(filtro.name, "");
+                        }
+                      }}
+                      onFocus={() =>
+                        setAutocompleteOpen((prev) => ({
+                          ...prev,
+                          [filtro.name]: true,
+                        }))
+                      }
+                      onBlur={() => {
+                        // Al perder foco, restaurar el label del valor seleccionado
+                        setTimeout(() => {
+                          setAutocompleteOpen((prev) => ({
+                            ...prev,
+                            [filtro.name]: false,
+                          }));
+                          const valor = filtrosActivos[filtro.name];
+                          if (valor) {
+                            const op = (filtro.opciones || []).find(
+                              (o) => String(o.value) === String(valor),
+                            );
+                            setAutocompleteText((prev) => ({
+                              ...prev,
+                              [filtro.name]: op ? op.label : "",
+                            }));
+                          } else {
+                            setAutocompleteText((prev) => ({
+                              ...prev,
+                              [filtro.name]: "",
+                            }));
+                          }
+                        }, 150);
+                      }}
+                      className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 transition"
+                      disabled={cargando}
+                    />
+                    {filtrosActivos[filtro.name] && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleChangeFiltro(filtro.name, "");
+                          setAutocompleteText((prev) => ({
+                            ...prev,
+                            [filtro.name]: "",
+                          }));
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Limpiar"
+                      >
+                        <FiX size={13} />
+                      </button>
+                    )}
+                    {autocompleteOpen[filtro.name] && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        {(filtro.opciones || [])
+                          .filter((o) => {
+                            const texto = (
+                              autocompleteText[filtro.name] || ""
+                            ).toLowerCase();
+                            if (!texto) return true;
+                            return String(o.label || "")
+                              .toLowerCase()
+                              .includes(texto);
+                          })
+                          .slice(0, 8)
+                          .map((opcion) => (
+                            <button
+                              key={opcion.value}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleChangeFiltro(filtro.name, opcion.value);
+                                setAutocompleteText((prev) => ({
+                                  ...prev,
+                                  [filtro.name]: opcion.label,
+                                }));
+                                setAutocompleteOpen((prev) => ({
+                                  ...prev,
+                                  [filtro.name]: false,
+                                }));
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              {opcion.label}
+                            </button>
+                          ))}
+                        {(filtro.opciones || []).filter((o) => {
+                          const texto = (
+                            autocompleteText[filtro.name] || ""
+                          ).toLowerCase();
+                          if (!texto) return true;
+                          return String(o.label || "")
+                            .toLowerCase()
+                            .includes(texto);
+                        }).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-400">
+                            Sin resultados
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 ) : filtro.type === "select" ? (
@@ -696,6 +855,7 @@ const ReporteBase = ({
                             "fecha",
                             "fecha_pago",
                             "fecha_inicio",
+                            "fecha_movimiento",
                           ].includes(col.accessor);
 
                           if (value == null || value === "") {

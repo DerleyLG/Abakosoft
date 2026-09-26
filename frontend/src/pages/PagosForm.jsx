@@ -29,6 +29,13 @@ const FormularioPagoAvances = () => {
   const [guardando, setGuardando] = useState(false);
   const [trabajadores, setTrabajadores] = useState([]);
 
+  // Modo anticipo: toggle que convierte el pago en un anticipo al trabajador
+  const [esAnticipo, setEsAnticipo] = useState(false);
+  const [montoAnticipo, setMontoAnticipo] = useState(0);
+  const [ordenes, setOrdenes] = useState([]);
+  const [ordenSeleccionada, setOrdenSeleccionada] = useState("");
+  const [trabajadorSeleccionado, setTrabajadorSeleccionado] = useState("");
+
   const [mostrarAlertaAnticipo, setMostrarAlertaAnticipo] = useState(false);
   const [ultimoDescuentoTempId, setUltimoDescuentoTempId] = useState(null);
   const submitBtnRef = React.useRef(null);
@@ -56,6 +63,11 @@ const FormularioPagoAvances = () => {
   useEffect(() => {
     // Restauramos el flujo original: si hay anticipos, preguntar con modal y después mostrar el formulario para elegir monto
     const checkYMostrarModal = async () => {
+      // En modo anticipo no se pregunta por descuentos: el pago ES un anticipo
+      if (esAnticipo) {
+        setMostrarAlertaAnticipo(false);
+        return;
+      }
       const avanceInicial = state.avances?.find(
         (a) => a && a.id_trabajador && !a.es_descuento,
       );
@@ -98,11 +110,17 @@ const FormularioPagoAvances = () => {
       }
     };
     checkYMostrarModal();
-  }, [state?.avances]);
+  }, [state?.avances, esAnticipo]);
 
   useEffect(() => {
     if (state?.avances?.length > 0) {
       setAvances(state.avances);
+      // Si el usuario activa modo anticipo, rellenar orden y trabajador automáticamente
+      const primerAvance = state.avances[0];
+      if (primerAvance?.id_orden_fabricacion)
+        setOrdenSeleccionada(primerAvance.id_orden_fabricacion);
+      if (primerAvance?.id_trabajador)
+        setTrabajadorSeleccionado(primerAvance.id_trabajador);
     }
   }, [state]);
 
@@ -118,13 +136,30 @@ const FormularioPagoAvances = () => {
   }, []);
 
   useEffect(() => {
-    if (state?.avances?.length > 0) {
+    if (state?.avances?.length > 0 || esAnticipo) {
       api
         .get("/trabajadores", { params: { incluir_inactivos: true } })
         .then((res) => setTrabajadores(res.data))
         .catch(() => toast.error("Error al cargar trabajadores"));
     }
-  }, [state]);
+  }, [esAnticipo, state]);
+
+  // En modo anticipo, cargar órdenes de fabricación disponibles (pendientes o en proceso)
+  useEffect(() => {
+    if (!esAnticipo) return;
+    api
+      .get("/ordenes-fabricacion?estados=pendiente,en proceso")
+      .then((res) => {
+        const ordenesArray = Array.isArray(res.data)
+          ? res.data
+          : res.data?.data || [];
+        setOrdenes(ordenesArray);
+      })
+      .catch(() => {
+        toast.error("Error al cargar órdenes de fabricación");
+        setOrdenes([]);
+      });
+  }, [esAnticipo]);
 
   const totalFinal = avances.reduce(
     (acc, a) => acc + a.cantidad * a.costo_fabricacion,
@@ -150,7 +185,7 @@ const FormularioPagoAvances = () => {
   }, [ultimoDescuentoTempId]);
 
   const handleRegistrarPago = async () => {
-    if (totalFinal < 0) {
+    if (!esAnticipo && totalFinal < 0) {
       toast.error("El total a pagar no puede ser menor a cero.");
       return;
     }
@@ -158,9 +193,36 @@ const FormularioPagoAvances = () => {
       toast.error("El método de pago es obligatorio.");
       return;
     }
+    if (esAnticipo) {
+      if (!trabajadorSeleccionado || montoAnticipo <= 0) {
+        toast.error("Debes seleccionar un trabajador e ingresar un monto.");
+        return;
+      }
+    }
 
     try {
       setGuardando(true);
+
+      if (esAnticipo) {
+        // Registrar como anticipo (el backend crea el movimiento de tesorería)
+        await api.post(
+          "/anticipos",
+          {
+            id_trabajador: trabajadorSeleccionado,
+            id_orden_fabricacion: ordenSeleccionada || null,
+            monto: montoAnticipo,
+            observaciones,
+            fecha: fechaPago,
+            id_metodo_pago: idMetodoPago,
+            referencia: referencia.trim() || null,
+            observaciones_pago: observacionesPago.trim() || null,
+          },
+          { headers: { "X-Idempotency-Key": idempotencyKey } },
+        );
+        toast.success("Anticipo registrado correctamente");
+        navigate("/pagos_anticipados");
+        return;
+      }
 
       const payload = {
         id_trabajador: avances?.[0]?.id_trabajador || "",
@@ -252,95 +314,221 @@ const FormularioPagoAvances = () => {
   const labelCls = "block text-sm font-semibold text-slate-600 mb-2";
 
   return (
-    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-8">
-      <div className="max-w-5xl mx-auto flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
-            >
-              <FiArrowLeft size={17} />
-            </button>
-            <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
-                Pagos
-              </p>
-              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-                Registrar Pago
-              </h1>
-            </div>
+    <div className="min-h-[calc(100vh-68px)] bg-slate-50 px-4 md:px-8 xl:px-12 py-6 flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shadow-sm"
+          >
+            <FiArrowLeft size={17} />
+          </button>
+          <div>
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+              Pagos
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+              Registrar Pago
+            </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("/avances_fabricacion")}
-              className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("/avances_fabricacion")}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+          >
+            Avances de fabricación
+            <FiArrowRight size={15} />
+          </button>
+          <button
+            ref={submitBtnRef}
+            type="button"
+            onClick={handleRegistrarPago}
+            disabled={
+              guardando ||
+              (esAnticipo && (!trabajadorSeleccionado || montoAnticipo <= 0)) ||
+              (!esAnticipo && mostrarAlertaAnticipo)
+            }
+            className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {guardando ? "Guardando..." : "Registrar Pago"}
+          </button>
+        </div>
+      </div>
+
+      {/* Card principal */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 flex flex-col gap-6">
+        {/* Fecha + Método de pago */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className={labelCls}>Fecha de pago</label>
+            <input
+              type="date"
+              value={fechaPago}
+              onChange={(e) => setFechaPago(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>
+              Método de Pago <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={idMetodoPago}
+              onChange={(e) => setIdMetodoPago(e.target.value)}
+              required
+              className={inputCls}
             >
-              Avances de fabricación
-              <FiArrowRight size={15} />
-            </button>
-            <button
-              ref={submitBtnRef}
-              type="button"
-              onClick={handleRegistrarPago}
-              disabled={guardando || mostrarAlertaAnticipo}
-              className="px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {guardando ? "Guardando..." : "Registrar Pago"}
-            </button>
+              <option value="">Selecciona método de pago</option>
+              {metodosPago.map((m) => (
+                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Card principal */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 flex flex-col gap-6">
-          {/* Fecha + Método de pago */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className={labelCls}>Fecha de pago</label>
-              <input
-                type="date"
-                value={fechaPago}
-                onChange={(e) => setFechaPago(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>
-                Método de Pago <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={idMetodoPago}
-                onChange={(e) => setIdMetodoPago(e.target.value)}
-                required
-                className={inputCls}
-              >
-                <option value="">Selecciona método de pago</option>
-                {metodosPago.map((m) => (
-                  <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Observaciones generales */}
-          <div>
-            <label className={labelCls}>
-              Observaciones{" "}
-              <span className="font-normal text-slate-400">(opcional)</span>
-            </label>
-            <textarea
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              rows={2}
-              className={`${inputCls} resize-none`}
+        {/* Toggle anticipo */}
+        <div
+          className={`flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-200 rounded-xl ${mostrarAlertaAnticipo ? "opacity-50 pointer-events-none" : ""}`}
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={esAnticipo}
+            onClick={() => setEsAnticipo((v) => !v)}
+            disabled={mostrarAlertaAnticipo}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${esAnticipo ? "bg-indigo-500" : "bg-slate-300"}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${esAnticipo ? "translate-x-6" : "translate-x-1"}`}
             />
+          </button>
+          <div>
+            <p className="text-sm font-semibold text-slate-700">
+              Marcar como anticipo
+            </p>
+            <p className="text-xs text-slate-500">
+              {esAnticipo
+                ? "Este pago se registrará como anticipo al trabajador"
+                : mostrarAlertaAnticipo
+                  ? "Hay un anticipo detectado para este trabajador"
+                  : "Este pago se aplicará a los avances de fabricación seleccionados"}
+            </p>
           </div>
+        </div>
 
+        {/* Observaciones generales */}
+        <div>
+          <label className={labelCls}>
+            {esAnticipo ? "Observaciones del anticipo" : "Observaciones"}{" "}
+            <span className="font-normal text-slate-400">(opcional)</span>
+          </label>
+          <textarea
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            rows={2}
+            className={`${inputCls} resize-none`}
+          />
+        </div>
+
+        {esAnticipo ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className={labelCls}>
+                  Orden de fabricación{" "}
+                  <span className="font-normal text-slate-400">(opcional)</span>
+                </label>
+                <select
+                  value={ordenSeleccionada}
+                  onChange={(e) => {
+                    setOrdenSeleccionada(e.target.value);
+                    const orden = Array.isArray(ordenes)
+                      ? ordenes.find(
+                          (o) =>
+                            o.id_orden_fabricacion === Number(e.target.value),
+                        )
+                      : null;
+                    if (orden) setTrabajadorSeleccionado(orden.id_trabajador);
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">Sin orden específica</option>
+                  {Array.isArray(ordenes) &&
+                    ordenes.map((o) => (
+                      <option
+                        key={o.id_orden_fabricacion}
+                        value={o.id_orden_fabricacion}
+                      >
+                        #{o.id_orden_fabricacion} -{" "}
+                        {o.nombre_cliente || "Cliente"}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Trabajador</label>
+                <select
+                  value={trabajadorSeleccionado}
+                  onChange={(e) => setTrabajadorSeleccionado(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">Seleccione un trabajador</option>
+                  {Array.isArray(trabajadores) &&
+                    trabajadores.map((t) => (
+                      <option key={t.id_trabajador} value={t.id_trabajador}>
+                        {t.nombre} - {t.cargo}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Monto del anticipo</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  min="0"
+                  value={
+                    montoAnticipo === 0 ? "" : montoAnticipo.toLocaleString()
+                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    setMontoAnticipo(raw ? parseFloat(raw) : 0);
+                  }}
+                  className={inputCls}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className={labelCls}>Referencia / No. Transacción</label>
+                <input
+                  type="text"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  placeholder="Ej: No. de cuenta, comprobante"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Observaciones del Pago</label>
+                <input
+                  type="text"
+                  value={observacionesPago}
+                  onChange={(e) => setObservacionesPago(e.target.value)}
+                  placeholder="Opcional"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
           <>
             {avances.length > 0 && avances[0]?.id_trabajador && (
               <>
@@ -479,7 +667,7 @@ const FormularioPagoAvances = () => {
               </div>
             </div>
           </>
-        </div>
+        )}
       </div>
     </div>
   );

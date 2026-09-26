@@ -6,7 +6,7 @@ import {
   FiArrowLeft,
   FiTrash2,
   FiPlus,
-  FiDollarSign,
+  FiShoppingCart,
   FiEdit,
   FiSearch,
   FiChevronDown,
@@ -19,6 +19,7 @@ import "../styles/confirmAlert.css";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
+import Tooltip from "../components/Tooltip";
 
 const Pedidos = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -383,53 +384,57 @@ const Pedidos = () => {
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
                             {!mostrarCancelados &&
                               pedido.estado === "pendiente" && (
-                                <button
-                                  onClick={(e) =>
-                                    handleCrearOrdenFabricacion(
-                                      e,
-                                      pedido.id_pedido,
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
-                                  title="Crear orden de fabricación"
-                                >
-                                  <FiPackage size={14} />
-                                </button>
+                                <Tooltip text="Crear orden de fabricación">
+                                  <button
+                                    onClick={(e) =>
+                                      handleCrearOrdenFabricacion(
+                                        e,
+                                        pedido.id_pedido,
+                                      )
+                                    }
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                                  >
+                                    <FiPackage size={14} />
+                                  </button>
+                                </Tooltip>
                               )}
                             {!mostrarCancelados &&
                               pedido.estado === "listo para entrega" && (
-                                <button
-                                  onClick={(e) =>
-                                    handleCrearOrdenVenta(e, pedido.id_pedido)
-                                  }
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
-                                  title="Crear orden de venta"
-                                >
-                                  <FiDollarSign size={14} />
-                                </button>
+                                <Tooltip text="Crear orden de venta">
+                                  <button
+                                    onClick={(e) =>
+                                      handleCrearOrdenVenta(e, pedido.id_pedido)
+                                    }
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
+                                  >
+                                    <FiShoppingCart size={14} />
+                                  </button>
+                                </Tooltip>
                               )}
                             {canEdit &&
                               !mostrarCancelados &&
                               pedido.estado === "pendiente" && (
-                                <button
-                                  onClick={(e) => handleEdit(e, pedido)}
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
-                                  title="Editar pedido"
-                                >
-                                  <FiEdit size={14} />
-                                </button>
+                                <Tooltip text="Editar pedido">
+                                  <button
+                                    onClick={(e) => handleEdit(e, pedido)}
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                                  >
+                                    <FiEdit size={14} />
+                                  </button>
+                                </Tooltip>
                               )}
                             {canDelete && !mostrarCancelados && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(pedido.id_pedido);
-                                }}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
-                                title="Eliminar"
-                              >
-                                <FiTrash2 size={14} />
-                              </button>
+                              <Tooltip text="Eliminar">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(pedido.id_pedido);
+                                  }}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                                >
+                                  <FiTrash2 size={14} />
+                                </button>
+                              </Tooltip>
                             )}
                           </div>
                         </td>

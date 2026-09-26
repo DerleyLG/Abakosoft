@@ -11,6 +11,7 @@ import {
   FiChevronDown,
   FiPackage,
   FiDollarSign,
+  FiEye,
 } from "react-icons/fi";
 import React from "react";
 import { confirmAlert } from "react-confirm-alert";
@@ -21,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { can, ACTIONS } from "../utils/permissions";
 import { usePlan } from "../hooks/usePlanApi";
 import SaldoFavorDrawer from "../components/SaldoFavorDrawer";
+import Tooltip from "../components/Tooltip";
 
 const OrdenesVenta = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -381,50 +383,70 @@ const OrdenesVenta = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            {isCredito &&
-                              orden.id_venta_credito &&
-                              saldo > 0 && (
+                            {isCredito && orden.id_venta_credito && (
+                              <Tooltip text="Ver historial del crédito">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     navigate("/ventas_credito", {
                                       state: {
-                                        openCreditId: orden.id_venta_credito,
-                                        openOrderId: orden.id_orden_venta,
+                                        openHistorialId: orden.id_venta_credito,
                                       },
                                     });
                                   }}
                                   className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
-                                  title="Registrar abono"
                                 >
-                                  <FiCreditCard size={14} />
+                                  <FiEye size={14} />
                                 </button>
+                              </Tooltip>
+                            )}
+                            {isCredito &&
+                              orden.id_venta_credito &&
+                              saldo > 0 && (
+                                <Tooltip text="Registrar abono">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate("/ventas_credito", {
+                                        state: {
+                                          openCreditId: orden.id_venta_credito,
+                                          openOrderId: orden.id_orden_venta,
+                                        },
+                                      });
+                                    }}
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
+                                  >
+                                    <FiCreditCard size={14} />
+                                  </button>
+                                </Tooltip>
                               )}
                             {canEdit &&
                               !mostrarAnuladas &&
                               !orden.id_pedido && (
+                                <Tooltip text="Editar">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEdit(orden.id_orden_venta);
+                                    }}
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                                  >
+                                    <FiEdit size={14} />
+                                  </button>
+                                </Tooltip>
+                              )}
+                            {canDelete && !mostrarAnuladas && (
+                              <Tooltip text="Eliminar">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleEdit(orden.id_orden_venta);
+                                    handleDelete(orden.id_orden_venta);
                                   }}
-                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
-                                  title="Editar"
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
                                 >
-                                  <FiEdit size={14} />
+                                  <FiTrash2 size={14} />
                                 </button>
-                              )}
-                            {canDelete && !mostrarAnuladas && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(orden.id_orden_venta);
-                                }}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
-                                title="Eliminar"
-                              >
-                                <FiTrash2 size={14} />
-                              </button>
+                              </Tooltip>
                             )}
                           </div>
                         </td>

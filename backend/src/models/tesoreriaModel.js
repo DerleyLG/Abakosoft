@@ -570,138 +570,97 @@ const TesoreriaModel = {
     return resumen;
   },
 
-  async getVentasCobrosReport({ desde, hasta, id_cliente, estado_pago }) {
-    const paramsOV = [];
-    const whereOV = ["1=1"];
+  // ── Reporte de tesorería: TODOS los movimientos ───────────────────
+  // Lista todos los movimientos de tesorería (ventas, compras, pagos,
+  // anticipos, abonos, saldos a favor, transferencias, etc.) con filtros
+  // por rango de fechas, cliente, tipo de documento y forma de pago.
+  async getVentasCobrosReport({
+    desde,
+    hasta,
+    id_cliente,
+    tipo_documento,
+    id_metodo_pago,
+  }) {
+    const where = ["1=1"];
+    const params = [];
 
     if (desde) {
-      whereOV.push("ov.fecha >= ?");
-      paramsOV.push(desde);
+      where.push("DATE(m.fecha_movimiento) >= ?");
+      params.push(desde);
     }
     if (hasta) {
-      whereOV.push("ov.fecha <= ?");
-      paramsOV.push(hasta);
+      where.push("DATE(m.fecha_movimiento) <= ?");
+      params.push(hasta);
+    }
+    if (tipo_documento) {
+      where.push("m.tipo_documento = ?");
+      params.push(tipo_documento);
+    }
+    if (id_metodo_pago) {
+      where.push("m.id_metodo_pago = ?");
+      params.push(id_metodo_pago);
     }
     if (id_cliente) {
-      whereOV.push("ov.id_cliente = ?");
-      paramsOV.push(id_cliente);
-    }
-
-    const paramsCR = [];
-    const whereCR = ["vc.id_orden_venta IS NULL"];
-    if (desde) {
-      whereCR.push("vc.fecha >= ?");
-      paramsCR.push(desde);
-    }
-    if (hasta) {
-      whereCR.push("vc.fecha <= ?");
-      paramsCR.push(hasta);
-    }
-    if (id_cliente) {
-      whereCR.push("vc.id_cliente = ?");
-      paramsCR.push(id_cliente);
+      where.push(`(
+        (m.tipo_documento = 'orden_venta' AND ov.id_cliente = ?)
+        OR (m.tipo_documento = 'abono_credito' AND vc.id_cliente = ?)
+        OR (m.tipo_documento IN ('saldo_favor','saldo_favor_usado') AND m.id_documento = ?)
+        OR (m.tipo_documento = 'reparacion' AND r.id_cliente = ?)
+        OR (m.tipo_documento = 'devolucion_cliente' AND dv.id_cliente = ?)
+      )`);
+      params.push(id_cliente, id_cliente, id_cliente, id_cliente, id_cliente);
     }
 
     const sql = `
-      /* Documentos basados en OV */
-      SELECT 
-        ov.id_orden_venta,
-        CONCAT('OV #', ov.id_orden_venta) AS documento,
-        MAX(ov.fecha) AS fecha,
-        MAX(c.nombre) AS cliente,
-        COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) AS total_factura,
-        COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0) AS total_pagado,
-        GREATEST(
-          COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) - (COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0)),
-          0
-        ) AS saldo,
-        TRIM(BOTH ', ' FROM CONCAT_WS(
-          ', ',
-          MAX(pd.formas_pago),
-          MAX(ab.formas_pago),
-          CASE WHEN MAX(CASE WHEN vc.id_venta_credito IS NULL THEN 0 ELSE 1 END) = 1 THEN 'Crédito' ELSE NULL END
-        )) AS formas_pago,
-        CASE 
-          WHEN GREATEST(
-                 COALESCE(SUM(dov.cantidad * dov.precio_unitario), 0) - (COALESCE(MAX(pd.total_pagado), 0) + COALESCE(MAX(ab.total_abonos), 0)),
-                 0
-               ) <= 0 THEN 'saldado'
-          ELSE 'pendiente'
-        END AS estado_pago
-      FROM ordenes_venta ov
-      JOIN clientes c ON ov.id_cliente = c.id_cliente
-      LEFT JOIN detalle_orden_venta dov ON ov.id_orden_venta = dov.id_orden_venta
-      LEFT JOIN ventas_credito vc ON vc.id_orden_venta = ov.id_orden_venta
-      LEFT JOIN (
-        SELECT 
-          mt.id_documento AS id_orden_venta,
-          SUM(mt.monto) AS total_pagado,
-          GROUP_CONCAT(DISTINCT mp.nombre ORDER BY mp.nombre SEPARATOR ', ') AS formas_pago
-        FROM movimientos_tesoreria mt
-        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = mt.id_metodo_pago
-        WHERE mt.tipo_documento = 'orden_venta'
-        GROUP BY mt.id_documento
-      ) pd ON pd.id_orden_venta = ov.id_orden_venta
-      LEFT JOIN (
-        SELECT 
-          vc2.id_orden_venta,
-          SUM(mt2.monto) AS total_abonos,
-          GROUP_CONCAT(DISTINCT mp2.nombre ORDER BY mp2.nombre SEPARATOR ', ') AS formas_pago
-        FROM ventas_credito vc2
-        LEFT JOIN movimientos_tesoreria mt2 
-          ON mt2.id_documento = vc2.id_venta_credito AND mt2.tipo_documento = 'abono_credito'
-        LEFT JOIN metodos_pago mp2 ON mp2.id_metodo_pago = mt2.id_metodo_pago
-        GROUP BY vc2.id_orden_venta
-      ) ab ON ab.id_orden_venta = ov.id_orden_venta
-      WHERE ${whereOV.join(" AND ")}
-      GROUP BY ov.id_orden_venta
+      SELECT
+        m.id_movimiento,
+        m.id_documento,
+        m.tipo_documento,
+        m.fecha_movimiento,
+        m.monto,
+        m.id_metodo_pago,
+        mp.nombre AS nombre_metodo,
+        m.referencia,
+        m.observaciones,
+        COALESCE(
+          c_ov.nombre, c_vc.nombre, c_sf.nombre, c_rep.nombre, c_dev.nombre,
+          p.nombre, t.nombre, ''
+        ) AS contraparte,
+        COALESCE(
+          c_ov.id_cliente, c_vc.id_cliente, c_sf.id_cliente,
+          c_rep.id_cliente, c_dev.id_cliente
+        ) AS id_cliente_resuelto
+      FROM movimientos_tesoreria m
+      LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = m.id_metodo_pago
+      LEFT JOIN ordenes_venta ov
+        ON m.tipo_documento = 'orden_venta' AND ov.id_orden_venta = m.id_documento
+      LEFT JOIN clientes c_ov ON c_ov.id_cliente = ov.id_cliente
+      LEFT JOIN ventas_credito vc
+        ON m.tipo_documento = 'abono_credito'
+        AND (vc.id_venta_credito = m.id_documento OR vc.id_orden_venta = m.id_documento)
+      LEFT JOIN clientes c_vc ON c_vc.id_cliente = vc.id_cliente
+      LEFT JOIN clientes c_sf
+        ON m.tipo_documento IN ('saldo_favor','saldo_favor_usado')
+        AND c_sf.id_cliente = m.id_documento
+      LEFT JOIN reparaciones r
+        ON m.tipo_documento = 'reparacion' AND r.id_reparacion = m.id_documento
+      LEFT JOIN clientes c_rep ON c_rep.id_cliente = r.id_cliente
+      LEFT JOIN devoluciones_venta dv
+        ON m.tipo_documento = 'devolucion_cliente' AND dv.id_devolucion_venta = m.id_documento
+      LEFT JOIN clientes c_dev ON c_dev.id_cliente = dv.id_cliente
+      LEFT JOIN ordenes_compra oc
+        ON m.tipo_documento = 'orden_compra' AND oc.id_orden_compra = m.id_documento
+      LEFT JOIN proveedores p ON p.id_proveedor = oc.id_proveedor
+      LEFT JOIN pagos_trabajadores pt
+        ON m.tipo_documento = 'pago_trabajador' AND pt.id_pago = m.id_documento
+      LEFT JOIN anticipos_trabajadores at
+        ON m.tipo_documento = 'anticipo' AND at.id_anticipo = m.id_documento
+      LEFT JOIN trabajadores t
+        ON t.id_trabajador = COALESCE(pt.id_trabajador, at.id_trabajador)
+      WHERE ${where.join(" AND ")}
+      ORDER BY m.fecha_movimiento DESC, m.id_movimiento DESC`;
 
-      UNION ALL
-
-      /* Créditos manuales (sin OV) */
-      SELECT 
-        NULL AS id_orden_venta,
-        CONCAT('CR #', vc.id_venta_credito) AS documento,
-        MAX(vc.fecha) AS fecha,
-        MAX(c.nombre) AS cliente,
-        MAX(vc.monto_total) AS total_factura,
-        COALESCE(MAX(ac.total_abonos), 0) AS total_pagado,
-        GREATEST(MAX(vc.monto_total) - COALESCE(MAX(ac.total_abonos), 0), 0) AS saldo,
-        MAX(ac.formas_pago) AS formas_pago,
-        CASE 
-          WHEN GREATEST(MAX(vc.monto_total) - COALESCE(MAX(ac.total_abonos), 0), 0) <= 0 THEN 'saldado'
-          ELSE 'pendiente'
-        END AS estado_pago
-      FROM ventas_credito vc
-      JOIN clientes c ON vc.id_cliente = c.id_cliente
-      LEFT JOIN (
-        SELECT 
-          mt.id_documento AS id_venta_credito,
-          SUM(mt.monto) AS total_abonos,
-          GROUP_CONCAT(DISTINCT mp.nombre ORDER BY mp.nombre SEPARATOR ', ') AS formas_pago
-        FROM movimientos_tesoreria mt
-        LEFT JOIN metodos_pago mp ON mp.id_metodo_pago = mt.id_metodo_pago
-        WHERE mt.tipo_documento = 'abono_credito'
-        GROUP BY mt.id_documento
-      ) ac ON ac.id_venta_credito = vc.id_venta_credito
-      WHERE ${whereCR.join(" AND ")}
-      GROUP BY vc.id_venta_credito
-
-      ORDER BY fecha DESC`;
-
-    const [rows] = await db.query(sql, [...paramsOV, ...paramsCR]);
-
-    // filtrar por estado_pago en HAVING equivalente
-    if (
-      estado_pago &&
-      ["pendiente", "saldado"].includes(String(estado_pago).toLowerCase())
-    ) {
-      return rows.filter(
-        (r) =>
-          String(r.estado_pago).toLowerCase() ===
-          String(estado_pago).toLowerCase(),
-      );
-    }
+    const [rows] = await db.query(sql, params);
     return rows;
   },
 
@@ -716,10 +675,10 @@ const TesoreriaModel = {
     page = 1,
     pageSize = 25,
   } = {}) => {
-    // La conciliación bancaria valida únicamente ventas pagadas por
-    // transferencia bancaria (verificar que el pago realmente llegó).
+    // La conciliación bancaria valida únicamente ventas y abonos a crédito
+    // pagados por transferencia bancaria (verificar que el pago realmente llegó).
     const where = [
-      "m.tipo_documento = 'orden_venta'",
+      "m.tipo_documento IN ('orden_venta', 'abono_credito')",
       "LOWER(mp.nombre) LIKE '%transferencia%'",
     ];
     const params = [];
@@ -761,7 +720,10 @@ const TesoreriaModel = {
       LEFT JOIN usuarios u ON m.id_usuario_conciliacion = u.id_usuario
       LEFT JOIN ordenes_venta ov ON m.tipo_documento = 'orden_venta'
         AND ov.id_orden_venta = m.id_documento
-      LEFT JOIN clientes cl ON cl.id_cliente = ov.id_cliente
+      LEFT JOIN ventas_credito vc ON m.tipo_documento = 'abono_credito'
+        AND (vc.id_venta_credito = m.id_documento
+             OR vc.id_orden_venta = m.id_documento)
+      LEFT JOIN clientes cl ON cl.id_cliente = COALESCE(ov.id_cliente, vc.id_cliente)
       ${whereSql}
     `;
 
@@ -797,20 +759,21 @@ const TesoreriaModel = {
     }
 
     if (conciliado) {
-      // Validar que el movimiento sea una venta pagada por transferencia
+      // Validar que el movimiento sea una venta o abono a crédito pagado
+      // por transferencia bancaria
       const [[mov]] = await db.query(
         `SELECT m.id_movimiento
          FROM movimientos_tesoreria m
          JOIN metodos_pago mp ON m.id_metodo_pago = mp.id_metodo_pago
          WHERE m.id_movimiento = ?
-           AND m.tipo_documento = 'orden_venta'
+           AND m.tipo_documento IN ('orden_venta', 'abono_credito')
            AND LOWER(mp.nombre) LIKE '%transferencia%'
          LIMIT 1`,
         [id_movimiento],
       );
       if (!mov) {
         throw new Error(
-          "El movimiento no es una venta por transferencia bancaria y no puede validarse.",
+          "El movimiento no es una venta o abono por transferencia bancaria y no puede validarse.",
         );
       }
     }

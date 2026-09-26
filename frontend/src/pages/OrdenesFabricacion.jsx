@@ -25,6 +25,7 @@ import { useAuth } from "../context/AuthContext";
 import ProrrateoButton from "../components/ProrrateoButton";
 import { can, ACTIONS } from "../utils/permissions";
 import ConsumoMateriaPrimaDrawer from "../components/ConsumoMateriaPrimaDrawer";
+import Tooltip from "../components/Tooltip";
 
 const ListaOrdenesFabricacion = () => {
   const [showModalConsumo, setShowModalConsumo] = useState(false);
@@ -1786,16 +1787,17 @@ const ListaOrdenesFabricacion = () => {
                               <FiPlus size={14} />
                             </button>
                             {esOrdenCompletada(orden.estado) && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCrearOrdenVenta(e, orden);
-                                }}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
-                                title="Crear orden de venta a partir de esta orden de fabricación"
-                              >
-                                <FiShoppingCart size={14} />
-                              </button>
+                              <Tooltip text="Crear orden de venta a partir de esta orden de fabricación">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCrearOrdenVenta(e, orden);
+                                  }}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer"
+                                >
+                                  <FiShoppingCart size={14} />
+                                </button>
+                              </Tooltip>
                             )}
                             {canDelete && (
                               <button
@@ -1884,16 +1886,17 @@ const ListaOrdenesFabricacion = () => {
                                       >
                                         <FiTrendingUp size={12} /> Ver progreso
                                       </button>
-                                      <button
-                                        onClick={(e) =>
-                                          handleCrearOrdenVenta(e, orden)
-                                        }
-                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
-                                        title="Crear orden de venta a partir de esta orden de fabricación"
-                                      >
-                                        <FiShoppingCart size={12} /> Crear orden
-                                        de venta
-                                      </button>
+                                      <Tooltip text="Crear orden de venta a partir de esta orden de fabricación">
+                                        <button
+                                          onClick={(e) =>
+                                            handleCrearOrdenVenta(e, orden)
+                                          }
+                                          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                        >
+                                          <FiShoppingCart size={12} /> Crear
+                                          orden de venta
+                                        </button>
+                                      </Tooltip>
                                     </div>
                                   );
                                 }

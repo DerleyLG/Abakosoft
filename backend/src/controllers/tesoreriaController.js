@@ -14,7 +14,8 @@ const tesoreriaController = {
   },
   async getVentasCobrosReport(req, res) {
     try {
-      let { desde, hasta, id_cliente, estado_pago } = req.query;
+      let { desde, hasta, id_cliente, tipo_documento, id_metodo_pago } =
+        req.query;
       // Normalizar fechas: si vienen como YYYY-MM-DD en 'hasta', agregar fin de día
       if (hasta && /^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
         hasta = `${hasta} 23:59:59`;
@@ -24,11 +25,12 @@ const tesoreriaController = {
         desde,
         hasta,
         id_cliente,
-        estado_pago,
+        tipo_documento,
+        id_metodo_pago,
       });
       res.json({ success: true, data });
     } catch (error) {
-      console.error("Error en reporte de tesorería (ventas y cobros):", error);
+      console.error("Error en reporte de tesorería (movimientos):", error);
       res.status(500).json({
         success: false,
         message: "Error al generar el reporte de tesorería.",
